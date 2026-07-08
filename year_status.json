@@ -1,0 +1,1684 @@
+{
+  "2016": {
+    "uploaded": true,
+    "row_count": 310,
+    "error_count": 275,
+    "errors": [
+      {
+        "row": 2,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 3,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 4,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 5,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 6,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 7,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 8,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 10,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 11,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 12,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 13,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 14,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 15,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 16,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 17,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 18,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 20,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 21,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 22,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 23,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 24,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 26,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 27,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 28,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 29,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 30,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 31,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 32,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 33,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 34,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 35,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 36,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 37,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 38,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 39,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 40,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 41,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 42,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 43,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 44,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 45,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 46,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 47,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 48,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 49,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 50,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 51,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 52,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 53,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 54,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 56,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 57,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 59,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 60,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 61,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 62,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 63,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 64,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 65,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 67,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 68,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 69,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 70,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 72,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 73,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 74,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 75,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 77,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 79,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 80,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 81,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 82,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 83,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 84,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 85,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 86,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 87,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 88,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 89,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 90,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 91,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 92,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 93,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 94,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 95,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 96,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 97,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 98,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 100,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 101,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 102,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 103,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 104,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 105,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 106,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 107,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 108,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 109,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 111,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 112,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 113,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 114,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 115,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 117,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 118,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 119,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 120,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 122,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 123,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 124,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 125,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 126,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 127,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 128,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 129,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 130,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 131,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 132,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 133,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 134,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 135,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 136,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 137,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 138,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 139,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 140,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 141,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 142,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 143,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 144,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 145,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 147,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 148,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 150,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 151,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 152,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 154,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 155,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 157,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 158,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 159,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 160,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 161,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 162,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 163,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 164,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 165,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 166,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 167,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 168,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 169,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 170,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 171,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 172,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 174,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 175,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 176,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 177,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 179,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 180,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 181,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 182,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 183,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 184,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 186,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 187,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 188,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 189,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 190,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 191,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 192,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 193,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 194,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 196,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 197,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 198,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 200,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 202,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 203,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 205,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 206,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 207,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 210,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 211,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 212,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 214,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 215,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 216,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 217,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 218,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 219,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 220,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 221,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 222,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 223,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 224,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 225,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 226,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 227,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 228,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 230,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 232,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 233,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 234,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 235,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 237,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 238,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 239,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 240,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 241,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 243,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 244,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 245,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 246,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 247,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 248,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 249,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 250,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 251,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 252,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 253,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 254,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 255,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 257,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 258,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 259,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 260,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 261,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 262,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 263,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 264,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 265,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 266,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 267,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 268,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 269,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 270,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 271,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 272,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 273,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 274,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 275,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 276,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 277,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 278,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 279,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 280,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 281,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 282,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 284,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 285,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 286,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 288,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 289,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 290,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 291,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 292,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 293,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 294,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      },
+      {
+        "row": 296,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 297,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 298,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2023"
+      },
+      {
+        "row": 299,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 300,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 301,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 302,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 303,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2017"
+      },
+      {
+        "row": 304,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2021"
+      },
+      {
+        "row": 305,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2024"
+      },
+      {
+        "row": 306,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 307,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2022"
+      },
+      {
+        "row": 308,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2018"
+      },
+      {
+        "row": 309,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2019"
+      },
+      {
+        "row": 310,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2025"
+      },
+      {
+        "row": 311,
+        "level": "warning",
+        "type": "연도 불일치",
+        "detail": "선택연도 2016, 실제 2020"
+      }
+    ]
+  },
+  "2017": {
+    "uploaded": false,
+    "error_count": 0,
+    "row_count": 0
+  },
+  "2018": {
+    "uploaded": false,
+    "error_count": 0,
+    "row_count": 0
+  },
+  "2019": {
+    "uploaded": false,
+    "error_count": 0,
+    "row_count": 0
+  },
+  "2020": {
+    "uploaded": false,
+    "error_count": 0,
+    "row_count": 0
+  },
+  "2021": {
+    "uploaded": false,
+    "error_count": 0,
+    "row_count": 0
+  }
+}

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+temp_upload.xlsx
+.claude/
+.DS_Store
