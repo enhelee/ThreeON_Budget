@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>발전플랜트 유지보수 예산 예측 프로그램 · 기획안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B3B5C; --navy-dark:#082B44; --teal:#1B9E8F; --teal-light:#E1F5EE;
+    --amber:#B8722A; --amber-light:#FBF1E6; --bg:#F7F6F2; --paper:#FFFFFF;
+    --text:#1E2A32; --text-soft:#5B6B74; --border:#E2E1D8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;}
+  h1,h2,h3{font-family:'Noto Serif KR',serif;margin:0;}
+  code, .mono{font-family:'JetBrains Mono',monospace;}
+
+  .layout{display:flex;max-width:1180px;margin:0 auto;}
+  nav.toc{
+    width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;
+    padding:2.5rem 1.2rem;border-right:1px solid var(--border);
+  }
+  nav.toc .brand{font-size:12px;color:var(--teal);font-weight:500;letter-spacing:.04em;margin-bottom:4px;}
+  nav.toc .title{font-family:'Noto Serif KR',serif;font-size:17px;font-weight:700;color:var(--navy);margin-bottom:2rem;line-height:1.4;}
+  nav.toc a{display:block;font-size:13px;color:var(--text-soft);text-decoration:none;padding:7px 0 7px 10px;border-left:2px solid transparent;transition:.15s;}
+  nav.toc a:hover{color:var(--navy);border-left-color:var(--teal);}
+  nav.toc a .num{font-family:'JetBrains Mono',monospace;color:var(--teal);margin-right:8px;font-size:11px;}
+
+  main{flex:1;padding:2.5rem 3rem 6rem;min-width:0;}
+  header.hero{padding-bottom:2rem;margin-bottom:2rem;border-bottom:1px solid var(--border);}
+  header.hero .eyebrow{font-size:13px;color:var(--teal);font-weight:500;letter-spacing:.04em;margin-bottom:10px;}
+  header.hero h1{font-size:32px;color:var(--navy);line-height:1.35;}
+  header.hero .meta{margin-top:14px;font-size:13px;color:var(--text-soft);}
+
+  section{padding:3.2rem 0;border-bottom:1px solid var(--border);}
+  section:last-child{border-bottom:none;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:1.4rem;}
+  .sec-head .num{font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--teal);font-weight:500;}
+  .sec-head h2{font-size:22px;color:var(--navy);}
+
+  p{font-size:15px;color:var(--text);}
+  .lead{font-size:15.5px;color:var(--text-soft);max-width:700px;}
+
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:14px;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{background:var(--navy);color:#fff;font-weight:500;font-size:13px;}
+  tr:nth-child(even) td{background:var(--teal-light);}
+
+  ul.plain{padding-left:1.1rem;margin:0.8rem 0;}
+  ul.plain li{margin-bottom:6px;font-size:14.5px;}
+
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:1rem 0;}
+  .card{background:var(--paper);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+  .card .card-label{font-size:12px;color:var(--teal);font-weight:500;margin-bottom:6px;}
+  .card .card-title{font-size:15px;font-weight:500;color:var(--navy);}
+  .card .card-sub{font-size:13px;color:var(--text-soft);margin-top:4px;}
+
+  .tag{display:inline-block;font-size:12px;padding:3px 10px;border-radius:20px;margin:2px 4px 2px 0;}
+  .tag-must{background:var(--teal-light);color:#085041;}
+  .tag-should{background:#EAF1F3;color:var(--navy);}
+  .tag-could{background:var(--amber-light);color:#6B4A25;}
+  .tag-wont{background:#F1EFE8;color:#5F5E5A;}
+
+  .note{background:var(--amber-light);border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 16px;font-size:13.5px;color:#6B4A25;margin:1rem 0;}
+  .status-pill{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;}
+  .status-done{background:var(--teal-light);color:#085041;}
+  .status-pending{background:var(--amber-light);color:#6B4A25;}
+
+  .col2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media (max-width:900px){
+    .layout{flex-direction:column;}
+    nav.toc{position:relative;height:auto;width:100%;border-right:none;border-bottom:1px solid var(--border);}
+    main{padding:2rem 1.3rem 4rem;}
+    .col2{grid-template-columns:1fr;}
+  }
+
+  .code-block{background:var(--navy-dark);color:#D7EDE8;border-radius:8px;padding:14px 16px;font-size:13px;overflow-x:auto;}
+  .concept{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--paper);}
+  .concept .term{font-family:'JetBrains Mono',monospace;font-size:13.5px;color:var(--navy);font-weight:500;}
+  .concept .def{font-size:13.5px;color:var(--text-soft);margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <div class="brand">발전플랜트 예산 예측</div>
+    <div class="title">프로그램 개발 기획안</div>
+    <a href="#s1"><span class="num">01</span>문제 / 수치화</a>
+    <a href="#s2"><span class="num">02</span>개발 목표</a>
+    <a href="#s3"><span class="num">03</span>화면 설계</a>
+    <a href="#s4"><span class="num">04</span>역할</a>
+    <a href="#s5"><span class="num">05</span>협업 방법</a>
+    <a href="#s6"><span class="num">06</span>사용 기술</a>
+    <a href="#s7"><span class="num">07</span>환경</a>
+    <a href="#s8"><span class="num">08</span>필요한 개념</a>
+    <a href="#s9"><span class="num">09</span>데이터</a>
+    <a href="#s10"><span class="num">10</span>이전 아이디어 목록</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">INTERNAL PLANNING DOCUMENT</div>
+      <h1>발전플랜트 유지보수 예산 분석<br>· 중장기 예측 프로그램 개발 기획안</h1>
+      <div class="meta">작성일 2026-07-08 · 작성자 예산 담당자 · 상태 개발 진행 중 (1~2단계 프로토타입 완료)</div>
+    </header>
+
+    <section id="s1">
+      <div class="sec-head"><span class="num">01</span><h2>문제 / 수치화</h2></div>
+      <p class="lead">10년 이상의 전표 데이터는 확보되어 있으나, 정비 예산 수립이 담당자의 경험치에 의존하고 있어 근거를 설명하기 어렵고 반복 작업 시간이 크다.</p>
+      <table>
+        <tr><th>구분</th><th>내용</th></tr>
+        <tr><td>데이터 소스</td><td>ERP → Excel export → 정형 양식 업로드</td></tr>
+        <tr><td>데이터 범위</td><td>10년 이상, 개별 전표 단위, 연간 집계</td></tr>
+        <tr><td>현재 편차</td><td>연간 예산 대비 실적 편차 10% 이내 (양호)</td></tr>
+        <tr><td>핵심 원인</td><td>정비 계획 자체가 담당자 경험치에 의존 → 근거·표준화 부재</td></tr>
+        <tr><td>현재 영향</td><td>큰 사고는 없으나 비효율적 (반복 작업, 설명 근거 부족)</td></tr>
+        <tr><td>기존 수작업 규모</td><td>유지보수부서 약 400명이 2주간 작업 + 예산주관담당자가 약 3개월간 취합·조정 (현재까지의 방식)</td></tr>
+      </table>
+      <div class="note">지금까지는 매년 유지보수부서 약 400명이 2주에 걸쳐 실적/계획 자료를 작성하고, 예산주관담당자가 이를 약 3개월간 취합·조정해 최종 예산안을 만들어왔음. 이 소요 인력과 시간을 줄이는 것이 핵심 목표 중 하나.</div>
+    </section>
+
+    <section id="s2">
+      <div class="sec-head"><span class="num">02</span><h2>개발 목표</h2></div>
+      <div class="card-grid">
+        <div class="card"><div class="card-label">GOAL 1</div><div class="card-title">예측 정확도 향상</div></div>
+        <div class="card"><div class="card-label">GOAL 2</div><div class="card-title">의사결정 근거 확보</div><div class="card-sub">왜 이 예산이 나오는지 설명 가능하게</div></div>
+        <div class="card"><div class="card-label">GOAL 3</div><div class="card-title">예산 수립 소요시간 단축</div></div>
+      </div>
+      <table>
+        <tr><th>성공 기준</th><th>설명</th></tr>
+        <tr><td>1순위</td><td>예산 실적 분석(투자유형 자동분류 포함) 및 수립 소요시간 단축</td></tr>
+        <tr><td>2순위(검증용)</td><td>기존 수작업 대비 예측치 오차율 — 개발/검증 단계 참고 지표</td></tr>
+      </table>
+    </section>
+
+    <section id="s3">
+      <div class="sec-head"><span class="num">03</span><h2>화면 설계</h2></div>
+      <p class="lead">6단계 개발 로드맵 중 1~2단계는 프로토타입 완성, 나머지는 설계 예정입니다.</p>
+      <table>
+        <tr><th>단계</th><th>화면</th><th>핵심 기능</th><th>상태</th></tr>
+        <tr><td>1</td><td>데이터 업로드 & 검증</td><td>연도별 업로드, 5칸 롤링 현황판(그룹+최근4년), 행 단위 오류 검출(치명적/경고)</td><td><span class="status-pill status-done">완료</span></td></tr>
+        <tr><td>2</td><td>투자유형 분류 검토</td><td>규칙기반→학습모델 자동전환, 확신도순 정렬, 모델 관리(재학습/초기화/내보내기)</td><td><span class="status-pill status-done">완료</span></td></tr>
+        <tr><td>3</td><td>집계 & 대시보드</td><td>지사×과목×유형 집계, 예산 vs 실적 시각화</td><td><span class="status-pill status-pending">예정</span></td></tr>
+        <tr><td>4</td><td>예측 모델</td><td>유형별 회귀/추세 예측</td><td><span class="status-pill status-pending">예정</span></td></tr>
+        <tr><td>5</td><td>시뮬레이션</td><td>물가상승률·노후화·돌발정비 팩터 조정</td><td><span class="status-pill status-pending">예정</span></td></tr>
+        <tr><td>6</td><td>전체 조립</td><td>단일 웹앱으로 연결</td><td><span class="status-pill status-pending">예정</span></td></tr>
+      </table>
+      <div class="note">1·2단계 화면은 목업 → 실제 Streamlit 코드로 구현하고, 더미 데이터로 전체 시나리오(10년치 업로드, 오류 검출, 분류, 재학습)를 실제 실행하여 검증 완료.</div>
+    </section>
+
+    <section id="s4">
+      <div class="sec-head"><span class="num">04</span><h2>역할</h2></div>
+      <div class="col2">
+        <div class="card">
+          <div class="card-label">나</div>
+          <div class="card-title">기획 · 개발</div>
+          <div class="card-sub">전체 기획, Claude Code 기반 개발</div>
+        </div>
+        <div class="card">
+          <div class="card-label">동료</div>
+          <div class="card-title">데이터 제공 · 검증 · 화면 개선 · 오류 검증</div>
+          <div class="card-sub">전표 데이터 확인, 투자유형 라벨링 검토, 화면 사용성 개선 의견, 실행 후 오류 리포트 및 검증</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="s5">
+      <div class="sec-head"><span class="num">05</span><h2>협업 방법</h2></div>
+      <p>정기적으로 화면/결과를 공유하고 피드백을 받는 방식으로 진행합니다.</p>
+      <ul class="plain">
+        <li>단계별 프로토타입이 완성될 때마다 화면 캡처 또는 실행 결과 공유</li>
+        <li>동료는 실제 업무 경험 기준으로 분류 결과·화면 사용성에 대한 피드백 제공</li>
+        <li>피드백 반영 후 다음 단계로 진행 (1단계씩 순차 진행, 되돌아가 수정 가능)</li>
+      </ul>
+    </section>
+
+    <section id="s6">
+      <div class="sec-head"><span class="num">06</span><h2>사용 기술</h2></div>
+      <table>
+        <tr><th>구분</th><th>선택</th><th>이유</th></tr>
+        <tr><td>언어</td><td>Python</td><td>비개발자도 Claude Code 도움으로 접근 가능, 데이터 처리에 강함</td></tr>
+        <tr><td>웹 프레임워크</td><td>Streamlit</td><td>별도 프론트엔드 개발 없이 파이썬 코드만으로 웹 화면 구현</td></tr>
+        <tr><td>데이터 처리</td><td>pandas, openpyxl</td><td>엑셀 업로드/처리, 집계</td></tr>
+        <tr><td>분류 모델</td><td>scikit-learn (TF-IDF + 로지스틱회귀)</td><td>가볍고 오프라인 학습 가능, 사내망 제약에 적합</td></tr>
+        <tr><td>모델 저장</td><td>joblib</td><td>학습된 모델을 파일로 저장/재사용</td></tr>
+        <tr><td>개발 도구</td><td>Claude Code</td><td>코딩 초급자가 AI 도움으로 직접 개발</td></tr>
+      </table>
+    </section>
+
+    <section id="s7">
+      <div class="sec-head"><span class="num">07</span><h2>환경</h2></div>
+      <div class="card-grid">
+        <div class="card"><div class="card-label">운영 방식</div><div class="card-title">내 PC에서 혼자 사용</div></div>
+        <div class="card"><div class="card-label">OS</div><div class="card-title">Windows</div></div>
+        <div class="card"><div class="card-label">네트워크</div><div class="card-title">사내 분리망 (오프라인)</div><div class="card-sub">외부 클라우드/API 사용 불가</div></div>
+      </div>
+      <div class="note">사내 분리망 제약 때문에 분류 모델도 인터넷 연결 없이 로컬에서 학습·추론되도록 설계함 (scikit-learn 기반 경량 모델).</div>
+    </section>
+
+    <section id="s8">
+      <div class="sec-head"><span class="num">08</span><h2>필요한 개념 (개발자용 용어 정리)</h2></div>
+      <div class="concept"><span class="term">지도학습 (Supervised Learning)</span><div class="def">사람이 정답(라벨)을 알려준 데이터로 모델을 학습시키는 방식. 여기서는 "이 텍스트는 LTSA다"처럼 확정된 분류를 학습 데이터로 사용.</div></div>
+      <div class="concept"><span class="term">TF-IDF</span><div class="def">텍스트를 숫자로 변환하는 방법 중 하나. 문서에서 자주 나오지만 다른 문서엔 잘 안 나오는 단어에 가중치를 준다. 여기서는 전표헤더텍스트를 모델이 이해할 수 있는 형태로 바꾸는 데 사용.</div></div>
+      <div class="concept"><span class="term">로지스틱 회귀 (Logistic Regression)</span><div class="def">여러 카테고리 중 하나로 분류하는 데 쓰는 기본적인 머신러닝 알고리즘. 가볍고 빠르며 사내망처럼 제한된 환경에서도 잘 동작함.</div></div>
+      <div class="concept"><span class="term">교차검증 (Cross Validation)</span><div class="def">가진 데이터를 여러 조각으로 나눠 서로 다른 조각으로 학습/평가를 반복해 모델의 신뢰도(정확도)를 추정하는 방법.</div></div>
+      <div class="concept"><span class="term">확신도 (Confidence)</span><div class="def">모델이 예측한 결과를 얼마나 확신하는지 나타내는 수치(0~100%). 낮으면 사람이 직접 검토해야 할 대상.</div></div>
+      <div class="concept"><span class="term">규칙기반 분류 (Rule-based Classification)</span><div class="def">키워드 사전을 만들어 "이 단어가 있으면 이 유형" 식으로 분류하는 방식. 학습 데이터가 부족할 때 임시로 사용.</div></div>
+      <div class="concept"><span class="term">세션 상태 (Session State)</span><div class="def">Streamlit 화면에서 사용자가 클릭하거나 입력한 값을 화면이 다시 그려져도 기억하게 해주는 저장 공간.</div></div>
+    </section>
+
+    <section id="s9">
+      <div class="sec-head"><span class="num">09</span><h2>데이터</h2></div>
+      <h3 style="font-size:15px;color:var(--navy);margin-bottom:8px;">엑셀 컬럼 스펙 (위치 기반 파싱)</h3>
+      <table>
+        <tr><th>열</th><th>필드명</th><th>비고</th></tr>
+        <tr><td>E</td><td>거래처명</td><td>예산과목 대용 (계정과목 컬럼 없음)</td></tr>
+        <tr><td>G</td><td>사업장</td><td>지사(숫자코드), 매핑표 추후 정의</td></tr>
+        <tr><td>L</td><td>전기일</td><td>실제 자금 집행일</td></tr>
+        <tr><td>N</td><td>전표헤더텍스트</td><td>투자유형 유추용 자유텍스트</td></tr>
+        <tr><td>O</td><td>금액</td><td>실적 금액</td></tr>
+      </table>
+      <h3 style="font-size:15px;color:var(--navy);margin:20px 0 8px;">투자유형 8종 (시드 라벨)</h3>
+      <p>
+        <span class="tag tag-must">LTSA</span><span class="tag tag-must">정기사업</span><span class="tag tag-must">노후설비개체</span><span class="tag tag-must">AX/DX</span>
+        <span class="tag tag-must">운영안정성 제고</span><span class="tag tag-must">환경강화</span><span class="tag tag-must">교육강화</span><span class="tag tag-must">보안강화</span>
+      </p>
+      <div class="note">기존 담당자가 5개년 실적을 직접 분류한 샘플을 지도학습의 초기 정답 데이터로 활용 예정.</div>
+    </section>
+
+    <section id="s10">
+      <div class="sec-head"><span class="num">10</span><h2>이전 아이디어 목록</h2></div>
+      <p class="lead">검토했지만 이번 범위에서 제외했거나, 방향을 바꾼 아이디어들. 나중에 다시 꺼내볼 수 있도록 기록.</p>
+
+      <h3 style="font-size:15px;color:var(--navy);margin-bottom:10px;">MoSCoW 전체 (최종 목표 기준)</h3>
+      <table>
+        <tr><th style="width:110px;">구분</th><th>항목</th></tr>
+        <tr><td><span class="tag tag-must">Must</span></td><td>정형 엑셀 업로드·검증 / 지사·과목·투자유형별 집계 / 투자유형별 맞춤 예측 모델 / 총액 예산 롤업 / 가정치 조정 시뮬레이션</td></tr>
+        <tr><td><span class="tag tag-should">Should</span></td><td>예산 vs 실적 편차 대시보드 / 시나리오 저장·비교 / 예측 근거 설명</td></tr>
+        <tr><td><span class="tag tag-could">Could</span></td><td>나머지 투자유형 정교화 / 설비 노후화 외부변수 반영 / 다중 지사 권한 관리 / PPT·PDF 자동 리포트</td></tr>
+        <tr><td><span class="tag tag-wont">Won&apos;t</span></td><td>ERP 직접 연동(API) / 외부 클라우드·API 연동 / 실시간 데이터 반영</td></tr>
+      </table>
+
+      <h3 style="font-size:15px;color:var(--navy);margin:22px 0 10px;">방향을 바꾼 결정들</h3>
+      <ul class="plain">
+        <li>분류 방식: 순수 클러스터링만 고려 → 5개년 라벨 샘플이 있다는 것을 확인 후 지도학습 기반으로 전환</li>
+        <li>투자유형 분류를 Should였다가, "패턴이 완전히 달라 분리가 필수"라는 판단으로 Must로 격상</li>
+        <li>정확도 vs 설명가능성 트레이드오프 → 단계적 접근(MVP는 단순, 후속 고도화)으로 절충</li>
+      </ul>
+
+    </section>
+  </main>
+</div>
+</body>
+</html>
