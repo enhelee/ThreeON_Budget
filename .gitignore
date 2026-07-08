@@ -4,3 +4,4 @@ __pycache__/
 temp_upload.xlsx
 .claude/
 .DS_Store
+.worktrees/
