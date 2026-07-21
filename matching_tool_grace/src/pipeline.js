@@ -302,26 +302,61 @@
     return aoa;
   }
 
-  // 종합표(피벗): 과목(행) × 지사(열) 실적 합계 — v1 기능형
-  function buildJonghapAOA(rows, ledger, C) {
-    const filtered = rows.filter((r) => r.ledger === ledger);
-    const depts = Object.keys(C.CHP_GROUP); // 종합표 지사 순서
-    const acctNames = [...new Set(filtered.map((r) => r.acctName))];
-    const cell = {}; // acctName -> dept -> sum
-    for (const r of filtered) {
-      const d = C.resolveDept(r.dept);
-      if (!d) continue; // 지사 아님 제외
-      cell[r.acctName] = cell[r.acctName] || {};
-      cell[r.acctName][d] = (cell[r.acctName][d] || 0) + (Number(r.actual) || 0);
+  // 종합표: 정답 격자(양식2/양식3) 그대로. 행=예산과목(구분별), 열=처/CHP지사/소계/합계
+  // cleaned(netting 결과)를 (지사 × 약정항목코드)로 합산해 채운다.
+  function buildJonghapAOA(cleaned, ledger, C) {
+    const cols = C.JONGHAP_COLS;
+    const tmpl = ledger === "자본" ? C.JONGHAP_ROWS_CAP : C.JONGHAP_ROWS_PL;
+    // 코드 → 지사명 → 합계
+    const byCode = {};
+    for (const x of cleaned) {
+      if (x.ledger !== ledger) continue;
+      const d = C.resolveDept(x.dept);
+      if (!d || !C.isJisa(d)) continue; // 종합표 지사만 (본사·미래개발원 제외)
+      byCode[x.acct] = byCode[x.acct] || {};
+      byCode[x.acct][d] = (byCode[x.acct][d] || 0) + (Number(x.amount) || 0);
     }
-    const header = ["예산과목", ...depts, "합계"];
-    const aoa = [header];
-    for (const an of acctNames) {
-      const row = [an];
-      let tot = 0;
-      for (const d of depts) { const v = (cell[an] && cell[an][d]) || 0; row.push(v); tot += v; }
-      row.push(tot);
-      aoa.push(row);
+    const gtIdx = cols.findIndex((c) => c.kind === "grandtotal");
+    // 한 과목(code) 행의 열 배열 계산
+    function itemValues(code) {
+      const src = code ? byCode[code] || {} : {};
+      const arr = cols.map((c) => (c.kind === "jisa" ? (src[c.name] || 0) : 0));
+      cols.forEach((c, i) => {
+        if (c.kind === "subtotal") {
+          const members = C.CHP_MEMBERS[c.group] || [];
+          arr[i] = members.reduce((s, nm) => s + (src[nm] || 0), 0);
+        }
+      });
+      arr[gtIdx] = cols.reduce((s, c, i) => (c.kind === "subtotal" ? s + arr[i] : s), 0);
+      return arr;
+    }
+    const addArr = (a, b) => a.map((v, i) => v + b[i]);
+    const zero = cols.map(() => 0);
+
+    // 헤더 2줄(그룹/열이름)
+    const groupRow = ["구분", "예산과목"].concat(cols.map((c) => {
+      if (c.kind === "subtotal") return c.group + " 소계";
+      if (c.kind === "grandtotal") return "합계";
+      return "";
+    }));
+    const nameRow = ["", ""].concat(cols.map((c) => (c.kind === "jisa" || c.kind === "cheo") ? c.name : ""));
+
+    const aoa = [groupRow, nameRow];
+    const itemArrays = []; // {gu, arr}
+    for (const row of tmpl) {
+      if (row.kind === "item") {
+        const arr = itemValues(row.code);
+        itemArrays.push({ gu: row.gu, arr });
+        aoa.push([row.gu, row.name].concat(arr));
+      } else if (row.kind === "subtotal") {
+        // 직전 그룹(gu) 아이템 합 — 손익 "계" = 수선유지비 합
+        const grp = "수선유지비";
+        const sum = itemArrays.filter((x) => x.gu === grp).reduce((a, x) => addArr(a, x.arr), zero.slice());
+        aoa.push([row.gu, row.name].concat(sum));
+      } else if (row.kind === "total") {
+        const sum = itemArrays.reduce((a, x) => addArr(a, x.arr), zero.slice());
+        aoa.push([row.gu, row.name].concat(sum));
+      }
     }
     return aoa;
   }
@@ -345,8 +380,8 @@
       review: buildReviewSheets(cleaned, C),
       chipCap: buildChipgyepyoAOA(rows, "자본"),
       chipPl: buildChipgyepyoAOA(rows, "손익"),
-      jongCap: buildJonghapAOA(rows, "자본", C),
-      jongPl: buildJonghapAOA(rows, "손익", C),
+      jongCap: buildJonghapAOA(cleaned, "자본", C),
+      jongPl: buildJonghapAOA(cleaned, "손익", C),
     };
   }
 

@@ -10,6 +10,8 @@ h1 { font-size: 22px; margin: 0 0 4px; }
 .up { display: flex; flex-direction: column; gap: 6px; border: 1px dashed #c7d0da; border-radius: 8px; padding: 12px 14px; }
 .up .lbl { font-size: 13px; font-weight: 600; }
 .up em { color: #d64545; font-style: normal; font-weight: 600; }
+.up em.opt { color: #8a94a0; }
+.up .note { font-size: 11px; color: #8a94a0; }
 input[type=file] { font-size: 13px; }
 button { font: inherit; cursor: pointer; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; }
 button.primary { background: #2d6cdf; color: #fff; font-weight: 600; }

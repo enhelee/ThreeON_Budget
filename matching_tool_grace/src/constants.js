@@ -68,8 +68,63 @@
     return Object.prototype.hasOwnProperty.call(CHP_GROUP, deptName);
   }
 
+  // ── 종합표 격자 구조 (양식2/양식3 실제 레이아웃) ──
+  // 열: 처 5개 + 소계, 중대형CHP 8지사 + 소계, 소형CHP 3 + 소계, DH 8 + 소계, 합계
+  const JONGHAP_COLS = [
+    { name: "플랜트기술처", kind: "cheo" }, { name: "안전처", kind: "cheo" },
+    { name: "통합운영처", kind: "cheo" }, { name: "건설처", kind: "cheo" },
+    { name: "미래사업처", kind: "cheo" }, { name: "소계", kind: "subtotal", group: "cheo" },
+    { name: "동탄지사", kind: "jisa" }, { name: "화성지사", kind: "jisa" },
+    { name: "파주지사", kind: "jisa" }, { name: "광교지사", kind: "jisa" },
+    { name: "판교지사", kind: "jisa" }, { name: "삼송지사", kind: "jisa" },
+    { name: "대구지사", kind: "jisa" }, { name: "청주지사", kind: "jisa" },
+    { name: "소계", kind: "subtotal", group: "중대형CHP" },
+    { name: "수원사업소", kind: "jisa" }, { name: "광주전남지사", kind: "jisa" },
+    { name: "강남지사", kind: "jisa" }, { name: "소계", kind: "subtotal", group: "소형CHP" },
+    { name: "중앙지사", kind: "jisa" }, { name: "고양사업소", kind: "jisa" },
+    { name: "용인지사", kind: "jisa" }, { name: "분당사업소", kind: "jisa" },
+    { name: "세종지사", kind: "jisa" }, { name: "김해사업소", kind: "jisa" },
+    { name: "양산지사", kind: "jisa" }, { name: "평택지사", kind: "jisa" },
+    { name: "소계", kind: "subtotal", group: "DH" },
+    { name: "합계", kind: "grandtotal" },
+  ];
+  // 상단 그룹 헤더(중대형CHP/소형CHP/DH)에 속한 지사 묶음
+  const CHP_MEMBERS = {
+    "중대형CHP": ["동탄지사", "화성지사", "파주지사", "광교지사", "판교지사", "삼송지사", "대구지사", "청주지사"],
+    "소형CHP": ["수원사업소", "광주전남지사", "강남지사"],
+    "DH": ["중앙지사", "고양사업소", "용인지사", "분당사업소", "세종지사", "김해사업소", "양산지사", "평택지사"],
+    "cheo": ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"],
+  };
+
+  // 행: {구분, 과목명, code|null, kind}  kind: item|subtotal|total
+  const JONGHAP_ROWS_CAP = [
+    { gu: "자산", name: "기계장치", code: "20704001", kind: "item" },
+    { gu: "자산", name: "공구와기구-열원시설공기구", code: "20706001", kind: "item" },
+    { gu: "자산", name: "건물", code: "20702001", kind: "item" },
+    { gu: "자산", name: "구축물", code: "20703001", kind: "item" },
+    { gu: "예비품", name: "저장품-열원(보수)", code: "10702001", kind: "item" },
+    { gu: "예비품", name: "건설중인자산-재생고온부품", code: "20790005", kind: "item" },
+    { gu: "예비품", name: "건설중인자산-자산화예비품", code: "20790006", kind: "item" },
+    { gu: "A급 정비", name: "외주비-열원정기점검", code: "60602015", kind: "item" },
+    { gu: "건설공사", name: "외주비-열원공사비", code: null, kind: "item" },
+    { gu: "건설공사", name: "재료비-열원자재비", code: null, kind: "item" },
+    { gu: "건설공사", name: "외주비-열원기술용역비", code: null, kind: "item" },
+    { gu: "자본예산 합계", name: "", code: null, kind: "total" },
+  ];
+  const JONGHAP_ROWS_PL = [
+    { gu: "수선유지비", name: "수선유지비-건물/구축물", code: "60909001", kind: "item" },
+    { gu: "수선유지비", name: "수선유지비-열원정기점검", code: "60909002", kind: "item" },
+    { gu: "수선유지비", name: "수선유지비-열원경상정비", code: "60909007", kind: "item" },
+    { gu: "수선유지비", name: "수선유지비-열원정기유지보수", code: "60909008", kind: "item" },
+    { gu: "수선유지비", name: "수선유지비-열원보완개선및기타", code: "60909009", kind: "item" },
+    { gu: "", name: "계", code: null, kind: "subtotal" },
+    { gu: "지급수수료", name: "지급수수료-열원점검수수료", code: "60913003", kind: "item" },
+    { gu: "손익예산 계", name: "", code: null, kind: "total" },
+  ];
+
   return {
     BUCKET, bucketOf, ledgerOf, CHP_GROUP,
     DEPT_PREFIX, resolveDept, isJisa,
+    JONGHAP_COLS, CHP_MEMBERS, JONGHAP_ROWS_CAP, JONGHAP_ROWS_PL,
   };
 });

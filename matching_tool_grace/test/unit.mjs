@@ -62,5 +62,36 @@ const nRaw = [
 const nClean = P.netting(P.parseRaw(nRaw));
 ok(nClean.length === 0, "같은 전표 합0 → 상계 제거 (실제 남은: " + nClean.length + ")");
 
+// ── 종합표 격자: 칸 배치 / 소계 / 합계 ──
+const jClean = [
+  { dept: "3040001", acct: "60909009", ledger: "손익", amount: 100 }, // 용인지사(DH)
+  { dept: "2020001", acct: "60909009", ledger: "손익", amount: 50 },  // 강남지사(소형CHP)
+  { dept: "3050001", acct: "20704001", ledger: "자본", amount: 200 }, // 화성지사(중대형CHP)
+];
+const jPl = P.buildJonghapAOA(jClean, "손익", C);
+const nameRow = jPl[1];
+const colIdx = (nm) => nameRow.indexOf(nm);
+const rowByName = (aoa, nm) => aoa.find((r) => r[1] === nm);
+const rBoan = rowByName(jPl, "수선유지비-열원보완개선및기타");
+ok(rBoan[colIdx("용인지사")] === 100, "종합표: 용인지사 칸 = 100");
+ok(rBoan[colIdx("강남지사")] === 50, "종합표: 강남지사 칸 = 50");
+const totIdx = jPl[0].indexOf("합계");
+ok(rBoan[totIdx] === 150, "종합표: 보완개선 행 합계 = 150 (실제: " + rBoan[totIdx] + ")");
+// DH 소계 = 100, 소형CHP 소계 = 50
+const dhSub = jPl[0].indexOf("DH 소계");
+ok(rBoan[dhSub] === 100, "종합표: DH 소계 = 100");
+const plTot = rowByName(jPl, "");  // "계" subtotal row (gu="")
+// 손익예산 계 (total)
+const rGrand = jPl.find((r) => r[0] === "손익예산 계");
+ok(rGrand[totIdx] === 150, "종합표: 손익예산 계 합계 = 150");
+
+const jCap = P.buildJonghapAOA(jClean, "자본", C);
+const rGigye = rowByName(jCap, "기계장치");
+const capNameRow = jCap[1];
+ok(rGigye[capNameRow.indexOf("화성지사")] === 200, "종합표(자본): 화성지사 기계장치 = 200");
+ok(jCap.find((r) => r[0] === "자본예산 합계")[jCap[0].indexOf("합계")] === 200, "종합표(자본): 자본예산 합계 = 200");
+// 건물·구축물 행이 존재하는지 (누락됐던 것)
+ok(rowByName(jCap, "건물") && rowByName(jCap, "구축물"), "종합표(자본): 건물·구축물 행 포함");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
