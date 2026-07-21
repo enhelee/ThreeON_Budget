@@ -217,7 +217,18 @@
     )) {
       pivot.push([p.ledger, chp(p), deptName(p), p.dept, p.acct, p.acctName, p.sum, p.cnt]);
     }
-    return { items, pivot };
+    // 미배분 vendor 목록: 빈텍스트(rule3)라 사업 자동배정이 안 되는 항목 → 담당자가 사업명 채우면 사전이 됨
+    const vRows = [["자본/손익", "지사/처", "예산과목코드", "예산과목", "공급업체(vendor)", "실적금액(천원)", "→ 사업명(담당자 작성)"]];
+    const vAgg = new Map();
+    for (const x of cleaned) {
+      if (!x.emptyText) continue;
+      const k = (x.org || x.dept) + "|" + x.acct + "|" + (x.vendor || "");
+      if (!vAgg.has(k)) vAgg.set(k, { ledger: x.ledger, org: x.org || x.dept, acct: x.acct, acctName: x.acctName, vendor: x.vendor || "", sum: 0 });
+      vAgg.get(k).sum += x.amount;
+    }
+    for (const v of [...vAgg.values()].sort((a, b) => a.acct.localeCompare(b.acct) || String(a.org).localeCompare(String(b.org))))
+      vRows.push([v.ledger, deptName({ org: v.org }), v.acct, v.acctName, v.vendor, Math.round(v.sum / 1000), ""]);
+    return { items, pivot, vendors: vRows };
   }
 
   // ── [3] 예산 파싱 (양식1(월별) 시트) ─────────────────────
