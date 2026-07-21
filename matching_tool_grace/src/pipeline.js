@@ -31,6 +31,20 @@
     if (s.length === 1) set.add(s);
     return set;
   }
+  // 단어 토큰 집합 (연도 제거, 구분자로 분리, 2자 이상). 사업명은 단어 매칭이 더 선명.
+  function tokens(t) {
+    const s = (t == null ? "" : String(t)).normalize("NFC").replace(/\d{4}\s*년도?/g, " ").replace(/\d+년/g, " ");
+    const set = new Set();
+    for (const w of s.split(/[\s,.·:;_\/()\[\]（）"'’”\-]+/)) { const x = w.trim(); if (x.length >= 2) set.add(x); }
+    return set;
+  }
+  // 특징 집합: FEAT=token이면 토큰, 아니면 문자bigram+토큰 혼합(기본)
+  function featSet(text) {
+    const mode = (typeof process !== "undefined" && process.env && process.env.FEAT) || "bigram";
+    if (mode === "token") return tokens(text);
+    if (mode === "mix") { const s = tokens(text); for (const g of bigrams(simNorm(text))) s.add("::" + g); return s; }
+    return bigrams(simNorm(text)); // 기본: 문자 bigram (A/B에서 최선)
+  }
   // Dice 계수 (0~1)
   function diceSim(aStr, bStr) {
     const a = bigrams(simNorm(aStr)), b = bigrams(simNorm(bStr));
@@ -661,7 +675,7 @@
       const prows = planByCode.get(code) || [];
       // 과목 내 사업명 bigram IDF 계산 (지역/분야 등 구분 단어 강조)
       const df = new Map();
-      for (const p of prows) { p._g = bigrams(simNorm(p.biz)); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
+      for (const p of prows) { p._g = featSet(p.biz); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
       const N = prows.length || 1;
       const idf = new Map();
       for (const [g, d] of df) idf.set(g, Math.log((N + 1) / d) + 1);
@@ -678,7 +692,7 @@
       const empties = [];
       for (const it of items) {
         if (it.emptyText) { empties.push(it); continue; }
-        const tg = bigrams(simNorm(it.text + " " + (it.costName || "")));
+        const tg = featSet(it.text + " " + (it.costName || ""));
         const io = nrm(it.org);
         const soR = pickBest(prows.filter((p) => p.org === io), tg);
         let r = soR;
