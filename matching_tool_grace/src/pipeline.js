@@ -606,7 +606,7 @@
       const code = C.resolveAcctCode(grid[r][ci.acctName]);
       if (!code) continue;
       if (!planByCode.has(code)) planByCode.set(code, []);
-      planByCode.get(code).push({ r, biz });
+      planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]) });
       planRows++;
     }
     // 실적 항목을 예산과목 코드별로 그룹핑
@@ -620,15 +620,20 @@
     let filled = 0;
     const unmatched = [];
     const sumByRow = {};
+    const pickBest = (pool, text) => {
+      let bj = -1, best = 0;
+      for (let j = 0; j < pool.length; j++) { const sc = diceSim(text, pool[j].biz); if (sc > best) { best = sc; bj = j; } }
+      return { row: bj >= 0 ? pool[bj] : null, best };
+    };
     for (const [code, items] of actByCode) {
       const prows = planByCode.get(code) || [];
       for (const it of items) {
-        let bj = -1, best = 0;
-        for (let j = 0; j < prows.length; j++) {
-          const sc = diceSim(it.text, prows[j].biz);
-          if (sc > best) { best = sc; bj = j; }
-        }
-        if (bj >= 0 && best >= SIM_THRESHOLD) sumByRow[prows[bj].r] = (sumByRow[prows[bj].r] || 0) + it.amount;
+        const io = nrm(it.org);
+        // 1) 같은 조직(지사/처) 우선
+        let r = pickBest(prows.filter((p) => p.org === io), it.text);
+        // 2) 못 붙으면 전역(부서 무관) — 처 집행/지사 귀속 등
+        if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, it.text);
+        if (r.row && r.best >= SIM_THRESHOLD) sumByRow[r.row.r] = (sumByRow[r.row.r] || 0) + it.amount;
         else unmatched.push(it);
       }
     }
