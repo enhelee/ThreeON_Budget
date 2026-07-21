@@ -119,5 +119,45 @@ ok(mNew && mNew.flag === "신규", "유사도: 무관한 전표 → 신규");
 ok(P.diceSim("정기점검 보수공사", "정기점검보수공사") > 0.8, "diceSim: 띄어쓰기만 다르면 높은 유사도");
 ok(P.diceSim("터보냉동기 유지보수", "옥상 방수 도장") < 0.2, "diceSim: 무관 텍스트 낮은 유사도");
 
+// ── fillJonghap: 파일의 분류를 그대로 따르는지 (양산을 중대형에 둔 틀) ──
+const jongTmpl = [
+  ["구분", "예산과목", "", "", "중대형CHP", "", "합계"],
+  ["", "", "동탄지사", "양산지사", "소계", "수원사업소", "합계"],
+  ["자산", "기계장치", 0, 0, 0, 0, 0],
+  ["자본예산 합계", "", 0, 0, 0, 0, 0],
+];
+const jClean2 = [
+  { dept: "3100001", acct: "20704001", ledger: "자본", amount: 100 }, // 동탄
+  { dept: "4020001", acct: "20704001", ledger: "자본", amount: 300 }, // 양산
+  { dept: "3030001", acct: "20704001", ledger: "자본", amount: 20 },  // 수원
+];
+const filledJ = P.fillJonghap(jongTmpl, jClean2, "자본", C);
+const gigyeRow = filledJ.find((r) => r[1] === "기계장치");
+ok(gigyeRow[2] === 100 && gigyeRow[3] === 300, "fillJonghap: 동탄100·양산300 각 칸");
+ok(gigyeRow[4] === 400, "fillJonghap: 첫 소계 = 동탄+양산 = 400 (양산이 파일상 중대형이므로 함께 합산)");
+ok(gigyeRow[6] === 420, "fillJonghap: 합계 = 420");
+const capTotRow = filledJ.find((r) => r[0] === "자본예산 합계");
+ok(capTotRow[6] === 420, "fillJonghap: 자본예산 합계 행 = 420");
+
+// ── parseChipPlan + matchPlanToActual: 집계표 계획을 읽어 실적 채움 ──
+const chipAOA = [
+  ["연번", "예산과목", "속성", "주관부서명", "예산귀속 부서명(처.지사)", "예산귀속 부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)"],
+  ["예시)", "수선유지비-건물/구축물", "", "", "", "", "미반영 신규사업의 경우 행추가", 0, ""],
+  [1, "수선유지비-열원경상정비", "제조", "플랜트", "강남지사", "강남 고객지원부", "경상정비 A", 900, ""],
+  [2, "수선유지비-열원보완개선및기타", "제조", "플랜트", "강남지사", "강남 고객지원부", "노후 전동밸브 개체", 500, ""],
+];
+const planParsed = P.parseChipPlan(chipAOA, C);
+ok(planParsed.length === 2, "parseChipPlan: 예시행 제외 2줄 (실제: " + planParsed.length + ")");
+ok(planParsed[0].acct === "60909007" && planParsed[0].deptName === "강남지사", "parseChipPlan: 과목명→코드, 지사명 인식");
+const clA = [
+  { dept: "2020001", acct: "60909007", ledger: "손익", amount: 1000, text: "경상정비 통합", bucket: "gyeongsang" },
+  { dept: "2020001", acct: "60909009", ledger: "손익", amount: 500, text: "노후 전동밸브 개체 보수", bucket: "boan" },
+];
+const mp = P.matchPlanToActual(clA, planParsed, C);
+const rG = mp.rows.find((r) => r.biz === "경상정비 A");
+ok(rG && rG.actual === 1000 && rG.flag === "매칭", "matchPlanToActual: 경상정비 지사통합 실적 → 계획 줄에 (실제: " + (rG && rG.actual) + ")");
+const rB = mp.rows.find((r) => r.biz === "노후 전동밸브 개체");
+ok(rB && rB.actual === 500 && rB.flag === "매칭", "matchPlanToActual: 유사 사업명 실적 매칭");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -16,6 +16,16 @@
     }
     return XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "" });
   }
+  // 집계표 파일에서 「계획대비실적」과 「종합표」 두 시트를 각각 AOA로
+  async function chipFileToSheets(file) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+    const pick = (kw) => {
+      const s = wb.SheetNames.find((n) => n.normalize("NFC").replace(/\s/g, "").includes(kw));
+      return s ? XLSX.utils.sheet_to_json(wb.Sheets[s], { header: 1, defval: "" }) : [];
+    };
+    return { chip: pick("계획대비실적") , jong: pick("종합") };
+  }
 
   function downloadWb(sheets, filename) {
     const wb = XLSX.utils.book_new();
@@ -32,7 +42,7 @@
     const s = R.stats;
     const cards = [
       ["netting 정리 항목", R.cleaned.length],
-      ["예산 라인", R.budget.length],
+      ["계획 사업 라인", R.plan.length],
       ["매칭", s.matched],
       ["신규(계획 미반영)", s.shingyu],
       ["실적없음", s.noActual],
@@ -50,11 +60,15 @@
       setMsg("처리 중… (파일이 크면 수십 초 걸릴 수 있어요)");
 
       const rawRows = await fileToRows(fRaw, null);
-      const capRows = $("fCap").files[0] ? await fileToRows($("fCap").files[0], "양식1(월별)") : [];
-      const plRows = $("fPl").files[0] ? await fileToRows($("fPl").files[0], "양식1(월별)") : [];
+      const cap = $("fCap").files[0] ? await chipFileToSheets($("fCap").files[0]) : { chip: [], jong: [] };
+      const pl = $("fPl").files[0] ? await chipFileToSheets($("fPl").files[0]) : { chip: [], jong: [] };
 
       const R = BUDGET_PIPELINE.runAll(
-        { rawRows, capBudgetRows: capRows, plBudgetRows: plRows },
+        {
+          rawRows,
+          capChipRows: cap.chip, capJongRows: cap.jong,
+          plChipRows: pl.chip, plJongRows: pl.jong,
+        },
         BUDGET_CONST
       );
       RESULT = R;

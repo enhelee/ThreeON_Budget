@@ -29,9 +29,9 @@ ${css}
   <div class="card">
     <h2>1. 파일 올리기</h2>
     <div class="uploads">
-      <label class="up"><span class="lbl">ERP raw data <em>(필수)</em></span><input type="file" id="fRaw" accept=".xlsx,.xls"><span class="note">종합표(실적)는 이 파일만으로 만들어집니다.</span></label>
-      <label class="up"><span class="lbl">자본예산 주관부서예산 <em class="opt">(선택)</em></span><input type="file" id="fCap" accept=".xlsx,.xls"><span class="note">계획대비실적 시트의 연예산·사업명 채움용</span></label>
-      <label class="up"><span class="lbl">손익예산 주관부서예산 <em class="opt">(선택)</em></span><input type="file" id="fPl" accept=".xlsx,.xls"><span class="note">계획대비실적 시트의 연예산·사업명 채움용</span></label>
+      <label class="up"><span class="lbl">ERP raw data <em>(필수)</em></span><input type="file" id="fRaw" accept=".xlsx,.xls"><span class="note">실적의 원천 데이터</span></label>
+      <label class="up"><span class="lbl">양식3 · 자본예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fCap" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
+      <label class="up"><span class="lbl">양식2 · 손익예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fPl" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
     </div>
     <button id="run" class="primary">집계표 생성</button>
     <div id="msg" class="msg"></div>

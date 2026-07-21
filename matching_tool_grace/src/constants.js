@@ -27,6 +27,36 @@
     return BUCKET[String(acct).trim()] || "common";
   }
 
+  // 예산과목(표시명) → 약정항목 코드. 종합표/계획대비실적의 과목명에서 코드를 역인식.
+  const ACCT_NAME_TO_CODE = {
+    "수선유지비-열원경상정비": "60909007",
+    "수선유지비-열원보완및개선": "60909009",
+    "수선유지비-열원보완개선및기타": "60909009",
+    "수선유지비-열원정기유지보수": "60909008",
+    "수선유지비-열원정기점검": "60909002",
+    "수선유지비-건물/구축물": "60909001",
+    "지급수수료-열원점검수수료": "60913003",
+    "지급수수료-열원점검검사수수료": "60913003",
+    "건설중인자산-자산화예비품": "20790006",
+    "건설중인자산-재생고온부품": "20790005",
+    "저장품-열원(보수)": "10702001",
+    "기계장치": "20704001",
+    "공구와기구-열원시설공기구": "20706001",
+    "구축물": "20703001",
+    "건물": "20702001",
+    "외주비-열원정기점검": "60602015",
+    "외주비-열원공사비": null, // 건설처 소관
+    "재료비-열원자재비": null,
+    "외주비-열원기술용역비": null,
+  };
+  function resolveAcctCode(name) {
+    const key = String(name == null ? "" : name).normalize("NFC").replace(/\s/g, "");
+    for (const k of Object.keys(ACCT_NAME_TO_CODE)) {
+      if (k.replace(/\s/g, "") === key) return ACCT_NAME_TO_CODE[k];
+    }
+    return null;
+  }
+
   // 자본/손익 구분: 코드 앞자리 1·2 = 자본, 6 = 손익
   function ledgerOf(acct) {
     const a = String(acct).trim();
@@ -124,6 +154,7 @@
 
   return {
     BUCKET, bucketOf, ledgerOf, CHP_GROUP,
+    ACCT_NAME_TO_CODE, resolveAcctCode,
     DEPT_PREFIX, resolveDept, isJisa,
     JONGHAP_COLS, CHP_MEMBERS, JONGHAP_ROWS_CAP, JONGHAP_ROWS_PL,
   };

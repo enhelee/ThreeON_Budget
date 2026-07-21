@@ -94,7 +94,7 @@
     }
     for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1 });
 
-    // Step B: 텍스트 완전일치끼리 합이 0이면 제거 (2순위). 0 아니면 그대로 둠(4순위 미사용)
+    // Step B: 텍스트 완전일치끼리 통합. 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거)
     const byText = new Map();
     for (const s of stage) {
       const k = textKey(s.text);
@@ -105,7 +105,11 @@
     for (const [, arr] of byText) {
       const net = arr.reduce((s, x) => s + x.amount, 0);
       if (net === 0) continue; // 2순위: 합0 → 제거
-      for (const s of arr) result.push(s); // 나머지는 개별 유지
+      // 같은 텍스트는 한 줄로 합치고, 대표 워딩은 금액(절대값) 최대 건
+      let best = arr[0];
+      for (const x of arr) if (Math.abs(x.amount) > Math.abs(best.amount)) best = x;
+      const docNos = arr.reduce((a, x) => a.concat(x.docNos || []), []);
+      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0) });
     }
     return result;
   }
@@ -393,33 +397,216 @@
     return aoa;
   }
 
+  // 한 행의 소계/합계 열 계산 (소계=직전 소계 이후 지사합, 합계=전체 지사합)
+  function fillRowSubtotals(row, colType) {
+    let run = 0, grand = 0;
+    for (let c = 0; c < colType.length; c++) {
+      const ct = colType[c];
+      if (!ct) continue;
+      if (ct.t === "jisa" || ct.t === "cheo") { const v = Number(row[c]) || 0; run += v; grand += v; }
+      else if (ct.t === "sub") { row[c] = run; run = 0; }
+      else if (ct.t === "grand") { row[c] = grand; }
+    }
+  }
+
+  // 업로드된 집계표의 종합표 틀(AOA)을 읽어 실적을 채운다. 분류·행·열은 파일 그대로.
+  function fillJonghap(aoa, cleaned, ledger, C) {
+    const nrm = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\s/g, "");
+    const grid = aoa.map((r) => (r || []).slice());
+    const jisaNames = new Set(Object.values(C.DEPT_PREFIX).filter((n) => C.isJisa(n)));
+    const cheoNames = new Set(C.CHP_MEMBERS.cheo);
+    // 1) 헤더행: 지사명 최다인 행 (합계/그룹은 병합으로 윗행에 있을 수 있음)
+    let hr = -1, bestHits = -1;
+    for (let r = 0; r < grid.length; r++) {
+      const hits = grid[r].map(nrm).filter((c) => jisaNames.has(c)).length;
+      if (hits > bestHits) { bestHits = hits; hr = r; }
+    }
+    if (hr < 0 || bestHits <= 0) return grid;
+    // 2) 열 분류 — 지사명 행 + (병합으로 비면) 윗행 라벨 참조
+    const above = hr > 0 ? grid[hr - 1] : [];
+    const colType = grid[hr].map((v, c) => {
+      const nm = nrm(v) || nrm(above[c]);
+      if (nm === "합계") return { t: "grand" };
+      if (nm === "소계") return { t: "sub" };
+      if (jisaNames.has(nm)) return { t: "jisa", name: nm };
+      if (cheoNames.has(nm)) return { t: "cheo", name: nm };
+      return null;
+    });
+    // 3) 과목명→코드 사전, 과목 열 탐색
+    const name2code = {};
+    C.JONGHAP_ROWS_CAP.concat(C.JONGHAP_ROWS_PL).forEach((row) => { if (row.code) name2code[nrm(row.name)] = row.code; });
+    const maxC = Math.max(...grid.map((r) => r.length), 0);
+    let ac = -1, acHits = -1;
+    for (let c = 0; c < maxC; c++) {
+      let h = 0;
+      for (let r = hr + 1; r < grid.length; r++) if (name2code[nrm((grid[r] || [])[c])]) h++;
+      if (h > acHits) { acHits = h; ac = c; }
+    }
+    // 4) cleaned → 코드→지사명→합계
+    const byCode = {};
+    for (const x of cleaned) {
+      if (x.ledger !== ledger) continue;
+      const d = C.resolveDept(x.dept);
+      if (!d || !C.isJisa(d)) continue;
+      byCode[x.acct] = byCode[x.acct] || {};
+      byCode[x.acct][d] = (byCode[x.acct][d] || 0) + (Number(x.amount) || 0);
+    }
+    // 5) 아이템 행 채우기
+    const itemRows = [];
+    for (let r = hr + 1; r < grid.length; r++) {
+      const code = name2code[nrm((grid[r] || [])[ac])];
+      if (!code) continue;
+      itemRows.push(r);
+      const src = byCode[code] || {};
+      for (let c = 0; c < colType.length; c++) {
+        const ct = colType[c];
+        if (!ct) continue;
+        if (ct.t === "jisa") grid[r][c] = src[ct.name] || 0;
+        else if (ct.t === "cheo") grid[r][c] = 0;
+      }
+      fillRowSubtotals(grid[r], colType);
+    }
+    // 6) 총계/소계 행 재계산 (열별 아이템 합)
+    for (let r = hr + 1; r < grid.length; r++) {
+      if (itemRows.indexOf(r) >= 0) continue;
+      const label = String((grid[r] || [])[ac] == null ? "" : grid[r][ac]) + " " +
+        String((grid[r] || [])[0] == null ? "" : grid[r][0]);
+      const hasNum = colType.some((ct, c) => ct && typeof grid[r][c] === "number");
+      if (!hasNum && !/합계|계/.test(label)) continue; // 값 없는 빈 행은 건드리지 않음
+      const isGrand = /예산/.test(label); // "자본예산 합계", "손익예산 계"
+      const src = isGrand ? itemRows : itemRows.filter((ir) => ir < r);
+      for (let c = 0; c < colType.length; c++) {
+        if (!colType[c]) continue;
+        grid[r][c] = src.reduce((s, ir) => s + (Number(grid[ir][c]) || 0), 0);
+      }
+    }
+    return grid;
+  }
+
+  // ── 집계표 「계획 대비 실적」 시트에서 계획(사업명·연예산) 읽기 ──
+  function parseChipPlan(aoa, C) {
+    const nrm = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\s/g, "");
+    let hr = -1, header = null;
+    for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+      const hs = (aoa[i] || []).map(nrm);
+      if (hs.some((h) => h.includes("사업명")) && hs.some((h) => h.includes("예산과목"))) { hr = i; header = hs; break; }
+    }
+    if (hr < 0) return [];
+    const find = (pred) => header.findIndex(pred);
+    const ci = {
+      acctName: find((h) => h.includes("예산과목")),
+      attr: find((h) => h.includes("속성")),
+      hqDept: find((h) => h.includes("주관부서명")),
+      deptName: find((h) => h.includes("부서명(처") || h.includes("처.지사")),
+      teamName: find((h) => h.includes("부서명(팀") || h.includes("부서명(부")),
+      biz: find((h) => h.includes("사업명")),
+      annual: find((h) => h.includes("연예산")),
+    };
+    const g = (r, k) => (ci[k] >= 0 ? r[ci[k]] : "");
+    const out = [];
+    for (let i = hr + 1; i < aoa.length; i++) {
+      const r = aoa[i] || [];
+      const acctName = nfc(g(r, "acctName"));
+      const biz = nfc(String(g(r, "biz") == null ? "" : g(r, "biz"))).trim();
+      if (!acctName && !biz) continue;
+      if (String(g(r, "biz")).includes("미반영") || String(r[0]).includes("예시")) continue; // 안내/예시 행
+      const acct = C.resolveAcctCode(acctName);
+      if (!acct) continue; // 코드 매칭 안 되는 과목(건설공사 등)은 실적 대상 아님
+      out.push({
+        acct, acctName, ledger: C.ledgerOf(acct),
+        attr: nfc(g(r, "attr")), hqDept: nfc(g(r, "hqDept")),
+        deptName: nfc(g(r, "deptName")), teamName: nfc(g(r, "teamName")),
+        biz, annual: Number(g(r, "annual")) || 0,
+      });
+    }
+    return out;
+  }
+
+  // ── 계획(사업명) ↔ 실적(netting) 매칭. (지사명 × 과목코드) 기준, 사업명은 유사도 ──
+  function matchPlanToActual(cleaned, plan, C) {
+    const key = (dn, a) => dn + "" + a;
+    const pmap = new Map();
+    for (const p of plan) { const k = key(p.deptName, p.acct); if (!pmap.has(k)) pmap.set(k, []); pmap.get(k).push(p); }
+    const amap = new Map();
+    for (const x of cleaned) {
+      const dn = C.resolveDept(x.dept);
+      if (!dn) continue;
+      const k = key(dn, x.acct); if (!amap.has(k)) amap.set(k, []); amap.get(k).push(x);
+    }
+    const rows = [];
+    const stats = { matched: 0, shingyu: 0, noActual: 0 };
+    for (const k of new Set([...pmap.keys(), ...amap.keys()])) {
+      const plist = pmap.get(k) || [];
+      const alist = (amap.get(k) || []);
+      const p0 = plist[0] || {};
+      const a0 = alist[0] || {};
+      const acct = p0.acct || a0.acct;
+      const deptName = p0.deptName || C.resolveDept(a0.dept);
+      const base = {
+        ledger: C.ledgerOf(acct), acct, acctName: p0.acctName || a0.acctName,
+        dept: deptName, deptName, attr: p0.attr || "", hqDept: p0.hqDept || "", teamName: p0.teamName || "",
+      };
+      if (C.bucketOf(acct) === "gyeongsang") {
+        const actual = alist.reduce((s, x) => s + x.amount, 0);
+        const annual = plist.reduce((s, x) => s + x.annual, 0);
+        rows.push({ ...base, biz: plist.length === 1 ? plist[0].biz : "경상정비(통합)", annual, actual, flag: plist.length ? "매칭" : "신규" });
+        plist.length ? stats.matched++ : stats.shingyu++;
+        continue;
+      }
+      const assign = new Array(alist.length).fill(-1);
+      for (let i = 0; i < alist.length; i++) {
+        let bj = -1, best = 0;
+        for (let j = 0; j < plist.length; j++) { const s = diceSim(alist[i].text, plist[j].biz); if (s > best) { best = s; bj = j; } }
+        if (bj >= 0 && best >= SIM_THRESHOLD) assign[i] = bj;
+      }
+      for (let j = 0; j < plist.length; j++) {
+        let sum = 0, hit = false;
+        for (let i = 0; i < alist.length; i++) if (assign[i] === j) { sum += alist[i].amount; hit = true; }
+        rows.push({ ...base, biz: plist[j].biz, annual: plist[j].annual, actual: hit ? sum : 0, flag: hit ? "매칭" : "실적없음" });
+        hit ? stats.matched++ : stats.noActual++;
+      }
+      for (let i = 0; i < alist.length; i++) {
+        if (assign[i] >= 0) continue;
+        rows.push({ ...base, biz: alist[i].text, annual: "", actual: alist[i].amount, flag: "신규" });
+        stats.shingyu++;
+      }
+    }
+    return { rows, stats };
+  }
+
   // ── 전체 오케스트레이션: raw + 예산(자본/손익) → 결과 AOA 묶음 ──
   // 입력은 SheetJS sheet_to_json(header:1) 2차원 배열들.
   function runAll(input, C) {
-    const rawRows = input.rawRows || [];
-    const capRows = input.capBudgetRows || [];
-    const plRows = input.plBudgetRows || [];
+    const cleaned = netting(parseRaw(input.rawRows || []));
 
-    const cleaned = netting(parseRaw(rawRows));
-    const budget = [].concat(
-      capRows.length ? parseBudget(capRows) : [],
-      plRows.length ? parseBudget(plRows) : []
-    );
-    const { rows, stats } = matchToBudget(cleaned, budget, C);
+    // 계획(사업명·연예산) 소스: ① 집계표의 계획대비실적 시트 ② (하위호환) 주관부서예산
+    let plan = [], usedChip = false;
+    if ((input.capChipRows && input.capChipRows.length) || (input.plChipRows && input.plChipRows.length)) {
+      usedChip = true;
+      if (input.capChipRows) plan = plan.concat(parseChipPlan(input.capChipRows, C));
+      if (input.plChipRows) plan = plan.concat(parseChipPlan(input.plChipRows, C));
+    } else if ((input.capBudgetRows && input.capBudgetRows.length) || (input.plBudgetRows && input.plBudgetRows.length)) {
+      if (input.capBudgetRows) plan = plan.concat(parseBudget(input.capBudgetRows));
+      if (input.plBudgetRows) plan = plan.concat(parseBudget(input.plBudgetRows));
+    }
+    const matched = usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C);
+    const rows = matched.rows, stats = matched.stats;
 
     return {
-      cleaned, budget, matchRows: rows, stats,
+      cleaned, plan, matchRows: rows, stats,
       review: buildReviewSheets(cleaned, C),
       chipCap: buildChipgyepyoAOA(rows, "자본"),
       chipPl: buildChipgyepyoAOA(rows, "손익"),
-      jongCap: buildJonghapAOA(cleaned, "자본", C),
-      jongPl: buildJonghapAOA(cleaned, "손익", C),
+      // 종합표: 업로드 집계표의 종합표 틀이 있으면 그걸 채움(분류·행·열 파일 그대로), 없으면 자체 생성
+      jongCap: (input.capJongRows && input.capJongRows.length) ? fillJonghap(input.capJongRows, cleaned, "자본", C) : buildJonghapAOA(cleaned, "자본", C),
+      jongPl: (input.plJongRows && input.plJongRows.length) ? fillJonghap(input.plJongRows, cleaned, "손익", C) : buildJonghapAOA(cleaned, "손익", C),
     };
   }
 
   return {
     nfc, textKey, simNorm, bigrams, diceSim, SIM_THRESHOLD,
     parseRaw, nettingGroup, netting, buildReviewSheets,
-    parseBudget, matchToBudget, buildChipgyepyoAOA, buildJonghapAOA, runAll,
+    parseBudget, matchToBudget, buildChipgyepyoAOA, buildJonghapAOA,
+    fillJonghap, fillRowSubtotals, parseChipPlan, matchPlanToActual, runAll,
   };
 });
