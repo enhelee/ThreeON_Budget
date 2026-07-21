@@ -45,23 +45,31 @@
     "세종지사": "DH", "김해사업소": "DH", "양산지사": "DH", "평택지사": "DH",
   };
 
-  // raw 이름(I열) 안의 키워드 → 종합표 지사명
-  // (raw는 "강남(동남권)", "판교사업소" 처럼 표기가 달라서 키워드로 정규화. 첫 매칭 우선)
-  const DEPT_KEYWORDS = [
-    ["광주전남", "광주전남지사"],
-    ["동탄", "동탄지사"], ["화성", "화성지사"], ["파주", "파주지사"],
-    ["광교", "광교지사"], ["판교", "판교지사"], ["삼송", "삼송지사"],
-    ["대구", "대구지사"], ["청주", "청주지사"],
-    ["수원", "수원사업소"], ["강남", "강남지사"], ["서울남부", "강남지사"],
-    ["중앙", "중앙지사"], ["고양", "고양사업소"], ["용인", "용인지사"],
-    ["분당", "분당사업소"], ["세종", "세종지사"], ["김해", "김해사업소"],
-    ["양산", "양산지사"], ["경남", "양산지사"], ["평택", "평택지사"],
-  ];
-  function resolveDeptName(rawName) {
-    const s = (rawName || "").normalize("NFC");
-    for (const [kw, dept] of DEPT_KEYWORDS) if (s.includes(kw)) return dept;
-    return null; // 미매핑(본사/태양광/연료전지 등) → 검토 대상
+  // 자금관리센터(P열) 앞 4자리 → 조직명 (종합표 표기 기준)
+  // raw 표기(판교사업소, 강남(동남권) 등)와 종합표 표기(판교지사, 강남지사)가 달라
+  // 코드 접두로 매핑하면 흔들리지 않는다.
+  const DEPT_PREFIX = {
+    "1000": "본사",
+    "2010": "중앙지사", "2020": "강남지사",
+    "2030": "미래개발원", "2032": "미래개발원",
+    "3010": "분당사업소", "3020": "고양사업소", "3030": "수원사업소",
+    "3040": "용인지사", "3050": "화성지사", "3060": "파주지사",
+    "3070": "판교지사", "3080": "삼송지사", "3090": "광교지사",
+    "3100": "동탄지사", "3110": "평택지사",
+    "4010": "대구지사", "4020": "양산지사", "4022": "김해사업소",
+    "4030": "청주지사", "4040": "세종지사", "4050": "광주전남지사",
+  };
+  function resolveDept(mgmtCenter) {
+    const pre = String(mgmtCenter || "").trim().slice(0, 4);
+    return DEPT_PREFIX[pre] || null; // 미등록 접두 → 검토 대상
+  }
+  // 종합표 지사인지 (본사·미래개발원은 지사 아님 → CHP군 없음)
+  function isJisa(deptName) {
+    return Object.prototype.hasOwnProperty.call(CHP_GROUP, deptName);
   }
 
-  return { BUCKET, bucketOf, ledgerOf, CHP_GROUP, DEPT_KEYWORDS, resolveDeptName };
+  return {
+    BUCKET, bucketOf, ledgerOf, CHP_GROUP,
+    DEPT_PREFIX, resolveDept, isJisa,
+  };
 });
