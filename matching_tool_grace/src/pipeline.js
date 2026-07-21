@@ -669,11 +669,16 @@
         if (it.emptyText) { empties.push(it); continue; }
         const tg = bigrams(simNorm(it.text + " " + (it.costName || "")));
         const io = nrm(it.org);
-        let r = pickBest(prows.filter((p) => p.org === io), tg);
+        const soR = pickBest(prows.filter((p) => p.org === io), tg);
+        let r = soR;
         if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, tg);
-        if (r.row && r.best >= SIM_THRESHOLD) {
-          sumByRow[r.row.r] = (sumByRow[r.row.r] || 0) + it.amount;
-          if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = r.row.r;
+        let chosen = (r.row && r.best >= SIM_THRESHOLD) ? r.row : null;
+        // 경상정비 lump은 계획줄에 강제로 안 넣음(정답도 계획대비실적엔 거의 안 넣고 종합표에만).
+        // 그 외 과목은 같은 과목에 계획줄이 있으면 조직최고(없으면 전역최고)로 강제 배정 → recall↑
+        if (!chosen && it.bucket !== "gyeongsang" && prows.length) chosen = soR.row || r.row;
+        if (chosen) {
+          sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
+          if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
         } else unmatched.push(it);
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
