@@ -574,6 +574,78 @@
     return { rows, stats };
   }
 
+  // ── 계획대비실적 시트를 "있는 줄 그대로" 두고 실적(B)만 채움 (줄 추가 안 함) ──
+  // 같은 (조직 × 과목) 안에서 각 실적 항목을 가장 유사한 사업명 줄에 배정(그룹 내 argmax).
+  // 계획에 아예 없는 (조직×과목)의 실적은 맨 뒤에 집계 1줄씩만 "(계획미반영)"으로 추가.
+  function fillChipInPlace(aoa, cleaned, ledger, C) {
+    const nrm = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\s/g, "");
+    const grid = aoa.map((r) => (r || []).slice());
+    let hr = -1, header = null;
+    for (let i = 0; i < Math.min(grid.length, 10); i++) {
+      const h = (grid[i] || []).map(nrm);
+      if (h.some((x) => x.includes("사업명")) && h.some((x) => x.includes("예산과목"))) { hr = i; header = h; break; }
+    }
+    if (hr < 0) return { aoa: grid, stats: { planRows: 0, filled: 0, unplanned: 0 } };
+    const find = (p) => header.findIndex(p);
+    const ci = {
+      acctName: find((h) => h.includes("예산과목")),
+      deptName: find((h) => h.includes("부서명(처") || h.includes("처.지사")),
+      biz: find((h) => h.includes("사업명")),
+      actual: find((h) => h.includes("실적")),
+    };
+    if (ci.actual < 0) ci.actual = header.length - 1;
+    const SEP = "";
+    // 계획 줄을 (조직×과목)으로 그룹핑, 원본 행 인덱스 보존
+    const groups = new Map();
+    let planRows = 0;
+    for (let r = hr + 1; r < grid.length; r++) {
+      const biz = String(grid[r][ci.biz] == null ? "" : grid[r][ci.biz]).trim();
+      if (!biz) continue;
+      if (biz.includes("미반영") || String(grid[r][0]).includes("예시")) continue;
+      const code = C.resolveAcctCode(grid[r][ci.acctName]);
+      if (!code) continue;
+      const org = nrm(grid[r][ci.deptName]);
+      const k = org + SEP + code;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push({ r, biz });
+      planRows++;
+    }
+    // 실적 항목을 (조직×과목)으로 그룹핑
+    const amap = new Map();
+    for (const x of cleaned) {
+      if (x.ledger !== ledger || !x.org) continue;
+      const k = nrm(x.org) + SEP + x.acct;
+      if (!amap.has(k)) amap.set(k, []);
+      amap.get(k).push(x);
+    }
+    let filled = 0;
+    for (const [k, rowsG] of groups) {
+      const items = amap.get(k) || [];
+      const sums = new Array(rowsG.length).fill(0);
+      for (const it of items) {
+        let bj = 0, best = -1;
+        for (let j = 0; j < rowsG.length; j++) { const s = diceSim(it.text, rowsG[j].biz); if (s > best) { best = s; bj = j; } }
+        sums[bj] += it.amount;
+      }
+      rowsG.forEach((row, j) => { grid[row.r][ci.actual] = sums[j]; if (sums[j]) filled++; });
+      amap.delete(k); // 소비됨
+    }
+    // 계획에 없는 (조직×과목) → 집계 1줄씩만 추가
+    const extra = [];
+    for (const [, items] of amap) {
+      if (!items.length) continue;
+      const x0 = items[0];
+      const sum = items.reduce((s, y) => s + y.amount, 0);
+      const row = new Array(Math.max(grid[hr].length, ci.actual + 1)).fill("");
+      if (ci.acctName >= 0) row[ci.acctName] = x0.acctName;
+      if (ci.deptName >= 0) row[ci.deptName] = x0.org;
+      row[ci.biz] = "(계획미반영) " + x0.org + " " + x0.acctName;
+      row[ci.actual] = sum;
+      extra.push(row);
+    }
+    return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length } };
+  }
+
   // ── 전체 오케스트레이션: raw + 예산(자본/손익) → 결과 AOA 묶음 ──
   // 입력은 SheetJS sheet_to_json(header:1) 2차원 배열들.
   function runAll(input, C) {
@@ -589,14 +661,25 @@
       if (input.capBudgetRows) plan = plan.concat(parseBudget(input.capBudgetRows));
       if (input.plBudgetRows) plan = plan.concat(parseBudget(input.plBudgetRows));
     }
-    const matched = usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C);
-    const rows = matched.rows, stats = matched.stats;
+    // 계획대비실적: 업로드 집계표의 계획 줄을 그대로 두고 실적(B)만 채움
+    let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0 };
+    if (input.capChipRows && input.capChipRows.length) {
+      const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C);
+      chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned;
+    } else {
+      chipCap = buildChipgyepyoAOA((usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C)).rows, "자본");
+    }
+    if (input.plChipRows && input.plChipRows.length) {
+      const r = fillChipInPlace(input.plChipRows, cleaned, "손익", C);
+      chipPl = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned;
+    } else {
+      chipPl = buildChipgyepyoAOA((usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C)).rows, "손익");
+    }
 
     return {
-      cleaned, plan, matchRows: rows, stats,
+      cleaned, plan, stats,
       review: buildReviewSheets(cleaned, C),
-      chipCap: buildChipgyepyoAOA(rows, "자본"),
-      chipPl: buildChipgyepyoAOA(rows, "손익"),
+      chipCap, chipPl,
       // 종합표: 업로드 집계표의 종합표 틀이 있으면 그걸 채움(분류·행·열 파일 그대로), 없으면 자체 생성
       jongCap: (input.capJongRows && input.capJongRows.length) ? fillJonghap(input.capJongRows, cleaned, "자본", C) : buildJonghapAOA(cleaned, "자본", C),
       jongPl: (input.plJongRows && input.plJongRows.length) ? fillJonghap(input.plJongRows, cleaned, "손익", C) : buildJonghapAOA(cleaned, "손익", C),
@@ -607,6 +690,6 @@
     nfc, textKey, simNorm, bigrams, diceSim, SIM_THRESHOLD,
     parseRaw, nettingGroup, netting, buildReviewSheets,
     parseBudget, matchToBudget, buildChipgyepyoAOA, buildJonghapAOA,
-    fillJonghap, fillRowSubtotals, parseChipPlan, matchPlanToActual, runAll,
+    fillJonghap, fillRowSubtotals, fillChipInPlace, parseChipPlan, matchPlanToActual, runAll,
   };
 });

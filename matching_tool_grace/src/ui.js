@@ -42,10 +42,9 @@
     const s = R.stats;
     const cards = [
       ["netting 정리 항목", R.cleaned.length],
-      ["계획 사업 라인", R.plan.length],
-      ["매칭", s.matched],
-      ["신규(계획 미반영)", s.shingyu],
-      ["실적없음", s.noActual],
+      ["계획 사업 줄", s.planRows],
+      ["실적 채운 줄", s.filled],
+      ["계획 미반영(추가줄)", s.unplanned],
     ];
     $("stats").innerHTML = cards.map(([k, n]) =>
       `<div class="stat"><div class="n">${n.toLocaleString()}</div><div class="k">${k}</div></div>`

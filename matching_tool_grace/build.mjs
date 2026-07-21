@@ -45,7 +45,7 @@ ${css}
       <button data-dl="cap">양식3 · 자본 집계표 내려받기</button>
       <button data-dl="review" class="ghost">netting 검토표 내려받기</button>
     </div>
-    <p class="hint">※ 구분 열: <b>매칭</b>(예산 사업명과 실적 일치) / <b>신규</b>(예산에 없는 실적=계획 미반영) / <b>실적없음</b>(예산은 있으나 실적 0). 신규 항목은 본사에서 확인하세요.</p>
+    <p class="hint">※ 계획대비실적: 업로드한 집계표의 <b>사업명 줄은 그대로</b> 두고 <b>실적(B)만</b> raw에서 채웁니다. 계획에 아예 없는 (조직×과목)의 실적은 맨 아래에 <b>(계획미반영)</b> 집계 줄로 표시됩니다.</p>
   </div>
 
   <footer>단일 파일 · 오프라인 동작 · SheetJS 인라인</footer>

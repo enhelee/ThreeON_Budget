@@ -184,5 +184,28 @@ ok(gr[2] === 400, "fillJonghap: 본사 플랜트기술처 열 = 400");
 ok(gr[4] === 400, "fillJonghap: 처 소계 = 400");
 ok(gr[7] === 500, "fillJonghap: 합계 = 처400+지사100 = 500");
 
+// ── fillChipInPlace: 있는 줄에 실적만 채움, 줄 폭증 없음 ──
+const chipIn = [
+  ["연번", "예산과목", "속성", "주관부서명", "예산귀속 부서명(처.지사)", "예산귀속 부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)"],
+  ["예시)", "수선유지비-건물/구축물", "", "", "", "", "미반영 신규사업 예시", 0, ""],
+  [1, "수선유지비-열원보완개선및기타", "제조", "플랜트", "강남지사", "강남 고객지원부", "노후 전동밸브 개체", 500, ""],
+  [2, "수선유지비-열원보완개선및기타", "제조", "플랜트", "강남지사", "강남 고객지원부", "제어분야 경상보수 자재구매", 300, ""],
+];
+const chipClean = [
+  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 480, text: "노후 전동밸브 개체 교체" },
+  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 320, text: "제어분야 경상보수자재 구매(추가)" },
+  { org: "용인지사", acct: "60909009", ledger: "손익", amount: 999, text: "계획에 없는 용인 공사" }, // 계획 없는 조직 → 미반영 1줄
+];
+const fr = P.fillChipInPlace(chipIn, chipClean, "손익", C);
+const outRows = fr.aoa;
+const bIdx = 8;
+const rowBy = (nm) => outRows.find((r) => r[6] === nm);
+ok(rowBy("노후 전동밸브 개체")[bIdx] === 480, "fillChip: 전동밸브 실적 480 (실제:" + rowBy("노후 전동밸브 개체")[bIdx] + ")");
+ok(rowBy("제어분야 경상보수 자재구매")[bIdx] === 320, "fillChip: 제어자재 실적 320");
+ok(fr.stats.unplanned === 1, "fillChip: 계획없는 조직 → 미반영 1줄만 (실제:" + fr.stats.unplanned + ")");
+ok(outRows.length === chipIn.length + 1, "fillChip: 줄 폭증 없음 (입력+미반영1)");
+const unp = outRows.find((r) => String(r[6]).includes("계획미반영"));
+ok(unp && unp[bIdx] === 999, "fillChip: 미반영 집계 실적 999");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
