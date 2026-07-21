@@ -54,7 +54,7 @@
     return (2 * inter) / (a.size + b.size);
   }
   const SIM_THRESHOLD = (typeof process !== "undefined" && process.env && process.env.SIM_TH)
-    ? Number(process.env.SIM_TH) : 0.35; // 매칭 임계 (정답 대조 후 튜닝, 튜닝 시 SIM_TH 환경변수)
+    ? Number(process.env.SIM_TH) : 0.35; // 매칭 임계 (overlap 기준, SIM_TH 환경변수로 튜닝)
   const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
   const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
@@ -665,11 +665,13 @@
     const unmatched = [];
     const sumByRow = {};
     // IDF 가중 dice: 과목 내에서 공통인 bigram은 약하게, 희귀(구분되는) bigram은 강하게
+    const METRIC = (typeof process !== "undefined" && process.env && process.env.SIM_METRIC) || "overlap";
     const wDice = (ag, bg, idf, defW) => {
       let inter = 0, sa = 0, sb = 0;
       for (const g of ag) { const w = idf.get(g) || defW; sa += w; if (bg.has(g)) inter += w; }
       for (const g of bg) sb += (idf.get(g) || defW);
-      return (sa + sb) ? (2 * inter) / (sa + sb) : 0;
+      if (METRIC === "overlap") return Math.min(sa, sb) ? inter / Math.min(sa, sb) : 0; // 포함도
+      return (sa + sb) ? (2 * inter) / (sa + sb) : 0; // dice
     };
     for (const [code, items] of actByCode) {
       const prows = planByCode.get(code) || [];
