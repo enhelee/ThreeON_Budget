@@ -39,7 +39,8 @@
     for (const g of a) if (b.has(g)) inter++;
     return (2 * inter) / (a.size + b.size);
   }
-  const SIM_THRESHOLD = 0.25; // 이 값 이상이면 같은 사업으로 매칭 (정답 대조 후 튜닝)
+  const SIM_THRESHOLD = (typeof process !== "undefined" && process.env && process.env.SIM_TH)
+    ? Number(process.env.SIM_TH) : 0.35; // 매칭 임계 (정답 대조 후 튜닝, 튜닝 시 SIM_TH 환경변수)
   const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
   const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
@@ -620,19 +621,34 @@
     let filled = 0;
     const unmatched = [];
     const sumByRow = {};
-    const pickBest = (pool, text) => {
-      let bj = -1, best = 0;
-      for (let j = 0; j < pool.length; j++) { const sc = diceSim(text, pool[j].biz); if (sc > best) { best = sc; bj = j; } }
-      return { row: bj >= 0 ? pool[bj] : null, best };
+    // IDF 가중 dice: 과목 내에서 공통인 bigram은 약하게, 희귀(구분되는) bigram은 강하게
+    const wDice = (ag, bg, idf, defW) => {
+      let inter = 0, sa = 0, sb = 0;
+      for (const g of ag) { const w = idf.get(g) || defW; sa += w; if (bg.has(g)) inter += w; }
+      for (const g of bg) sb += (idf.get(g) || defW);
+      return (sa + sb) ? (2 * inter) / (sa + sb) : 0;
     };
     for (const [code, items] of actByCode) {
       const prows = planByCode.get(code) || [];
+      // 과목 내 사업명 bigram IDF 계산 (지역/분야 등 구분 단어 강조)
+      const df = new Map();
+      for (const p of prows) { p._g = bigrams(simNorm(p.biz)); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
+      const N = prows.length || 1;
+      const idf = new Map();
+      for (const [g, d] of df) idf.set(g, Math.log((N + 1) / d) + 1);
+      const defW = Math.log(N + 1) + 1; // 계획에 없던 bigram = 희귀 취급
+      const pickBest = (pool, tg) => {
+        let row = null, best = 0;
+        for (const p of pool) { const sc = wDice(tg, p._g, idf, defW); if (sc > best) { best = sc; row = p; } }
+        return { row, best };
+      };
       for (const it of items) {
+        const tg = bigrams(simNorm(it.text));
         const io = nrm(it.org);
         // 1) 같은 조직(지사/처) 우선
-        let r = pickBest(prows.filter((p) => p.org === io), it.text);
+        let r = pickBest(prows.filter((p) => p.org === io), tg);
         // 2) 못 붙으면 전역(부서 무관) — 처 집행/지사 귀속 등
-        if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, it.text);
+        if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, tg);
         if (r.row && r.best >= SIM_THRESHOLD) sumByRow[r.row.r] = (sumByRow[r.row.r] || 0) + it.amount;
         else unmatched.push(it);
       }
