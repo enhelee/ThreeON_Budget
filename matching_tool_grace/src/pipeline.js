@@ -123,5 +123,48 @@
     return cleaned;
   }
 
-  return { nfc, textKey, parseRaw, nettingGroup, netting };
+  // ── netting 결과 → 검토용 시트 데이터(AOA) ──────────────
+  // C: constants (지사 매핑용). 반환: {items:[[...]], pivot:[[...]]}
+  function buildReviewSheets(cleaned, C) {
+    const deptName = (d) => C.resolveDept(d) || "(지사아님)";
+    const chp = (d) => {
+      const nm = C.resolveDept(d);
+      return nm && C.CHP_GROUP[nm] ? C.CHP_GROUP[nm] : "";
+    };
+    // 정렬: 자본/손익 → 지사 → 과목 → 금액 desc
+    const sorted = [...cleaned].sort((a, b) =>
+      (a.ledger).localeCompare(b.ledger) ||
+      String(a.dept).localeCompare(String(b.dept)) ||
+      String(a.acct).localeCompare(String(b.acct)) ||
+      b.amount - a.amount
+    );
+    const items = [[
+      "자본/손익", "사업군", "지사", "자금관리센터", "예산과목코드", "예산과목",
+      "버킷", "대표텍스트(사업명)", "실적금액", "관련전표수",
+    ]];
+    for (const x of sorted) {
+      items.push([
+        x.ledger, chp(x.dept), deptName(x.dept), x.dept,
+        x.acct, x.acctName, x.bucket, x.text, x.amount, x.n,
+      ]);
+    }
+    // 피벗: (지사 × 과목) 합계
+    const pivMap = new Map();
+    for (const x of cleaned) {
+      const k = x.dept + "" + x.acct;
+      if (!pivMap.has(k))
+        pivMap.set(k, { ledger: x.ledger, dept: x.dept, acct: x.acct, acctName: x.acctName, sum: 0, cnt: 0 });
+      const p = pivMap.get(k);
+      p.sum += x.amount; p.cnt++;
+    }
+    const pivot = [["자본/손익", "사업군", "지사", "자금관리센터", "예산과목코드", "예산과목", "실적합계", "정리항목수"]];
+    for (const p of [...pivMap.values()].sort((a, b) =>
+      a.ledger.localeCompare(b.ledger) || String(a.dept).localeCompare(String(b.dept)) || String(a.acct).localeCompare(String(b.acct))
+    )) {
+      pivot.push([p.ledger, chp(p.dept), deptName(p.dept), p.dept, p.acct, p.acctName, p.sum, p.cnt]);
+    }
+    return { items, pivot };
+  }
+
+  return { nfc, textKey, parseRaw, nettingGroup, netting, buildReviewSheets };
 });
