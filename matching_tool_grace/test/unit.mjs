@@ -64,9 +64,9 @@ ok(nClean.length === 0, "같은 전표 합0 → 상계 제거 (실제 남은: " 
 
 // ── 종합표 격자: 칸 배치 / 소계 / 합계 ──
 const jClean = [
-  { dept: "3040001", org: "용인지사", acct: "60909009", ledger: "손익", amount: 100 }, // 용인지사(DH)
-  { dept: "2020001", org: "강남지사", acct: "60909009", ledger: "손익", amount: 50 },  // 강남지사(소형CHP)
-  { dept: "3050001", org: "화성지사", acct: "20704001", ledger: "자본", amount: 200 }, // 화성지사(중대형CHP)
+  { dept: "3040001", org: "용인지사", acct: "60909009", ledger: "손익", amount: 100000 }, // 용인지사(DH) → 100천원
+  { dept: "2020001", org: "강남지사", acct: "60909009", ledger: "손익", amount: 50000 },  // 강남지사(소형CHP) → 50
+  { dept: "3050001", org: "화성지사", acct: "20704001", ledger: "자본", amount: 200000 }, // 화성지사(중대형CHP) → 200
 ];
 const jPl = P.buildJonghapAOA(jClean, "손익", C);
 const nameRow = jPl[1];
@@ -127,9 +127,9 @@ const jongTmpl = [
   ["자본예산 합계", "", 0, 0, 0, 0, 0],
 ];
 const jClean2 = [
-  { dept: "3100001", org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100 }, // 동탄
-  { dept: "4020001", org: "양산지사", acct: "20704001", ledger: "자본", amount: 300 }, // 양산
-  { dept: "3030001", org: "수원사업소", acct: "20704001", ledger: "자본", amount: 20 },  // 수원
+  { dept: "3100001", org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100000 }, // 동탄 → 100
+  { dept: "4020001", org: "양산지사", acct: "20704001", ledger: "자본", amount: 300000 }, // 양산 → 300
+  { dept: "3030001", org: "수원사업소", acct: "20704001", ledger: "자본", amount: 20000 },  // 수원 → 20
 ];
 const filledJ = P.fillJonghap(jongTmpl, jClean2, "자본", C);
 const gigyeRow = filledJ.find((r) => r[1] === "기계장치");
@@ -175,8 +175,8 @@ const jongCheo = [
   ["자본예산 합계", "", 0, 0, 0, 0, 0, 0],
 ];
 const clCheo = [
-  { org: "플랜트기술처", acct: "20704001", ledger: "자본", amount: 400 },
-  { org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100 },
+  { org: "플랜트기술처", acct: "20704001", ledger: "자본", amount: 400000 }, // → 400
+  { org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100000 },     // → 100
 ];
 const fc = P.fillJonghap(jongCheo, clCheo, "자본", C);
 const gr = fc.find((r) => r[1] === "기계장치");
@@ -192,9 +192,9 @@ const chipIn = [
   [2, "수선유지비-열원보완개선및기타", "제조", "플랜트", "강남지사", "강남 고객지원부", "제어분야 경상보수 자재구매", 300, ""],
 ];
 const chipClean = [
-  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 480, text: "노후 전동밸브 개체 교체" },
-  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 320, text: "제어분야 경상보수자재 구매(추가)" },
-  { org: "용인지사", acct: "60909009", ledger: "손익", amount: 999, text: "계획에 없는 용인 공사" }, // 계획 없는 조직 → 미반영 1줄
+  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 480000, text: "노후 전동밸브 개체 교체" }, // → 480
+  { org: "강남지사", acct: "60909009", ledger: "손익", amount: 320000, text: "제어분야 경상보수자재 구매(추가)" }, // → 320
+  { org: "용인지사", acct: "60909009", ledger: "손익", amount: 999000, text: "계획에 없는 용인 공사" }, // → 999 신규
 ];
 const fr = P.fillChipInPlace(chipIn, chipClean, "손익", C);
 const outRows = fr.aoa;

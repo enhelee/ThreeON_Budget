@@ -40,6 +40,8 @@
     return (2 * inter) / (a.size + b.size);
   }
   const SIM_THRESHOLD = 0.25; // 이 값 이상이면 같은 사업으로 매칭 (정답 대조 후 튜닝)
+  const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
+  const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
   // ── [1] raw 파싱 ─────────────────────────────────────────
   // rows: SheetJS sheet_to_json(header:1) 결과 (2차원 배열). 헤더 1줄 가정.
@@ -336,7 +338,7 @@
     );
     const aoa = [["연번", "예산과목", "속성", "주관부서명", "예산귀속 부서명(처.지사)", "예산귀속 부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)", "구분"]];
     filtered.forEach((r, i) => {
-      aoa.push([i + 1, r.acctName, r.attr, r.hqDept, r.deptName, r.teamName, r.biz, r.annual, r.actual, r.flag]);
+      aoa.push([i + 1, r.acctName, r.attr, r.hqDept, r.deptName, r.teamName, r.biz, r.annual, toUnit(r.actual), r.flag]);
     });
     return aoa;
   }
@@ -358,11 +360,11 @@
     // 한 과목(code) 행의 열 배열 계산
     function itemValues(code) {
       const src = code ? byCode[code] || {} : {};
-      const arr = cols.map((c) => (c.kind === "jisa" ? (src[c.name] || 0) : 0));
+      const arr = cols.map((c) => (c.kind === "jisa" ? toUnit(src[c.name] || 0) : 0));
       cols.forEach((c, i) => {
         if (c.kind === "subtotal") {
           const members = C.CHP_MEMBERS[c.group] || [];
-          arr[i] = members.reduce((s, nm) => s + (src[nm] || 0), 0);
+          arr[i] = members.reduce((s, nm) => s + toUnit(src[nm] || 0), 0);
         }
       });
       arr[gtIdx] = cols.reduce((s, c, i) => (c.kind === "subtotal" ? s + arr[i] : s), 0);
@@ -462,7 +464,7 @@
       for (let c = 0; c < colType.length; c++) {
         const ct = colType[c];
         if (!ct) continue;
-        if (ct.t === "jisa" || ct.t === "cheo") grid[r][c] = src[ct.name] || 0;
+        if (ct.t === "jisa" || ct.t === "cheo") grid[r][c] = toUnit(src[ct.name] || 0);
       }
       fillRowSubtotals(grid[r], colType);
     }
@@ -632,7 +634,7 @@
     }
     for (const code of planByCode.keys())
       for (const pr of planByCode.get(code))
-        if (sumByRow[pr.r] != null) { grid[pr.r][ci.actual] = sumByRow[pr.r]; if (sumByRow[pr.r]) filled++; }
+        if (sumByRow[pr.r] != null) { grid[pr.r][ci.actual] = toUnit(sumByRow[pr.r]); if (sumByRow[pr.r]) filled++; }
     // 계획에 없는 실적 → 신규 줄 추가(개별)
     const extra = [];
     for (const it of unmatched) {
@@ -640,7 +642,7 @@
       if (ci.acctName >= 0) row[ci.acctName] = it.acctName;
       if (ci.deptName >= 0) row[ci.deptName] = it.org || "";
       row[ci.biz] = "(신규) " + it.text;
-      row[ci.actual] = it.amount;
+      row[ci.actual] = toUnit(it.amount);
       extra.push(row);
     }
     return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length } };
