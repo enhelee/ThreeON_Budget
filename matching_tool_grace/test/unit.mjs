@@ -202,10 +202,10 @@ const bIdx = 8;
 const rowBy = (nm) => outRows.find((r) => r[6] === nm);
 ok(rowBy("노후 전동밸브 개체")[bIdx] === 480, "fillChip: 전동밸브 실적 480 (실제:" + rowBy("노후 전동밸브 개체")[bIdx] + ")");
 ok(rowBy("제어분야 경상보수 자재구매")[bIdx] === 320, "fillChip: 제어자재 실적 320");
-ok(fr.stats.unplanned === 1, "fillChip: 계획없는 조직 → 미반영 1줄만 (실제:" + fr.stats.unplanned + ")");
-ok(outRows.length === chipIn.length + 1, "fillChip: 줄 폭증 없음 (입력+미반영1)");
-const unp = outRows.find((r) => String(r[6]).includes("계획미반영"));
-ok(unp && unp[bIdx] === 999, "fillChip: 미반영 집계 실적 999");
+ok(fr.stats.unplanned === 1, "fillChip: 계획없는 실적 → 신규 1줄 (실제:" + fr.stats.unplanned + ")");
+ok(outRows.length === chipIn.length + 1, "fillChip: 줄 폭증 없음 (입력+신규1)");
+const unp = outRows.find((r) => String(r[6]).includes("(신규)"));
+ok(unp && unp[bIdx] === 999, "fillChip: 신규 실적 999");
 
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

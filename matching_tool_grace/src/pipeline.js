@@ -39,7 +39,7 @@
     for (const g of a) if (b.has(g)) inter++;
     return (2 * inter) / (a.size + b.size);
   }
-  const SIM_THRESHOLD = 0.34; // 이 값 이상이면 같은 사업으로 매칭 (튜닝 가능)
+  const SIM_THRESHOLD = 0.25; // 이 값 이상이면 같은 사업으로 매칭 (정답 대조 후 튜닝)
 
   // ── [1] raw 파싱 ─────────────────────────────────────────
   // rows: SheetJS sheet_to_json(header:1) 결과 (2차원 배열). 헤더 1줄 가정.
@@ -586,7 +586,7 @@
       if (h.some((x) => x.includes("사업명")) && h.some((x) => x.includes("예산과목"))) { hr = i; header = h; break; }
     }
     if (hr < 0) return { aoa: grid, stats: { planRows: 0, filled: 0, unplanned: 0 } };
-    const find = (p) => header.findIndex(p);
+    const find = (pr) => header.findIndex(pr);
     const ci = {
       acctName: find((h) => h.includes("예산과목")),
       deptName: find((h) => h.includes("부서명(처") || h.includes("처.지사")),
@@ -594,9 +594,8 @@
       actual: find((h) => h.includes("실적")),
     };
     if (ci.actual < 0) ci.actual = header.length - 1;
-    const SEP = "";
-    // 계획 줄을 (조직×과목)으로 그룹핑, 원본 행 인덱스 보존
-    const groups = new Map();
+    // 계획 줄을 "예산과목 코드"별로만 그룹핑(부서 무관) — 사업명은 raw 전체에서 검색해 매칭
+    const planByCode = new Map();
     let planRows = 0;
     for (let r = hr + 1; r < grid.length; r++) {
       const biz = String(grid[r][ci.biz] == null ? "" : grid[r][ci.biz]).trim();
@@ -604,43 +603,44 @@
       if (biz.includes("미반영") || String(grid[r][0]).includes("예시")) continue;
       const code = C.resolveAcctCode(grid[r][ci.acctName]);
       if (!code) continue;
-      const org = nrm(grid[r][ci.deptName]);
-      const k = org + SEP + code;
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push({ r, biz });
+      if (!planByCode.has(code)) planByCode.set(code, []);
+      planByCode.get(code).push({ r, biz });
       planRows++;
     }
-    // 실적 항목을 (조직×과목)으로 그룹핑
-    const amap = new Map();
+    // 실적 항목을 예산과목 코드별로 그룹핑
+    const actByCode = new Map();
     for (const x of cleaned) {
-      if (x.ledger !== ledger || !x.org) continue;
-      const k = nrm(x.org) + SEP + x.acct;
-      if (!amap.has(k)) amap.set(k, []);
-      amap.get(k).push(x);
+      if (x.ledger !== ledger) continue;
+      if (!actByCode.has(x.acct)) actByCode.set(x.acct, []);
+      actByCode.get(x.acct).push(x);
     }
+    // 각 실적 항목 → 같은 과목의 계획 사업명 중 최고 유사도 줄에 배정(부서 무관). 임계 미만은 신규.
     let filled = 0;
-    for (const [k, rowsG] of groups) {
-      const items = amap.get(k) || [];
-      const sums = new Array(rowsG.length).fill(0);
+    const unmatched = [];
+    const sumByRow = {};
+    for (const [code, items] of actByCode) {
+      const prows = planByCode.get(code) || [];
       for (const it of items) {
-        let bj = 0, best = -1;
-        for (let j = 0; j < rowsG.length; j++) { const s = diceSim(it.text, rowsG[j].biz); if (s > best) { best = s; bj = j; } }
-        sums[bj] += it.amount;
+        let bj = -1, best = 0;
+        for (let j = 0; j < prows.length; j++) {
+          const sc = diceSim(it.text, prows[j].biz);
+          if (sc > best) { best = sc; bj = j; }
+        }
+        if (bj >= 0 && best >= SIM_THRESHOLD) sumByRow[prows[bj].r] = (sumByRow[prows[bj].r] || 0) + it.amount;
+        else unmatched.push(it);
       }
-      rowsG.forEach((row, j) => { grid[row.r][ci.actual] = sums[j]; if (sums[j]) filled++; });
-      amap.delete(k); // 소비됨
     }
-    // 계획에 없는 (조직×과목) → 집계 1줄씩만 추가
+    for (const code of planByCode.keys())
+      for (const pr of planByCode.get(code))
+        if (sumByRow[pr.r] != null) { grid[pr.r][ci.actual] = sumByRow[pr.r]; if (sumByRow[pr.r]) filled++; }
+    // 계획에 없는 실적 → 신규 줄 추가(개별)
     const extra = [];
-    for (const [, items] of amap) {
-      if (!items.length) continue;
-      const x0 = items[0];
-      const sum = items.reduce((s, y) => s + y.amount, 0);
+    for (const it of unmatched) {
       const row = new Array(Math.max(grid[hr].length, ci.actual + 1)).fill("");
-      if (ci.acctName >= 0) row[ci.acctName] = x0.acctName;
-      if (ci.deptName >= 0) row[ci.deptName] = x0.org;
-      row[ci.biz] = "(계획미반영) " + x0.org + " " + x0.acctName;
-      row[ci.actual] = sum;
+      if (ci.acctName >= 0) row[ci.acctName] = it.acctName;
+      if (ci.deptName >= 0) row[ci.deptName] = it.org || "";
+      row[ci.biz] = "(신규) " + it.text;
+      row[ci.actual] = it.amount;
       extra.push(row);
     }
     return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length } };
