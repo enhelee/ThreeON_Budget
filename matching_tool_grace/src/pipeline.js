@@ -89,17 +89,18 @@
       } else noDoc.push(it);
     }
     let stage = [];
-    const repText = (arr) => {
+    const repItem = (arr) => {
       let best = arr[0];
       for (const x of arr) if (Math.abs(x.amount) > Math.abs(best.amount)) best = x;
-      return best.text;
+      return best;
     };
     for (const [docNo, arr] of byDoc) {
       const net = arr.reduce((s, x) => s + x.amount, 0);
       if (net === 0) continue; // 1순위: 합0 → 제거
-      stage.push({ text: repText(arr), amount: net, docNos: [docNo], n: arr.length });
+      const b = repItem(arr);
+      stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI });
     }
-    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1 });
+    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI });
 
     // Step B: 텍스트 완전일치끼리 통합. 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거)
     const byText = new Map();
@@ -116,7 +117,7 @@
       let best = arr[0];
       for (const x of arr) if (Math.abs(x.amount) > Math.abs(best.amount)) best = x;
       const docNos = arr.reduce((a, x) => a.concat(x.docNos || []), []);
-      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0) });
+      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName });
     }
     return result;
   }
@@ -143,7 +144,7 @@
       if (meta.bucket === "gyeongsang") {
         // 경상정비: 전표수·전기일·사업명 무관 지사별 1건 합산
         const total = items.reduce((s, x) => s + x.amount, 0);
-        cleaned.push({ ...meta, text: "경상정비 통합", amount: total, docNos: [], n: items.length });
+        cleaned.push({ ...meta, text: "경상정비 통합", amount: total, docNos: [], n: items.length, costName: items[0].nameI });
         continue;
       }
       let netted = nettingGroup(items);
@@ -643,7 +644,8 @@
         return { row, best };
       };
       for (const it of items) {
-        const tg = bigrams(simNorm(it.text));
+        // 코스트센터 이름(예: "강남(동남권)")을 매칭 텍스트에 더해 세부 위치까지 반영
+        const tg = bigrams(simNorm(it.text + " " + (it.costName || "")));
         const io = nrm(it.org);
         // 1) 같은 조직(지사/처) 우선
         let r = pickBest(prows.filter((p) => p.org === io), tg);
