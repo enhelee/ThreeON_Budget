@@ -67,6 +67,7 @@
         text: nfc(r[7] == null ? "" : String(r[7])).trim(),
         nameI: nfc(r[8]),
         nameJ,
+        vendor: String(r[14] == null ? "" : r[14]).trim(), // O열 공급업체 — 빈텍스트 사업 식별 단서
         mgmtCenter,
         org: C.resolveOrg(mgmtCenter, nameJ), // 종합표 열(지사 or 처) or null
         bucket: C.bucketOf(acct),
@@ -98,9 +99,9 @@
       const net = arr.reduce((s, x) => s + x.amount, 0);
       if (net === 0) continue; // 1순위: 합0 → 제거
       const b = repItem(arr);
-      stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI });
+      stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI, vendor: b.vendor });
     }
-    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI });
+    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI, vendor: it.vendor });
 
     // Step B: 텍스트 완전일치끼리 통합. 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거)
     const byText = new Map();
@@ -117,7 +118,7 @@
       let best = arr[0];
       for (const x of arr) if (Math.abs(x.amount) > Math.abs(best.amount)) best = x;
       const docNos = arr.reduce((a, x) => a.concat(x.docNos || []), []);
-      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName });
+      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName, vendor: best.vendor });
     }
     return result;
   }
@@ -145,6 +146,22 @@
         // 경상정비: 전표수·전기일·사업명 무관 지사별 1건 합산
         const total = items.reduce((s, x) => s + x.amount, 0);
         cleaned.push({ ...meta, text: "경상정비 통합", amount: total, docNos: [], n: items.length, costName: items[0].nameI });
+        continue;
+      }
+      if (meta.bucket === "rule3") {
+        // rule3(자산화예비품·고온부품·저장품): 텍스트 있는 건 일반 netting,
+        // 텍스트 없는 건 공급업체(vendor)별로 합산해 유지(사업 배정은 fillChipInPlace에서)
+        const textItems = items.filter((x) => textKey(x.text) !== "");
+        const emptyItems = items.filter((x) => textKey(x.text) === "");
+        for (const x of nettingGroup(textItems)) cleaned.push({ ...meta, ...x });
+        const byV = new Map();
+        for (const it of emptyItems) { const v = it.vendor || "(무vendor)"; if (!byV.has(v)) byV.set(v, []); byV.get(v).push(it); }
+        for (const [v, arr] of byV) {
+          const net = arr.reduce((s, x) => s + x.amount, 0);
+          if (net === 0) continue; // 상계로 0이면 제거
+          const b = arr.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), arr[0]);
+          cleaned.push({ ...meta, text: "", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: v, emptyText: true });
+        }
         continue;
       }
       let netted = nettingGroup(items);
@@ -643,16 +660,39 @@
         for (const p of pool) { const sc = wDice(tg, p._g, idf, defW); if (sc > best) { best = sc; row = p; } }
         return { row, best };
       };
+      const rowsByOrg = {};
+      for (const p of prows) (rowsByOrg[p.org] = rowsByOrg[p.org] || []).push(p);
+      const vendorToRow = {}; // 런타임 학습: vendor → 계획줄 r (텍스트 매칭에서 배움)
+      // 1패스: 텍스트 있는 항목 배정 + vendor→사업 학습
+      const empties = [];
       for (const it of items) {
-        // 코스트센터 이름(예: "강남(동남권)")을 매칭 텍스트에 더해 세부 위치까지 반영
+        if (it.emptyText) { empties.push(it); continue; }
         const tg = bigrams(simNorm(it.text + " " + (it.costName || "")));
         const io = nrm(it.org);
-        // 1) 같은 조직(지사/처) 우선
         let r = pickBest(prows.filter((p) => p.org === io), tg);
-        // 2) 못 붙으면 전역(부서 무관) — 처 집행/지사 귀속 등
         if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, tg);
-        if (r.row && r.best >= SIM_THRESHOLD) sumByRow[r.row.r] = (sumByRow[r.row.r] || 0) + it.amount;
-        else unmatched.push(it);
+        if (r.row && r.best >= SIM_THRESHOLD) {
+          sumByRow[r.row.r] = (sumByRow[r.row.r] || 0) + it.amount;
+          if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = r.row.r;
+        } else unmatched.push(it);
+      }
+      // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
+      const unassigned = {};
+      for (const it of empties) {
+        const io = nrm(it.org);
+        if (it.vendor && vendorToRow[it.vendor] != null) {
+          const rr = vendorToRow[it.vendor]; sumByRow[rr] = (sumByRow[rr] || 0) + it.amount;
+        } else if ((rowsByOrg[io] || []).length === 1) {
+          const rr = rowsByOrg[io][0].r; sumByRow[rr] = (sumByRow[rr] || 0) + it.amount;
+        } else {
+          const k = io + "||" + code;
+          unassigned[k] = unassigned[k] || { org: it.org, acctName: it.acctName, sum: 0 };
+          unassigned[k].sum += it.amount;
+        }
+      }
+      for (const k of Object.keys(unassigned)) {
+        const u = unassigned[k];
+        unmatched.push({ org: u.org, acctName: u.acctName, text: "미배분", amount: u.sum, _unassigned: true });
       }
     }
     for (const code of planByCode.keys())
@@ -664,7 +704,7 @@
       const row = new Array(Math.max(grid[hr].length, ci.actual + 1)).fill("");
       if (ci.acctName >= 0) row[ci.acctName] = it.acctName;
       if (ci.deptName >= 0) row[ci.deptName] = it.org || "";
-      row[ci.biz] = "(신규) " + it.text;
+      row[ci.biz] = (it._unassigned ? "(미배분·검토) " : "(신규) ") + it.text;
       row[ci.actual] = toUnit(it.amount);
       extra.push(row);
     }
