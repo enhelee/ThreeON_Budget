@@ -64,9 +64,9 @@ ok(nClean.length === 0, "같은 전표 합0 → 상계 제거 (실제 남은: " 
 
 // ── 종합표 격자: 칸 배치 / 소계 / 합계 ──
 const jClean = [
-  { dept: "3040001", acct: "60909009", ledger: "손익", amount: 100 }, // 용인지사(DH)
-  { dept: "2020001", acct: "60909009", ledger: "손익", amount: 50 },  // 강남지사(소형CHP)
-  { dept: "3050001", acct: "20704001", ledger: "자본", amount: 200 }, // 화성지사(중대형CHP)
+  { dept: "3040001", org: "용인지사", acct: "60909009", ledger: "손익", amount: 100 }, // 용인지사(DH)
+  { dept: "2020001", org: "강남지사", acct: "60909009", ledger: "손익", amount: 50 },  // 강남지사(소형CHP)
+  { dept: "3050001", org: "화성지사", acct: "20704001", ledger: "자본", amount: 200 }, // 화성지사(중대형CHP)
 ];
 const jPl = P.buildJonghapAOA(jClean, "손익", C);
 const nameRow = jPl[1];
@@ -127,9 +127,9 @@ const jongTmpl = [
   ["자본예산 합계", "", 0, 0, 0, 0, 0],
 ];
 const jClean2 = [
-  { dept: "3100001", acct: "20704001", ledger: "자본", amount: 100 }, // 동탄
-  { dept: "4020001", acct: "20704001", ledger: "자본", amount: 300 }, // 양산
-  { dept: "3030001", acct: "20704001", ledger: "자본", amount: 20 },  // 수원
+  { dept: "3100001", org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100 }, // 동탄
+  { dept: "4020001", org: "양산지사", acct: "20704001", ledger: "자본", amount: 300 }, // 양산
+  { dept: "3030001", org: "수원사업소", acct: "20704001", ledger: "자본", amount: 20 },  // 수원
 ];
 const filledJ = P.fillJonghap(jongTmpl, jClean2, "자본", C);
 const gigyeRow = filledJ.find((r) => r[1] === "기계장치");
@@ -150,14 +150,39 @@ const planParsed = P.parseChipPlan(chipAOA, C);
 ok(planParsed.length === 2, "parseChipPlan: 예시행 제외 2줄 (실제: " + planParsed.length + ")");
 ok(planParsed[0].acct === "60909007" && planParsed[0].deptName === "강남지사", "parseChipPlan: 과목명→코드, 지사명 인식");
 const clA = [
-  { dept: "2020001", acct: "60909007", ledger: "손익", amount: 1000, text: "경상정비 통합", bucket: "gyeongsang" },
-  { dept: "2020001", acct: "60909009", ledger: "손익", amount: 500, text: "노후 전동밸브 개체 보수", bucket: "boan" },
+  { dept: "2020001", org: "강남지사", acct: "60909007", ledger: "손익", amount: 1000, text: "경상정비 통합", bucket: "gyeongsang" },
+  { dept: "2020001", org: "강남지사", acct: "60909009", ledger: "손익", amount: 500, text: "노후 전동밸브 개체 보수", bucket: "boan" },
 ];
 const mp = P.matchPlanToActual(clA, planParsed, C);
 const rG = mp.rows.find((r) => r.biz === "경상정비 A");
 ok(rG && rG.actual === 1000 && rG.flag === "매칭", "matchPlanToActual: 경상정비 지사통합 실적 → 계획 줄에 (실제: " + (rG && rG.actual) + ")");
 const rB = mp.rows.find((r) => r.biz === "노후 전동밸브 개체");
 ok(rB && rB.actual === 500 && rB.flag === "매칭", "matchPlanToActual: 유사 사업명 실적 매칭");
+
+// ── resolveOrg: 지사는 그대로, 본사는 이름(J)에서 처 추출 ──
+ok(C.resolveOrg("3040001", "용인지사 고객지원부") === "용인지사", "resolveOrg: 지사 코드 → 지사");
+ok(C.resolveOrg("1000094", "플랜트기술처 전기기술부") === "플랜트기술처", "resolveOrg: 본사+플랜트기술처");
+ok(C.resolveOrg("1000050", "안전처 재난안전부") === "안전처", "resolveOrg: 본사+안전처");
+ok(C.resolveOrg("1000090", "(태양광)신재생사업부(광양항)") === "미래사업처", "resolveOrg: 신재생사업부 → 미래사업처");
+ok(C.resolveOrg("1000006", "경영지원처 총무부") === null, "resolveOrg: 종합표에 없는 처(경영지원처) → null");
+ok(C.resolveOrg("2030005", "미래개발원(RPS 태양광)") === null, "resolveOrg: 미래개발원 → null");
+
+// ── fillJonghap: 본사 처 열 채우기 ──
+const jongCheo = [
+  ["", "", "", "", "중대형CHP", "", "합계"],
+  ["구분", "예산과목", "플랜트기술처", "안전처", "소계", "동탄지사", "소계", "합계"],
+  ["자산", "기계장치", 0, 0, 0, 0, 0, 0],
+  ["자본예산 합계", "", 0, 0, 0, 0, 0, 0],
+];
+const clCheo = [
+  { org: "플랜트기술처", acct: "20704001", ledger: "자본", amount: 400 },
+  { org: "동탄지사", acct: "20704001", ledger: "자본", amount: 100 },
+];
+const fc = P.fillJonghap(jongCheo, clCheo, "자본", C);
+const gr = fc.find((r) => r[1] === "기계장치");
+ok(gr[2] === 400, "fillJonghap: 본사 플랜트기술처 열 = 400");
+ok(gr[4] === 400, "fillJonghap: 처 소계 = 400");
+ok(gr[7] === 500, "fillJonghap: 합계 = 처400+지사100 = 500");
 
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

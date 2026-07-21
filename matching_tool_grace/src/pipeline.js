@@ -52,6 +52,8 @@
       const acct = String(r[1] == null ? "" : r[1]).trim();
       if (!acct) continue; // 합계행 등 약정항목 빈 행 제거
       const amount = Number(r[6]) || 0;
+      const mgmtCenter = String(r[15] == null ? "" : r[15]).trim(); // P열 = 조직 키
+      const nameJ = nfc(r[9]); // 이름(부서명) — 본사의 처 구분이 여기 있음
       out.push({
         fund: nfc(r[0]),
         acct,
@@ -61,7 +63,9 @@
         amount,
         text: nfc(r[7] == null ? "" : String(r[7])).trim(),
         nameI: nfc(r[8]),
-        mgmtCenter: String(r[15] == null ? "" : r[15]).trim(), // P열 = 지사 키
+        nameJ,
+        mgmtCenter,
+        org: C.resolveOrg(mgmtCenter, nameJ), // 종합표 열(지사 or 처) or null
         bucket: C.bucketOf(acct),
         ledger: C.ledgerOf(acct),
       });
@@ -117,19 +121,21 @@
   // 전체 netting: dept(자금관리센터) × acct 로 그룹핑 후 nettingGroup 적용
   // 경상정비는 예외: 지사(dept)별로 전부 하나로 합산
   function netting(rawItems) {
-    const groups = new Map(); // key: dept||acct
+    const groups = new Map(); // key: org(또는 fallback) + SEP + acct — 같은 조직·과목만 통합
     for (const it of rawItems) {
-      const k = it.mgmtCenter + "" + it.acct;
+      const orgKey = it.org || ("X:" + it.mgmtCenter);
+      const k = orgKey + "" + it.acct;
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(it);
     }
     const cleaned = [];
-    for (const [k, items] of groups) {
-      const [dept, acct] = k.split("");
+    for (const [, items] of groups) {
+      const acct = items[0].acct;
       const meta = {
-        dept, acct, acctName: items[0].acctName,
+        dept: items[0].mgmtCenter, acct, acctName: items[0].acctName,
         ledger: items[0].ledger, bucket: items[0].bucket,
-        deptName: items[0].nameI,
+        org: items[0].org,
+        deptName: items[0].org || items[0].nameI,
       };
       if (meta.bucket === "gyeongsang") {
         // 경상정비: 전표수·전기일·사업명 무관 지사별 1건 합산
@@ -156,11 +162,8 @@
   // ── netting 결과 → 검토용 시트 데이터(AOA) ──────────────
   // C: constants (지사 매핑용). 반환: {items:[[...]], pivot:[[...]]}
   function buildReviewSheets(cleaned, C) {
-    const deptName = (d) => C.resolveDept(d) || "(지사아님)";
-    const chp = (d) => {
-      const nm = C.resolveDept(d);
-      return nm && C.CHP_GROUP[nm] ? C.CHP_GROUP[nm] : "";
-    };
+    const deptName = (x) => x.org || x.deptName || "(제외)";
+    const chp = (x) => x.org && C.CHP_GROUP[x.org] ? C.CHP_GROUP[x.org] : (C.isCheo(x.org) ? "본사" : "");
     // 정렬: 자본/손익 → 지사 → 과목 → 금액 desc
     const sorted = [...cleaned].sort((a, b) =>
       (a.ledger).localeCompare(b.ledger) ||
@@ -174,7 +177,7 @@
     ]];
     for (const x of sorted) {
       items.push([
-        x.ledger, chp(x.dept), deptName(x.dept), x.dept,
+        x.ledger, chp(x), deptName(x), x.dept,
         x.acct, x.acctName, x.bucket, x.text, x.amount, x.n,
       ]);
     }
@@ -183,15 +186,15 @@
     for (const x of cleaned) {
       const k = x.dept + "" + x.acct;
       if (!pivMap.has(k))
-        pivMap.set(k, { ledger: x.ledger, dept: x.dept, acct: x.acct, acctName: x.acctName, sum: 0, cnt: 0 });
+        pivMap.set(k, { ledger: x.ledger, org: x.org, dept: x.dept, acct: x.acct, acctName: x.acctName, sum: 0, cnt: 0 });
       const p = pivMap.get(k);
       p.sum += x.amount; p.cnt++;
     }
-    const pivot = [["자본/손익", "사업군", "지사", "자금관리센터", "예산과목코드", "예산과목", "실적합계", "정리항목수"]];
+    const pivot = [["자본/손익", "사업군", "지사/처", "자금관리센터", "예산과목코드", "예산과목", "실적합계", "정리항목수"]];
     for (const p of [...pivMap.values()].sort((a, b) =>
-      a.ledger.localeCompare(b.ledger) || String(a.dept).localeCompare(String(b.dept)) || String(a.acct).localeCompare(String(b.acct))
+      a.ledger.localeCompare(b.ledger) || String(a.org || a.dept).localeCompare(String(b.org || b.dept)) || String(a.acct).localeCompare(String(b.acct))
     )) {
-      pivot.push([p.ledger, chp(p.dept), deptName(p.dept), p.dept, p.acct, p.acctName, p.sum, p.cnt]);
+      pivot.push([p.ledger, chp(p), deptName(p), p.dept, p.acct, p.acctName, p.sum, p.cnt]);
     }
     return { items, pivot };
   }
@@ -347,10 +350,9 @@
     const byCode = {};
     for (const x of cleaned) {
       if (x.ledger !== ledger) continue;
-      const d = C.resolveDept(x.dept);
-      if (!d || !C.isJisa(d)) continue; // 종합표 지사만 (본사·미래개발원 제외)
+      if (!x.org) continue; // 종합표 조직(지사/처)만, 제외 조직 스킵
       byCode[x.acct] = byCode[x.acct] || {};
-      byCode[x.acct][d] = (byCode[x.acct][d] || 0) + (Number(x.amount) || 0);
+      byCode[x.acct][x.org] = (byCode[x.acct][x.org] || 0) + (Number(x.amount) || 0);
     }
     const gtIdx = cols.findIndex((c) => c.kind === "grandtotal");
     // 한 과목(code) 행의 열 배열 계산
@@ -446,10 +448,9 @@
     const byCode = {};
     for (const x of cleaned) {
       if (x.ledger !== ledger) continue;
-      const d = C.resolveDept(x.dept);
-      if (!d || !C.isJisa(d)) continue;
+      if (!x.org) continue; // 종합표 조직(지사/처)만
       byCode[x.acct] = byCode[x.acct] || {};
-      byCode[x.acct][d] = (byCode[x.acct][d] || 0) + (Number(x.amount) || 0);
+      byCode[x.acct][x.org] = (byCode[x.acct][x.org] || 0) + (Number(x.amount) || 0);
     }
     // 5) 아이템 행 채우기
     const itemRows = [];
@@ -461,8 +462,7 @@
       for (let c = 0; c < colType.length; c++) {
         const ct = colType[c];
         if (!ct) continue;
-        if (ct.t === "jisa") grid[r][c] = src[ct.name] || 0;
-        else if (ct.t === "cheo") grid[r][c] = 0;
+        if (ct.t === "jisa" || ct.t === "cheo") grid[r][c] = src[ct.name] || 0;
       }
       fillRowSubtotals(grid[r], colType);
     }
@@ -529,7 +529,7 @@
     for (const p of plan) { const k = key(p.deptName, p.acct); if (!pmap.has(k)) pmap.set(k, []); pmap.get(k).push(p); }
     const amap = new Map();
     for (const x of cleaned) {
-      const dn = C.resolveDept(x.dept);
+      const dn = x.org; // 종합표 조직명(지사/처)
       if (!dn) continue;
       const k = key(dn, x.acct); if (!amap.has(k)) amap.set(k, []); amap.get(k).push(x);
     }
@@ -541,7 +541,7 @@
       const p0 = plist[0] || {};
       const a0 = alist[0] || {};
       const acct = p0.acct || a0.acct;
-      const deptName = p0.deptName || C.resolveDept(a0.dept);
+      const deptName = p0.deptName || a0.org;
       const base = {
         ledger: C.ledgerOf(acct), acct, acctName: p0.acctName || a0.acctName,
         dept: deptName, deptName, attr: p0.attr || "", hqDept: p0.hqDept || "", teamName: p0.teamName || "",

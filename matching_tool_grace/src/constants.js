@@ -98,6 +98,23 @@
     return Object.prototype.hasOwnProperty.call(CHP_GROUP, deptName);
   }
 
+  // 종합표 컬럼(지사 또는 처) 해석. 본사(1000)는 이름(J열)에서 처를 뽑는다.
+  // 반환: 종합표 열 이름(지사 or 처) | null(종합표에 없는 조직=제외)
+  const CHEO_LIST = ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"];
+  function resolveOrg(mgmtCenter, nameJ) {
+    const dept = resolveDept(mgmtCenter);
+    if (dept && isJisa(dept)) return dept;         // 지사
+    const pre = String(mgmtCenter || "").trim().slice(0, 4);
+    if (pre === "1000") {                           // 본사 → 처 (J열)
+      const j = String(nameJ || "").normalize("NFC");
+      for (const cheo of CHEO_LIST) if (j.includes(cheo)) return cheo;
+      if (/신재생사업부|태양광/.test(j)) return "미래사업처";
+      return null; // 경영지원처·열수송처·빈칸 등 종합표에 없는 처
+    }
+    return null; // 미래개발원 등
+  }
+  function isCheo(name) { return CHEO_LIST.indexOf(name) >= 0; }
+
   // ── 종합표 격자 구조 (양식2/양식3 실제 레이아웃) ──
   // 열: 처 5개 + 소계, 중대형CHP 8지사 + 소계, 소형CHP 3 + 소계, DH 8 + 소계, 합계
   const JONGHAP_COLS = [
@@ -155,7 +172,7 @@
   return {
     BUCKET, bucketOf, ledgerOf, CHP_GROUP,
     ACCT_NAME_TO_CODE, resolveAcctCode,
-    DEPT_PREFIX, resolveDept, isJisa,
+    DEPT_PREFIX, resolveDept, isJisa, resolveOrg, isCheo, CHEO_LIST,
     JONGHAP_COLS, CHP_MEMBERS, JONGHAP_ROWS_CAP, JONGHAP_ROWS_PL,
   };
 });
