@@ -15,6 +15,32 @@
       .trim();
   }
 
+  // 유사도 매칭용 정규화: 연도·구분자 제거하고 핵심 단어만 남김
+  function simNorm(t) {
+    return (t == null ? "" : String(t))
+      .normalize("NFC")
+      .replace(/\d{4}\s*년도?/g, " ")   // 2025년, 2024년도
+      .replace(/['"’”()\[\]（）·:,\-_/]/g, " ")
+      .replace(/\s+/g, "")
+      .trim();
+  }
+  // 문자 bigram 집합
+  function bigrams(s) {
+    const set = new Set();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    if (s.length === 1) set.add(s);
+    return set;
+  }
+  // Dice 계수 (0~1)
+  function diceSim(aStr, bStr) {
+    const a = bigrams(simNorm(aStr)), b = bigrams(simNorm(bStr));
+    if (a.size === 0 || b.size === 0) return 0;
+    let inter = 0;
+    for (const g of a) if (b.has(g)) inter++;
+    return (2 * inter) / (a.size + b.size);
+  }
+  const SIM_THRESHOLD = 0.34; // 이 값 이상이면 같은 사업으로 매칭 (튜닝 가능)
+
   // ── [1] raw 파싱 ─────────────────────────────────────────
   // rows: SheetJS sheet_to_json(header:1) 결과 (2차원 배열). 헤더 1줄 가정.
   // 열: A자금텍스트 B약정항목 C약정항목텍스트 D기간 E전기일 F참조전표 G금액
@@ -264,22 +290,28 @@
         continue;
       }
 
-      // 일반: 예산 사업명별로 실적 매칭 (텍스트 완전일치)
-      const used = new Array(alist.length).fill(false);
-      for (const b of blist) {
-        const bk = textKey(b.biz);
-        let sum = 0, hit = false;
-        for (let i = 0; i < alist.length; i++) {
-          if (!used[i] && textKey(alist[i].text) === bk && bk !== "") {
-            sum += alist[i].amount; used[i] = true; hit = true;
-          }
+      // 일반: 예산 사업명별로 실적 매칭 (텍스트 유사도)
+      // 각 실적 항목을, 같은 (지사×과목)의 예산 사업명 중 가장 유사한 것에 배정.
+      const assign = new Array(alist.length).fill(-1);
+      const score = new Array(alist.length).fill(0);
+      for (let i = 0; i < alist.length; i++) {
+        let bestJ = -1, best = 0;
+        for (let j = 0; j < blist.length; j++) {
+          const s = diceSim(alist[i].text, blist[j].biz);
+          if (s > best) { best = s; bestJ = j; }
         }
-        rows.push({ ...base, biz: b.biz, annual: b.annual, actual: hit ? sum : 0, flag: hit ? "매칭" : "실적없음" });
+        if (bestJ >= 0 && best >= SIM_THRESHOLD) { assign[i] = bestJ; score[i] = best; }
+      }
+      // 예산 사업명별 실적 합산
+      for (let j = 0; j < blist.length; j++) {
+        let sum = 0, hit = false;
+        for (let i = 0; i < alist.length; i++) if (assign[i] === j) { sum += alist[i].amount; hit = true; }
+        rows.push({ ...base, biz: blist[j].biz, annual: blist[j].annual, actual: hit ? sum : 0, flag: hit ? "매칭" : "실적없음" });
         if (hit) stats.matched++; else stats.noActual++;
       }
-      // 예산에 없는 실적 → 계획 미반영 신규
+      // 어느 사업에도 못 붙은 실적 → 계획 미반영 신규
       for (let i = 0; i < alist.length; i++) {
-        if (used[i]) continue;
+        if (assign[i] >= 0) continue;
         rows.push({ ...base, biz: alist[i].text, annual: "", actual: alist[i].amount, flag: "신규" });
         stats.shingyu++;
       }
@@ -386,7 +418,8 @@
   }
 
   return {
-    nfc, textKey, parseRaw, nettingGroup, netting, buildReviewSheets,
+    nfc, textKey, simNorm, bigrams, diceSim, SIM_THRESHOLD,
+    parseRaw, nettingGroup, netting, buildReviewSheets,
     parseBudget, matchToBudget, buildChipgyepyoAOA, buildJonghapAOA, runAll,
   };
 });

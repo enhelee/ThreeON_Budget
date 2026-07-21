@@ -93,5 +93,31 @@ ok(jCap.find((r) => r[0] === "자본예산 합계")[jCap[0].indexOf("합계")] =
 // 건물·구축물 행이 존재하는지 (누락됐던 것)
 ok(rowByName(jCap, "건물") && rowByName(jCap, "구축물"), "종합표(자본): 건물·구축물 행 포함");
 
+// ── 유사도 매칭: 전표헤더텍스트 ↔ 사업명 (글자 조금 달라도 매칭) ──
+const budFuzzy = [
+  { dept: "2020001", acct: "60909002", acctName: "수선유지비-열원정기점검", ledger: "손익",
+    biz: "2025년 강남지사 열병합발전시설 정기점검 보수공사(기계_일원)", annual: 534633,
+    hqDept: "", deptName: "강남지사", teamName: "", attr: "제조" },
+  { dept: "2020001", acct: "60909002", acctName: "수선유지비-열원정기점검", ledger: "손익",
+    biz: "2025년 강남지사 동남권 열공급시설 정기점검 보수공사(기계분야)", annual: 297000,
+    hqDept: "", deptName: "강남지사", teamName: "", attr: "제조" },
+];
+const cleanFuzzy = [
+  // 전표 표기(연도·괄호·띄어쓰기 다름) → 1번 사업에 붙어야
+  { dept: "2020001", acct: "60909002", acctName: "수선유지비-열원정기점검", ledger: "손익", bucket: "common", deptName: "강남", text: "강남 열병합발전시설 정기점검 보수공사 기계 일원", amount: 538881, n: 3, docNos: [] },
+  // 전혀 다른 건 → 신규
+  { dept: "2020001", acct: "60909002", acctName: "수선유지비-열원정기점검", ledger: "손익", bucket: "common", deptName: "강남", text: "옥상 방수 도장 공사", amount: 9999, n: 1, docNos: [] },
+];
+const rF = P.matchToBudget(cleanFuzzy, budFuzzy, C).rows;
+const m1 = rF.find((r) => r.biz.includes("열병합발전시설 정기점검"));
+ok(m1 && m1.actual === 538881 && m1.flag === "매칭", "유사도: 열병합 정기점검 전표 → 해당 사업 매칭 (실제: " + (m1 && m1.actual) + "/" + (m1 && m1.flag) + ")");
+const m2 = rF.find((r) => r.biz.includes("동남권 열공급시설"));
+ok(m2 && m2.actual === 0 && m2.flag === "실적없음", "유사도: 실적 없는 사업 → 0/실적없음");
+const mNew = rF.find((r) => r.biz === "옥상 방수 도장 공사");
+ok(mNew && mNew.flag === "신규", "유사도: 무관한 전표 → 신규");
+// 유사도 함수 스모크
+ok(P.diceSim("정기점검 보수공사", "정기점검보수공사") > 0.8, "diceSim: 띄어쓰기만 다르면 높은 유사도");
+ok(P.diceSim("터보냉동기 유지보수", "옥상 방수 도장") < 0.2, "diceSim: 무관 텍스트 낮은 유사도");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
