@@ -691,20 +691,23 @@
       // 1패스: 텍스트 있는 항목 배정 + vendor→사업 학습
       const empties = [];
       for (const it of items) {
+        // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
+        if (it.bucket === "gyeongsang") continue;
         if (it.emptyText) { empties.push(it); continue; }
         const tg = featSet(it.text + " " + (it.costName || ""));
         const io = nrm(it.org);
         const soR = pickBest(prows.filter((p) => p.org === io), tg);
-        let r = soR;
-        if (!(r.row && r.best >= SIM_THRESHOLD)) r = pickBest(prows, tg);
-        let chosen = (r.row && r.best >= SIM_THRESHOLD) ? r.row : null;
-        // 경상정비 lump은 계획줄에 강제로 안 넣음(정답도 계획대비실적엔 거의 안 넣고 종합표에만).
-        // 그 외 과목은 같은 과목에 계획줄이 있으면 조직최고(없으면 전역최고)로 강제 배정 → recall↑
-        if (!chosen && it.bucket !== "gyeongsang" && prows.length) chosen = soR.row || r.row;
+        let chosen = null;
+        if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;      // 같은 조직 매칭(임계 이상)
+        else {
+          const gR = pickBest(prows, tg);
+          if (gR.row && gR.best >= SIM_THRESHOLD) chosen = gR.row;       // 강한 전역 매칭만 허용(처 집행 등)
+          else if (it.bucket !== "gyeongsang" && soR.row) chosen = soR.row; // 강제배정은 '같은 조직 안'에서만 → 지사 간 누수 방지
+        }
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
-        } else unmatched.push(it);
+        } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
       const unassigned = {};
