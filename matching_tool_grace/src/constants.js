@@ -58,8 +58,11 @@
   }
 
   // 자본/손익 구분: 코드 앞자리 1·2 = 자본, 6 = 손익
+  // 단, 예외: 60602015(외주비-열원정기점검=A급정비)는 6으로 시작하지만 자본 집계표 항목.
+  const LEDGER_OVERRIDE = { "60602015": "자본" };
   function ledgerOf(acct) {
     const a = String(acct).trim();
+    if (LEDGER_OVERRIDE[a]) return LEDGER_OVERRIDE[a];
     if (a[0] === "6") return "손익";
     if (a[0] === "1" || a[0] === "2") return "자본";
     return "기타";
