@@ -182,7 +182,9 @@ def render_actual_tab():
         if r["연도불일치"]:
             st.warning("⚠ " + r["연도불일치"])
         if r["미매핑처지사"]:
-            st.warning("미매핑 처지사(집계 누락 위험): " + ", ".join(r["미매핑처지사"])
+            amt = r.get("미매핑처지사금액", 0)
+            st.warning(f"미매핑 처지사(종합표 집계 누락 {amt:,}천원): "
+                       + ", ".join(r["미매핑처지사"])
                        + " → config/처지사_별칭.json 보강 필요")
         if r["미분류과목"]:
             st.warning("미분류 예산과목: " + ", ".join(r["미분류과목"]))

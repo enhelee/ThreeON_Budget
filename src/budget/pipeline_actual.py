@@ -69,6 +69,7 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
         "year_dist": dict(year_dist),
         "year_mismatch": year_mismatch,
         "unmatched_dept": res["unmatched_dept"],
+        "unmatched_dept_amt": res.get("unmatched_dept_amt", 0),
         "unclassified_item": res["unclassified_item"],
         "summary": {
             "계획행수": len(plan_rows),
@@ -94,6 +95,7 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
         "zrfm2_v1_path": v1_path,
         "요약": review["summary"],
         "미매핑처지사": res["unmatched_dept"],
+        "미매핑처지사금액": res.get("unmatched_dept_amt", 0),
         "미분류과목": res["unclassified_item"],
         "연도불일치": year_mismatch,
     }

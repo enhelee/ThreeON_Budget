@@ -49,6 +49,8 @@ def normalize_dept(raw, plan_depts, override_map=None, threshold=90):
     cleaned = _clean(key)
     if not cleaned:
         return None
+    if cleaned in override_map:
+        return override_map[cleaned]
     if cleaned in plan_depts:
         return cleaned
 

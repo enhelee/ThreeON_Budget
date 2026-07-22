@@ -10,9 +10,22 @@
 """
 from collections import defaultdict
 
+import pandas as pd
 from rapidfuzz import fuzz
 
 from . import normalize
+
+
+def _clean_na(v):
+    """pandas NaN / None을 파이썬 None으로 정규화."""
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
 
 
 def normalize_erp_df(erp_df, code_to_item, item_alias, dept_alias, plan_depts):
@@ -20,15 +33,17 @@ def normalize_erp_df(erp_df, code_to_item, item_alias, dept_alias, plan_depts):
     df = erp_df.copy()
     canon_items, canon_depts = [], []
     for _, row in df.iterrows():
-        base = code_to_item.get(row["계정코드"]) if row["계정코드"] else None
+        code = _clean_na(row["계정코드"])
+        base = code_to_item.get(code) if code else None
         if not base:
-            base = row["예산과목원문"]
+            base = _clean_na(row["예산과목원문"])
         canon_items.append(normalize.normalize_item(base, item_alias))
         canon_depts.append(
-            normalize.normalize_dept(row["지사원문"], plan_depts, dept_alias)
+            normalize.normalize_dept(_clean_na(row["지사원문"]), plan_depts, dept_alias)
         )
-    df["과목정규"] = canon_items
-    df["처지사정규"] = canon_depts
+    # NaN 혼입 방지를 위해 object dtype으로 명시 저장
+    df["과목정규"] = pd.Series(canon_items, index=df.index, dtype="object")
+    df["처지사정규"] = pd.Series(canon_depts, index=df.index, dtype="object")
     return df
 
 
@@ -60,14 +75,14 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
 
     # 이번 예산에 해당하는 ERP 전표만 대상
     erp = erp_norm_df
-    in_budget_idx = [
-        i for i, it in enumerate(erp["과목정규"]) if it in budget_items
-    ]
+    items_norm = [_clean_na(x) for x in erp["과목정규"]]
+    depts_norm = [_clean_na(x) for x in erp["처지사정규"]]
+    in_budget_idx = [i for i, it in enumerate(items_norm) if it in budget_items]
 
     # 그룹: (과목정규, 처지사정규) -> [erp positional index]
     groups = defaultdict(list)
     for i in in_budget_idx:
-        key = (erp["과목정규"].iloc[i], erp["처지사정규"].iloc[i])
+        key = (items_norm[i], depts_norm[i])
         groups[key].append(i)
 
     # 계획행 그룹핑: (과목, 처지사) -> [plan row dict]
@@ -90,7 +105,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         candidates = plan_by_key.get(key, [])
         for i in idxs:
             erp_name = erp["사업명"].iloc[i]
-            amt = erp["금액천원"].iloc[i]
+            amt = _clean_na(erp["금액천원"].iloc[i]) or 0.0
             if not candidates:
                 attributed[i] = None       # 그룹에 계획행 없음 → 신규
                 erp_match_name[i] = None
@@ -104,7 +119,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                 attributed[i] = None       # 엄격정책: 사업명 미달 → 신규
                 erp_match_name[i] = None
             else:
-                best["실적금액"] += (amt or 0.0)
+                best["실적금액"] += amt
                 best["매칭전표수"] += 1
                 if best_score < threshold:
                     best["저유사전표수"] += 1
@@ -119,9 +134,9 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     new_group = defaultdict(lambda: {"금액": 0.0, "전표": [], "사업명들": []})
     for i in in_budget_idx:
         if attributed.get(i) is None:
-            key = (erp["과목정규"].iloc[i], erp["처지사정규"].iloc[i])
+            key = (items_norm[i], depts_norm[i])
             g = new_group[key]
-            g["금액"] += (erp["금액천원"].iloc[i] or 0.0)
+            g["금액"] += (_clean_na(erp["금액천원"].iloc[i]) or 0.0)
             if erp["전표번호"].iloc[i]:
                 g["전표"].append(erp["전표번호"].iloc[i])
             if erp["사업명"].iloc[i]:
@@ -146,30 +161,35 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         })
     new_rows.sort(key=lambda x: (str(x["예산과목"]), str(x["처지사"])))
 
-    # 검토 항목: 미매핑 처지사 / 미분류 과목 (in-budget 전표 기준)
+    # 검토 항목: 미매핑 처지사(in-budget인데 정규화 실패) / 미분류 과목
     unmatched_dept = sorted({
-        erp["지사원문"].iloc[i] for i in in_budget_idx
-        if erp["처지사정규"].iloc[i] is None and erp["지사원문"].iloc[i]
+        _clean_na(erp["지사원문"].iloc[i]) for i in in_budget_idx
+        if depts_norm[i] is None and _clean_na(erp["지사원문"].iloc[i])
     })
+    unmatched_dept_amt = round(sum(
+        (_clean_na(erp["금액천원"].iloc[i]) or 0.0)
+        for i in in_budget_idx if depts_norm[i] is None
+    ))
     unclassified_item = sorted({
-        erp["과목정규"].iloc[i] for i in range(len(erp))
-        if erp["과목정규"].iloc[i] and erp["과목정규"].iloc[i] not in known
+        items_norm[i] for i in range(len(erp))
+        if items_norm[i] and str(items_norm[i]).strip() and items_norm[i] not in known
     })
 
     # zrfm2_V1용 R열: 귀속 계획 사업명 / [신규] / 빈값(타예산·미분류)
     r_labels = []
     for i in range(len(erp)):
-        if i in erp_match_name:
+        if i in attributed:
             r_labels.append(erp_match_name[i] if erp_match_name[i] else "[신규]")
         else:
             r_labels.append("")
     erp_annotated = erp.copy()
-    erp_annotated["매칭사업명"] = r_labels
+    erp_annotated["매칭사업명"] = pd.Series(r_labels, index=erp.index, dtype="object")
 
     return {
         "plan_rows": plan_rows,
         "new_rows": new_rows,
         "erp_annotated": erp_annotated,
         "unmatched_dept": unmatched_dept,
+        "unmatched_dept_amt": unmatched_dept_amt,
         "unclassified_item": unclassified_item,
     }

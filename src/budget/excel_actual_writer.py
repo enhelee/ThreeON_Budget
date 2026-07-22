@@ -88,7 +88,7 @@ def write_review_sheet(wb, review):
     if review.get("year_mismatch"):
         ws.append(["⚠ 연도 불일치", review["year_mismatch"]])
     ws.append([])
-    ws.append(["■ 미매핑 처지사 (종합표 집계 누락 위험 — 처지사_별칭.json 보강 필요)"])
+    ws.append([f"■ 미매핑 처지사 (종합표 집계 누락 {review.get('unmatched_dept_amt', 0):,}천원 — 처지사_별칭.json 보강 필요)"])
     for d in review.get("unmatched_dept", []):
         ws.append([d])
     ws.append([])
