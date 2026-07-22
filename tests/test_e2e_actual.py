@@ -20,24 +20,23 @@ def _make_plan(tmp_path, budget):
     return res["output_path"], cfg, out
 
 
-def test_actual_total_equals_full_erp(tmp_path):
-    """종합표에 반영되는 총 실적 = ERP 전체 해당예산 실적(누락 0)."""
-    for budget, expected in [("손익", 98554801), ("자본", 49709178)]:
+def test_actual_total_equals_configured_erp(tmp_path):
+    """종합표 총 실적 = 사용자 구성 예산과목의 ERP 실적. 미분류(결측)는 별도 보고."""
+    # 2025 시드 기준: '수선유지비-열원보완및개선'은 구성에 없어 결측(11,640,035천원)
+    for budget, expected in [("손익", 86914766), ("자본", 49709178)]:
         plan_path, cfg, out = _make_plan(tmp_path, budget)
         res = pipeline_actual.run_actual(
             plan_path, ZRFM2, MASTER, cfg, out, "2025", budget, new_policy="group",
         )
         assert os.path.exists(res["output_path"])
         assert os.path.exists(res["zrfm2_v1_path"])
-        # 데이터 총액은 전액 보존(계획집행+신규 = ERP 전체). 미매핑 처지사분도
-        # 신규((미매핑))로 남아 총액에는 포함되며, 검토리포트로 보고된다.
+        # 구성된 과목 총액은 전액 보존(계획집행+신규). 처지사 미매핑 0 확인.
         assert abs(res["요약"]["총 실적(천원)"] - expected) <= 1
         assert abs((res["요약"]["계획집행 실적(천원)"] + res["요약"]["신규 실적(천원)"]) - expected) <= 2
-        # 미분류 예산과목은 없어야 함(빈문자열 제외)
-        assert res["미분류과목"] == []
-        # 미매핑 처지사가 있으면 금액이 함께 보고돼야 함
-        if res["미매핑처지사"]:
-            assert res["미매핑처지사금액"] > 0
+        assert res["미매핑처지사"] == []
+        # '열원보완및개선'은 결측으로 보고되고 금액이 집계됨
+        assert "수선유지비-열원보완및개선" in res["미분류과목"]
+        assert res["미분류과목금액"] > 0
 
 
 def test_strict_policy_more_new(tmp_path):

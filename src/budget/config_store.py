@@ -93,11 +93,10 @@ def save_item_config(config_dir, year, budget, items):
 # 정규화 맵 (2단계 실적분석) — 표기 불일치 해소용. config로 편집·영속화 가능.
 # ---------------------------------------------------------------------------
 
-# 예산과목 alias: {ERP/기타 표기 -> 계획본(종합표) 표준 표기}
-SEED_ITEM_ALIAS = {
-    "수선유지비-열원보완및개선": "수선유지비-열원보완개선및기타",
-    "수선유지비-열원보안개선": "수선유지비-열원보완개선및기타",
-}
+# 예산과목 alias: 기본값 없음. 서로 다른 과목은 통일하지 않는다(예: 25년
+# '수선유지비-열원보완개선및기타' vs 26년 '수선유지비-열원보완및개선'은 별개 과목).
+# 사용자 예산과목 구성에 없는 ERP 과목은 결측(미분류)으로 분류·보고한다.
+SEED_ITEM_ALIAS = {}
 
 # 처지사 정규화 override: {ERP 원문 -> 계획 처지사}. 접두/유사도 규칙으로
 # 자동 처리되지 않는 예외만 등록한다.
@@ -107,6 +106,12 @@ SEED_DEPT_ALIAS = {
     "서울중앙지사": "중앙지사",
     "대구우드칩": "대구지사",
     "미래개발원": "미래사업처",
+    "본사(광양태양광)": "미래사업처",
+    "본사(강릉태양광)": "미래사업처",
+    "본사(함백태양광)": "미래사업처",
+    "서울남부지사": "강남지사",
+    "경남지사(양산RPS 태양광)": "양산지사",
+    "고양 PLB": "고양사업소",
 }
 
 
@@ -127,11 +132,13 @@ def _dept_alias_path(config_dir):
 
 
 def load_item_alias(config_dir):
+    """시드 기본값 + 파일(사용자 편집) 병합. 파일 항목이 우선."""
+    merged = seed_item_alias()
     path = _item_alias_path(config_dir)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return seed_item_alias()
+            merged.update(json.load(f))
+    return merged
 
 
 def save_item_alias(config_dir, mapping):
@@ -141,11 +148,13 @@ def save_item_alias(config_dir, mapping):
 
 
 def load_dept_alias(config_dir):
+    """시드 기본값 + 파일(사용자 편집) 병합. 파일 항목이 우선."""
+    merged = seed_dept_alias()
     path = _dept_alias_path(config_dir)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return seed_dept_alias()
+            merged.update(json.load(f))
+    return merged
 
 
 def save_dept_alias(config_dir, mapping):

@@ -11,13 +11,13 @@ import openpyxl
 
 ERP_COLUMNS = [
     "계정코드", "예산과목원문", "연도", "전표번호",
-    "금액원", "금액천원", "사업명", "지사원문", "_erp_row",
+    "금액원", "금액천원", "사업명", "지사원문", "부서부원문", "_erp_row",
 ]
 
 # zrfm2 시트 내 위치(1-index)
 _COL = {
     "계정코드": 2, "예산과목원문": 3, "기간연도": 4, "전표번호": 6,
-    "금액": 7, "사업명": 8, "지사": 9,
+    "금액": 7, "사업명": 8, "지사": 9, "부서부": 10,
 }
 
 
@@ -58,6 +58,8 @@ def load_erp(path, sheet=None):
                     if row[_COL["사업명"] - 1] is not None else None),
             "지사원문": (str(row[_COL["지사"] - 1]).strip()
                      if row[_COL["지사"] - 1] is not None else None),
+            "부서부원문": (str(row[_COL["부서부"] - 1]).strip()
+                      if row[_COL["부서부"] - 1] is not None else None),
             "_erp_row": r,
         })
     wb.close()

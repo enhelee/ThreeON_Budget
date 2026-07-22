@@ -31,6 +31,7 @@ def _clean_na(v):
 def normalize_erp_df(erp_df, code_to_item, item_alias, dept_alias, plan_depts):
     """ERP DataFrame에 과목정규/처지사정규 컬럼 추가."""
     df = erp_df.copy()
+    has_j = "부서부원문" in df.columns
     canon_items, canon_depts = [], []
     for _, row in df.iterrows():
         code = _clean_na(row["계정코드"])
@@ -38,9 +39,17 @@ def normalize_erp_df(erp_df, code_to_item, item_alias, dept_alias, plan_depts):
         if not base:
             base = _clean_na(row["예산과목원문"])
         canon_items.append(normalize.normalize_item(base, item_alias))
-        canon_depts.append(
-            normalize.normalize_dept(_clean_na(row["지사원문"]), plan_depts, dept_alias)
-        )
+
+        raw_dept = _clean_na(row["지사원문"])
+        d = normalize.normalize_dept(raw_dept, plan_depts, dept_alias)
+        if d is None:
+            # J열(부서명(부)) 텍스트에서 처지사 탐지
+            j = _clean_na(row["부서부원문"]) if has_j else None
+            d = normalize.dept_from_text(j, plan_depts)
+        if d is None and raw_dept and str(raw_dept).replace("　", "").strip() == "본사":
+            # 본사인데 J열로도 특정 불가 → 플랜트기술처로 지정
+            d = "플랜트기술처"
+        canon_depts.append(d)
     # NaN 혼입 방지를 위해 object dtype으로 명시 저장
     df["과목정규"] = pd.Series(canon_items, index=df.index, dtype="object")
     df["처지사정규"] = pd.Series(canon_depts, index=df.index, dtype="object")
@@ -174,6 +183,10 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         items_norm[i] for i in range(len(erp))
         if items_norm[i] and str(items_norm[i]).strip() and items_norm[i] not in known
     })
+    unclassified_item_amt = round(sum(
+        (_clean_na(erp["금액천원"].iloc[i]) or 0.0) for i in range(len(erp))
+        if items_norm[i] and str(items_norm[i]).strip() and items_norm[i] not in known
+    ))
 
     # zrfm2_V1용 R열: 귀속 계획 사업명 / [신규] / 빈값(타예산·미분류)
     r_labels = []
@@ -192,4 +205,5 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         "unmatched_dept": unmatched_dept,
         "unmatched_dept_amt": unmatched_dept_amt,
         "unclassified_item": unclassified_item,
+        "unclassified_item_amt": unclassified_item_amt,
     }

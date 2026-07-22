@@ -71,6 +71,7 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
         "unmatched_dept": res["unmatched_dept"],
         "unmatched_dept_amt": res.get("unmatched_dept_amt", 0),
         "unclassified_item": res["unclassified_item"],
+        "unclassified_item_amt": res.get("unclassified_item_amt", 0),
         "summary": {
             "계획행수": len(plan_rows),
             "계획집행 행수": sum(1 for r in plan_rows if r["구분"] == "계획집행"),
@@ -97,5 +98,6 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
         "미매핑처지사": res["unmatched_dept"],
         "미매핑처지사금액": res.get("unmatched_dept_amt", 0),
         "미분류과목": res["unclassified_item"],
+        "미분류과목금액": res.get("unclassified_item_amt", 0),
         "연도불일치": year_mismatch,
     }

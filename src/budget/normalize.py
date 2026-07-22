@@ -32,6 +32,18 @@ def normalize_item(name, alias_map):
     return alias_map.get(key, key)
 
 
+def dept_from_text(text, plan_depts):
+    """자유 텍스트(예: ERP J열 '(CHP)광교지사 고객지원부')에서 계획 처지사를
+    부분문자열로 탐지. 가장 긴 매칭을 우선한다. 없으면 None."""
+    if not text:
+        return None
+    s = str(text)
+    hits = [d for d in plan_depts if d in s]
+    if not hits:
+        return None
+    return max(hits, key=len)
+
+
 def normalize_dept(raw, plan_depts, override_map=None, threshold=90):
     """ERP 지사명 raw를 계획 처지사(plan_depts) 중 하나로 정규화.
 

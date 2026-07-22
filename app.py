@@ -187,7 +187,9 @@ def render_actual_tab():
                        + ", ".join(r["미매핑처지사"])
                        + " → config/처지사_별칭.json 보강 필요")
         if r["미분류과목"]:
-            st.warning("미분류 예산과목: " + ", ".join(r["미분류과목"]))
+            iamt = r.get("미분류과목금액", 0)
+            st.warning(f"미분류(결측) 예산과목 — 예산과목 구성에 없음 ({iamt:,}천원, 종합표 미반영): "
+                       + ", ".join(r["미분류과목"]))
         st.download_button("실적 결과 파일 다운로드", r["bytes"], file_name=r["name"], key="a_dl_result")
         st.download_button("zrfm2_V1 다운로드", r["v1_bytes"], file_name=r["v1_name"], key="a_dl_v1")
 

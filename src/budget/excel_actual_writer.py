@@ -54,6 +54,8 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
             low = row.get("저유사전표수", 0)
             if low:
                 note += f" (저유사 {low}건)"
+        elif row.get("구분") == "미시행":
+            note = "계획O·실적X (실적 없음)"
         else:
             note = ""
         ws.cell(r, 14, note)
@@ -92,7 +94,7 @@ def write_review_sheet(wb, review):
     for d in review.get("unmatched_dept", []):
         ws.append([d])
     ws.append([])
-    ws.append(["■ 미분류 예산과목 (손익/자본 시드에 없음)"])
+    ws.append([f"■ 미분류(결측) 예산과목 — 사용자 예산과목 구성에 없음 ({review.get('unclassified_item_amt', 0):,}천원, 종합표 미반영)"])
     for it in review.get("unclassified_item", []):
         ws.append([it])
     ws.append([])

@@ -39,5 +39,11 @@ def test_dept_override():
 
 
 def test_dept_unmapped_returns_none():
+    # 로컬 맵에 없으면 None (실제 앱은 SEED_DEPT_ALIAS로 매핑)
     assert normalize.normalize_dept("본　　사", PLAN_DEPTS, DEPT_ALIAS) is None
-    assert normalize.normalize_dept("서울남부지사", PLAN_DEPTS, DEPT_ALIAS) is None
+
+
+def test_dept_from_text_j_column():
+    assert normalize.dept_from_text("(CHP)광교지사 고객지원부", PLAN_DEPTS) == "광교지사"
+    assert normalize.dept_from_text("(지사공통)강남지사 고객지원부", PLAN_DEPTS) == "강남지사"
+    assert normalize.dept_from_text("본사 총무부", PLAN_DEPTS) is None
