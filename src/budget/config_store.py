@@ -87,3 +87,72 @@ def save_item_config(config_dir, year, budget, items):
     os.makedirs(config_dir, exist_ok=True)
     with open(_item_path(config_dir, year, budget), "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# 정규화 맵 (2단계 실적분석) — 표기 불일치 해소용. config로 편집·영속화 가능.
+# ---------------------------------------------------------------------------
+
+# 예산과목 alias: {ERP/기타 표기 -> 계획본(종합표) 표준 표기}
+SEED_ITEM_ALIAS = {
+    "수선유지비-열원보완및개선": "수선유지비-열원보완개선및기타",
+    "수선유지비-열원보안개선": "수선유지비-열원보완개선및기타",
+}
+
+# 처지사 정규화 override: {ERP 원문 -> 계획 처지사}. 접두/유사도 규칙으로
+# 자동 처리되지 않는 예외만 등록한다.
+SEED_DEPT_ALIAS = {
+    "판교사업소": "판교지사",
+    "분당지사": "분당사업소",
+    "서울중앙지사": "중앙지사",
+    "대구우드칩": "대구지사",
+    "미래개발원": "미래사업처",
+}
+
+
+def seed_item_alias():
+    return dict(SEED_ITEM_ALIAS)
+
+
+def seed_dept_alias():
+    return dict(SEED_DEPT_ALIAS)
+
+
+def _item_alias_path(config_dir):
+    return os.path.join(config_dir, "예산과목_별칭.json")
+
+
+def _dept_alias_path(config_dir):
+    return os.path.join(config_dir, "처지사_별칭.json")
+
+
+def load_item_alias(config_dir):
+    path = _item_alias_path(config_dir)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return seed_item_alias()
+
+
+def save_item_alias(config_dir, mapping):
+    os.makedirs(config_dir, exist_ok=True)
+    with open(_item_alias_path(config_dir), "w", encoding="utf-8") as f:
+        json.dump(mapping, f, ensure_ascii=False, indent=2)
+
+
+def load_dept_alias(config_dir):
+    path = _dept_alias_path(config_dir)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return seed_dept_alias()
+
+
+def save_dept_alias(config_dir, mapping):
+    os.makedirs(config_dir, exist_ok=True)
+    with open(_dept_alias_path(config_dir), "w", encoding="utf-8") as f:
+        json.dump(mapping, f, ensure_ascii=False, indent=2)
+
+
+# 사업명 유사도 매칭 임계값(%). 요구사항: 80% 이상.
+SIMILARITY_THRESHOLD = 80

@@ -52,8 +52,8 @@ def write_datasheet(ws, df, budget, year, item_flags):
     return {"written_rows": r - 4}
 
 
-def build_summary_layout(ws, dept_columns, item_rows, budget, year):
-    ws.cell(1, 1, f"{year}년 {budget}예산 계획 종합표 (단위: 천원)")
+def build_summary_layout(ws, dept_columns, item_rows, budget, year, kind="계획"):
+    ws.cell(1, 1, f"{year}년 {budget}예산 {kind} 종합표 (단위: 천원)")
     ws.merge_cells(start_row=HEADER_ROW, start_column=1, end_row=NAME_ROW, end_column=3)
     c = ws.cell(HEADER_ROW, 1, "구 분")
     c.font = Font(bold=True, color="FFFFFF")
@@ -130,7 +130,13 @@ def build_summary_layout(ws, dept_columns, item_rows, budget, year):
     return {"groups": groups, "total_col": total_col, "item_rows": item_row_layout, "grand_total_row": grand_total_row}
 
 
-def write_summary_formulas(ws, layout):
+def write_summary_formulas(ws, layout, value_col="J", data_sheet="양식1(월별)"):
+    """종합표 각 셀에 SUMIFS 수식 작성.
+
+    value_col: 데이터시트에서 합산할 금액 열(계획=연예산 J, 실적=실적금액 K 등).
+    """
+    V = value_col
+    DS = data_sheet
     all_cols = []
     for g in layout["groups"]:
         all_cols.extend(g["dept_cols"].values())
@@ -144,14 +150,14 @@ def write_summary_formulas(ws, layout):
                 for dept, col in g["dept_cols"].items():
                     dept_cell = f"{get_column_letter(col)}{NAME_ROW}"
                     if item_row["심의구분"] == "이상":
-                        f = (f"=SUMIFS('양식1(월별)'!$J:$J,'양식1(월별)'!$G:$G,$B{r},"
-                             f"'양식1(월별)'!$C:$C,{dept_cell},'양식1(월별)'!$L:$L,\"O\")")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
+                             f"'{DS}'!$C:$C,{dept_cell},'{DS}'!$L:$L,\"O\")")
                     elif item_row["심의구분"] == "미만":
-                        f = (f"=SUMIFS('양식1(월별)'!$J:$J,'양식1(월별)'!$G:$G,$B{r},"
-                             f"'양식1(월별)'!$C:$C,{dept_cell},'양식1(월별)'!$L:$L,\"<>O\")")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
+                             f"'{DS}'!$C:$C,{dept_cell},'{DS}'!$L:$L,\"<>O\")")
                     else:
-                        f = (f"=SUMIFS('양식1(월별)'!$J:$J,'양식1(월별)'!$G:$G,$B{r},"
-                             f"'양식1(월별)'!$C:$C,{dept_cell})")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
+                             f"'{DS}'!$C:$C,{dept_cell})")
                     cell = ws.cell(r, col, f)
                     cell.number_format = "#,##0"
                 first = min(g["dept_cols"].values())
