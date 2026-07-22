@@ -102,6 +102,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         rec["실적금액"] = 0.0
         rec["매칭전표수"] = 0
         rec["저유사전표수"] = 0
+        rec["_점수합"] = 0.0
         rec["구분"] = "미시행"
         plan_rows.append(rec)
         plan_by_key[(rec.get("예산과목"), rec.get("처지사"))].append(rec)
@@ -109,6 +110,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     # ERP별 귀속 결과
     attributed = {}      # erp idx -> plan rec / None(신규)
     erp_match_name = {}  # erp idx -> 귀속된 계획 사업명 / None(신규)
+    erp_score = {}       # erp idx -> 최고 사업명 유사도(0~100)
 
     for key, idxs in groups.items():
         candidates = plan_by_key.get(key, [])
@@ -118,26 +120,35 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             if not candidates:
                 attributed[i] = None       # 그룹에 계획행 없음 → 신규
                 erp_match_name[i] = None
+                erp_score[i] = 0.0
                 continue
             best, best_score = None, -1
             for prec in candidates:
                 s = _sim(erp_name, prec.get("사업명"))
                 if s > best_score:
                     best, best_score = prec, s
+            erp_score[i] = float(best_score)
             if new_policy == "strict_name" and best_score < threshold:
                 attributed[i] = None       # 엄격정책: 사업명 미달 → 신규
                 erp_match_name[i] = None
             else:
                 best["실적금액"] += amt
                 best["매칭전표수"] += 1
+                best["_점수합"] += float(best_score)
                 if best_score < threshold:
                     best["저유사전표수"] += 1
                 attributed[i] = best
                 erp_match_name[i] = best.get("사업명")
 
-    # 계획행 구분 확정
+    # 계획행 구분 + 매칭확신도(0~1, 귀속전표 평균 유사도) 확정
     for rec in plan_rows:
-        rec["구분"] = "계획집행" if rec["매칭전표수"] > 0 else "미시행"
+        if rec["매칭전표수"] > 0:
+            rec["구분"] = "계획집행"
+            rec["매칭확신도"] = round(rec["_점수합"] / rec["매칭전표수"] / 100.0, 3)
+        else:
+            rec["구분"] = "미시행"
+            rec["매칭확신도"] = None
+        rec.pop("_점수합", None)
 
     # 신규사업: 귀속 안된 in-budget 전표를 (과목,처지사)별 집계.
     # 소액(건당 |금액| ≤ small_threshold)은 별도로 묶어 '집행' 일괄 확정.
@@ -210,15 +221,25 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         if items_norm[i] and str(items_norm[i]).strip() and items_norm[i] not in known
     ))
 
-    # zrfm2_V1용 R열: 귀속 계획 사업명 / [신규] / 빈값(타예산·미분류)
-    r_labels = []
+    # zrfm2_V1 / matched CSV용 전표별 주석: 매칭사업명 · 매칭확신도(0~1) · 구분
+    r_labels, r_conf, r_gubun = [], [], []
     for i in range(len(erp)):
         if i in attributed:
-            r_labels.append(erp_match_name[i] if erp_match_name[i] else "[신규]")
+            if attributed[i] is not None:
+                r_labels.append(erp_match_name[i] if erp_match_name[i] else "[신규]")
+                r_gubun.append("계획집행")
+            else:
+                r_labels.append("[신규]")
+                r_gubun.append("신규")
+            r_conf.append(round(erp_score.get(i, 0.0) / 100.0, 3))
         else:
-            r_labels.append("")
+            r_labels.append("")       # 타예산·미분류 전표
+            r_conf.append(None)
+            r_gubun.append("")
     erp_annotated = erp.copy()
     erp_annotated["매칭사업명"] = pd.Series(r_labels, index=erp.index, dtype="object")
+    erp_annotated["매칭확신도"] = pd.Series(r_conf, index=erp.index, dtype="object")
+    erp_annotated["구분"] = pd.Series(r_gubun, index=erp.index, dtype="object")
 
     return {
         "plan_rows": plan_rows,

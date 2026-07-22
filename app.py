@@ -157,11 +157,15 @@ def render_actual_tab():
                 actual_bytes = f.read()
             with open(res["zrfm2_v1_path"], "rb") as f:
                 v1_bytes = f.read()
+            with open(res["matched_csv_path"], "rb") as f:
+                matched_bytes = f.read()
             st.session_state["actual_result"] = {
                 "name": os.path.basename(res["output_path"]),
                 "bytes": actual_bytes,
                 "v1_name": os.path.basename(res["zrfm2_v1_path"]),
                 "v1_bytes": v1_bytes,
+                "matched_name": os.path.basename(res["matched_csv_path"]),
+                "matched_bytes": matched_bytes,
                 "요약": res["요약"],
                 "미매핑처지사": res["미매핑처지사"],
                 "미분류과목": res["미분류과목"],
@@ -192,6 +196,8 @@ def render_actual_tab():
                        + ", ".join(r["미분류과목"]))
         st.download_button("실적 결과 파일 다운로드", r["bytes"], file_name=r["name"], key="a_dl_result")
         st.download_button("zrfm2_V1 다운로드", r["v1_bytes"], file_name=r["v1_name"], key="a_dl_v1")
+        st.download_button("matched CSV 다운로드", r["matched_bytes"], file_name=r["matched_name"],
+                           mime="text/csv", key="a_dl_matched")
 
 
 def main():

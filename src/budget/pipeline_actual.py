@@ -98,10 +98,13 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
     )
     v1_path = os.path.join(out_dir, f"zrfm2_V1({budget}).xlsx")
     excel_actual_writer.write_zrfm2_v1(zrfm2_path, v1_path, res["erp_annotated"])
+    matched_csv_path = os.path.join(out_dir, f"matched_{year}_{budget}.csv")
+    excel_actual_writer.write_matched_csv(matched_csv_path, res["erp_annotated"])
 
     return {
         "output_path": out_path,
         "zrfm2_v1_path": v1_path,
+        "matched_csv_path": matched_csv_path,
         "요약": review["summary"],
         "미매핑처지사": res["unmatched_dept"],
         "미매핑처지사금액": res.get("unmatched_dept_amt", 0),

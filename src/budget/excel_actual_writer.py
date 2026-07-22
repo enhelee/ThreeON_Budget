@@ -17,7 +17,7 @@ from . import excel_plan_writer as epw
 ACTUAL_HEADER = [
     "주관부서명", "예산귀속 부서코드", "예산귀속 부서명(처.지사)", "예산귀속 부서명(부)",
     "속성", "예산코드", "예산과목", "사업명", "산출내역", "연예산(계획)",
-    "최종 실적금액", "심의플래그", "구분", "비고",
+    "최종 실적금액", "심의플래그", "구분", "비고", "매칭확신도",
 ]
 VALUE_COL_LETTER = "K"   # 11번 = 최종 실적금액
 NEW_FILL = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")   # 신규(노랑)
@@ -59,8 +59,10 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
         else:
             note = ""
         ws.cell(r, 14, note)
+        conf = row.get("매칭확신도")
+        ws.cell(r, 15, conf if conf is not None else None)
         if row.get("구분") == "미시행":
-            for c in range(1, 15):
+            for c in range(1, 16):
                 ws.cell(r, c).fill = MISSING_EXEC_FILL
         r += 1
 
@@ -74,7 +76,7 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
         ws.cell(r, 12, _simui_flag(item_flags, nr["예산과목"], nr["실적금액"]))
         ws.cell(r, 13, nr.get("구분", "신규"))
         ws.cell(r, 14, nr.get("비고", ""))
-        for c in range(1, 15):
+        for c in range(1, 16):
             ws.cell(r, c).fill = NEW_FILL
         r += 1
 
@@ -119,15 +121,36 @@ def write_actual_workbook(out_path, plan_rows, new_rows, dept_columns, item_rows
 
 
 def write_zrfm2_v1(src_path, out_path, erp_annotated):
-    """원본 zrfm2 + R열(18)에 매칭 사업명. _erp_row 기준으로 매핑."""
+    """원본 zrfm2 + R열(18) 매칭 사업명 + S열(19) 매칭확신도. _erp_row 기준 매핑."""
     label_by_row = {int(r): lab for r, lab in
                     zip(erp_annotated["_erp_row"], erp_annotated["매칭사업명"])}
+    conf_by_row = {int(r): c for r, c in
+                   zip(erp_annotated["_erp_row"], erp_annotated["매칭확신도"])}
     wb = openpyxl.load_workbook(src_path)
     ws = wb[wb.sheetnames[0]]
     ws.cell(1, 18, "사업명(매칭)")
+    ws.cell(1, 19, "매칭확신도")
     for r in range(2, ws.max_row + 1):
         lab = label_by_row.get(r)
         if lab:
             ws.cell(r, 18, lab)
+        c = conf_by_row.get(r)
+        if c is not None:
+            ws.cell(r, 19, c)
     wb.save(out_path)
     wb.close()
+
+
+# matched_{year}.csv 컬럼(데이터 계약 §08). ERP 전표 + 매칭 결과.
+MATCHED_CSV_COLUMNS = [
+    "_erp_row", "계정코드", "예산과목원문", "과목정규", "지사원문", "처지사정규",
+    "연도", "전표번호", "사업명", "금액원", "금액천원",
+    "매칭사업명", "매칭확신도", "구분",
+]
+
+
+def write_matched_csv(out_path, erp_annotated):
+    """전표-사업 매칭 결과를 CSV로 저장(데이터 계약: matched_{year}.csv).
+    3·4단계 파이프라인/외부 도구가 소비. Excel 한글 호환 위해 utf-8-sig."""
+    cols = [c for c in MATCHED_CSV_COLUMNS if c in erp_annotated.columns]
+    erp_annotated.to_csv(out_path, columns=cols, index=False, encoding="utf-8-sig")
