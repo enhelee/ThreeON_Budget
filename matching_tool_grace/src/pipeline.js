@@ -707,14 +707,11 @@
           if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, "보정됨"]); continue; }
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
+        // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지
         const soR = pickBest(prows.filter((p) => p.org === io), tg);
         let chosen = null;
-        if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;      // 같은 조직 매칭(임계 이상)
-        else {
-          const gR = pickBest(prows, tg);
-          if (gR.row && gR.best >= SIM_THRESHOLD) chosen = gR.row;       // 강한 전역 매칭만 허용(처 집행 등)
-          else if (it.bucket !== "gyeongsang" && soR.row) chosen = soR.row; // 강제배정은 '같은 조직 안'에서만 → 지사 간 누수 방지
-        }
+        if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
+        else if (soR.row) chosen = soR.row;                                // 같은 조직 내 최고(강제배정, 조직 밖으론 안 감)
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
