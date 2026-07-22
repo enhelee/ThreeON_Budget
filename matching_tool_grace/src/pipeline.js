@@ -55,6 +55,14 @@
   }
   const SIM_THRESHOLD = (typeof process !== "undefined" && process.env && process.env.SIM_TH)
     ? Number(process.env.SIM_TH) : 0.35; // 매칭 임계 (overlap 기준, SIM_TH 환경변수로 튜닝)
+  // 고유키 부분문자열 가점 가중. 실험 결과 금액정확도 개선 없음(오히려 미세 하락) → 기본 off(0).
+  // 맞는 케이스만큼 우연 일치도 끌어와 상쇄됨. ANCHOR_W 환경변수로 재실험 가능.
+  const ANCHOR_W = (typeof process !== "undefined" && process.env && process.env.ANCHOR_W != null)
+    ? Number(process.env.ANCHOR_W) : 0;
+  // 4순위: 전표번호 다르지만 텍스트 유사한 건 통합(네팅 Step C). diceSim 이 임계 이상끼리 한 건으로.
+  // null=끄기(완전일치 통합만). NET_SIM 환경변수로 튜닝.
+  const NET_SIM_TH = (typeof process !== "undefined" && process.env && process.env.NET_SIM != null)
+    ? Number(process.env.NET_SIM) : null;
   const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
   const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
@@ -134,6 +142,40 @@
       const docNos = arr.reduce((a, x) => a.concat(x.docNos || []), []);
       result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName, vendor: best.vendor });
     }
+    // Step C (4순위): 전표번호 다르지만 텍스트 유사한 건 통합. 금액 큰 워딩을 대표로.
+    // IDF 가중: 그룹 내 흔한 bigram은 약하게, 구별되는(희귀) bigram은 강하게 → 핵심어가 겹칠 때만 통합.
+    if (NET_SIM_TH != null) {
+      const gdf = new Map();
+      for (const s of result) { s._g = bigrams(simNorm(s.text)); for (const g of s._g) gdf.set(g, (gdf.get(g) || 0) + 1); }
+      const M = result.length || 1;
+      const gidf = (g) => Math.log((M + 1) / (gdf.get(g) || 1)) + 1;
+      const wsim = (a, b) => { // IDF 가중 overlap(포함도)
+        let inter = 0, sa = 0, sb = 0;
+        for (const g of a) { const w = gidf(g); sa += w; if (b.has(g)) inter += w; }
+        for (const g of b) sb += gidf(g);
+        return Math.min(sa, sb) ? inter / Math.min(sa, sb) : 0;
+      };
+      const byLen = result.slice().sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+      const clusters = [];
+      for (const s of byLen) {
+        if (textKey(s.text) === "") { clusters.push({ rep: s, members: [s] }); continue; } // 빈텍스트는 유사통합 안 함
+        let placed = null;
+        for (const c of clusters) {
+          if (textKey(c.rep.text) === "") continue;
+          if (wsim(s._g, c.rep._g) >= NET_SIM_TH) { placed = c; break; }
+        }
+        if (placed) placed.members.push(s); else clusters.push({ rep: s, members: [s] });
+      }
+      const merged = [];
+      for (const c of clusters) {
+        const net = c.members.reduce((a, x) => a + x.amount, 0);
+        if (net === 0) continue; // 상계로 0 → 제거
+        const rep = c.members.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), c.members[0]);
+        const docNos = c.members.reduce((a, x) => a.concat(x.docNos || []), []);
+        merged.push({ text: rep.text, amount: net, docNos, n: c.members.reduce((a, x) => a + (x.n || 1), 0), costName: rep.costName, vendor: rep.vendor });
+      }
+      return merged;
+    }
     return result;
   }
 
@@ -163,18 +205,27 @@
         continue;
       }
       if (meta.bucket === "rule3") {
-        // rule3(자산화예비품·고온부품·저장품): 텍스트 있는 건 일반 netting,
-        // 텍스트 없는 건 공급업체(vendor)별로 합산해 유지(사업 배정은 fillChipInPlace에서)
+        // rule3(자산화예비품·고온부품·저장품):
+        //  - 텍스트 있는 건: 일반 netting → 계획 사업명과 텍스트 매칭
+        //  - 텍스트 없는 건: 지사별 × 전기일(날짜)별로 합산 → "제1차/2차… 예비품 입고"로 고정 정리
         const textItems = items.filter((x) => textKey(x.text) !== "");
         const emptyItems = items.filter((x) => textKey(x.text) === "");
         for (const x of nettingGroup(textItems)) cleaned.push({ ...meta, ...x });
-        const byV = new Map();
-        for (const it of emptyItems) { const v = it.vendor || "(무vendor)"; if (!byV.has(v)) byV.set(v, []); byV.get(v).push(it); }
-        for (const [v, arr] of byV) {
+        const byDate = new Map();
+        for (const it of emptyItems) { const k = String(it.date == null ? "" : it.date); if (!byDate.has(k)) byDate.set(k, []); byDate.get(k).push(it); }
+        const dateKeys = [...byDate.keys()].sort((a, b) => {
+          const na = Number(a), nb = Number(b);
+          if (!isNaN(na) && !isNaN(nb)) return na - nb; // 엑셀 날짜 serial 등 숫자면 수치 정렬
+          return a < b ? -1 : a > b ? 1 : 0;            // 문자열이면 사전식(날짜 문자열도 대개 정렬됨)
+        });
+        let cha = 0;
+        for (const dk of dateKeys) {
+          const arr = byDate.get(dk);
           const net = arr.reduce((s, x) => s + x.amount, 0);
           if (net === 0) continue; // 상계로 0이면 제거
+          cha++;
           const b = arr.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), arr[0]);
-          cleaned.push({ ...meta, text: "", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: v, emptyText: true });
+          cleaned.push({ ...meta, text: "제" + cha + "차 예비품 입고", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: b.vendor, rule3Fixed: true });
         }
         continue;
       }
@@ -685,9 +736,28 @@
       const idf = new Map();
       for (const [g, d] of df) idf.set(g, Math.log((N + 1) / d) + 1);
       const defW = Math.log(N + 1) + 1; // 계획에 없던 bigram = 희귀 취급
-      const pickBest = (pool, tg) => {
+      // ── 고유키 anchor: 과목 내 사업명의 희귀 부분문자열(3~6자)이 전표텍스트에 그대로 나오면 가점 ──
+      // 흔한 단어(정기점검/구매 등)는 여러 사업명에 겹쳐 df가 커져 자동 배제됨. 연도무관 런타임 계산.
+      const A_MAXDF = 2;   // 과목 내 이 개수 이하 사업명에만 등장하는 부분문자열만 고유키로 인정
+      const subsOf = (s) => { const set = new Set(); const n = s.length; for (let L = 3; L <= 6; L++) for (let i = 0; i + L <= n; i++) set.add(s.slice(i, i + L)); return set; };
+      const subDf = new Map();
+      for (const p of prows) { p._sn = simNorm(p.biz); p._subs = [...subsOf(p._sn)]; for (const g of p._subs) subDf.set(g, (subDf.get(g) || 0) + 1); }
+      for (const p of prows) {
+        p._anchors = p._subs.filter((g) => (subDf.get(g) || 99) <= A_MAXDF);
+        p._anchorTot = p._anchors.reduce((s, g) => s + g.length, 0); // 길수록 구체적 → 가중
+      }
+      const anchorFrac = (p, txtNorm) => {
+        if (!p._anchorTot) return 0;
+        let s = 0; for (const g of p._anchors) if (txtNorm.indexOf(g) >= 0) s += g.length;
+        return s / p._anchorTot; // 이 사업명 고유키가 전표에 얼마나 들어있나 (0~1)
+      };
+      const pickBest = (pool, tg, txtNorm) => {
         let row = null, best = 0;
-        for (const p of pool) { const sc = wDice(tg, p._g, idf, defW); if (sc > best) { best = sc; row = p; } }
+        for (const p of pool) {
+          let sc = wDice(tg, p._g, idf, defW);
+          if (ANCHOR_W && txtNorm) sc += ANCHOR_W * anchorFrac(p, txtNorm);
+          if (sc > best) { best = sc; row = p; }
+        }
         return { row, best };
       };
       const rowsByOrg = {};
@@ -698,6 +768,8 @@
       for (const it of items) {
         // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
         if (it.bucket === "gyeongsang") continue;
+        // rule3 빈텍스트 → "제N차 예비품 입고" 고정 줄: 매칭 안 하고 그대로 출력
+        if (it.rule3Fixed) { unmatched.push({ org: it.org, acctName: it.acctName, text: it.text, amount: it.amount, _fixedName: true }); continue; }
         if (it.emptyText) { empties.push(it); continue; }
         const io = nrm(it.org);
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
@@ -708,8 +780,9 @@
           if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨"]); continue; }
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
+        const txtNorm = simNorm(it.text + " " + (it.costName || ""));
         // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지
-        const soR = pickBest(prows.filter((p) => p.org === io), tg);
+        const soR = pickBest(prows.filter((p) => p.org === io), tg, txtNorm);
         let chosen = null;
         if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
         else if (soR.row) chosen = soR.row;                                // 같은 조직 내 최고(강제배정, 조직 밖으론 안 감)
@@ -748,7 +821,7 @@
       const row = new Array(Math.max(grid[hr].length, ci.actual + 1)).fill("");
       if (ci.acctName >= 0) row[ci.acctName] = it.acctName;
       if (ci.deptName >= 0) row[ci.deptName] = it.org || "";
-      row[ci.biz] = (it._unassigned ? "(미배분·검토) " : "(신규) ") + it.text;
+      row[ci.biz] = it._fixedName ? it.text : (it._unassigned ? "(미배분·검토) " : "(신규) ") + it.text;
       row[ci.actual] = toUnit(it.amount);
       extra.push(row);
     }
