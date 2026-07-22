@@ -704,7 +704,7 @@
         if (corr.has(ckey)) {
           const target = textKey(corr.get(ckey));
           const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
-          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, "보정됨"]); continue; }
+          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨"]); continue; }
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
         // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지
@@ -715,7 +715,8 @@
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, ""]);
+          const conf = Math.round((soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, ""]);
         } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
@@ -801,8 +802,9 @@
     const corr = parseCorrections(input.correctionRows || [], C);
     // 계획대비실적: 업로드 집계표의 계획 줄을 그대로 두고 실적(B)만 채움
     let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
-    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "올바른사업명(수정시 작성)", "비고"]];
-    const addLog = (lg) => { for (const x of lg || []) checklist.push([x[0], x[1], x[2], x[3], x[4], "", x[5]]); };
+    const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
+    const _clRows = [];
+    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], (x[5] < CONF_REVIEW ? "검토필요" : ""), "", x[6]]); };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
@@ -815,6 +817,11 @@
     } else {
       chipPl = buildChipgyepyoAOA((usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C)).rows, "손익");
     }
+
+    // 금액 큰 순 정렬(파레토): 위에서부터 큰 건만 검토하면 대부분의 돈을 커버
+    _clRows.sort((a, b) => Math.abs(Number(b[3]) || 0) - Math.abs(Number(a[3]) || 0));
+    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고"], ..._clRows];
+    stats.reviewNeeded = _clRows.filter((r) => r[6] === "검토필요").length;
 
     return {
       cleaned, plan, stats, checklist,
