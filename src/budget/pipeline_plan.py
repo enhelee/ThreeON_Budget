@@ -4,6 +4,7 @@ import os
 
 from . import config_store, org_structure, loaders, classify, excel_plan_writer
 from . import missing as missing_mod
+from . import normalize
 
 
 def run_plan(business_plan_path, config_dir, out_dir, year, budget):
@@ -20,6 +21,9 @@ def run_plan(business_plan_path, config_dir, out_dir, year, budget):
     cap_items = {x["과목"] for x in cap_config if x.get("포함")}
 
     df = loaders.load_business_plan(business_plan_path)
+    # 예산과목 명칭 통일(계정코드 동일 개명 흡수) — 실적 분석과 동일 기준
+    item_alias = config_store.load_item_alias(config_dir)
+    df["예산과목"] = df["예산과목"].map(lambda x: normalize.normalize_item(x, item_alias))
     missing_rows = missing_mod.collect_missing_rows(df)
     filtered_df, unclassified = classify.classify_rows(df, budget, pl_items, cap_items)
 

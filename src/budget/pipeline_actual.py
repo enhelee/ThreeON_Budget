@@ -7,7 +7,7 @@
 import os
 
 from . import config_store, org_structure, loaders, master_data, erp_loader
-from . import matching, excel_actual_writer
+from . import matching, excel_actual_writer, normalize
 
 
 def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, budget,
@@ -37,8 +37,11 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
     master = master_data.load_master(master_path) if master_path and os.path.exists(master_path) else \
         {"code_to_item": {}, "code_to_attr": {}, "deptcode_to_branch": {}}
 
-    # 계획본 로드
+    # 계획본 로드 + 예산과목 명칭 통일(구명→현명, 계정코드 동일 개명 흡수)
     plan_df = loaders.load_business_plan(plan_path)
+    plan_df["예산과목"] = plan_df["예산과목"].map(
+        lambda x: normalize.normalize_item(x, item_alias)
+    )
 
     # ERP 로드 + 정규화
     erp_df = erp_loader.load_erp(zrfm2_path)
@@ -51,6 +54,7 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
     res = matching.match_actuals(
         plan_df, erp_norm, budget_items, pl_items, cap_items,
         threshold=config_store.SIMILARITY_THRESHOLD, new_policy=new_policy,
+        small_threshold=config_store.SMALL_AMOUNT_THOUSAND,
     )
 
     # 연도 검증
@@ -63,6 +67,8 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
     exec_total = sum(r["실적금액"] for r in plan_rows if r["구분"] == "계획집행")
     new_total = sum(r["실적금액"] for r in new_rows)
     missing_cnt = sum(1 for r in plan_rows if r["구분"] == "미시행")
+    small_rows = [r for r in new_rows if r["구분"] == "신규(소액집행)"]
+    small_total = sum(r["실적금액"] for r in small_rows)
 
     review = {
         "year": year,
@@ -77,8 +83,10 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
             "계획집행 행수": sum(1 for r in plan_rows if r["구분"] == "계획집행"),
             "미시행 행수": missing_cnt,
             "신규 행수": len(new_rows),
+            "  └ 소액집행 행수": len(small_rows),
             "계획집행 실적(천원)": round(exec_total),
             "신규 실적(천원)": round(new_total),
+            "  └ 소액집행 실적(천원)": round(small_total),
             "총 실적(천원)": round(exec_total + new_total),
         },
     }

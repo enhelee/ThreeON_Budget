@@ -61,6 +61,26 @@ def test_match_group_policy_default():
     assert total == 18000.0
 
 
+def test_small_amount_lumped_as_execution_title():
+    """소액(≤2,000천원) 신규 전표는 (지사×과목)별 '집행'으로 일괄 확정."""
+    erp = pd.DataFrame([
+        {"계정코드": "60909002", "예산과목원문": "수선유지비-열원정기점검", "연도": "2025",
+         "전표번호": "S1", "금액원": 1_500_000, "금액천원": 1500.0,
+         "사업명": "잡다한 소액 A", "지사원문": "대구지사"},
+        {"계정코드": "60909002", "예산과목원문": "수선유지비-열원정기점검", "연도": "2025",
+         "전표번호": "S2", "금액원": 800_000, "금액천원": 800.0,
+         "사업명": "잡다한 소액 B", "지사원문": "대구지사"},
+    ])
+    pl = {"수선유지비-열원정기점검"}
+    # 대구지사에는 계획행 없음 → 신규. 둘 다 소액 → 소액집행 1행으로 묶임.
+    res = matching.match_actuals(_plan(), _erp_norm(erp), pl, pl, set(),
+                                 threshold=80, small_threshold=2000)
+    smalls = [r for r in res["new_rows"] if r["구분"] == "신규(소액집행)"]
+    assert len(smalls) == 1
+    assert smalls[0]["사업명"] == "대구지사 수선유지비-열원정기점검 집행"
+    assert smalls[0]["실적금액"] == 2300.0
+
+
 def test_match_strict_name_policy():
     """엄격정책: 사업명 유사도 미달 전표는 신규로 분리."""
     pl = {"수선유지비-열원정기점검"}

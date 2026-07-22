@@ -27,10 +27,9 @@ def test_seed_item_config_pl_and_capital():
     assert len(pl) == 8
     assert len(cap) == 11
     names = {x["과목"] for x in pl}
-    assert "수선유지비-열원보완개선및기타" in names
-    assert "수선유지비-열원보완및개선" not in names
+    assert "수선유지비-열원보완및개선" in names  # 25년 개명된 표기
     simui = {x["과목"] for x in pl if x["심의대상"]}
-    assert simui == {"수선유지비-건물/구축물", "수선유지비-열원보완개선및기타"}
+    assert simui == {"수선유지비-건물/구축물", "수선유지비-열원보완및개선"}
     assert all(not x["심의대상"] for x in cap)
 
 def test_item_config_save_and_load_roundtrip(tmp_path):

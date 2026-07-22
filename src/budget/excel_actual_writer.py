@@ -72,7 +72,7 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
         ws.cell(r, 10, None)
         ws.cell(r, 11, round(nr["실적금액"]))
         ws.cell(r, 12, _simui_flag(item_flags, nr["예산과목"], nr["실적금액"]))
-        ws.cell(r, 13, "신규")
+        ws.cell(r, 13, nr.get("구분", "신규"))
         ws.cell(r, 14, nr.get("비고", ""))
         for c in range(1, 15):
             ws.cell(r, c).fill = NEW_FILL

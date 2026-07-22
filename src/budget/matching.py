@@ -63,7 +63,7 @@ def _sim(a, b):
 
 
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
-                  threshold=80, new_policy="group"):
+                  threshold=80, new_policy="group", small_threshold=2000):
     """계획행별 실적금액 산출 + 신규사업 집계.
 
     plan_df: 계획본 양식1(월별) 로드 결과(loaders.PLAN_COLUMNS + _row).
@@ -139,20 +139,30 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     for rec in plan_rows:
         rec["구분"] = "계획집행" if rec["매칭전표수"] > 0 else "미시행"
 
-    # 신규사업: 귀속 안된 in-budget 전표를 (과목,처지사)별 집계
-    new_group = defaultdict(lambda: {"금액": 0.0, "전표": [], "사업명들": []})
+    # 신규사업: 귀속 안된 in-budget 전표를 (과목,처지사)별 집계.
+    # 소액(건당 |금액| ≤ small_threshold)은 별도로 묶어 '집행' 일괄 확정.
+    big_group = defaultdict(lambda: {"금액": 0.0, "전표": [], "사업명들": []})
+    small_group = defaultdict(lambda: {"금액": 0.0, "전표": []})
     for i in in_budget_idx:
         if attributed.get(i) is None:
             key = (items_norm[i], depts_norm[i])
-            g = new_group[key]
-            g["금액"] += (_clean_na(erp["금액천원"].iloc[i]) or 0.0)
-            if erp["전표번호"].iloc[i]:
-                g["전표"].append(erp["전표번호"].iloc[i])
-            if erp["사업명"].iloc[i]:
-                g["사업명들"].append(erp["사업명"].iloc[i])
+            amt = _clean_na(erp["금액천원"].iloc[i]) or 0.0
+            doc = erp["전표번호"].iloc[i]
+            if abs(amt) <= small_threshold:
+                g = small_group[key]
+                g["금액"] += amt
+                if doc:
+                    g["전표"].append(doc)
+            else:
+                g = big_group[key]
+                g["금액"] += amt
+                if doc:
+                    g["전표"].append(doc)
+                if erp["사업명"].iloc[i]:
+                    g["사업명들"].append(erp["사업명"].iloc[i])
 
     new_rows = []
-    for (item, dept), g in new_group.items():
+    for (item, dept), g in big_group.items():
         distinct = list(dict.fromkeys(g["사업명들"]))
         label = " / ".join(distinct[:3])
         if len(distinct) > 3:
@@ -168,7 +178,19 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             "비고": f"전표 {len(g['전표'])}건: " + ", ".join(g["전표"][:5])
                    + (" ..." if len(g["전표"]) > 5 else ""),
         })
-    new_rows.sort(key=lambda x: (str(x["예산과목"]), str(x["처지사"])))
+    # 소액 일괄 확정: "{지사} {예산과목} 집행"
+    for (item, dept), g in small_group.items():
+        dept_label = dept if dept else "(미매핑)"
+        new_rows.append({
+            "예산과목": item,
+            "처지사": dept_label,
+            "사업명": f"{dept_label} {item} 집행",
+            "실적금액": g["금액"],
+            "구분": "신규(소액집행)",
+            "전표건수": len(g["전표"]),
+            "비고": f"소액(건당≤{small_threshold:,}천원) 일괄확정 {len(g['전표'])}건",
+        })
+    new_rows.sort(key=lambda x: (str(x["예산과목"]), str(x["처지사"]), str(x["구분"])))
 
     # 검토 항목: 미매핑 처지사(in-budget인데 정규화 실패) / 미분류 과목
     unmatched_dept = sorted({
