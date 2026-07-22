@@ -33,8 +33,9 @@ def test_run_plan_pl_and_capital(tmp_path):
 
     res_pl = pipeline_plan.run_plan(plan_path, config_dir, out_dir, "2026", "손익")
     assert os.path.exists(res_pl["output_path"])
-    assert res_pl["요약"]["행수"] == 1
-    assert res_pl["요약"]["총액"] == 30000.0
+    # 손익 시드 과목 2종(수선유지비-건물/구축물 60000 + 수선유지비-열원경상정비 30000) 매칭
+    assert res_pl["요약"]["행수"] == 2
+    assert res_pl["요약"]["총액"] == 90000.0
     assert "이상한과목" in res_pl["요약"]["미분류과목"]
     assert res_pl["요약"]["결측치건수"] == 0  # 이상한과목 행은 부서코드/예산코드만 비어있음(필수아님)
 
