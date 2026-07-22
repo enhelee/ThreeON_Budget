@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """업로드 데이터를 손익/자본으로 분류, 미분류 예산과목 탐지."""
+import pandas as pd
 
 
 def classify_rows(df, budget, pl_items, cap_items):
@@ -8,6 +9,6 @@ def classify_rows(df, budget, pl_items, cap_items):
     known = pl_items | cap_items
     unclassified = sorted({
         str(v).strip() for v in df["예산과목"]
-        if v is not None and str(v).strip() != "" and str(v).strip() not in known
+        if not pd.isna(v) and str(v).strip() != "" and str(v).strip() not in known
     })
     return filtered, unclassified
