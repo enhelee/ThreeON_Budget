@@ -638,6 +638,7 @@
       acctName: find((h) => h.includes("예산과목")),
       deptName: find((h) => h.includes("부서명(처") || h.includes("처.지사")),
       biz: find((h) => h.includes("사업명")),
+      annual: find((h) => h.includes("연예산")),
       actual: find((h) => h.includes("실적")),
     };
     if (ci.actual < 0) ci.actual = header.length - 1;
@@ -651,7 +652,7 @@
       const code = C.resolveAcctCode(grid[r][ci.acctName]);
       if (!code) continue;
       if (!planByCode.has(code)) planByCode.set(code, []);
-      planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]) });
+      planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]), annual: (ci.annual >= 0 ? Number(grid[r][ci.annual]) || 0 : 0) });
       planRows++;
     }
     // 실적 항목을 예산과목 코드별로 그룹핑
