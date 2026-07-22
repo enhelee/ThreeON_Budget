@@ -61,12 +61,14 @@
       const rawRows = await fileToRows(fRaw, null);
       const cap = $("fCap").files[0] ? await chipFileToSheets($("fCap").files[0]) : { chip: [], jong: [] };
       const pl = $("fPl").files[0] ? await chipFileToSheets($("fPl").files[0]) : { chip: [], jong: [] };
+      const correctionRows = $("fCorr") && $("fCorr").files[0] ? await fileToRows($("fCorr").files[0], null) : [];
 
       const R = BUDGET_PIPELINE.runAll(
         {
           rawRows,
           capChipRows: cap.chip, capJongRows: cap.jong,
           plChipRows: pl.chip, plJongRows: pl.jong,
+          correctionRows,
         },
         BUDGET_CONST
       );
@@ -89,6 +91,7 @@
       if (kind === "pl") downloadWb([["종합표", RESULT.jongPl], ["계획대비실적", RESULT.chipPl]], "양식2_손익_실적집계.xlsx");
       else if (kind === "cap") downloadWb([["종합표", RESULT.jongCap], ["계획대비실적", RESULT.chipCap]], "양식3_자본_실적집계.xlsx");
       else if (kind === "review") downloadWb([["지사x과목합계", RESULT.review.pivot], ["정리내역", RESULT.review.items], ["미배분vendor", RESULT.review.vendors]], "netting검토표.xlsx");
+      else if (kind === "checklist") downloadWb([["검토목록(보정사전)", RESULT.checklist]], "검토목록_보정사전.xlsx");
     });
   });
 })();

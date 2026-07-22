@@ -623,7 +623,8 @@
   // ── 계획대비실적 시트를 "있는 줄 그대로" 두고 실적(B)만 채움 (줄 추가 안 함) ──
   // 같은 (조직 × 과목) 안에서 각 실적 항목을 가장 유사한 사업명 줄에 배정(그룹 내 argmax).
   // 계획에 아예 없는 (조직×과목)의 실적은 맨 뒤에 집계 1줄씩만 "(계획미반영)"으로 추가.
-  function fillChipInPlace(aoa, cleaned, ledger, C) {
+  function fillChipInPlace(aoa, cleaned, ledger, C, corrections) {
+    const corr = corrections || new Map();
     const nrm = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\s/g, "");
     const grid = aoa.map((r) => (r || []).slice());
     let hr = -1, header = null;
@@ -664,6 +665,7 @@
     let filled = 0;
     const unmatched = [];
     const sumByRow = {};
+    const log = []; // 배정 기록: [지사, 예산과목, 전표텍스트, 금액천원, 내가붙인사업명, 비고]
     // IDF 가중 dice: 과목 내에서 공통인 bigram은 약하게, 희귀(구분되는) bigram은 강하게
     const METRIC = (typeof process !== "undefined" && process.env && process.env.SIM_METRIC) || "overlap";
     const wDice = (ag, bg, idf, defW) => {
@@ -696,8 +698,15 @@
         // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
         if (it.bucket === "gyeongsang") continue;
         if (it.emptyText) { empties.push(it); continue; }
-        const tg = featSet(it.text + " " + (it.costName || ""));
         const io = nrm(it.org);
+        // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
+        const ckey = it.org + "|" + it.acct + "|" + textKey(it.text);
+        if (corr.has(ckey)) {
+          const target = textKey(corr.get(ckey));
+          const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
+          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, "보정됨"]); continue; }
+        }
+        const tg = featSet(it.text + " " + (it.costName || ""));
         const soR = pickBest(prows.filter((p) => p.org === io), tg);
         let chosen = null;
         if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;      // 같은 조직 매칭(임계 이상)
@@ -709,6 +718,7 @@
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, ""]);
         } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
@@ -743,7 +753,36 @@
       row[ci.actual] = toUnit(it.amount);
       extra.push(row);
     }
-    return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length } };
+    return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length }, log };
+  }
+
+  // ── 보정 사전 파싱: [지사, 예산과목, 전표텍스트, 올바른사업명] → Map(org|code|textKey → 사업명) ──
+  function parseCorrections(aoa, C) {
+    const map = new Map();
+    if (!aoa || !aoa.length) return map;
+    const nrm2 = (x) => String(x == null ? "" : x).normalize("NFC").replace(/\s/g, "");
+    let hr = -1, H = null;
+    for (let i = 0; i < Math.min(aoa.length, 6); i++) {
+      const h = (aoa[i] || []).map(nrm2);
+      if (h.some((x) => x.includes("전표텍스트")) && h.some((x) => x.includes("사업명"))) { hr = i; H = h; break; }
+    }
+    if (hr < 0) return map;
+    const ci = {
+      dep: H.findIndex((h) => h.includes("지사") || h.includes("부서")),
+      acct: H.findIndex((h) => h.includes("예산과목") || h.includes("과목")),
+      text: H.findIndex((h) => h.includes("전표텍스트")),
+      biz: H.findIndex((h) => h.includes("올바른") || h.includes("사업명")),
+    };
+    for (let r = hr + 1; r < aoa.length; r++) {
+      const row = aoa[r] || [];
+      const biz = nfc(String(row[ci.biz] == null ? "" : row[ci.biz])).trim();
+      if (!biz) continue; // 올바른 사업명 안 채운 줄은 스킵
+      const code = C.resolveAcctCode(row[ci.acct]) || String(row[ci.acct] || "").trim();
+      const org = nfc(row[ci.dep]);
+      const key = org + "|" + code + "|" + textKey(row[ci.text]);
+      map.set(key, biz);
+    }
+    return map;
   }
 
   // ── 전체 오케스트레이션: raw + 예산(자본/손익) → 결과 AOA 묶음 ──
@@ -761,23 +800,27 @@
       if (input.capBudgetRows) plan = plan.concat(parseBudget(input.capBudgetRows));
       if (input.plBudgetRows) plan = plan.concat(parseBudget(input.plBudgetRows));
     }
+    // 보정 사전(있으면): (조직|과목|전표텍스트)→올바른 사업명
+    const corr = parseCorrections(input.correctionRows || [], C);
     // 계획대비실적: 업로드 집계표의 계획 줄을 그대로 두고 실적(B)만 채움
-    let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0 };
+    let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
+    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "올바른사업명(수정시 작성)", "비고"]];
+    const addLog = (lg) => { for (const x of lg || []) checklist.push([x[0], x[1], x[2], x[3], x[4], "", x[5]]); };
     if (input.capChipRows && input.capChipRows.length) {
-      const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C);
-      chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned;
+      const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
+      chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
     } else {
       chipCap = buildChipgyepyoAOA((usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C)).rows, "자본");
     }
     if (input.plChipRows && input.plChipRows.length) {
-      const r = fillChipInPlace(input.plChipRows, cleaned, "손익", C);
-      chipPl = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned;
+      const r = fillChipInPlace(input.plChipRows, cleaned, "손익", C, corr);
+      chipPl = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
     } else {
       chipPl = buildChipgyepyoAOA((usedChip ? matchPlanToActual(cleaned, plan, C) : matchToBudget(cleaned, plan, C)).rows, "손익");
     }
 
     return {
-      cleaned, plan, stats,
+      cleaned, plan, stats, checklist,
       review: buildReviewSheets(cleaned, C),
       chipCap, chipPl,
       // 종합표: 업로드 집계표의 종합표 틀이 있으면 그걸 채움(분류·행·열 파일 그대로), 없으면 자체 생성
@@ -790,6 +833,6 @@
     nfc, textKey, simNorm, bigrams, diceSim, SIM_THRESHOLD,
     parseRaw, nettingGroup, netting, buildReviewSheets,
     parseBudget, matchToBudget, buildChipgyepyoAOA, buildJonghapAOA,
-    fillJonghap, fillRowSubtotals, fillChipInPlace, parseChipPlan, matchPlanToActual, runAll,
+    fillJonghap, fillRowSubtotals, fillChipInPlace, parseChipPlan, matchPlanToActual, parseCorrections, runAll,
   };
 });

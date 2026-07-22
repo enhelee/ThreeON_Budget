@@ -32,6 +32,7 @@ ${css}
       <label class="up"><span class="lbl">ERP raw data <em>(필수)</em></span><input type="file" id="fRaw" accept=".xlsx,.xls"><span class="note">실적의 원천 데이터</span></label>
       <label class="up"><span class="lbl">양식3 · 자본예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fCap" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
       <label class="up"><span class="lbl">양식2 · 손익예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fPl" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
+      <label class="up"><span class="lbl">보정 사전 <em class="opt">(선택)</em></span><input type="file" id="fCorr" accept=".xlsx,.xls"><span class="note">이전에 담당자가 고친 [지사·과목·전표텍스트→올바른사업명] 표. 있으면 자동 적용</span></label>
     </div>
     <button id="run" class="primary">집계표 생성</button>
     <div id="msg" class="msg"></div>
@@ -44,6 +45,7 @@ ${css}
       <button data-dl="pl">양식2 · 손익 집계표 내려받기</button>
       <button data-dl="cap">양식3 · 자본 집계표 내려받기</button>
       <button data-dl="review" class="ghost">netting 검토표 내려받기</button>
+      <button data-dl="checklist" class="ghost">검토목록(보정사전 초안) 내려받기</button>
     </div>
     <p class="hint">※ 계획대비실적: 업로드한 집계표의 <b>사업명 줄은 그대로</b> 두고 <b>실적(B)만</b> raw에서 채웁니다. 계획에 아예 없는 (조직×과목)의 실적은 맨 아래에 <b>(계획미반영)</b> 집계 줄로 표시됩니다.</p>
   </div>

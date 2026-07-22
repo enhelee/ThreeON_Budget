@@ -207,5 +207,28 @@ ok(outRows.length === chipIn.length + 1, "fillChip: 줄 폭증 없음 (입력+�
 const unp = outRows.find((r) => String(r[6]).includes("(신규)"));
 ok(unp && unp[bIdx] === 999, "fillChip: 신규 실적 999");
 
+// ── 보정 사전: 오배분을 지정한 사업으로 강제 ──
+const chipCorr = [
+  ["연번", "예산과목", "속성", "주관부서명", "예산귀속 부서명(처.지사)", "예산귀속 부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)"],
+  [1, "수선유지비-건물/구축물", "제조", "플랜트", "용인지사", "용인 고객지원부", "용인지사 동백 열원설비동 방수 유지보수 공사", 47827, ""],
+  [2, "수선유지비-건물/구축물", "제조", "플랜트", "용인지사", "용인 고객지원부", "용인지사 위험물저장소 및 연계펌프동 방수 유지보수 공사", 106424, ""],
+];
+const clCorr = [{ org: "용인지사", acct: "60909001", acctName: "수선유지비-건물/구축물", ledger: "손익", amount: 135435000, text: "연계설비동및동백수처리실옥상방수공사" }];
+// 보정 없이: 유사도로 배정(동백일 가능성)
+const noCorr = P.fillChipInPlace(chipCorr, clCorr, "손익", C, new Map());
+const bizOf = (aoa, r) => aoa[r][6];
+// 보정 사전: 이 전표 → 위험물 사업
+const corrAoa = [
+  ["지사", "예산과목", "전표텍스트", "올바른사업명"],
+  ["용인지사", "수선유지비-건물/구축물", "연계설비동및동백수처리실옥상방수공사", "용인지사 위험물저장소 및 연계펌프동 방수 유지보수 공사"],
+];
+const corrMap = P.parseCorrections(corrAoa, C);
+ok(corrMap.size === 1, "parseCorrections: 1건 읽음");
+const withCorr = P.fillChipInPlace(chipCorr, clCorr, "손익", C, corrMap);
+const wRow = withCorr.aoa.find((r) => String(r[6]).includes("위험물저장소"));
+const dRow = withCorr.aoa.find((r) => String(r[6]).includes("동백 열원설비동"));
+ok(Math.round(135435000 / 1000) === (Number(wRow[8]) || 0), "보정사전: 실적이 위험물 사업으로 (실제:" + wRow[8] + ")");
+ok((Number(dRow[8]) || 0) === 0, "보정사전: 동백 사업은 0");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
