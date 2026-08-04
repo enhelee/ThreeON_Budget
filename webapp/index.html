@@ -39,13 +39,16 @@
 .det-table th{padding:.45rem .35rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .det-table .th-line{display:inline-flex;align-items:center;gap:.2rem;white-space:nowrap}
 .det-table td.table-cell{padding:.4rem .35rem;font-size:.76rem;line-height:1.3;overflow-wrap:anywhere}
-.det-table th:nth-child(1){width:3.2rem}
-.det-table th:nth-child(2){width:9.4rem}
-.det-table th:nth-child(3){width:6.2rem}
-.det-table th:nth-child(5){width:6.8rem}
-.det-table th:nth-child(6){width:6.8rem}
-.det-table th:nth-child(7){width:4.4rem}
-.det-table th:nth-child(8){width:4.2rem}
+/* 열 폭은 실측 기준(12.16px 폰트 + 좌우 패딩 11.2px):
+   예산과목 최장 14자=150px, 전표번호 10자리=67px, 금액 14자=85px, 상태 배지 최대
+   '신규(소액집행)'=~77px, 확신도 배지 '학습 0.99'=50px. 여유를 조금 더 준 값. */
+.det-table th:nth-child(1){width:4rem}   /* 헤더 '구분 ↕'가 61px 필요 */
+.det-table th:nth-child(2){width:10.8rem}
+.det-table th:nth-child(3){width:5.2rem}
+.det-table th:nth-child(5){width:6.2rem}
+.det-table th:nth-child(6){width:6.2rem}
+.det-table th:nth-child(7){width:5.4rem}
+.det-table th:nth-child(8){width:4.4rem}
 .det-table th:nth-child(9){width:2.4rem}
 .det-table .cell-name{white-space:normal;overflow-wrap:anywhere}
 .det-table .cell-item{white-space:normal;overflow-wrap:anywhere}
