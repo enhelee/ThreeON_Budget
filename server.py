@@ -323,22 +323,93 @@ class BizEditReq(BaseModel):
 def biz_edit(req: BizEditReq):
     # 처지사 = 예산귀속 지사. 종합표·지사별 집계 기준이라 이 값이 바뀌면 사업이 통째로
     #   이동한다(계획행=여기, 귀속 전표=override.target_dept — 둘 다 매칭 전에 적용).
-    allowed = {"사업명", "속성", "주관부서명", "부서부", "처지사"}
-    fields = {k: str(v) for k, v in req.fields.items() if k in allowed}
+    # 연예산(천원)도 고칠 수 있다 — 원본 plan_row는 보존하고 분석에만 덧씌운다.
+    allowed = {"사업명", "속성", "주관부서명", "부서부", "처지사", "연예산"}
+    fields = {}
+    for k, v in req.fields.items():
+        if k not in allowed:
+            continue
+        if k == "연예산":
+            s = str(v).replace(",", "").strip()
+            if s == "":
+                fields[k] = ""            # 빈칸 = 연예산 결측으로 되돌림
+                continue
+            try:
+                fields[k] = float(s)
+            except ValueError:
+                raise HTTPException(400, f"연예산은 숫자(천원)로 입력하세요: '{v}'")
+        else:
+            fields[k] = str(v)
     if not fields:
-        raise HTTPException(400,
-                            "수정할 필드가 없습니다. (사업명/속성/주관부서명/부서부/처지사)")
-    if "처지사" in fields and not fields["처지사"].strip():
+        raise HTTPException(
+            400, "수정할 필드가 없습니다. (사업명/속성/주관부서명/부서부/처지사/연예산)")
+    if "처지사" in fields and not str(fields["처지사"]).strip():
         raise HTTPException(400, "예산귀속 지사는 비울 수 없습니다.")
     conn = _conn()
     try:
         _guard_unlocked(conn, req.year, "사업 내용 수정")
         dbm.add_biz_edit(conn, req.year, req.budget, req.예산과목, req.처지사,
                          req.사업명, fields)
+        # 이름을 바꾸면 그 이름을 가리키던 재배정·학습도 함께 옮긴다 — 안 하면
+        #   재분석 때 옛 이름의 동명 신규 사업이 따로 생겨 중복 행이 된다.
+        moved = {}
+        new_name = fields.get("사업명")
+        if new_name and new_name != req.사업명:
+            moved = dbm.rename_biz_references(conn, req.year, req.budget, req.예산과목,
+                                              req.처지사, req.사업명, new_name)
         patched = dbm.patch_latest_run_biz(conn, req.year, req.budget, req.예산과목,
                                            req.처지사, req.사업명, fields)
-        return {"patched": patched,
-                "notice": "저장됨 — 화면에 즉시 반영되며, 이후 분석에도 유지됩니다."}
+        notice = "저장됨 — 화면에 즉시 반영되며, 이후 분석에도 유지됩니다."
+        if moved.get("override") or moved.get("learned"):
+            notice += (f" (이름 변경 연동: 재배정 {moved.get('override', 0)}건 ·"
+                       f" 학습 {moved.get('learned', 0)}건)")
+        return {"patched": patched, "moved": moved, "notice": notice}
+    finally:
+        conn.close()
+
+
+class BizDeleteReq(BaseModel):
+    year: str
+    budget: str
+    예산과목: str
+    처지사: str
+    사업명: str
+    memo: str | None = None
+
+
+@app.post("/api/biz-delete")
+def biz_delete(req: BizDeleteReq):
+    """사업 삭제 = 분석 대상에서 제외(원본 plan_row는 보존 → 이력 삭제로 복구).
+
+    귀속 전표를 먼저 다른 사업으로 옮기는 것은 호출자(UI)의 책임이다. 남아 있어도
+    금액이 사라지지는 않고 매칭이 신규로 되살리므로 총액은 항상 보존된다.
+    """
+    conn = _conn()
+    try:
+        _guard_unlocked(conn, req.year, "사업 삭제")
+        dbm.add_biz_delete(conn, req.year, req.budget, req.예산과목, req.처지사,
+                           req.사업명, req.memo)
+        return {"deleted": req.사업명,
+                "notice": "삭제됨 — 설정 탭 '사업 삭제 이력'에서 되돌릴 수 있습니다."}
+    finally:
+        conn.close()
+
+
+@app.get("/api/biz-deletes")
+def biz_deletes(year: str):
+    conn = _conn()
+    try:
+        return _clean_json(dbm.list_biz_deletes(conn, year))
+    finally:
+        conn.close()
+
+
+@app.delete("/api/biz-delete/{del_id}")
+def restore_biz_delete(del_id: int):
+    conn = _conn()
+    try:
+        dbm.delete_biz_delete(conn, del_id)
+        return {"restored": del_id}
     finally:
         conn.close()
 

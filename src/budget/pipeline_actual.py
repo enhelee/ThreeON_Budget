@@ -44,7 +44,7 @@ VALID_ATTRS = ("일반", "제조", "건가", "자산")
 def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
                       new_policy="group", zrfm2_src_path=None, overrides=None,
                       learned=None, biz_edits=None, attr_map=None, code_to_item=None,
-                      deptcode_map=None, manual_biz=None):
+                      deptcode_map=None, manual_biz=None, biz_deletes=None):
     """공용 코어 — DataFrame 입력(DB 기반 실행 포함).
 
     zrfm2_src_path가 있으면 원본 워크북에 주석을 달아 zrfm2_V1을 만들고,
@@ -52,7 +52,9 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
     overrides: {_erp_row -> 사업명} 수동 재배정(matching 참조).
     learned: {(과목, 텍스트정규) -> 사업명} 과년도 확정 학습 맵(matching 참조).
     biz_edits: [{예산과목, 처지사, 사업명, fields}] — 관리자 사업 내용 수정.
-        매칭 전 계획행에 적용(사업명 변경 포함, 빈칸 입력 허용).
+        매칭 전 계획행에 적용(사업명·연예산 변경 포함, 빈칸 입력 허용).
+    biz_deletes: [{예산과목, 처지사, 사업명}] — 관리자 사업 삭제. 매칭 전 계획행에서 제외
+        (원본은 그대로 → 이력 삭제로 복구).
     attr_map: {예산과목 -> 속성} 마스터 — 계획 속성이 4종(일반/제조/건가/자산)이
         아니면(원본 품질 문제) 마스터 값으로 교정. 신규 행 속성도 이걸로 채움.
     code_to_item: {계정코드 -> 과목명} 마스터 — ERP 과목 정규화 보강.
@@ -159,8 +161,26 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
         if not mask.any():
             continue
         for k, v in (ed.get("fields") or {}).items():
-            if k in plan_df.columns:
+            if k not in plan_df.columns:
+                continue
+            if k == "연예산":                     # 금액은 숫자로 — 빈칸은 결측 유지
+                plan_df.loc[mask, k] = None if v in (None, "") else _num(v)
+            else:
                 plan_df.loc[mask, k] = (v if v != "" else None)
+
+    # 관리자 사업 삭제(biz_delete) — 분석 대상에서 제외. 원본 plan_row는 그대로 두므로
+    #   설정 탭 이력을 지우면 복구된다. 귀속 전표는 삭제 전에 다른 사업으로 옮겨야
+    #   하며(UI가 강제), 남아 있으면 매칭이 신규로 되살려 총액은 보존된다.
+    plan_deleted = {"행": 0, "연예산": 0.0}
+    for dl in (biz_deletes or []):
+        mask = ((plan_df["예산과목"] == dl.get("예산과목"))
+                & (plan_df["처지사"] == dl.get("처지사"))
+                & (plan_df["사업명"] == dl.get("사업명")))
+        if not mask.any():
+            continue
+        plan_deleted["행"] += int(mask.sum())
+        plan_deleted["연예산"] += float(plan_df.loc[mask, "연예산"].map(_num).sum())
+        plan_df = plan_df[~mask].reset_index(drop=True)
 
     # 계획행 스코프 확정 — 이번 예산의 실적 대상 과목만 남긴다.
     #   손익·자본이 섞인 원본을 올려도 상대 예산 행이 섞이지 않는다.
@@ -303,6 +323,9 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
         (reason, g["행"], round(g["연예산"]), ", ".join(sorted(g["과목"])[:6]))
         for reason, g in sorted(plan_excluded.items(), key=lambda kv: -kv[1]["연예산"])
     ]
+    if plan_deleted["행"]:      # 관리자 삭제분도 조용히 빼지 않고 함께 보고
+        plan_excluded_rows.insert(0, ("관리자 사업 삭제(설정 탭 이력에서 복구 가능)",
+                                     plan_deleted["행"], round(plan_deleted["연예산"]), ""))
 
     total = exec_total + new_total
     review = {

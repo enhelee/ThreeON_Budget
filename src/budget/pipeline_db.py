@@ -34,12 +34,13 @@ def run_actual_db(conn, config_dir, out_dir, year, budget, new_policy="group",
     code_to_item = dbm.load_code_to_item(conn)       # 마스터: 계정코드→과목명
     deptcode_map = dbm.load_deptcode_map(conn)       # 마스터: 부서코드→처지사
     manual_biz = dbm.list_manual_biz(conn, year, budget)   # 수동 추가 사업
+    biz_deletes = dbm.list_biz_deletes(conn, year, budget)  # 삭제(분석 제외) 사업
     res = pipeline_actual.run_actual_frames(
         plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
         new_policy=new_policy, zrfm2_src_path=None, overrides=overrides,
         learned=learned, biz_edits=biz_edits,
         attr_map=attr_map, code_to_item=code_to_item, deptcode_map=deptcode_map,
-        manual_biz=manual_biz,
+        manual_biz=manual_biz, biz_deletes=biz_deletes,
     )
     run_id = dbm.save_run(conn, year, budget, res["요약"], res["erp_annotated"])
     dbm.save_biz_lines(conn, run_id, budget, res["plan_rows"], res["new_rows"])

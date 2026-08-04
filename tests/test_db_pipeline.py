@@ -297,6 +297,98 @@ def test_biz_moved_whole_to_other_dept(env):
                 & (biz["사업명"] == "화성 정기점검 보수공사")).any()
 
 
+def test_biz_delete_excludes_plan_row_and_restores(env):
+    """사업 삭제 = 계획행을 분석에서 제외. 원본은 남아 이력 삭제로 복구된다."""
+    conn, cfg, out = env
+    # 실적 없는 계획행(도색공사)에 붙은 임의귀속 전표를 다른 사업으로 치워 미시행로 만든다
+    base = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    detail = dbm.load_match_detail(conn, base["run_id"])
+    d3 = detail[detail["전표번호"] == "D3"].iloc[0]
+    dbm.add_override(conn, "2023", "손익", int(d3["erp_row_id"]),
+                     "화성 정기점검 보수공사")
+    dbm.add_biz_delete(conn, "2023", "손익", "수선유지비-열원정기점검", "화성지사",
+                       "화성 옥외배관 도색공사")
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz = dbm.load_biz_lines(conn, res["run_id"])
+    assert not (biz["사업명"] == "화성 옥외배관 도색공사").any()   # 삭제됨
+    assert res["요약"]["총 실적(천원)"] == TOTAL                   # 실적 총액 보존
+    # 검토리포트에 삭제분을 보고(조용한 누락 금지)
+    reasons = [r[0] for r in res["계획행제외"]]
+    assert any("관리자 사업 삭제" in r for r in reasons)
+
+    # 이력을 지우면 되살아난다
+    dl = dbm.list_biz_deletes(conn, "2023", "손익")
+    assert len(dl) == 1
+    dbm.delete_biz_delete(conn, dl[0]["id"])
+    res2 = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz2 = dbm.load_biz_lines(conn, res2["run_id"])
+    assert (biz2["사업명"] == "화성 옥외배관 도색공사").any()
+
+
+def test_biz_delete_with_vouchers_moved_keeps_total(env):
+    """전표가 붙은 사업 삭제 = 전표를 다른 사업(또는 미지정)으로 옮긴 뒤 제외 → 총액 보존."""
+    conn, cfg, out = env
+    base = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    detail = dbm.load_match_detail(conn, base["run_id"])
+    new_row = detail[detail["구분"] == "신규"].iloc[0]       # 대구지사 전표
+    unassigned = "대구지사 수선유지비-열원정기점검 미지정"
+    dbm.add_override(conn, "2023", "손익", int(new_row["erp_row_id"]), unassigned)
+    dbm.add_biz_delete(conn, "2023", "손익", "수선유지비-열원정기점검", "대구지사",
+                       new_row["매칭사업명"].replace("[신규] ", ""))
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    assert res["요약"]["총 실적(천원)"] == TOTAL              # 금액은 사라지지 않는다
+    biz = dbm.load_biz_lines(conn, res["run_id"])
+    moved = biz[biz["사업명"] == unassigned]
+    assert len(moved) == 1 and moved.iloc[0]["실적금액"] == 3000
+
+
+def test_rename_syncs_override_no_duplicate(env):
+    """사업명을 바꾸면 그 이름을 가리키던 재배정도 함께 옮겨져 동명 중복 행이 안 생긴다."""
+    conn, cfg, out = env
+    bid = dbm.add_manual_biz(conn, "2023", "손익", "수선유지비-열원정기점검",
+                             "화성지사", "옛이름 사업", attr="제조", plan_amt=0)
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    detail = dbm.load_match_detail(conn, res["run_id"])
+    d3 = detail[detail["전표번호"] == "D3"].iloc[0]
+    dbm.add_override(conn, "2023", "손익", int(d3["erp_row_id"]), "옛이름 사업")
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz = dbm.load_biz_lines(conn, res["run_id"])
+    assert len(biz[biz["사업명"] == "옛이름 사업"]) == 1        # 한 행(계획집행)
+
+    # 이름 변경 + 참조 동기화
+    dbm.add_biz_edit(conn, "2023", "손익", "수선유지비-열원정기점검", "화성지사",
+                     "옛이름 사업", {"사업명": "새이름 사업"})
+    moved = dbm.rename_biz_references(conn, "2023", "손익", "수선유지비-열원정기점검",
+                                      "화성지사", "옛이름 사업", "새이름 사업")
+    assert moved["override"] == 1
+    res2 = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz2 = dbm.load_biz_lines(conn, res2["run_id"])
+    assert not (biz2["사업명"] == "옛이름 사업").any()          # 옛 이름 잔존 없음
+    same = biz2[biz2["사업명"] == "새이름 사업"]
+    assert len(same) == 1                                      # 중복 아님 — 한 행
+    assert same.iloc[0]["구분"] == "계획집행" and same.iloc[0]["실적금액"] == 2500
+    assert res2["요약"]["총 실적(천원)"] == TOTAL
+    dbm.delete_manual_biz(conn, bid)
+
+
+def test_biz_edit_changes_plan_amount(env):
+    """연예산(A) 수정이 계획행에 반영되고(원본 plan_row는 보존) 이력 삭제로 복구된다."""
+    conn, cfg, out = env
+    dbm.add_biz_edit(conn, "2023", "손익", "수선유지비-열원정기점검", "화성지사",
+                     "화성 정기점검 보수공사", {"연예산": 12345.0})
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz = dbm.load_biz_lines(conn, res["run_id"])
+    row = biz[biz["사업명"] == "화성 정기점검 보수공사"].iloc[0]
+    assert row["연예산"] == 12345                     # 10000 → 12345
+    assert res["요약"]["총 실적(천원)"] == TOTAL       # 실적은 그대로
+
+    ed = dbm.list_biz_edits(conn, "2023", "손익")[0]
+    dbm.delete_biz_edit(conn, ed["id"])
+    res2 = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz2 = dbm.load_biz_lines(conn, res2["run_id"])
+    assert biz2[biz2["사업명"] == "화성 정기점검 보수공사"].iloc[0]["연예산"] == 10000
+
+
 def test_override_forced_new_name(env):
     """신규 전표(D2)에 사용자가 직접 사업명 부여 → 그 이름의 신규 사업으로 강제."""
     conn, cfg, out = env

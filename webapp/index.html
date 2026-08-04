@@ -124,7 +124,7 @@
     ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
     det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
            hideMissing: false, sortKey: "", sortDir: 1,
-           open: new Set(), sel: new Set(), selBudget: null, editKey: null,
+           open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
            // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
            //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.
            ovDept: "", ovTarget: "", ovManual: "" },
@@ -211,7 +211,7 @@
     state.det.data = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
     state.det.branch = branch;
     state.det.open = new Set(); state.det.sel = new Set();
-    state.det.selBudget = null; state.det.editKey = null;
+    state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null;
     state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
   }
 
@@ -494,6 +494,42 @@
       </section>`;
   }
 
+  // 사업 삭제 확인 상자 — 귀속 전표가 있으면 '어디로 옮길지'를 반드시 고르게 한다.
+  //   전표를 그냥 지우면 ERP 총액과 어긋나므로, 삭제는 언제나 (전표 이동 + 계획행 제외)다.
+  function unassignedName(b) {
+    return `${state.det.branch} ${b.예산과목} 미지정`;
+  }
+  function deleteBoxHtml(b, key) {
+    if (state.det.delKey !== key) return "";
+    const n = (b.전표 || []).length;
+    const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+    // 자기 자신만 제외(이름이 아니라 행 단위) — 동명 사업이 둘일 때 쌍둥이를 대상으로
+    //   고를 수 있어야 중복을 하나로 합칠 수 있다.
+    const others = [...new Set((state.det.data.biz || [])
+      .map((x, idx) => ({...x, _k: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+      .filter(x => x.budget === b.budget && x.예산과목 === b.예산과목 && x._k !== key
+                   && !(hasPlan && x.사업명 === b.사업명))
+      .map(x => x.사업명))].sort((x, y) => String(x).localeCompare(String(y), "ko"));
+    return `
+      <div class="mt-3 rounded-xl border border-red-200 bg-red-50 p-4">
+        <p class="text-sm font-bold text-red-800">사업 삭제 — "${esc(b.사업명)}"</p>
+        ${!hasPlan ? `<p class="mt-1 text-xs text-red-700">이 사업은 계획에 없는 <b>${esc(b.구분)}</b> 행입니다 — 귀속 전표를 옮기면 그대로 사라집니다(삭제 기록을 남기지 않습니다).</p>` : ""}
+        ${n ? `
+        <p class="mt-1 text-xs text-red-700">귀속 전표 <b>${n}건 · ${fmt(b.실적원)}원</b>이 있습니다. 총액이 어긋나지 않게 <b>먼저 옮길 곳을 고르세요.</b>${hasPlan ? " 옮긴 뒤 이 사업을 삭제합니다." : ""}</p>
+        <label class="mt-3 block max-w-xl"><span class="mb-1.5 block text-xs font-semibold text-red-700">전표를 옮길 사업 (같은 지사 · 같은 예산과목)</span>
+          <select id="delTarget" class="control w-full">
+            ${others.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}
+            <option value="__unassigned__" ${others.length ? "" : "selected"}>— 미지정 항목으로 이동 (${esc(unassignedName(b))}) —</option>
+          </select></label>` : `
+        <p class="mt-1 text-xs text-red-700">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)}천원</b>)이 이후 분석에서 제외됩니다.</p>`}
+        ${hasPlan ? `<p class="mt-2 text-xs text-red-600">원본 계획 자료는 지우지 않습니다 — 설정 탭 <b>'사업 삭제 이력'</b>에서 되돌릴 수 있습니다.</p>` : `<p class="mt-2 text-xs text-red-600">되돌리려면 설정 탭 <b>'수동 재배정 이력'</b>에서 해당 이동 기록을 지우면 됩니다.</p>`}
+        <div class="mt-3 flex gap-2">
+          <button class="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700" data-action="confirm-delete" data-ekey="${esc(key)}">${!hasPlan ? "전표 옮기고 정리" : (n ? "옮기고 삭제" : "삭제")}</button>
+          <button class="btn-secondary" data-action="cancel-delete">취소</button>
+        </div>
+      </div>`;
+  }
+
   // 검색어 입력 시 결과 영역만 갱신(#detResults) — 입력창을 다시 만들지 않아
   // 한글 조합(IME)이 끊기지 않는다.
   function detResultsHtml() {
@@ -558,11 +594,14 @@
               <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">속성</span><input id="edAttr" class="control w-full" value="${esc(b.속성 ?? "")}" placeholder="예: 제조/자산/건가"></label>
               <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">주관부서명</span><input id="edDept" class="control w-full" value="${esc(b.주관부서명 ?? "")}"></label>
               <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 부서명(부)</span><input id="edPart" class="control w-full" value="${esc(b.부서부 ?? "")}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">연예산(A) · 천원</span><input id="edPlan" class="control w-full text-right" value="${b.연예산 ?? ""}" placeholder="천원 단위"></label>
             </div>
-            <p class="mt-2 text-xs text-blue-700"><b>예산귀속 지사</b>를 바꾸면 이 사업이 연예산(A)·귀속 전표까지 <b>통째로</b> 그 지사로 이동합니다(삭제·재생성 아님). <b>주관부서명</b>은 표기용 텍스트라 종합표·지사별 집계는 바뀌지 않습니다.</p>
-            <div class="mt-4 flex gap-2">
+            <p class="mt-2 text-xs text-blue-700"><b>예산귀속 지사</b>를 바꾸면 이 사업이 연예산(A)·귀속 전표까지 <b>통째로</b> 그 지사로 이동합니다(삭제·재생성 아님). <b>주관부서명</b>은 표기용 텍스트라 종합표·지사별 집계는 바뀌지 않습니다. <b>연예산</b>을 고치면 원본 계획본은 그대로 두고 이후 모든 분석·종합표·집행률에 그 값이 쓰입니다.</p>
+            ${deleteBoxHtml(b, key)}
+            <div class="mt-4 flex flex-wrap gap-2">
               <button class="btn-primary" data-action="save-edit" data-ekey="${esc(key)}">저장</button>
               <button class="btn-secondary" data-action="cancel-edit">취소</button>
+              <button class="ml-auto rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50" data-action="ask-delete" data-ekey="${esc(key)}">이 사업 삭제</button>
             </div>
           </div>
         </td></tr>`;
@@ -746,6 +785,10 @@
       <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">사업 내용 수정 이력 (${esc(state.year)}년)</h3><p class="section-help">상세 화면 ✎로 저장한 수정입니다. 삭제하면 다음 분석부터 원본으로 돌아갑니다.</p></div>
       ${edits.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">대상 사업</th><th class="px-4 py-3">수정 내용</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
       <tbody class="divide-y divide-slate-100">${edits.map(e => `<tr><td class="table-cell">${e.id}</td><td class="table-cell">${e.budget}</td><td class="table-cell">${esc(e.처지사)} · ${esc(e.예산과목)} · ${esc(e.사업명)}</td><td class="table-cell text-xs">${esc(Object.entries(e.fields).map(([k, v]) => `${k}→${v === "" ? "(빈칸)" : v}`).join(", "))}</td><td class="table-cell text-xs text-slate-500">${esc(e.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-edit="${e.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">수정 이력이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">사업 삭제 이력 (${esc(state.year)}년)</h3><p class="section-help">상세 화면에서 삭제한 사업입니다. 원본 계획 자료는 지워지지 않았으므로, 여기서 <b>되돌리기</b>를 누르면 다음 분석부터 다시 살아납니다.</p></div>
+      ${(state.bizDeletes || []).length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">삭제한 사업</th><th class="px-4 py-3">전표 처리</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">되돌리기</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${state.bizDeletes.map(x => `<tr><td class="table-cell">${x.id}</td><td class="table-cell">${x.budget}</td><td class="table-cell">${esc(x.처지사)} · ${esc(x.예산과목)} · <b>${esc(x.사업명)}</b></td><td class="table-cell text-xs text-slate-500">${esc(x.memo || "귀속 전표 없음")}</td><td class="table-cell text-xs text-slate-500">${esc(x.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-restore-del="${x.id}">되돌리기</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">삭제한 사업이 없습니다.</p>`}</section>
     </div>`;
   }
 
@@ -781,6 +824,7 @@
         state.learned = await api("/api/learned");
         state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
         state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
+        state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`);
       }
     } catch (e) { toast(e.message); }
     renderPage();
@@ -881,7 +925,7 @@
       state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
       renderPage();
     }
-    if (act === "cancel-edit") { state.det.editKey = null; renderPage(); }
+    if (act === "cancel-edit") { state.det.editKey = null; state.det.delKey = null; renderPage(); }
     if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
     if (act === "save-add") {
       const name = $("#abName").value.trim();
@@ -909,6 +953,8 @@
       const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
         .find(x => x._key === key);
       if (!b) return;
+      const planIn = $("#edPlan") ? $("#edPlan").value.replace(/,/g, "").trim() : "";
+      if (planIn !== "" && isNaN(Number(planIn))) { toast("연예산은 숫자(천원)로 입력하세요."); return; }
       const fields = {
         "사업명": $("#edName").value.trim(),
         "속성": $("#edAttr").value.trim(),
@@ -916,6 +962,8 @@
         "부서부": $("#edPart").value.trim(),
       };
       if (!fields["사업명"]) { toast("사업명은 비울 수 없습니다."); return; }
+      const planChanged = planIn !== String(b.연예산 ?? "");
+      if (planChanged) fields["연예산"] = planIn;      // 안 바꿨으면 보내지 않는다
       // 예산귀속 지사 변경 = 사업 통째 이동(계획행=biz_edit.처지사, 전표=override.target_dept)
       const from = state.det.branch;
       const to = $("#edBranch") ? $("#edBranch").value : from;
@@ -923,7 +971,8 @@
       const vouchers = (b.전표 || []).map(v => v.erp_row_id);
       const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
       // 내용이 실제로 바뀐 게 없으면 이력을 남기지 않는다(신규 사업 이동 등).
-      const edited = fields["사업명"] !== b.사업명
+      const edited = planChanged
+        || fields["사업명"] !== b.사업명
         || fields["속성"] !== String(b.속성 ?? "")
         || fields["주관부서명"] !== String(b.주관부서명 ?? "")
         || fields["부서부"] !== String(b.부서부 ?? "");
@@ -932,6 +981,10 @@
         if (!confirm(`"${fields["사업명"]}" 사업을 ${from} → ${to}(으)로 통째 이동합니다.\n(${parts.join(" + ")})\n\n계속할까요?`)) return;
         if (hasPlan) fields["처지사"] = to;      // 계획행(연예산)도 함께 이동
       } else if (!edited) { state.det.editKey = null; renderPage(); return; }
+      // 사업명·연예산·지사는 매칭·집계에 영향 → 저장 후 재분석으로 확정.
+      //   속성·부서명은 표기용이라 즉시 패치만으로 충분하다.
+      const renamed = fields["사업명"] !== b.사업명;
+      const reanalyze = moving || planChanged || renamed;
       busy(true, moving ? "사업 이동 저장 중..." : "사업 내용 저장 중...");
       try {
         let r = {notice: ""};
@@ -947,20 +1000,63 @@
                                   memo: `사업 통째 이동 ${from}→${to}`})});
         }
         state.det.editKey = null;
-        if (!moving) { toast(r.notice); await loadDetail(from); renderPage(); return; }
+        if (!reanalyze) { toast(r.notice); await loadDetail(from); renderPage(); return; }
       } catch (err) { toast(err.message); busy(false); return; }
-      finally { if (!moving) busy(false); }
-      // 이동은 매칭 결과가 바뀌므로 재분석으로 확정 → 새 지사 화면으로 전환
-      state.det.branch = to;
+      finally { if (!reanalyze) busy(false); }
+      state.det.branch = moving ? to : from;
       state.det.sel.clear(); state.det.selBudget = null;
+      const ok = await runAnalyze(true);
+      if (ok) {
+        toast(moving ? `이동 완료 — "${fields["사업명"]}" → ${to}`
+                     : `저장·재분석 완료 — "${fields["사업명"]}"`);
+      }
+    }
+    if (act === "ask-delete") {
+      state.det.delKey = e.target.closest("[data-action]").dataset.ekey;
+      renderPage();
+    }
+    if (act === "cancel-delete") { state.det.delKey = null; renderPage(); }
+    if (act === "confirm-delete") {
+      const key = e.target.closest("[data-action]").dataset.ekey;
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === key);
+      if (!b) return;
+      const vouchers = (b.전표 || []).map(v => v.erp_row_id);
+      // 계획행이 없는 행(신규·미매핑)은 '그 전표들의 집합'일 뿐이다 — 전표를 옮기면 사라진다.
+      //   여기에 삭제 기록(이름 기준)을 남기면 같은 이름의 계획행까지 지워지므로 남기지 않는다.
+      const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+      let moveTo = null;
       if (vouchers.length) {
-        const ok = await runAnalyze(true);
-        if (ok) toast(`이동 완료 — "${fields["사업명"]}" → ${to}`);
-      } else {
-        await loadDetail(to);
-        renderPage();
-        busy(false);
-        toast(`이동 완료 — "${fields["사업명"]}" → ${to} (귀속 전표 없음)`);
+        const pick = $("#delTarget") ? $("#delTarget").value : "";
+        if (!pick) { toast("전표를 옮길 사업을 선택하세요."); return; }
+        moveTo = pick === "__unassigned__" ? unassignedName(b) : pick;
+        if (hasPlan && moveTo === b.사업명) { toast("같은 이름의 사업으로는 옮길 수 없습니다."); return; }
+        const tail = hasPlan ? `\n그 뒤 "${b.사업명}" 사업을 삭제합니다.` : "";
+        if (!confirm(`귀속 전표 ${vouchers.length}건(${fmt(b.실적원)}원)을 "${moveTo}"(으)로 옮깁니다.${tail}\n\n계속할까요?`)) return;
+      } else if (!confirm(`"${b.사업명}" 사업을 삭제합니다. (연예산 ${fmt(b.연예산)}천원, 귀속 전표 없음)\n설정 탭 이력에서 되돌릴 수 있습니다.\n\n계속할까요?`)) {
+        return;
+      }
+      busy(true, hasPlan ? "사업 삭제 중..." : "전표 이동 중...");
+      try {
+        if (moveTo) {
+          await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, erp_row_ids: vouchers,
+                                  target_name: moveTo, target_dept: state.det.branch,
+                                  memo: `사업 정리에 따른 전표 이동 (${b.사업명} → ${moveTo})`})});
+        }
+        if (hasPlan) {
+          await api("/api/biz-delete", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                                  처지사: state.det.branch, 사업명: b.사업명,
+                                  memo: moveTo ? `전표 ${vouchers.length}건 → ${moveTo}` : null})});
+        }
+        state.det.delKey = null; state.det.editKey = null;
+        state.det.sel.clear(); state.det.selBudget = null;
+      } catch (err) { toast(err.message); busy(false); return; }
+      const ok = await runAnalyze(true);
+      if (ok) {
+        toast((hasPlan ? `삭제 완료 — "${b.사업명}"` : `정리 완료 — "${b.사업명}"`)
+              + (moveTo ? ` (전표 ${vouchers.length}건 → ${moveTo})` : ""));
       }
     }
     if (act === "save-override") {
@@ -1041,6 +1137,14 @@
       try {
         await api(`/api/biz-edit/${delEd.dataset.delEdit}`, {method: "DELETE"});
         toast("수정 이력 삭제됨 — 다음 분석 실행부터 원본으로 복원됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const restore = e.target.closest("[data-restore-del]");
+    if (restore) {
+      try {
+        await api(`/api/biz-delete/${restore.dataset.restoreDel}`, {method: "DELETE"});
+        toast("되돌렸습니다 — 다음 분석 실행부터 그 사업이 다시 살아납니다.");
         await navigate("settings");
       } catch (err) { toast(err.message); }
     }

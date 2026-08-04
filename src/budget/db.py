@@ -112,6 +112,12 @@ def init_db(conn):
         예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
         속성 TEXT, 주관부서명 TEXT, 부서부 TEXT, 연예산 REAL,
         created_at TEXT NOT NULL)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS biz_delete(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year TEXT NOT NULL, budget TEXT NOT NULL,
+        예산과목 TEXT, 처지사 TEXT, 사업명 TEXT,   -- 삭제 대상 사업(현재 이름)
+        memo TEXT,
+        created_at TEXT NOT NULL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS biz_edit(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         year TEXT NOT NULL, budget TEXT NOT NULL,
@@ -588,6 +594,56 @@ def delete_biz_edit(conn, edit_id):
     conn.commit()
 
 
+def add_biz_delete(conn, year, budget, item, dept, name, memo=None):
+    """사업 삭제(=분석 대상에서 제외) 기록. 원본을 지우지 않으므로 이력을 지우면 복구된다."""
+    conn.execute(
+        "INSERT INTO biz_delete(year,budget,예산과목,처지사,사업명,memo,created_at)"
+        " VALUES(?,?,?,?,?,?,?)",
+        (str(year), budget, item, dept, name, memo, _now()))
+    conn.commit()
+
+
+def list_biz_deletes(conn, year, budget=None):
+    q = ("SELECT id,budget,예산과목,처지사,사업명,memo,created_at FROM biz_delete"
+         " WHERE year=?" + (" AND budget=?" if budget else "") + " ORDER BY id")
+    cur = conn.execute(q, (str(year), budget) if budget else (str(year),))
+    cols = ["id", "budget", "예산과목", "처지사", "사업명", "memo", "created_at"]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def delete_biz_delete(conn, del_id):
+    conn.execute("DELETE FROM biz_delete WHERE id=?", (del_id,))
+    conn.commit()
+
+
+def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
+    """사업명 변경 시 그 사업을 '이름으로' 가리키는 기록을 함께 옮긴다.
+
+    이걸 하지 않으면 재배정(override)·학습(learned_match)이 옛 이름을 계속 가리켜,
+    재분석 때 그 이름의 계획행이 없으므로 동명의 신규 사업이 따로 생긴다(중복 행).
+    override는 과목·지사를 갖고 있지 않으므로 최신 실행의 match_line으로 범위를 좁힌다.
+    manual_biz는 건드리지 않는다 — 이름 변경은 biz_edit가 매 분석 때 적용하므로,
+    원본 이름을 바꾸면 그 biz_edit(옛 이름 키)가 더 이상 매칭되지 않아 속성 등 나머지
+    수정까지 함께 사라진다.
+    """
+    if not old_name or not new_name or old_name == new_name:
+        return {"override": 0, "learned": 0}
+    run = latest_run(conn, year, budget)
+    ov = 0
+    if run:
+        cur = conn.execute(
+            "UPDATE override SET target_name=? WHERE year=? AND budget=? AND target_name=?"
+            " AND erp_row_id IN (SELECT erp_row_id FROM match_line WHERE run_id=?"
+            "                    AND 과목정규=? AND 처지사정규=?)",
+            (new_name, str(year), budget, old_name, run["id"], item, dept))
+        ov = cur.rowcount
+    cur = conn.execute("UPDATE learned_match SET 사업명=? WHERE 과목=? AND 사업명=?",
+                       (new_name, item, old_name))
+    lm = cur.rowcount
+    conn.commit()
+    return {"override": ov, "learned": lm}
+
+
 def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     """최신 실행의 biz_line(및 사업명 변경 시 match_line 라벨)을 즉시 수정 —
     재분석 없이 화면에 바로 반영하기 위한 패치. 영구 반영은 biz_edit가 담당."""
@@ -595,7 +651,7 @@ def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     if not run:
         return 0
     sets, vals = [], []
-    for k in ("속성", "사업명", "주관부서명", "부서부", "처지사"):
+    for k in ("속성", "사업명", "주관부서명", "부서부", "처지사", "연예산"):
         if k in fields:
             sets.append(f"{k}=?")
             vals.append(fields[k] if fields[k] != "" else None)
