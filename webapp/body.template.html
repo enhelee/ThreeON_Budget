@@ -81,7 +81,10 @@
     learned: null, overrides: null, bizEdits: null,
     det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
            hideMissing: false, sortKey: "", sortDir: 1,
-           open: new Set(), sel: new Set(), selBudget: null, editKey: null },
+           open: new Set(), sel: new Set(), selBudget: null, editKey: null,
+           // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
+           //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.
+           ovDept: "", ovTarget: "", ovManual: "" },
   };
 
   const viewMeta = {
@@ -166,6 +169,7 @@
     state.det.branch = branch;
     state.det.open = new Set(); state.det.sel = new Set();
     state.det.selBudget = null; state.det.editKey = null;
+    state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
   }
 
   function amounts(row) {
@@ -468,11 +472,9 @@
       const key = b._key;
       const open = d.open.has(key);
       const editing = d.editKey === key;
-      const allSel = b.전표.length > 0 && b.전표.every(v => d.sel.has(v.erp_row_id));
       const vhead = !open || !b.전표.length ? "" : `
         <tr class="voucher-head">
-          <td class="table-cell pl-6 text-xs font-bold text-slate-500" colspan="2">
-          ${locked ? "예산과목" : `<label class="flex items-center gap-2"><input type="checkbox" class="accent-blue-600" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>전체 선택 · 예산과목</span></label>`}</td>
+          <td class="table-cell pl-6 text-xs font-bold text-slate-500" colspan="2">예산과목</td>
           <td class="table-cell text-xs font-bold text-slate-500">전표번호</td>
           <td class="table-cell text-xs font-bold text-slate-500">전표 텍스트(ERP)</td>
           <td class="table-cell text-right text-xs font-bold text-slate-500">전기일</td>
@@ -484,7 +486,7 @@
           <td class="table-cell pl-6" colspan="2">
           <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-blue-600" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
           <span class="cell-item text-xs text-slate-600" title="${esc(v.과목 ?? b.예산과목)}">${esc(v.과목 ?? b.예산과목)}</span></label></td>
-          <td class="table-cell text-xs text-slate-500">${esc(v.전표번호 ?? "-")}</td>
+          <td class="table-cell cell-doc text-xs text-slate-500">${esc(v.전표번호 ?? "-")}</td>
           <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
           <td class="table-cell text-right text-xs text-slate-400">${esc(v.전기일 ?? "")}</td>
           <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
@@ -527,7 +529,10 @@
     const targetOpts = (() => {
       if (!selCount) return "";
       const names = [...new Set(data.biz.filter(b => b.budget === d.selBudget).map(b => b.사업명))];
-      return names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+      // 첫 항목은 항상 '선택 없음' — 실수로 목록 맨 위 사업에 붙는 것을 막고,
+      //   다른 지사·처로 새 사업명을 만들어 옮기는 흐름을 기본값으로 둔다.
+      return `<option value="" ${d.ovTarget ? "" : "selected"}>— 선택 없음 (새 사업명 직접 입력) —</option>`
+        + names.map(n => `<option value="${esc(n)}" ${n === d.ovTarget ? "selected" : ""}>${esc(n)}</option>`).join("");
     })();
 
     return `
@@ -540,13 +545,13 @@
           <div class="flex flex-wrap items-end gap-3">
             <p class="font-bold text-blue-950">${selCount}건 전표 선택 (${esc(d.selBudget)})</p>
             <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 지사</span>
-              <select id="ovDept" class="control">${realBranches().map(b => `<option value="${esc(b)}" ${b === d.branch ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
-            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 사업 선택 (현재 지사 기준)</span><select id="ovTarget" class="control w-full">${targetOpts || '<option value="">(직접 입력 사용)</option>'}</select></label>
-            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용"></label>
+              <select id="ovDept" class="control">${realBranches().map(b => `<option value="${esc(b)}" ${b === (d.ovDept || d.branch) ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 사업 선택 (현재 지사 기준)</span><select id="ovTarget" class="control w-full">${targetOpts}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용" value="${esc(d.ovManual || "")}"></label>
             <button class="btn-primary" data-action="save-override">재배정 저장 (자동 재분석)</button>
             <button class="btn-secondary" data-action="clear-sel">선택 해제</button>
           </div>
-          <p class="mt-2 text-xs text-blue-700">다른 지사로 이동하는 경우: 입력한 사업명이 그 지사의 계획 사업명과 정확히 일치하면 그 사업으로, 아니면 그 지사의 신규 사업으로 귀속됩니다.</p>
+          <p class="mt-2 text-xs text-blue-700">새 사업으로 옮기려면 <b>'— 선택 없음 —'</b> 그대로 두고 <b>사업명을 직접 입력</b>하세요. 다른 지사·처로 이동하는 경우: 입력한 사업명이 그 지사의 계획 사업명과 정확히 일치하면 그 사업으로, 아니면 그 지사의 신규 사업으로 귀속됩니다.</p>
           </section>` : ""}
         <section class="panel mt-6 overflow-hidden">
           <div class="border-b border-slate-200 px-4 py-3">${legend()}</div>
@@ -806,7 +811,11 @@
     if (act === "pick-erp") $("#erpFile").click();
     if (act === "pick-master-item") $("#masterItemFile").click();
     if (act === "pick-master-dept") $("#masterDeptFile").click();
-    if (act === "clear-sel") { state.det.sel.clear(); state.det.selBudget = null; renderPage(); }
+    if (act === "clear-sel") {
+      state.det.sel.clear(); state.det.selBudget = null;
+      state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
+      renderPage();
+    }
     if (act === "cancel-edit") { state.det.editKey = null; renderPage(); }
     if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
     if (act === "save-add") {
@@ -892,7 +901,7 @@
     if (act === "save-override") {
       const manual = $("#ovManual").value.trim();
       const target = manual || $("#ovTarget").value;
-      if (!target) { toast("이동할 사업을 선택하거나 입력하세요."); return; }
+      if (!target) { toast("이동할 사업을 목록에서 고르거나, 새 사업명을 직접 입력하세요."); return; }
       const destDept = $("#ovDept") ? $("#ovDept").value : "";
       const isUnmapped = !!state.det.data?.unmapped;
       // 미매핑 전표는 항상 지사 지정, 일반 전표는 지사가 바뀐 경우만 지정
@@ -904,6 +913,7 @@
                                 erp_row_ids: [...state.det.sel], target_name: target,
                                 target_dept: targetDept})});
         state.det.sel.clear(); state.det.selBudget = null;
+        state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
         if (targetDept && targetDept !== state.det.branch) state.det.branch = targetDept;
       } catch (err) { toast(err.message); busy(false); return; }
       // 저장 즉시 자동 재분석 → 반영된 결과로 새로고침
@@ -989,6 +999,10 @@
       finally { busy(false); }
       return;
     }
+    // 재배정 바 입력 보존 — 전표를 하나 더 체크해도 고른 지사·사업이 풀리지 않게
+    //   상태에 담아둔다(재렌더 없음).
+    if (e.target.id === "ovDept") { state.det.ovDept = e.target.value; return; }
+    if (e.target.id === "ovTarget") { state.det.ovTarget = e.target.value; return; }
     const f = e.target.dataset.filter;
     if (f === "type") { state.type = e.target.value; renderPage(); }
     if (f === "sort") { state.sort = e.target.value; renderPage(); }
@@ -1006,27 +1020,6 @@
     if (det === "attr") { state.det.attr = e.target.value; renderPage(); }
     if (e.target.dataset.addBudget) {
       state.det.add = {budget: e.target.value};
-      renderPage();
-      return;
-    }
-    const vall = e.target.dataset.vall;
-    if (vall) {
-      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
-        .find(x => x._key === vall);
-      if (!b) return;
-      const vb = e.target.dataset.vbudget;
-      if (e.target.checked) {
-        if (state.det.selBudget && state.det.selBudget !== vb) {
-          toast("손익과 자본 전표는 함께 재배정할 수 없습니다.");
-          e.target.checked = false;
-          return;
-        }
-        state.det.selBudget = vb;
-        b.전표.forEach(x => state.det.sel.add(x.erp_row_id));
-      } else {
-        b.전표.forEach(x => state.det.sel.delete(x.erp_row_id));
-        if (!state.det.sel.size) state.det.selBudget = null;
-      }
       renderPage();
       return;
     }
@@ -1053,6 +1046,8 @@
   // 검색 입력: 결과 영역만 부분 갱신 — 입력창 DOM을 유지해 한글 조합(IME)이
   // 끊기지 않는다(전체 재렌더 금지).
   document.addEventListener("input", e => {
+    // 직접 입력한 사업명도 재렌더에 견디게 상태로 보관(입력창 DOM은 그대로 → IME 안전)
+    if (e.target.id === "ovManual") { state.det.ovManual = e.target.value; return; }
     const f = e.target.dataset.filter;
     const det = e.target.dataset.det;
     if (f === "search") {
