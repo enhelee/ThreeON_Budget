@@ -44,7 +44,8 @@ VALID_ATTRS = ("일반", "제조", "건가", "자산")
 def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
                       new_policy="group", zrfm2_src_path=None, overrides=None,
                       learned=None, biz_edits=None, attr_map=None, code_to_item=None,
-                      deptcode_map=None, manual_biz=None, biz_deletes=None):
+                      deptcode_map=None, manual_biz=None, biz_deletes=None,
+                      make_files=True):
     """공용 코어 — DataFrame 입력(DB 기반 실행 포함).
 
     zrfm2_src_path가 있으면 원본 워크북에 주석을 달아 zrfm2_V1을 만들고,
@@ -55,6 +56,8 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
         매칭 전 계획행에 적용(사업명·연예산 변경 포함, 빈칸 입력 허용).
     biz_deletes: [{예산과목, 처지사, 사업명}] — 관리자 사업 삭제. 매칭 전 계획행에서 제외
         (원본은 그대로 → 이력 삭제로 복구).
+    make_files: Excel/CSV 산출물 생성 여부. False면 매칭 결과만 반환(화면 갱신용, 약 2.7배 빠름).
+        내보내기 시점에 True로 다시 실행해 파일을 만든다.
     attr_map: {예산과목 -> 속성} 마스터 — 계획 속성이 4종(일반/제조/건가/자산)이
         아니면(원본 품질 문제) 마스터 값으로 교정. 신규 행 속성도 이걸로 채움.
     code_to_item: {계정코드 -> 과목명} 마스터 — ERP 과목 정규화 보강.
@@ -365,23 +368,28 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
         },
     }
 
+    # 산출물 파일 생성 — 화면 갱신용 분석에서는 건너뛴다(make_files=False).
+    #   실측(2025 손익): 매칭 엔진 4.5초 vs 파일 3종 8.9초(zrfm2_V1이 8.2초).
+    #   수정할 때마다 아무도 열지 않는 xlsx를 다시 쓰는 것이 대기시간의 63%였다.
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"{year}년 {budget}예산_실적.xlsx")
-    excel_actual_writer.write_actual_workbook(
-        out_path, plan_rows, new_rows, dept_columns, item_rows, budget, year, review,
-    )
     v1_path = os.path.join(out_dir, f"zrfm2_{year}_V1({budget}).xlsx")
-    if zrfm2_src_path:
-        excel_actual_writer.write_zrfm2_v1(zrfm2_src_path, v1_path, res["erp_annotated"])
-    else:
-        excel_actual_writer.write_zrfm2_v1_from_df(v1_path, res["erp_annotated"])
     matched_csv_path = os.path.join(out_dir, f"matched_{year}_{budget}.csv")
-    excel_actual_writer.write_matched_csv(matched_csv_path, res["erp_annotated"])
+    if make_files:
+        excel_actual_writer.write_actual_workbook(
+            out_path, plan_rows, new_rows, dept_columns, item_rows, budget, year, review,
+        )
+        if zrfm2_src_path:
+            excel_actual_writer.write_zrfm2_v1(zrfm2_src_path, v1_path, res["erp_annotated"])
+        else:
+            excel_actual_writer.write_zrfm2_v1_from_df(v1_path, res["erp_annotated"])
+        excel_actual_writer.write_matched_csv(matched_csv_path, res["erp_annotated"])
 
     return {
-        "output_path": out_path,
-        "zrfm2_v1_path": v1_path,
-        "matched_csv_path": matched_csv_path,
+        "output_path": out_path if make_files else None,
+        "zrfm2_v1_path": v1_path if make_files else None,
+        "matched_csv_path": matched_csv_path if make_files else None,
+        "files_written": bool(make_files),
         "erp_annotated": res["erp_annotated"],
         "plan_rows": plan_rows,
         "new_rows": new_rows,

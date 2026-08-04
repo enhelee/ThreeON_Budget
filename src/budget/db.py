@@ -558,6 +558,38 @@ def learned_stats(conn):
     return out
 
 
+def count_learn_pending(conn, year):
+    """아직 학습되지 않은 '사람 확정 재배정' 건수.
+
+    재배정 저장 시 자동 학습을 떼어냈으므로(설정 탭 [AI 학습] 버튼으로 분리),
+    학습 대기 = override 중 (과목, 텍스트정규)가 learned_match에 없는 것.
+    """
+    n = 0
+    for budget in ("손익", "자본"):
+        run = latest_run(conn, year, budget)
+        rows = conn.execute(
+            "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
+            " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
+            " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
+        for rid, target, item_raw, text in rows:
+            item = None
+            if run:
+                r = conn.execute(
+                    "SELECT 과목정규 FROM match_line WHERE run_id=? AND erp_row_id=?",
+                    (run["id"], int(rid))).fetchone()
+                item = r[0] if r else None
+            item = item or item_raw
+            key = norm_text(text)
+            if not item or not key:
+                continue          # 텍스트 없는 전표는 학습 대상 아님
+            hit = conn.execute(
+                "SELECT 사업명 FROM learned_match WHERE 과목=? AND 텍스트정규=?",
+                (item, key)).fetchone()
+            if not hit or hit[0] != target:
+                n += 1
+    return n
+
+
 def clear_learned(conn):
     conn.execute("DELETE FROM learned_match")
     conn.commit()

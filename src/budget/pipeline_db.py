@@ -11,8 +11,13 @@ from . import pipeline_actual
 
 
 def run_actual_db(conn, config_dir, out_dir, year, budget, new_policy="group",
-                  master_path=None):
+                  master_path=None, make_files=True, record_run=True):
     """DB의 최신 계획/ERP 데이터셋으로 실적분석 실행 + 결과를 run으로 기록.
+
+    make_files=False면 Excel/CSV를 만들지 않는다 — 화면 갱신용 빠른 분석
+    (실측 2025 손익: 13.8초 → 5.3초). 파일은 내보내기 시점에 생성한다.
+    record_run=False면 실행 이력(run/match_line/biz_line)을 남기지 않는다 —
+    내보내기용 파일 재생성처럼 '결과를 바꾸지 않는 재실행'에 쓴다.
 
     반환: pipeline_actual 결과 dict + {"run_id": ...}.
     """
@@ -40,9 +45,15 @@ def run_actual_db(conn, config_dir, out_dir, year, budget, new_policy="group",
         new_policy=new_policy, zrfm2_src_path=None, overrides=overrides,
         learned=learned, biz_edits=biz_edits,
         attr_map=attr_map, code_to_item=code_to_item, deptcode_map=deptcode_map,
-        manual_biz=manual_biz, biz_deletes=biz_deletes,
+        manual_biz=manual_biz, biz_deletes=biz_deletes, make_files=make_files,
     )
-    run_id = dbm.save_run(conn, year, budget, res["요약"], res["erp_annotated"])
-    dbm.save_biz_lines(conn, run_id, budget, res["plan_rows"], res["new_rows"])
-    res["run_id"] = run_id
+    if record_run:
+        run_id = dbm.save_run(conn, year, budget, res["요약"], res["erp_annotated"])
+        dbm.save_biz_lines(conn, run_id, budget, res["plan_rows"], res["new_rows"])
+        res["run_id"] = run_id
+    else:
+        # 내보내기용 재실행 — 새 실행 이력을 남기지 않는다. 남기면 방금 만든 파일이
+        #   'run보다 오래됨'으로 판정돼 매 다운로드마다 다시 생성된다.
+        cur = dbm.latest_run(conn, year, budget)
+        res["run_id"] = cur["id"] if cur else None
     return res

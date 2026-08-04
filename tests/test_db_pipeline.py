@@ -403,6 +403,60 @@ def test_biz_edit_changes_item(env):
     assert res["요약"]["총 실적(천원)"] == TOTAL                   # 전표 총액 보존
 
 
+def test_make_files_false_skips_outputs_same_numbers(env):
+    """화면 갱신용 빠른 분석: 파일을 만들지 않지만 숫자는 동일해야 한다."""
+    conn, cfg, out = env
+    fast = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익", make_files=False)
+    assert fast["files_written"] is False
+    assert fast["output_path"] is None and fast["zrfm2_v1_path"] is None
+    assert not os.path.exists(os.path.join(out, "2023년 손익예산_실적.xlsx"))
+    assert not os.path.exists(os.path.join(out, "zrfm2_2023_V1(손익).xlsx"))
+    assert not os.path.exists(os.path.join(out, "matched_2023_손익.csv"))
+    # DB 기록은 정상(화면 조회는 run/biz_line/match_line만 쓴다)
+    assert dbm.latest_run(conn, "2023", "손익")["id"] == fast["run_id"]
+    assert len(dbm.load_biz_lines(conn, fast["run_id"])) > 0
+    assert len(dbm.load_match_detail(conn, fast["run_id"])) == 3
+
+    full = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익", make_files=True)
+    assert full["files_written"] is True
+    for k in ("output_path", "zrfm2_v1_path", "matched_csv_path"):
+        assert os.path.exists(full[k])
+    assert full["요약"] == fast["요약"]          # 파일 생성 여부가 숫자를 바꾸지 않는다
+
+
+def test_export_regeneration_does_not_add_run(env):
+    """내보내기용 파일 재생성은 실행 이력을 남기지 않는다 —
+    남기면 방금 만든 파일이 'run보다 오래됨'이 되어 매번 다시 만들게 된다."""
+    conn, cfg, out = env
+    base = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익", make_files=False)
+    runs_before = conn.execute("SELECT COUNT(*) FROM run").fetchone()[0]
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익",
+                                    make_files=True, record_run=False)
+    assert conn.execute("SELECT COUNT(*) FROM run").fetchone()[0] == runs_before
+    assert res["run_id"] == base["run_id"]          # 기존 실행을 그대로 가리킨다
+    assert os.path.exists(res["output_path"])       # 파일은 만들어졌다
+    assert dbm.latest_run(conn, "2023", "손익")["id"] == base["run_id"]
+
+
+def test_override_does_not_learn_on_save(env):
+    """재배정 저장은 학습하지 않는다(학습은 설정 탭 버튼으로 분리) — 학습 대기로 집계."""
+    conn, cfg, out = env
+    base = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    detail = dbm.load_match_detail(conn, base["run_id"])
+    d3 = detail[detail["전표번호"] == "D3"].iloc[0]
+    before = dbm.learned_stats(conn).get("총계", 0)
+    dbm.add_override(conn, "2023", "손익", int(d3["erp_row_id"]),
+                     "화성 옥외배관 도색공사")
+    assert dbm.learned_stats(conn).get("총계", 0) == before      # 저장만으로는 학습 없음
+    assert dbm.count_learn_pending(conn, "2023") >= 1            # 학습 대기로 잡힌다
+
+    # 분석 반영 후 버튼(learn_from_year)을 누르면 학습된다
+    pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익", make_files=False)
+    dbm.learn_from_year(conn, "2023")
+    assert dbm.learned_stats(conn).get("총계", 0) > before
+    assert dbm.count_learn_pending(conn, "2023") == 0
+
+
 def test_override_forced_new_name(env):
     """신규 전표(D2)에 사용자가 직접 사업명 부여 → 그 이름의 신규 사업으로 강제."""
     conn, cfg, out = env

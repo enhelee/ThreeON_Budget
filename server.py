@@ -42,6 +42,13 @@ def _guard_unlocked(conn, year, action="변경"):
                  "설정 탭에서 잠금을 해제한 뒤 진행하세요.")
 
 
+def _mtime_str(path):
+    """파일 수정시각을 DB의 created_at과 같은 'YYYY-MM-DD HH:MM:SS' 문자열로."""
+    import datetime
+    return datetime.datetime.fromtimestamp(os.path.getmtime(path)).strftime(
+        "%Y-%m-%d %H:%M:%S")
+
+
 def _clean_json(obj):
     """NaN → None 재귀 정리(JSON 직렬화 안전)."""
     if isinstance(obj, dict):
@@ -147,14 +154,19 @@ class AnalyzeReq(BaseModel):
 
 @app.post("/api/analyze")
 def analyze(req: AnalyzeReq):
-    """손익·자본 모두 실행(25년 확정 분류체계 시드 사용)."""
+    """손익·자본 모두 실행(25년 확정 분류체계 시드 사용).
+
+    Excel/CSV 산출물은 만들지 않는다 — 그게 시간의 63%였다(zrfm2_V1 8.2초).
+    파일은 `/api/export`에서 필요할 때 생성한다.
+    """
     conn = _conn()
     try:
         _guard_unlocked(conn, req.year, "분석 실행")
         out = {}
         for budget in ("손익", "자본"):
             res = pipeline_db.run_actual_db(
-                conn, CONFIG_DIR, OUT_DIR, req.year, budget, new_policy=req.policy)
+                conn, CONFIG_DIR, OUT_DIR, req.year, budget, new_policy=req.policy,
+                make_files=False)
             out[budget] = {"run_id": res["run_id"], "요약": res["요약"],
                            "경고": res.get("경고", [])}
         return _clean_json(out)
@@ -285,6 +297,38 @@ def learn(req: LearnReq):
         stats_ = dbm.learned_stats(conn)
         return _clean_json({"learned": counts, "total": stats_,
                             "notice": f"{req.year}년 확정 결과 학습 완료 — 다음 분석부터 자동 적용됩니다."})
+    finally:
+        conn.close()
+
+
+@app.get("/api/pending")
+def pending(year: str):
+    """분석에 아직 반영되지 않은 변경 건수 + 학습 대기 건수.
+
+    최신 run 시각보다 나중에 저장된 지시(재배정·수정·삭제·사업추가)를 센다.
+    """
+    conn = _conn()
+    try:
+        runs = _latest_runs(conn, year)
+        # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
+        stamps = [str(r["created_at"]) for r in runs.values()]
+        base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
+        out = {"analyzed_at": base, "counts": {}, "total": 0}
+        tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
+                  ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
+        for tbl, label in tables:
+            if base is None:
+                n = conn.execute(
+                    f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
+            else:
+                n = conn.execute(
+                    f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
+                    (str(year), base)).fetchone()[0]
+            if n:
+                out["counts"][label] = n
+                out["total"] += n
+        out["learn_pending"] = dbm.count_learn_pending(conn, year)
+        return _clean_json(out)
     finally:
         conn.close()
 
@@ -690,11 +734,11 @@ def add_override(req: OverrideReq):
         for rid in req.erp_row_ids:
             dbm.add_override(conn, req.year, req.budget, rid, name, req.memo,
                              target_dept=dept)
-        # 사람이 확정한 재배정은 저장 즉시 학습 DB에도 자동 축적(수동확정)
-        learned = dbm.learn_from_override(conn, req.year, req.budget,
-                                          req.erp_row_ids, name)
-        return {"saved": len(req.erp_row_ids), "learned": learned,
-                "notice": "재배정 저장 + 학습 완료"}
+        # 학습은 여기서 하지 않는다(사용자 확정) — 설정 탭 [AI 학습] 버튼으로 분리.
+        #   수정 중에 학습이 쌓이면 되돌려도 학습에 흔적이 남고, 저장도 느려진다.
+        return {"saved": len(req.erp_row_ids),
+                "notice": f"저장됨 — 전표 {len(req.erp_row_ids)}건. "
+                          "'분석 반영'을 누르면 결과에 적용됩니다."}
     finally:
         conn.close()
 
@@ -827,6 +871,20 @@ def export(year: str, budget: str, kind: str = "actual"):
     if kind not in names:
         raise HTTPException(400, "kind는 actual|v1|matched 중 하나여야 합니다.")
     path = os.path.join(OUT_DIR, names[kind])
+    conn = _conn()
+    try:
+        run = dbm.latest_run(conn, year, budget)
+        if not run:
+            raise HTTPException(404, "분석 이력이 없습니다. 먼저 분석을 실행하세요.")
+        # 분석은 속도를 위해 파일을 만들지 않는다 → 없거나 최신 분석보다 오래됐으면 지금 생성.
+        stale = (not os.path.exists(path)
+                 or _mtime_str(path) < str(run["created_at"]))
+        if stale:
+            # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
+            pipeline_db.run_actual_db(conn, CONFIG_DIR, OUT_DIR, year, budget,
+                                      make_files=True, record_run=False)
+    finally:
+        conn.close()
     if not os.path.exists(path):
-        raise HTTPException(404, "산출물이 없습니다. 먼저 분석을 실행하세요.")
+        raise HTTPException(500, "산출물 생성에 실패했습니다.")
     return FileResponse(path, filename=names[kind])

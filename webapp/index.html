@@ -33,6 +33,13 @@
 @media (min-width:1024px){.edit-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .push-right{margin-left:auto}
 .max-w-30{max-width:30rem}
+/* 미반영 변경 건수 배지 — 분석 버튼에 붙는다 */
+.pending-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;margin-left:.15rem;border-radius:9999px;background:#fff;color:#1d4ed8;font-size:.72rem;font-weight:800;line-height:1}
+.btn-pending{background:#b45309 !important;border-color:#b45309 !important;animation:pendPulse 1.8s ease-in-out infinite}
+.btn-pending .pending-count{color:#b45309}
+@keyframes pendPulse{0%,100%{box-shadow:0 0 0 0 rgba(180,83,9,.45)}50%{box-shadow:0 0 0 .35rem rgba(180,83,9,0)}}
+.pending-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;border:1px solid #fcd34d;background:#fffbeb;border-radius:.75rem;padding:.7rem .9rem}
+.pending-bar b{color:#92400e}
 @keyframes spin{to{transform:rotate(1turn)}}
 /* 컴팩트 상세 테이블: 고정 레이아웃으로 한 화면에 맞춤 */
 /* 100% 배율에서 가로 스크롤·생략 없이 전부 보이게: 고정폭은 최소한으로 잡고
@@ -114,9 +121,9 @@
               <select id="yearSelect" class="control"></select>
             </label>
             <button id="addYearBtn" class="btn-secondary hidden sm:inline-flex" title="새 연도 추가">＋연도</button>
-            <button class="btn-primary" data-action="analyze">
+            <button class="btn-primary" data-action="analyze" id="analyzeBtn">
               <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
-              <span class="hidden sm:inline">분석 실행</span><span class="sm:hidden">분석</span>
+              <span id="analyzeLabel">분석 실행</span><span id="pendingCount" class="pending-count hidden"></span>
             </button>
           </div>
         </div>
@@ -143,6 +150,7 @@
     status: null, branches: null, stats: null, overview: null,
     learned: null, overrides: null, bizEdits: null,
     ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
+    pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}
     det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
            hideMissing: false, sortKey: "", sortDir: 1,
            open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
@@ -224,6 +232,29 @@
   }
   async function loadStatus() {
     state.status = await api(`/api/status?year=${state.year}`);
+  }
+  // 분석에 아직 반영되지 않은 변경 건수 — 저장은 즉시, 분석은 모아서 한 번.
+  async function loadPending() {
+    try { state.pending = await api(`/api/pending?year=${state.year}`); }
+    catch { state.pending = null; }
+  }
+  // 저장 후 공통 처리: 미반영 배지 갱신 + 화면 부분 갱신(분석은 하지 않는다)
+  async function afterSave(msg) {
+    await loadPending();
+    if (state.view === "detail" && state.det.branch) await loadDetail(state.det.branch);
+    renderPage();
+    const n = state.pending?.total || 0;
+    toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
+  }
+  function pendingBarHtml() {
+    const p = state.pending;
+    if (!p || !p.total) return "";
+    const detail = Object.entries(p.counts || {}).map(([k, v]) => `${k} ${v}건`).join(" · ");
+    return `<section class="pending-bar mb-4">
+      <b>분석 미반영 변경 ${p.total}건</b>
+      <span class="text-xs text-amber-800">${esc(detail)}</span>
+      <button class="btn-primary push-right" data-action="analyze">분석 반영 (${p.total})</button>
+    </section>`;
   }
   async function loadBranches() {
     state.branches = (await api(`/api/branches?year=${state.year}`)).rows;
@@ -467,9 +498,10 @@
         <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div><p class="text-sm font-semibold text-blue-700">STAGE 3+ · ${esc(state.year)}년</p>
           <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">${esc(d.branch)} — 사업별 실적 검토</h2>
-          <p class="mt-2 text-sm text-slate-500">사업 클릭=전표 트리 · 컬럼 제목 클릭=정렬 · ✎=내용 수정 · 전표 체크=재배정.</p></div>
+          <p class="mt-2 text-sm text-slate-500">사업 클릭=전표 트리 · 컬럼 제목 클릭=정렬 · ✎=내용 수정 · 전표 체크=재배정. <b>수정은 즉시 저장되고, 분석 반영은 모아서 한 번</b> 하면 됩니다.</p></div>
           <button class="btn-secondary" data-view="branches">← 전체 지사</button>
         </section>
+        ${pendingBarHtml()}
         <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
           <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
@@ -706,9 +738,9 @@
           <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6">
             <div><h3 class="section-title">${budget}예산 — 과목별 계획 대비 실적</h3><p class="section-help">${esc(state.year)}년 · 25년 확정 분류체계 · 단위: 천원</p></div>
             <div class="flex flex-wrap gap-2">
-              <button class="btn-primary" data-export="actual" data-budget="${budget}">실적 Excel</button>
-              <button class="btn-secondary" data-export="v1" data-budget="${budget}">zrfm2_V1</button>
-              <button class="btn-secondary" data-export="matched" data-budget="${budget}">matched CSV</button>
+              <button class="btn-primary" data-export="actual" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">실적 Excel</button>
+              <button class="btn-secondary" data-export="v1" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">zrfm2_V1</button>
+              <button class="btn-secondary" data-export="matched" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">matched CSV</button>
             </div>
           </div>
           <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">대분류</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">계획(A)</th><th class="px-4 py-3 text-right">실적(B)</th><th class="px-4 py-3 text-right">└ 계획집행</th><th class="px-4 py-3 text-right">└ 신규</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">사업수</th><th class="px-4 py-3 text-right">미시행</th></tr></thead>
@@ -767,19 +799,21 @@
 
       <section class="panel p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
-          <div><h3 class="section-title">🧠 확정 결과 학습</h3>
-          <p class="section-help">학습 DB는 <b>연도 구분 없이 하나</b>입니다 — 어느 연도에서 학습했든 <b>모든 연도 분석에 공통 적용</b>됩니다. <b>상세 화면의 재배정은 저장 즉시 자동 학습</b>(사람 확정)되고, 아래 버튼은 검토가 끝난 연도의 <b>자동 매칭 결과까지 통째로</b> 전체 학습 DB에 추가하는 일괄 학습입니다. 같은 텍스트의 전표는 유사도 계산보다 학습 결과를 우선 적용(확신도 0.99, 사람 확정 &gt; 자동 확정).</p></div>
+          <div><h3 class="section-title">🧠 AI 학습 (수동 실행)</h3>
+          <p class="section-help">학습 DB는 <b>연도 구분 없이 하나</b>입니다 — 어느 연도에서 학습했든 <b>모든 연도 분석에 공통 적용</b>됩니다. 재배정은 <b>저장 시 학습하지 않습니다</b>(rev13에서 분리) — 검토가 끝난 뒤 아래 버튼으로 한 번에 학습하세요. 같은 텍스트의 전표는 유사도 계산보다 학습 결과를 우선 적용(확신도 0.99, 사람 확정 &gt; 자동 확정)하며, <b>사람이 직접 재배정한 전표는 학습이 덮지 못합니다</b>(확신도 1.0).</p>
+          <p class="mt-2 text-xs font-semibold text-amber-700">순서: ① 상세에서 수정·저장 → ② 상단 <b>분석 반영</b> → ③ 여기서 <b>AI 학습</b> → ④ 연도 마감. 분석 반영 전에 학습하면 방금 한 수정이 학습에 안 들어갑니다.</p></div>
           <div class="flex flex-wrap gap-2">
-            <button class="btn-primary" data-action="learn">${esc(state.year)}년 확정 결과를 전체 학습 DB에 추가</button>
+            <button class="btn-primary" data-action="learn">${esc(state.year)}년 확정 결과 AI 학습${(state.pending?.learn_pending || 0) ? ` (대기 ${state.pending.learn_pending}건)` : ""}</button>
             <button class="btn-secondary" data-action="clear-learned">학습 초기화</button>
           </div>
         </div>
+        ${(state.pending?.total || 0) ? `<p class="mt-4 text-xs font-semibold text-amber-700">⚠ 분석 미반영 변경 ${state.pending.total}건이 있습니다 — 먼저 상단 '분석 반영'을 누르세요.</p>` : ""}
         <div class="mt-5 grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">학습된 매핑 총계 (전체 연도 공용)</p><p class="mt-1 text-2xl font-bold">${(learned["총계"] || 0).toLocaleString()}건</p></div>
           <div class="rounded-xl bg-blue-50 p-4"><p class="text-xs font-semibold text-blue-700">사람 확정(재배정)</p><p class="mt-1 text-2xl font-bold text-blue-950">${(learned["수동확정"] || 0).toLocaleString()}건</p></div>
           <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">자동 확정</p><p class="mt-1 text-2xl font-bold">${(learned["자동확정"] || 0).toLocaleString()}건</p></div>
         </div>
-        <p class="mt-4 text-xs text-slate-400">권장 절차: 상세 검토·재배정(자동 학습) → 일괄 학습 → <b>연도 마감(잠금)</b> → 다음 연도 분석 시 자동 적용.</p>
+        <p class="mt-4 text-xs text-slate-400">'학습 대기'는 재배정한 전표 중 아직 학습표에 없는 건수입니다(텍스트 없는 전표는 학습 대상이 아닙니다).</p>
       </section>
 
       <section class="panel p-6">
@@ -829,12 +863,14 @@
     const ys = $("#yearSelect");
     const years = state.years.length ? state.years : [state.year];
     ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
+    syncAnalyzeButton();
   }
 
   async function navigate(view) {
     state.view = view;
     try {
       await loadOverview();
+      await loadPending();
       if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
       if (view === "budget" || view === "collect") await loadStatus();
       if (view === "stats") {
@@ -874,17 +910,34 @@
   }
 
   async function runAnalyze(silent) {
-    busy(true, `손익·자본 자동 매칭 분석 중... (${state.year}년, 약 1분)`);
+    const n = state.pending?.total || 0;
+    const t0 = Date.now();
+    busy(true, `손익·자본 매칭 분석 중... (${state.year}년${n ? `, 미반영 ${n}건 반영` : ""})`);
     try {
       const res = await api("/api/analyze", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({year: state.year})});
       const p = res["손익"]["요약"], c = res["자본"]["요약"];
-      if (!silent) toast(`분석 완료 — 손익 ${fmt(p["총 실적(천원)"])}천원 / 자본 ${fmt(c["총 실적(천원)"])}천원`);
+      const sec = ((Date.now() - t0) / 1000).toFixed(1);
+      if (!silent) {
+        toast(`분석 완료 (${sec}초) — 손익 ${fmt(p["총 실적(천원)"])}천원 / 자본 ${fmt(c["총 실적(천원)"])}천원`);
+      }
       if (state.det.branch) await loadDetail(state.det.branch);
       await navigate(state.view);
       return true;
     } catch (e) { toast("분석 실패: " + e.message); return false; }
     finally { busy(false); }
+  }
+
+  // 헤더 분석 버튼 — 미반영 변경이 있으면 '분석 반영 (N)'으로 바뀌고 강조된다.
+  function syncAnalyzeButton() {
+    const btn = $("#analyzeBtn"), label = $("#analyzeLabel"), cnt = $("#pendingCount");
+    if (!btn || !label || !cnt) return;
+    const n = state.pending?.total || 0;
+    label.textContent = n ? "분석 반영" : "분석 실행";
+    btn.classList.toggle("btn-pending", n > 0);
+    btn.title = n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
+    cnt.textContent = n ? String(n) : "";
+    cnt.classList.toggle("hidden", !n);
   }
 
   async function uploadFile(kind, file) {
@@ -963,13 +1016,12 @@
       };
       busy(true, "사업 추가 저장 중...");
       try {
-        const r = await api("/api/manual-biz", {method: "POST",
+        await api("/api/manual-biz", {method: "POST",
           headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
         state.det.addOpen = false;
-        toast(r.notice);
       } catch (err) { toast(err.message); busy(false); return; }
-      const ok = await runAnalyze(true);
-      if (ok) toast(`사업 추가 반영 완료 — '${name}'`);
+      finally { busy(false); }
+      await afterSave(`사업 추가 저장 — "${name}"`);
     }
     if (act === "save-edit") {
       const key = e.target.closest("[data-action]").dataset.ekey;
@@ -1013,15 +1065,10 @@
         if (!confirm(`"${fields["사업명"]}" 사업을 ${from} → ${to}(으)로 통째 이동합니다.\n(${parts.join(" + ")})\n\n계속할까요?`)) return;
         if (hasPlan) fields["처지사"] = to;      // 계획행(연예산)도 함께 이동
       } else if (!edited) { state.det.editKey = null; renderPage(); return; }
-      // 사업명·연예산·지사는 매칭·집계에 영향 → 저장 후 재분석으로 확정.
-      //   속성·부서명은 표기용이라 즉시 패치만으로 충분하다.
-      const renamed = fields["사업명"] !== b.사업명;
-      const reanalyze = moving || planChanged || renamed || itemChanged;
       busy(true, moving ? "사업 이동 저장 중..." : "사업 내용 저장 중...");
       try {
-        let r = {notice: ""};
         if (edited || "처지사" in fields) {
-          r = await api("/api/biz-edit", {method: "POST", headers: {"Content-Type": "application/json"},
+          await api("/api/biz-edit", {method: "POST", headers: {"Content-Type": "application/json"},
             body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
                                   처지사: from, 사업명: b.사업명, fields})});
         }
@@ -1032,16 +1079,12 @@
                                   memo: `사업 통째 이동 ${from}→${to}`})});
         }
         state.det.editKey = null;
-        if (!reanalyze) { toast(r.notice); await loadDetail(from); renderPage(); return; }
+        state.det.sel.clear(); state.det.selBudget = null;
       } catch (err) { toast(err.message); busy(false); return; }
-      finally { if (!reanalyze) busy(false); }
-      state.det.branch = moving ? to : from;
-      state.det.sel.clear(); state.det.selBudget = null;
-      const ok = await runAnalyze(true);
-      if (ok) {
-        toast(moving ? `이동 완료 — "${fields["사업명"]}" → ${to}`
-                     : `저장·재분석 완료 — "${fields["사업명"]}"`);
-      }
+      finally { busy(false); }
+      // 분석은 하지 않는다 — 화면은 즉시 패치분으로 갱신되고, 확정은 '분석 반영'에서.
+      await afterSave(moving ? `이동 저장 — "${fields["사업명"]}" → ${to}`
+                             : `저장 — "${fields["사업명"]}"`);
     }
     if (act === "ask-delete") {
       state.det.delKey = e.target.closest("[data-action]").dataset.ekey;
@@ -1085,11 +1128,9 @@
         state.det.delKey = null; state.det.editKey = null;
         state.det.sel.clear(); state.det.selBudget = null;
       } catch (err) { toast(err.message); busy(false); return; }
-      const ok = await runAnalyze(true);
-      if (ok) {
-        toast((hasPlan ? `삭제 완료 — "${b.사업명}"` : `정리 완료 — "${b.사업명}"`)
-              + (moveTo ? ` (전표 ${vouchers.length}건 → ${moveTo})` : ""));
-      }
+      finally { busy(false); }
+      await afterSave((hasPlan ? `삭제 저장 — "${b.사업명}"` : `정리 저장 — "${b.사업명}"`)
+                      + (moveTo ? ` (전표 ${vouchers.length}건 → ${moveTo})` : ""));
     }
     if (act === "save-override") {
       const manual = $("#ovManual").value.trim();
@@ -1100,6 +1141,8 @@
       if (!destDept) { toast("이동할 지사를 선택하세요."); return; }
       // 미매핑 전표는 항상 지사 지정, 일반 전표는 지사가 바뀐 경우만 지정
       const targetDept = (isUnmapped || destDept !== state.det.branch) ? destDept : null;
+      const cnt = state.det.sel.size;          // 선택을 비우기 전에 세어둔다
+      const movedDept = targetDept && targetDept !== state.det.branch ? targetDept : null;
       busy(true, "재배정 저장 중...");
       try {
         await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
@@ -1108,11 +1151,11 @@
                                 target_dept: targetDept})});
         state.det.sel.clear(); state.det.selBudget = null;
         state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
-        if (targetDept && targetDept !== state.det.branch) state.det.branch = targetDept;
       } catch (err) { toast(err.message); busy(false); return; }
-      // 저장 즉시 자동 재분석 → 반영된 결과로 새로고침
-      const ok = await runAnalyze(true);
-      if (ok) toast("재배정 반영 완료 — 최신 결과로 갱신했습니다." + (targetDept ? ` (${targetDept}로 이동)` : ""));
+      finally { busy(false); }
+      // 분석은 하지 않는다 — 여러 건 모아서 상단 '분석 반영'으로 한 번에.
+      await afterSave(`재배정 저장 — 전표 ${cnt}건 → "${target}"`
+                      + (movedDept ? ` (${movedDept})` : ""));
     }
     if (act === "learn") {
       busy(true, `${state.year}년 확정 결과를 학습 중...`);
@@ -1147,7 +1190,11 @@
       catch (err) { toast(err.message); }
     }
     const exp = e.target.closest("[data-export]");
-    if (exp) window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
+    if (exp) {
+      // 산출물 파일은 분석 때 만들지 않는다(그래야 수정이 빠름) → 첫 다운로드에서 생성.
+      toast("내보내기 준비 중… 분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다. 잠시 기다려 주세요.");
+      window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
+    }
     const delOv = e.target.closest("[data-del-override]");
     if (delOv) {
       try {
