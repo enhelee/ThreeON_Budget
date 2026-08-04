@@ -130,13 +130,17 @@ def build_summary_layout(ws, dept_columns, item_rows, budget, year, kind="계획
     return {"groups": groups, "total_col": total_col, "item_rows": item_row_layout, "grand_total_row": grand_total_row}
 
 
-def write_summary_formulas(ws, layout, value_col="J", data_sheet="양식1(월별)"):
+def write_summary_formulas(ws, layout, value_col="J", data_sheet="양식1(월별)",
+                           item_col="G", dept_col="C", flag_col="L"):
     """종합표 각 셀에 SUMIFS 수식 작성.
 
-    value_col: 데이터시트에서 합산할 금액 열(계획=연예산 J, 실적=실적금액 K 등).
+    value_col: 데이터시트에서 합산할 금액 열(계획=연예산 J, 실적=실적금액 I 등).
+    item_col/dept_col/flag_col: 데이터시트의 예산과목/처지사/심의플래그 열.
+        계획 데이터시트 기본값은 G/C/L. 실적(양식3 포맷) 데이터시트는 B/E/J.
     """
     V = value_col
     DS = data_sheet
+    IC, DC, FC = item_col, dept_col, flag_col
     all_cols = []
     for g in layout["groups"]:
         all_cols.extend(g["dept_cols"].values())
@@ -150,14 +154,14 @@ def write_summary_formulas(ws, layout, value_col="J", data_sheet="양식1(월별
                 for dept, col in g["dept_cols"].items():
                     dept_cell = f"{get_column_letter(col)}{NAME_ROW}"
                     if item_row["심의구분"] == "이상":
-                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
-                             f"'{DS}'!$C:$C,{dept_cell},'{DS}'!$L:$L,\"O\")")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!${IC}:${IC},$B{r},"
+                             f"'{DS}'!${DC}:${DC},{dept_cell},'{DS}'!${FC}:${FC},\"O\")")
                     elif item_row["심의구분"] == "미만":
-                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
-                             f"'{DS}'!$C:$C,{dept_cell},'{DS}'!$L:$L,\"<>O\")")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!${IC}:${IC},$B{r},"
+                             f"'{DS}'!${DC}:${DC},{dept_cell},'{DS}'!${FC}:${FC},\"<>O\")")
                     else:
-                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!$G:$G,$B{r},"
-                             f"'{DS}'!$C:$C,{dept_cell})")
+                        f = (f"=SUMIFS('{DS}'!${V}:${V},'{DS}'!${IC}:${IC},$B{r},"
+                             f"'{DS}'!${DC}:${DC},{dept_cell})")
                     cell = ws.cell(r, col, f)
                     cell.number_format = "#,##0"
                 first = min(g["dept_cols"].values())

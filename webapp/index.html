@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="발전플랜트 유지보수 예산·실적 분석 프로그램">
+  <title>예산·실적 업무 분석 프로그램</title>
+  <style>*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}html{font-family:Pretendard,Noto Sans KR,Malgun Gothic,system-ui,sans-serif}body{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1));-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}button:focus,input:focus,select:focus{outline:2px solid transparent;outline-offset:2px;--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000);--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246/var(--tw-ring-opacity,1));--tw-ring-offset-width:2px}.nav-button{display:flex;width:100%;align-items:center;gap:.75rem;border-radius:.75rem;padding:.625rem .75rem;text-align:left;font-size:.875rem;line-height:1.25rem;font-weight:500;--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1));transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.nav-button:hover{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(30 64 175/var(--tw-text-opacity,1))}.nav-button-active{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.nav-button-active:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.metric-card,.panel{border-radius:1rem;border-width:1px;--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.metric-card{padding:1.25rem}.control{border-radius:.75rem;border-width:1px;--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));padding:.5rem .75rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:600;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.btn-primary:disabled{cursor:not-allowed;opacity:.5}.btn-primary{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.btn-primary:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216/var(--tw-bg-opacity,1))}.btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:600;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.btn-secondary:disabled{cursor:not-allowed;opacity:.5}.btn-secondary{border-width:1px;--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.btn-secondary:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.badge{display:inline-flex;align-items:center;border-radius:9999px;padding:.25rem .625rem;font-size:.75rem;line-height:1rem;font-weight:600}.section-title{font-size:1.125rem;line-height:1.75rem;font-weight:700;letter-spacing:-.025em;--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1))}.section-help{margin-top:.25rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.table-head{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1));text-align:left;font-size:.75rem;line-height:1rem;font-weight:600;text-transform:uppercase;letter-spacing:.025em;--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.table-cell{white-space:nowrap;padding:.75rem 1rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.sticky{position:sticky}.inset-0{inset:0}.inset-y-0{top:0;bottom:0}.bottom-5{bottom:1.25rem}.left-0{left:0}.right-5{right:1.25rem}.top-0{top:0}.z-20{z-index:20}.z-30{z-index:30}.z-40{z-index:40}.z-50{z-index:50}.mx-1{margin-left:.25rem;margin-right:.25rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-1\.5{margin-bottom:.375rem}.mb-2{margin-bottom:.5rem}.ml-2{margin-left:.5rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-5{margin-top:1.25rem}.mt-6{margin-top:1.5rem}.mt-7{margin-top:1.75rem}.mt-8{margin-top:2rem}.block{display:block}.flex{display:flex}.table{display:table}.table-cell{display:table-cell}.grid{display:grid}.hidden{display:none}.h-10{height:2.5rem}.h-11{height:2.75rem}.h-12{height:3rem}.h-2{height:.5rem}.h-3{height:.75rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-7{height:1.75rem}.h-full{height:100%}.min-h-16{min-height:4rem}.min-h-screen{min-height:100vh}.w-10{width:2.5rem}.w-11{width:2.75rem}.w-12{width:3rem}.w-2{width:.5rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-7{width:1.75rem}.w-72{width:18rem}.w-full{width:100%}.min-w-0{min-width:0}.min-w-48{min-width:12rem}.max-w-7xl{max-width:80rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.-translate-x-full{--tw-translate-x:-100%;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.resize{resize:both}.grid-cols-\[56px_1fr_80px\]{grid-template-columns:56px 1fr 80px}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.place-items-center{place-items:center}.items-start{align-items:flex-start}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}.gap-5{gap:1.25rem}.gap-6{gap:1.5rem}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-1\.5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.375rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.375rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.25rem*var(--tw-space-y-reverse))}.space-y-6>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem*var(--tw-space-y-reverse))}.divide-y>:not([hidden])~:not([hidden]){--tw-divide-y-reverse:0;border-top-width:calc(1px*(1 - var(--tw-divide-y-reverse)));border-bottom-width:calc(1px*var(--tw-divide-y-reverse))}.divide-slate-100>:not([hidden])~:not([hidden]){--tw-divide-opacity:1;border-color:rgb(241 245 249/var(--tw-divide-opacity,1))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-2{border-width:2px}.border-b{border-bottom-width:1px}.border-r{border-right-width:1px}.border-t-2{border-top-width:2px}.border-dashed{border-style:dashed}.border-amber-200{--tw-border-opacity:1;border-color:rgb(253 230 138/var(--tw-border-opacity,1))}.border-amber-300{--tw-border-opacity:1;border-color:rgb(252 211 77/var(--tw-border-opacity,1))}.border-blue-200{--tw-border-opacity:1;border-color:rgb(191 219 254/var(--tw-border-opacity,1))}.border-blue-300{--tw-border-opacity:1;border-color:rgb(147 197 253/var(--tw-border-opacity,1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1))}.border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1))}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235/var(--tw-bg-opacity,1))}.bg-blue-100{--tw-bg-opacity:1;background-color:rgb(219 234 254/var(--tw-bg-opacity,1))}.bg-blue-50{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1))}.bg-blue-500{--tw-bg-opacity:1;background-color:rgb(59 130 246/var(--tw-bg-opacity,1))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1))}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245/var(--tw-bg-opacity,1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129/var(--tw-bg-opacity,1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.bg-slate-300{--tw-bg-opacity:1;background-color:rgb(203 213 225/var(--tw-bg-opacity,1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.bg-slate-950{--tw-bg-opacity:1;background-color:rgb(2 6 23/var(--tw-bg-opacity,1))}.bg-slate-950\/30{background-color:rgba(2,6,23,.3)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-white\/20{background-color:hsla(0,0%,100%,.2)}.bg-white\/95{background-color:hsla(0,0%,100%,.95)}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.py-10{padding-top:2.5rem;padding-bottom:2.5rem}.py-12{padding-top:3rem;padding-bottom:3rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-5{padding-top:1.25rem;padding-bottom:1.25rem}.pb-1{padding-bottom:.25rem}.pt-5{padding-top:1.25rem}.text-center{text-align:center}.text-right{text-align:right}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.leading-5{line-height:1.25rem}.tracking-tight{letter-spacing:-.025em}.tracking-wider{letter-spacing:.05em}.text-amber-700{--tw-text-opacity:1;color:rgb(180 83 9/var(--tw-text-opacity,1))}.text-amber-800{--tw-text-opacity:1;color:rgb(146 64 14/var(--tw-text-opacity,1))}.text-amber-900{--tw-text-opacity:1;color:rgb(120 53 15/var(--tw-text-opacity,1))}.text-amber-950{--tw-text-opacity:1;color:rgb(69 26 3/var(--tw-text-opacity,1))}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216/var(--tw-text-opacity,1))}.text-blue-900{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}.text-blue-950{--tw-text-opacity:1;color:rgb(23 37 84/var(--tw-text-opacity,1))}.text-emerald-700{--tw-text-opacity:1;color:rgb(4 120 87/var(--tw-text-opacity,1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38/var(--tw-text-opacity,1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1))}.text-slate-900{--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1))}.text-slate-950{--tw-text-opacity:1;color:rgb(2 6 23/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.accent-blue-600{accent-color:#2563eb}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-sm,.shadow-xl{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color),0 8px 10px -6px var(--tw-shadow-color)}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur{--tw-backdrop-blur:blur(8px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.duration-200{transition-duration:.2s}.hover\:border-blue-400:hover{--tw-border-opacity:1;border-color:rgb(96 165 250/var(--tw-border-opacity,1))}.hover\:bg-blue-50\/40:hover{background-color:rgba(239,246,255,.4)}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.hover\:text-blue-900:hover{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}@media (min-width:640px){.sm\:block{display:block}.sm\:inline{display:inline}.sm\:inline-flex{display:inline-flex}.sm\:hidden{display:none}.sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.sm\:flex-row{flex-direction:row}.sm\:items-center{align-items:center}.sm\:justify-between{justify-content:space-between}.sm\:p-6{padding:1.5rem}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}}@media (min-width:768px){.md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.md\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (min-width:1024px){.lg\:sticky{position:sticky}.lg\:top-0{top:0}.lg\:flex{display:flex}.lg\:hidden{display:none}.lg\:h-screen{height:100vh}.lg\:translate-x-0{--tw-translate-x:0px;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.lg\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.lg\:p-8{padding:2rem}.lg\:px-8{padding-left:2rem;padding-right:2rem}}@media (min-width:1280px){.xl\:grid-cols-\[\.65fr_1\.35fr\]{grid-template-columns:.65fr 1.35fr}.xl\:grid-cols-\[1\.05fr_\.95fr\]{grid-template-columns:1.05fr .95fr}.xl\:grid-cols-\[1fr_\.75fr\]{grid-template-columns:1fr .75fr}.xl\:flex-row{flex-direction:row}.xl\:items-end{align-items:flex-end}.xl\:justify-between{justify-content:space-between}}
+/* ── 상세 화면 추가 스타일 ── */
+.clickable{cursor:pointer}
+.voucher-row td{background:#f8fafc;border-bottom:1px dashed #e2e8f0;padding-top:.4rem;padding-bottom:.4rem}
+.voucher-head td{background:#eef2f7;border-bottom:1px solid #e2e8f0;padding-top:.35rem;padding-bottom:.35rem}
+.row-new td{background:#fffbeb}
+.row-missing td{background:#fef2f2}
+.row-unmapped td{background:#f1f5f9}
+.edit-row td{background:#f8fafc}
+.spinner{width:2rem;height:2rem;border-radius:9999px;border:3px solid #dbeafe;border-top-color:#2563eb;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(1turn)}}
+/* 컴팩트 상세 테이블: 고정 레이아웃으로 한 화면에 맞춤 */
+.det-table{table-layout:fixed;width:100%}
+.det-table th{padding:.5rem .45rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.det-table .th-line{display:inline-flex;align-items:center;gap:.2rem;white-space:nowrap}
+.det-table td.table-cell{padding:.45rem .45rem;font-size:.78rem;overflow:hidden;text-overflow:ellipsis}
+.det-table th:nth-child(1){width:3.4rem}
+.det-table th:nth-child(2){width:7.8rem}
+.det-table th:nth-child(3){width:5.2rem}
+.det-table th:nth-child(5){width:7.4rem}
+.det-table th:nth-child(6){width:7.6rem}
+.det-table th:nth-child(7){width:4.8rem}
+.det-table th:nth-child(8){width:4.4rem}
+.det-table th:nth-child(9){width:2.8rem}
+.det-table .cell-name{white-space:nowrap}
+.det-table .cell-item{white-space:nowrap}
+.det-table .badge{padding:.12rem .4rem;font-size:.68rem}
+.det-table .voucher-row td,.det-table .voucher-head td{white-space:normal}
+.swatch{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;border:1px solid #e2e8f0;flex:none}
+</style>
+</head>
+<body>
+  <div class="min-h-screen lg:flex">
+    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/30 lg:hidden" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      <div class="flex items-center gap-3 px-2">
+        <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-slate-950">예산·실적 분석</p>
+          <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
+        </div>
+      </div>
+
+      <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
+        <button class="nav-button nav-button-active" data-view="home"><span class="grid h-7 w-7 place-items-center rounded-lg bg-white/20 text-xs">H</span>홈</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">업무 단계</p>
+        <button class="nav-button" data-view="budget"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">1</span>예산 계획</button>
+        <button class="nav-button" data-view="collect"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">2</span>실적 집계</button>
+        <button class="nav-button" data-view="branches"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3</span>실적 분석</button>
+        <button class="nav-button" data-view="detail"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3+</span>실적분석(상세)</button>
+        <button class="nav-button" data-view="stats"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">4</span>통계·내보내기</button>
+        <button class="nav-button" data-view="forecast"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">5</span>중장기 예측</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">관리</p>
+        <button class="nav-button" data-view="settings"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">S</span>설정</button>
+      </nav>
+
+      <div class="rounded-2xl bg-blue-50 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>사내망 · 백엔드 DB 저장
+        </div>
+        <p class="mt-2 text-xs leading-5 text-blue-700">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div class="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-3">
+            <button id="menuButton" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 lg:hidden" aria-label="메뉴 열기">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <div class="min-w-0">
+              <h1 id="pageTitle" class="truncate text-lg font-bold text-slate-950">홈</h1>
+              <p id="pageSubtitle" class="hidden truncate text-xs text-slate-500 sm:block"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">대상연도
+              <select id="yearSelect" class="control"></select>
+            </label>
+            <button id="addYearBtn" class="btn-secondary hidden sm:inline-flex" title="새 연도 추가">＋연도</button>
+            <button class="btn-primary" data-action="analyze">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+              <span class="hidden sm:inline">분석 실행</span><span class="sm:hidden">분석</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
+  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-slate-950/30">
+    <div class="rounded-2xl bg-white px-8 py-6 text-center shadow-xl">
+      <div class="spinner mx-auto"></div>
+      <p id="busyText" class="mt-3 text-sm font-semibold text-slate-700">처리 중...</p>
+    </div>
+  </div>
+
+  <script>
+  "use strict";
+  // ───────────────────────── 상태 ─────────────────────────
+  const state = {
+    view: "home", year: "", years: [],
+    type: "all", search: "", sort: "rateDesc",
+    status: null, branches: null, stats: null, overview: null,
+    learned: null, overrides: null, bizEdits: null,
+    det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
+           hideMissing: false, sortKey: "", sortDir: 1,
+           open: new Set(), sel: new Set(), selBudget: null, editKey: null },
+  };
+
+  const viewMeta = {
+    home: ["홈", "다년도 실적과 대상연도 집행 현황을 확인합니다."],
+    budget: ["예산 계획", "연도를 선택하고 계획본(양식1)을 업로드해 DB에 등록합니다."],
+    collect: ["실적 집계", "연도를 선택하고 ERP(zrfm2)를 업로드 → 자동 매칭을 실행합니다."],
+    branches: ["실적 분석", "전체 지사의 계획·실적·집행률을 조회합니다."],
+    detail: ["실적분석(상세)", "지사별 사업 목록과 귀속 ERP 전표를 검토·수정합니다."],
+    stats: ["통계·내보내기", "손익/자본 통계와 Excel 산출물을 내려받습니다."],
+    forecast: ["중장기 예측", "표준금액에 팩터를 적용해 미래 예산을 살펴봅니다. (개발 예정)"],
+    settings: ["설정", "데이터셋·수동 재배정·학습·사업수정 이력을 관리합니다."],
+  };
+
+  // ───────────────────────── 공통 유틸 ─────────────────────────
+  const $ = s => document.querySelector(s);
+  const esc = v => String(v ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[c]));
+  const fmt = v => (v === null || v === undefined || isNaN(v)) ? "-" : Math.round(v).toLocaleString("ko-KR");
+  const fmtRate = (p, a) => p > 0 ? (a / p * 100).toFixed(1) + "%" : "-";
+  const rateVal = (p, a) => p > 0 ? a / p * 100 : null;
+
+  function rateBadge(p, a) {
+    const r = rateVal(p, a);
+    if (r === null) return '<span class="badge bg-slate-100 text-slate-600">-</span>';
+    const cls = r >= 95 ? "bg-blue-50 text-blue-700" : r >= 85 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
+    return `<span class="badge ${cls}">${r.toFixed(1)}%</span>`;
+  }
+  function confBadge(c) {
+    if (c === null || c === undefined) return '<span class="badge bg-slate-100 text-slate-600">신규</span>';
+    const n = Number(c);
+    const label = n >= 0.99 ? (n >= 1 ? "수동 1.00" : "학습 0.99") : n.toFixed(2);
+    const cls = n >= 0.8 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+  function gubunBadge(g) {
+    const map = {"계획집행": "bg-blue-50 text-blue-700", "미시행": "bg-slate-100 text-slate-500",
+                 "신규": "bg-amber-50 text-amber-700", "신규(소액집행)": "bg-amber-50 text-amber-700",
+                 "미매핑": "bg-slate-100 text-red-600"};
+    return `<span class="badge ${map[g] || "bg-slate-100 text-slate-600"}">${esc(g)}</span>`;
+  }
+  function realBranches() {
+    return (state.branches || []).map(r => r.branch).filter(b => !b.endsWith(" (미매핑)"));
+  }
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg; t.classList.remove("hidden");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.add("hidden"), 4500);
+  }
+  function busy(on, text) {
+    $("#busyText").textContent = text || "처리 중...";
+    $("#busy").classList.toggle("hidden", !on);
+    $("#busy").classList.toggle("grid", on);
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { msg = (await res.json()).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    return res.json();
+  }
+
+  // ───────────────────────── 데이터 로드 ─────────────────────────
+  async function loadOverview() {
+    state.overview = (await api("/api/overview")).years;   // 오름차순 [{year, 손익:{}, 자본:{}}]
+    const ys = state.overview.map(r => r.year);
+    for (const y of ys) if (!state.years.includes(y)) state.years.push(y);
+    state.years.sort((a, b) => String(b).localeCompare(String(a)));
+    if (!state.year) state.year = state.years[0] || String(new Date().getFullYear());
+  }
+  async function loadStatus() {
+    state.status = await api(`/api/status?year=${state.year}`);
+  }
+  async function loadBranches() {
+    state.branches = (await api(`/api/branches?year=${state.year}`)).rows;
+  }
+  async function loadDetail(branch) {
+    state.det.data = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
+    state.det.branch = branch;
+    state.det.open = new Set(); state.det.sel = new Set();
+    state.det.selBudget = null; state.det.editKey = null;
+  }
+
+  function amounts(row) {
+    if (state.type === "profit") return { plan: row.profitPlan, actual: row.profitActual };
+    if (state.type === "capital") return { plan: row.capitalPlan, actual: row.capitalActual };
+    return { plan: row.profitPlan + row.capitalPlan, actual: row.profitActual + row.capitalActual };
+  }
+
+  // ───────────────────────── 홈 (다년도) ─────────────────────────
+  function renderHome() {
+    const ov = state.overview || [];
+    const analyzed = ov.filter(r => r["손익"] || r["자본"]);
+    const cur = ov.find(r => String(r.year) === String(state.year));
+    const recent = analyzed.slice(-5);          // 최근 최대 5개년(오름차순)
+    const maxV = Math.max(1, ...recent.flatMap(r => ["손익", "자본"].flatMap(b =>
+      r[b] ? [r[b].계획, r[b].실적] : [])));
+    const yearTotal = b => b ? (b.계획 || 0) : 0;
+
+    const cards = ["손익", "자본"].map(b => {
+      const s = cur?.[b];
+      return `<article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 ${b}예산</p>${s ? `<span class="badge bg-emerald-50 text-emerald-700">분석 완료</span>` : `<span class="badge bg-slate-100 text-slate-500">미실행</span>`}</div>
+        ${s ? `<p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">${fmt(s.실적)} <span class="text-sm font-semibold text-slate-400">천원</span></p>
+        <p class="mt-2 text-sm text-slate-500">계획 ${fmt(s.계획)} · 현재까지 집행률 <b>${s.집행률 ?? "-"}%</b></p>` :
+        `<p class="mt-4 text-sm text-slate-500">'분석 실행'을 눌러 집계하세요.</p>`}</article>`;
+    }).join("");
+    const curAll = cur && (cur["손익"] || cur["자본"]) ? {
+      p: (cur["손익"]?.계획 || 0) + (cur["자본"]?.계획 || 0),
+      a: (cur["손익"]?.실적 || 0) + (cur["자본"]?.실적 || 0),
+    } : null;
+
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div><p class="text-sm font-semibold text-blue-700">통합 현황</p>
+          <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">다년도 예산·실적 현황</h2>
+          <p class="mt-2 text-sm text-slate-500">분석 완료된 모든 연도를 집계합니다. (단위: 천원)</p></div>
+        </section>
+        ${!analyzed.length ? emptyState("아직 분석 이력이 없습니다. ① 계획 업로드 → ② zrfm2 업로드 → 상단 '분석 실행'을 눌러주세요.") : `
+        <section class="grid gap-4 md:grid-cols-3">
+          ${cards}
+          <article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 전체(손익+자본)</p><span class="badge bg-blue-50 text-blue-700">현재까지</span></div>
+          ${curAll ? `<p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">${fmt(curAll.a)} <span class="text-sm font-semibold text-slate-400">천원</span></p>
+          <p class="mt-2 text-sm text-slate-500">계획 ${fmt(curAll.p)} · 집행률 ${fmtRate(curAll.p, curAll.a)}</p>` : `<p class="mt-4 text-sm text-slate-500">해당 연도 분석 이력이 없습니다.</p>`}</article>
+        </section>
+        <section class="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
+          <article class="panel p-5 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3><p class="section-help">파랑=계획 · 청록=실적 (손익+자본, 천원)</p></div><span class="badge bg-slate-100 text-slate-600">${recent.length}개 연도</span></div>
+            <div class="mt-7 space-y-6">
+              ${recent.map(r => {
+                const p = (r["손익"]?.계획 || 0) + (r["자본"]?.계획 || 0);
+                const a = (r["손익"]?.실적 || 0) + (r["자본"]?.실적 || 0);
+                return `<div><div class="mb-2 flex items-end justify-between gap-3"><div><span class="font-bold text-slate-800 clickable" data-goyear="${r.year}">${r.year}</span><span class="ml-2 text-xs text-slate-500">집행률 ${fmtRate(p, a)}</span></div>
+                <div class="text-right text-xs text-slate-500"><span class="font-semibold text-blue-700">${fmt(p)}</span><span class="mx-1">/</span><span class="font-semibold text-emerald-700">${fmt(a)}</span></div></div>
+                <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-500" style="width:${p / maxV * 100}%"></div></div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${a / maxV * 100}%"></div></div></div></div>`;
+              }).join("")}
+            </div>
+            <p class="mt-6 flex items-center gap-2 text-xs text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-300"></span>연도를 클릭하면 해당 연도로 전환됩니다. 자료가 없는 연도는 계산하지 않습니다.</p>
+          </article>
+          <article class="panel overflow-hidden">
+            <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">각 연도의 최신 분석 기준</p></div><button class="text-sm font-semibold text-blue-700 hover:text-blue-900" data-view="branches">전체 지사 →</button></div>
+            <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">연도</th><th class="px-4 py-3">구분</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">집행률</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">${analyzed.slice().reverse().flatMap(r => ["손익", "자본"].filter(b => r[b]).map(b => `<tr class="hover:bg-slate-50 clickable" data-goyear="${r.year}"><td class="table-cell font-semibold text-slate-900">${r.year}</td><td class="table-cell">${b}</td><td class="table-cell text-right">${fmt(r[b].계획)}</td><td class="table-cell text-right">${fmt(r[b].실적)}</td><td class="table-cell text-right">${rateBadge(r[b].계획, r[b].실적)}</td></tr>`)).join("")}</tbody></table></div>
+          </article>
+        </section>`}
+      </div>`;
+  }
+
+  function emptyState(msg) {
+    return `<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"><p class="font-semibold text-slate-700">${esc(msg)}</p></div>`;
+  }
+  function yearPicker(prefix) {
+    return `<div class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">대상연도</span>
+      <select class="control" data-yearpick="1">${state.years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("")}</select></label>
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">새 연도 직접 입력</span>
+      <div class="flex gap-2"><input id="${prefix}NewYear" class="control" style="width:7rem" placeholder="예: 2021" maxlength="4">
+      <button class="btn-secondary" data-action="add-year" data-input="${prefix}NewYear">추가</button></div></label>
+    </div>`;
+  }
+
+  // ───────────────────────── 1 예산 계획 ─────────────────────────
+  function renderBudget() {
+    const ds = (state.status?.datasets || []).filter(d => d.kind === "plan" && String(d.year) === String(state.year));
+    return `
+      <div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 1</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 계획 등록</h2>
+        <p class="mt-2 text-sm text-slate-500">사업별 예산(양식1(월별)) 파일을 업로드하면 행 단위로 백엔드 DB에 흡수됩니다. 원본 파일은 서버에 남지 않습니다.</p></section>
+        ${state.status?.locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태 — 업로드가 차단됩니다.</section>` : ""}
+        <section class="panel p-5">${yearPicker("bp")}</section>
+        <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
+          <article class="panel p-6"><h3 class="section-title">계획본 업로드 — <span class="text-blue-700">${esc(state.year)}년</span>으로 등록</h3>
+            <p class="section-help">헤더 3행 · 데이터 4행부터 — 주관부서명, 부서코드, 처지사, 부서(부), 속성, 예산코드, 예산과목, 사업명, 산출내역, 연예산</p>
+            <button class="mt-6 grid w-full place-items-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-6 py-12 text-center hover:border-blue-400" data-action="pick-plan">
+              <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-blue-700 shadow-sm"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
+              <span class="mt-4 font-bold text-blue-950">계획 Excel(xlsx) 선택</span>
+              <span class="mt-1 text-sm text-blue-700">업로드 즉시 DB로 흡수됩니다</span></button>
+            <input id="planFile" class="hidden" type="file" accept=".xlsx">
+          </article>
+          <article class="panel p-6"><h3 class="section-title">이 연도의 계획 데이터셋</h3>
+            ${ds.length ? `<ul class="mt-5 space-y-3 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between rounded-xl ${i === 0 ? "border border-blue-200 bg-blue-50" : "bg-slate-50"} p-3"><div><p class="font-semibold text-slate-800">${esc(d.label)}</p><p class="text-xs text-slate-500">${d.row_count.toLocaleString()}행 · ${fmt(d.total_amount)}천원 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-blue-100 text-blue-700">사용중</span>' : '<span class="badge bg-slate-100 text-slate-500">이전본</span>'}</li>`).join("")}</ul>` : `<p class="mt-5 text-sm text-slate-500">${esc(state.year)}년 계획이 아직 없습니다.</p>`}
+            <p class="mt-4 text-xs text-slate-400">같은 연도에 여러 번 올리면 <b>가장 최근 업로드</b>가 사용됩니다.</p>
+          </article>
+        </section>
+      </div>`;
+  }
+
+  // ───────────────────────── 2 실적 집계 ─────────────────────────
+  function renderCollect() {
+    const ds = (state.status?.datasets || []).filter(d => d.kind === "erp" && String(d.year) === String(state.year));
+    const runs = state.status?.runs || {};
+    const sums = ["손익", "자본"].map(b => {
+      const s = runs[b]?.summary;
+      if (!s) return `<article class="metric-card"><p class="text-sm font-semibold text-slate-500">${b} 매칭</p><p class="mt-3 text-sm text-slate-500">미실행</p></article>`;
+      return `<article class="metric-card"><p class="text-sm font-semibold text-slate-500">${b} 매칭 결과</p>
+        <p class="mt-3 text-3xl font-bold">${fmt(s["총 실적(천원)"])}<span class="ml-1 text-sm font-semibold text-slate-400">천원</span></p>
+        <p class="mt-2 text-sm text-slate-500">계획집행 ${fmt(s["계획집행 행수"])}행 · 신규 ${fmt(s["신규 행수"])}행 · 학습확정 ${fmt(s["학습확정 전표수"] ?? 0)}건</p></article>`;
+    }).join("");
+    return `
+      <div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 2</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">실적 집계와 사업 매칭</h2>
+        <p class="mt-2 text-sm text-slate-500">ERP(SAP) zrfm2 실적을 업로드하고 자동 매칭을 실행합니다. 저확신 항목은 실적분석(상세)에서 사람이 확인합니다.</p></section>
+        ${state.status?.locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태 — 업로드·분석이 차단됩니다.</section>` : ""}
+        <section class="panel p-5">${yearPicker("cp")}</section>
+        <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
+          <article class="panel p-6"><h3 class="section-title">ERP(zrfm2) 업로드 — <span class="text-blue-700">${esc(state.year)}년</span>으로 등록</h3>
+            <p class="section-help">SAP에서 추출한 zrfm2 원본 그대로 — 합계행·타연도 전표는 자동으로 걸러집니다.</p>
+            <button class="mt-6 grid w-full place-items-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-6 py-12 text-center hover:border-blue-400" data-action="pick-erp">
+              <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-blue-700 shadow-sm"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
+              <span class="mt-4 font-bold text-blue-950">zrfm2 Excel(xlsx) 선택</span>
+              <span class="mt-1 text-sm text-blue-700">업로드 즉시 DB로 흡수 · 원본 미보관</span></button>
+            <input id="erpFile" class="hidden" type="file" accept=".xlsx">
+            <div class="mt-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
+              <div><p class="font-semibold text-slate-800">자동 매칭 분석 (${esc(state.year)}년)</p><p class="text-xs text-slate-500">손익·자본을 한 번에 실행합니다 (약 1분) · 학습 DB 자동 적용</p></div>
+              <button class="btn-primary" data-action="analyze">분석 실행</button>
+            </div>
+          </article>
+          <article class="panel p-6"><h3 class="section-title">이 연도의 ERP 데이터셋</h3>
+            ${ds.length ? `<ul class="mt-5 space-y-3 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between rounded-xl ${i === 0 ? "border border-emerald-200 bg-emerald-50" : "bg-slate-50"} p-3"><div><p class="font-semibold text-slate-800">${esc(d.label)}</p><p class="text-xs text-slate-500">${d.row_count.toLocaleString()}행 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-emerald-100 text-emerald-700">사용중</span>' : '<span class="badge bg-slate-100 text-slate-500">이전본</span>'}</li>`).join("")}</ul>` : `<p class="mt-5 text-sm text-slate-500">${esc(state.year)}년 ERP 자료가 아직 없습니다.</p>`}
+          </article>
+        </section>
+        <section class="grid gap-4 md:grid-cols-3">${sums}
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">다음 단계</p>
+          <p class="mt-3 text-sm text-slate-600">매칭 결과를 지사별로 검토하고 잘못 붙은 전표를 재배정하세요.</p>
+          <button class="btn-secondary mt-4" data-view="detail">실적분석(상세) →</button></article>
+        </section>
+      </div>`;
+  }
+
+  // ───────────────────────── 3 실적 분석 (전지사) ─────────────────────────
+  // 검색어 입력 시에는 결과 영역(#brResults)만 갱신 — 입력창을 다시 만들지
+  // 않아 한글 조합(IME)이 끊기지 않는다.
+  function brResultsHtml() {
+    const all = (state.branches || []).map(r => ({...r, ...amounts(r)}))
+      .filter(r => r.branch.toLocaleLowerCase("ko").includes(state.search.trim().toLocaleLowerCase("ko")));
+    const rows = all.filter(r => !r.unmapped);
+    const unmappedRows = all.filter(r => r.unmapped);   // 미매핑 가상 지사 → 맨 아래
+    if (state.sort === "rateAsc") rows.sort((a, b) => (rateVal(a.plan, a.actual) ?? Infinity) - (rateVal(b.plan, b.actual) ?? Infinity));
+    else if (state.sort === "planDesc") rows.sort((a, b) => b.plan - a.plan);
+    else if (state.sort === "branchAsc") rows.sort((a, b) => a.branch.localeCompare(b.branch, "ko"));
+    else rows.sort((a, b) => (rateVal(b.plan, b.actual) ?? -Infinity) - (rateVal(a.plan, a.actual) ?? -Infinity));
+    const tot = rows.reduce((a, r) => { a.plan += r.plan; a.actual += r.actual; return a; }, {plan: 0, actual: 0});
+    return `
+        <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 계획</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-slate-400">천원</span></p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 집행률</p><p class="mt-3 text-2xl font-bold">${fmtRate(tot.plan, tot.actual)}</p></article></section>
+        <section class="panel mt-6 overflow-hidden">
+          ${rows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">잔액</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">검토대상</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${rows.map(r => `<tr class="clickable hover:bg-blue-50/40" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-slate-900">${esc(r.branch)}</td><td class="table-cell text-right">${fmt(r.plan)}</td><td class="table-cell text-right">${fmt(r.actual)}</td><td class="table-cell text-right ${r.plan - r.actual < 0 ? "text-red-600" : ""}">${fmt(r.plan - r.actual)}</td><td class="table-cell text-right">${rateBadge(r.plan, r.actual)}</td><td class="table-cell text-right">${r.lowConf ? `<span class="badge bg-amber-50 text-amber-700">${r.lowConf}건</span>` : '<span class="text-xs text-slate-400">-</span>'}</td></tr>`).join("")}
+          ${unmappedRows.map(r => `<tr class="clickable row-unmapped hover:bg-blue-50/40" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-red-600">${esc(r.branch)}</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right"><span class="badge bg-slate-100 text-red-600">종합표 미포함</span></td><td class="table-cell text-right"><span class="badge bg-slate-100 text-red-600">미매핑 ${r.unmapped}건 · ${fmt(r.unmappedAmt)}천원</span></td></tr>`).join("")}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold text-slate-950">합계</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td class="table-cell text-right font-bold">${fmt(tot.plan - tot.actual)}</td><td class="table-cell text-right font-bold">${fmtRate(tot.plan, tot.actual)}</td><td></td></tr></tfoot></table></div>` : emptyState("분석 이력이 없거나 검색 결과가 없습니다.")}
+        </section>`;
+  }
+
+  function renderBranches() {
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-blue-700">실적 분석</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">전체 지사 현황 — ${esc(state.year)}년</h2><p class="mt-2 text-sm text-slate-500">지사를 클릭하면 상세 검토 화면으로 이동합니다. (단위: 천원)</p></div></section>
+        <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
+          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사명 검색</span><input class="control w-full" data-filter="search" value="${esc(state.search)}" placeholder="지사명을 입력하세요"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산 구분</span><select class="control" data-filter="type"><option value="all" ${state.type === "all" ? "selected" : ""}>전체</option><option value="profit" ${state.type === "profit" ? "selected" : ""}>손익</option><option value="capital" ${state.type === "capital" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">정렬</span><select class="control" data-filter="sort"><option value="rateDesc" ${state.sort === "rateDesc" ? "selected" : ""}>집행률 높은 순</option><option value="rateAsc" ${state.sort === "rateAsc" ? "selected" : ""}>집행률 낮은 순</option><option value="planDesc" ${state.sort === "planDesc" ? "selected" : ""}>예산 금액 큰 순</option><option value="branchAsc" ${state.sort === "branchAsc" ? "selected" : ""}>지사명 순</option></select></label>
+        </div></section>
+        <div id="brResults">${brResultsHtml()}</div>
+      </div>`;
+  }
+
+  // ───────────────────────── 3+ 실적분석(상세) ─────────────────────────
+  const DET_COLS = [
+    ["budget", "구분"], ["예산과목", "예산과목"], ["속성", "속성"], ["사업명", "사업명"],
+    ["연예산원", "연예산(A)"], ["실적원", "실적금액(B)"], ["구분", "상태"], ["확신도", "확신도"],
+  ];
+
+  function detSortArrow(key) {
+    if (state.det.sortKey !== key) return '<span class="text-slate-300">↕</span>';
+    return state.det.sortDir > 0 ? "▲" : "▼";
+  }
+
+  function legend() {
+    return `<div class="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fff;border:1px solid #cbd5e1"></span>계획집행 — 계획 사업에 실적이 붙음</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fef2f2"></span><b>분홍</b> = 미시행 (계획은 있으나 실적 0)</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fffbeb"></span><b>노랑</b> = 신규 (계획에 없던 집행)</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#f1f5f9"></span><b>회색</b> = 미매핑 (지사 미확정 — 재배정으로 지사 지정, 종합표 미포함)</span>
+      <span class="flex items-center gap-1.5">확신도: <span class="badge bg-emerald-50 text-emerald-700">0.80↑ 자동확정</span><span class="badge bg-amber-50 text-amber-700">0.80미만 검토 필요</span></span>
+    </div>`;
+  }
+
+  function renderDetail() {
+    const d = state.det;
+    const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
+    if (!d.data) {
+      return `<div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 3+</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">실적분석 (상세) — ${esc(state.year)}년</h2>
+        <p class="mt-2 text-sm text-slate-500">지사를 선택하면 손익·자본 구분 없이 전체 사업 목록이 표시됩니다.</p></section>
+        <section class="panel p-5"><label class="block max-w-sm"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사 선택</span>
+        <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
+        ${!(state.branches || []).length ? `<p class="mt-4 text-sm text-amber-700">분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.</p>` : ""}</section>
+      </div>`;
+    }
+    const locked = !!state.status?.locked;
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div><p class="text-sm font-semibold text-blue-700">STAGE 3+ · ${esc(state.year)}년</p>
+          <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">${esc(d.branch)} — 사업별 실적 검토</h2>
+          <p class="mt-2 text-sm text-slate-500">사업 클릭=전표 트리 · 컬럼 제목 클릭=정렬 · ✎=내용 수정 · 전표 체크=재배정.</p></div>
+          <button class="btn-secondary" data-view="branches">← 전체 지사</button>
+        </section>
+        <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산과목</span><select class="control" data-det="item"><option value="">전체</option>${d.data.items.map(it => `<option value="${esc(it)}" ${d.item === it ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">속성</span><select class="control" data-det="attr"><option value="">전체</option>${d.data.attrs.map(a => `<option value="${esc(a)}" ${d.attr === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></label>
+          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-slate-500">사업명 검색</span><input class="control w-full" data-det="q" value="${esc(d.q)}" placeholder="사업명 일부를 입력"></label>
+          <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-slate-600"><input type="checkbox" class="accent-blue-600" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+          ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
+        </div></section>
+        ${!locked && d.addOpen ? addBizFormHtml() : ""}
+        ${locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태입니다 — 조회만 가능하며 재배정·수정이 차단됩니다. (설정 탭에서 해제 가능)</section>` : ""}
+        <div id="detResults">${detResultsHtml()}</div>
+      </div>`;
+  }
+
+  // 수동 사업 추가 폼 — 계획본에 없는 사업을 이 지사에 직접 등록
+  function addBizFormHtml() {
+    const d = state.det;
+    const add = d.add || (d.add = {budget: "손익"});
+    const items = state.status?.items?.[add.budget] || [];
+    return `
+      <section class="panel border-blue-300 bg-blue-50 p-5">
+        <p class="mb-3 text-sm font-bold text-blue-950">＋ 사업 추가 — <b>${esc(d.branch)}</b>에 계획본에 없는 사업을 등록합니다
+          <span class="ml-2 text-xs font-medium text-blue-700">저장 후 자동 재분석되어 목록에 나타나고(실적 없으면 '미시행'), 전표 재배정 대상 사업으로 쓸 수 있습니다.</span></p>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산구분</span>
+            <select id="abBudget" class="control w-full" data-add-budget="1">
+              <option value="손익" ${add.budget === "손익" ? "selected" : ""}>손익</option>
+              <option value="자본" ${add.budget === "자본" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산과목 *</span>
+            <select id="abItem" class="control w-full">${items.map(it => `<option value="${esc(it)}">${esc(it)}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">속성 (비우면 마스터 자동)</span>
+            <select id="abAttr" class="control w-full"><option value="">(자동)</option>${["일반", "제조", "건가", "자산"].map(a => `<option value="${a}">${a}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">연예산 (천원)</span><input id="abPlan" class="control w-full" type="number" min="0" placeholder="0"></label>
+          <label class="block sm:col-span-2"><span class="mb-1.5 block text-xs font-semibold text-blue-700">사업명 *</span><input id="abName" class="control w-full" placeholder="사업명을 입력하세요"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">주관부서명</span><input id="abOwner" class="control w-full"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 부서명(부)</span><input id="abPart" class="control w-full"></label>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button class="btn-primary" data-action="save-add">사업 추가 (자동 재분석)</button>
+          <button class="btn-secondary" data-action="toggle-add">닫기</button>
+        </div>
+      </section>`;
+  }
+
+  // 검색어 입력 시 결과 영역만 갱신(#detResults) — 입력창을 다시 만들지 않아
+  // 한글 조합(IME)이 끊기지 않는다.
+  function detResultsHtml() {
+    const d = state.det;
+    const data = d.data;
+    let biz = data.biz.map((b, idx) => ({...b, _key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}));
+    if (d.budget !== "all") biz = biz.filter(b => b.budget === d.budget);
+    if (d.item) biz = biz.filter(b => b.예산과목 === d.item);
+    if (d.attr) biz = biz.filter(b => String(b.속성 ?? "") === d.attr);
+    if (d.hideMissing) biz = biz.filter(b => b.구분 !== "미시행");
+    if (d.q.trim()) { const q = d.q.trim().toLocaleLowerCase("ko"); biz = biz.filter(b => String(b.사업명 ?? "").toLocaleLowerCase("ko").includes(q)); }
+    if (d.sortKey) {
+      const k = d.sortKey, dir = d.sortDir;
+      biz.sort((a, b) => {
+        const va = a[k], vb = b[k];
+        if (typeof va === "number" || typeof vb === "number")
+          return ((va ?? -Infinity) - (vb ?? -Infinity)) * dir;
+        return String(va ?? "").localeCompare(String(vb ?? ""), "ko") * dir;
+      });
+    }
+    const tot = biz.reduce((a, b) => { a.plan += b.연예산; a.actual += b.실적;
+      a.planWon += b.연예산원; a.actualWon += b.실적원; return a; },
+      {plan: 0, actual: 0, planWon: 0, actualWon: 0});
+    const selCount = d.sel.size;
+    const locked = !!state.status?.locked;
+
+    const rows = biz.map(b => {
+      const key = b._key;
+      const open = d.open.has(key);
+      const editing = d.editKey === key;
+      const allSel = b.전표.length > 0 && b.전표.every(v => d.sel.has(v.erp_row_id));
+      const vhead = !open || !b.전표.length ? "" : `
+        <tr class="voucher-head">
+          <td class="table-cell pl-6 text-xs font-bold text-slate-500" colspan="2">
+          ${locked ? "예산과목" : `<label class="flex items-center gap-2"><input type="checkbox" class="accent-blue-600" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>전체 선택 · 예산과목</span></label>`}</td>
+          <td class="table-cell text-xs font-bold text-slate-500">전표번호</td>
+          <td class="table-cell text-xs font-bold text-slate-500">전표 텍스트(ERP)</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500">전기일</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500">전표금액(원)</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500" colspan="2">확신도</td>
+          <td></td></tr>`;
+      const vrows = !open ? "" : vhead + b.전표.map(v => `
+        <tr class="voucher-row">
+          <td class="table-cell pl-6" colspan="2">
+          <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-blue-600" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
+          <span class="cell-item text-xs text-slate-600" title="${esc(v.과목 ?? b.예산과목)}">${esc(v.과목 ?? b.예산과목)}</span></label></td>
+          <td class="table-cell text-xs text-slate-500">${esc(v.전표번호 ?? "-")}</td>
+          <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
+          <td class="table-cell text-right text-xs text-slate-400">${esc(v.전기일 ?? "")}</td>
+          <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
+          <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}</td>
+          <td></td></tr>`).join("")
+        + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-slate-400" colspan="9">귀속 전표 없음 (미시행)</td></tr>` : "");
+      const editRow = !editing ? "" : `
+        <tr class="edit-row"><td colspan="9" class="p-4">
+          <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p class="mb-3 text-sm font-bold text-blue-950">사업 내용 수정 <span class="ml-2 text-xs font-medium text-blue-700">빈칸으로 저장하면 해당 값이 지워집니다. 저장 즉시 반영 + 이후 분석에도 유지.</span></p>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 지사(처.지사)</span>
+                <select id="edBranch" class="control w-full">${realBranches().map(x => `<option value="${esc(x)}" ${x === state.det.branch ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">사업명</span><input id="edName" class="control w-full" value="${esc(b.사업명)}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">속성</span><input id="edAttr" class="control w-full" value="${esc(b.속성 ?? "")}" placeholder="예: 제조/자산/건가"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">주관부서명</span><input id="edDept" class="control w-full" value="${esc(b.주관부서명 ?? "")}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 부서명(부)</span><input id="edPart" class="control w-full" value="${esc(b.부서부 ?? "")}"></label>
+            </div>
+            <p class="mt-2 text-xs text-blue-700"><b>예산귀속 지사</b>를 바꾸면 이 사업이 연예산(A)·귀속 전표까지 <b>통째로</b> 그 지사로 이동합니다(삭제·재생성 아님). <b>주관부서명</b>은 표기용 텍스트라 종합표·지사별 집계는 바뀌지 않습니다.</p>
+            <div class="mt-4 flex gap-2">
+              <button class="btn-primary" data-action="save-edit" data-ekey="${esc(key)}">저장</button>
+              <button class="btn-secondary" data-action="cancel-edit">취소</button>
+            </div>
+          </div>
+        </td></tr>`;
+      return `
+        <tr class="clickable ${b.구분 === "미시행" ? "row-missing" : ""} ${String(b.구분).startsWith("신규") ? "row-new" : ""} ${b.구분 === "미매핑" ? "row-unmapped" : ""} hover:bg-blue-50/40" data-biz="${esc(key)}">
+          <td class="table-cell"><span class="badge ${b.budget === "손익" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}">${b.budget}</span></td>
+          <td class="table-cell text-slate-700 cell-item" title="${esc(b.예산과목)}">${esc(b.예산과목)}</td>
+          <td class="table-cell text-slate-500">${esc(b.속성 ?? "-")}</td>
+          <td class="table-cell font-semibold text-slate-900 cell-name" title="${esc(b.사업명)}"><span class="mr-1 inline-block w-3 text-slate-400">${b.전표.length ? (open ? "▾" : "▸") : ""}</span>${esc(b.사업명)}</td>
+          <td class="table-cell text-right">${fmt(b.연예산원)}</td>
+          <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
+          <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
+          <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
+          <td class="table-cell text-right">${locked ? "" : `<button class="grid h-6 w-6 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700" title="사업 내용 수정" data-edit="${esc(key)}">✎</button>`}</td>
+        </tr>${editRow}${vrows}`;
+    }).join("");
+
+    const targetOpts = (() => {
+      if (!selCount) return "";
+      const names = [...new Set(data.biz.filter(b => b.budget === d.selBudget).map(b => b.사업명))];
+      return names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    })();
+
+    return `
+        <section class="grid gap-4 sm:grid-cols-3">
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 사업</p><p class="mt-3 text-2xl font-bold">${biz.length}건</p></article>
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">연예산(A)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-slate-400">천원</span></p></article>
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">최종 실적금액(B)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.actual)} <span class="text-xs font-semibold text-slate-400">천원</span></p><p class="mt-1 text-xs text-slate-500">집행률 ${fmtRate(tot.plan, tot.actual)}</p></article>
+        </section>
+        ${selCount && !locked ? `<section class="panel sticky top-16 z-10 mt-6 border-blue-300 bg-blue-50 p-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <p class="font-bold text-blue-950">${selCount}건 전표 선택 (${esc(d.selBudget)})</p>
+            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 지사</span>
+              <select id="ovDept" class="control">${realBranches().map(b => `<option value="${esc(b)}" ${b === d.branch ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 사업 선택 (현재 지사 기준)</span><select id="ovTarget" class="control w-full">${targetOpts || '<option value="">(직접 입력 사용)</option>'}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용"></label>
+            <button class="btn-primary" data-action="save-override">재배정 저장 (자동 재분석)</button>
+            <button class="btn-secondary" data-action="clear-sel">선택 해제</button>
+          </div>
+          <p class="mt-2 text-xs text-blue-700">다른 지사로 이동하는 경우: 입력한 사업명이 그 지사의 계획 사업명과 정확히 일치하면 그 사업으로, 아니면 그 지사의 신규 사업으로 귀속됩니다.</p>
+          </section>` : ""}
+        <section class="panel mt-6 overflow-hidden">
+          <div class="border-b border-slate-200 px-4 py-3">${legend()}</div>
+          ${biz.length ? `<div class="overflow-x-auto"><table class="det-table w-full"><thead class="table-head"><tr>
+            ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 7 ? "text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
+            <th class="text-right">수정</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${rows}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="3"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
+        </section>
+        <p class="mt-4 text-xs text-slate-400">표의 연예산(A)·실적금액(B)·전표금액은 <b>원 단위</b>, 상단 요약 카드는 <b>천원 단위</b>입니다. 재배정은 저장 즉시 자동 재분석되어 반영되고, 그 확정 내용은 자동으로 학습됩니다.</p>`;
+  }
+
+  // ───────────────────────── 4 통계·내보내기 ─────────────────────────
+  function renderStats() {
+    const st = state.stats;
+    if (!st || !Object.keys(st.budgets || {}).length) {
+      return `<div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">통계 · 내보내기 — ${esc(state.year)}년</h2></section>${emptyState("분석 이력이 없습니다. 먼저 분석을 실행하세요.")}</div>`;
+    }
+    const sections = Object.entries(st.budgets).map(([budget, data]) => {
+      const items = data.items;
+      const tot = items.reduce((a, x) => { a.p += x.계획; a.a += x.실적; return a; }, {p: 0, a: 0});
+      const maxA = Math.max(1, ...data.groups.map(g => Math.max(g.계획, g.실적)));
+      return `
+        <section class="panel overflow-hidden">
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6">
+            <div><h3 class="section-title">${budget}예산 — 과목별 계획 대비 실적</h3><p class="section-help">${esc(state.year)}년 · 25년 확정 분류체계 · 단위: 천원</p></div>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn-primary" data-export="actual" data-budget="${budget}">실적 Excel</button>
+              <button class="btn-secondary" data-export="v1" data-budget="${budget}">zrfm2_V1</button>
+              <button class="btn-secondary" data-export="matched" data-budget="${budget}">matched CSV</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">대분류</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">계획(A)</th><th class="px-4 py-3 text-right">실적(B)</th><th class="px-4 py-3 text-right">└ 계획집행</th><th class="px-4 py-3 text-right">└ 신규</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">사업수</th><th class="px-4 py-3 text-right">미시행</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${items.map(x => `<tr class="hover:bg-slate-50"><td class="table-cell text-slate-500">${esc(x.대분류)}</td><td class="table-cell font-semibold text-slate-900">${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.계획)}</td><td class="table-cell text-right font-semibold">${fmt(x.실적)}</td><td class="table-cell text-right text-slate-500">${fmt(x.집행)}</td><td class="table-cell text-right text-slate-500">${fmt(x.신규)}</td><td class="table-cell text-right">${rateBadge(x.계획, x.실적)}</td><td class="table-cell text-right">${x.사업수}</td><td class="table-cell text-right ${x.미시행 ? "text-amber-700" : "text-slate-400"}">${x.미시행}</td></tr>`).join("")}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold" colspan="2">합계</td><td class="table-cell text-right font-bold">${fmt(tot.p)}</td><td class="table-cell text-right font-bold">${fmt(tot.a)}</td><td colspan="2"></td><td class="table-cell text-right font-bold">${fmtRate(tot.p, tot.a)}</td><td colspan="2"></td></tr></tfoot></table></div>
+          <div class="border-t border-slate-200 p-5 sm:p-6"><h4 class="text-sm font-bold text-slate-700">지사그룹별 (계획 파랑 · 실적 청록)</h4>
+            <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-slate-800">${esc(g.그룹)}</span><span class="text-xs text-slate-500"><span class="font-semibold text-blue-700">${fmt(g.계획)}</span> / <span class="font-semibold text-emerald-700">${fmt(g.실적)}</span> · ${fmtRate(g.계획, g.실적)}</span></div>
+            <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-500" style="width:${g.계획 / maxA * 100}%"></div></div>
+            <div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
+        </section>`;
+    }).join("");
+    const cmp = state.statsCompare;
+    const cmpSection = !cmp || !cmp.prev ? "" : Object.entries(cmp.budgets).map(([budget, items]) => {
+      const t = items.reduce((a, x) => { a.o += x.전년실적; a.c += x.당년실적; return a; }, {o: 0, c: 0});
+      return `
+      <section class="panel overflow-hidden">
+        <div class="border-b border-slate-200 p-5 sm:p-6"><h3 class="section-title">${budget}예산 — 전년 대비 증감 (${cmp.prev}년 → ${esc(state.year)}년)</h3><p class="section-help">각 연도의 최신 분석 실적 기준 · 단위: 천원</p></div>
+        <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">${cmp.prev}년 실적</th><th class="px-4 py-3 text-right">${esc(state.year)}년 실적</th><th class="px-4 py-3 text-right">증감</th><th class="px-4 py-3 text-right">증감률</th></tr></thead>
+        <tbody class="divide-y divide-slate-100">${items.map(x => `<tr class="hover:bg-slate-50"><td class="table-cell font-semibold text-slate-900">${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.전년실적)}</td><td class="table-cell text-right font-semibold">${fmt(x.당년실적)}</td><td class="table-cell text-right ${x.증감 < 0 ? "text-red-600" : "text-emerald-700"}">${x.증감 >= 0 ? "+" : ""}${fmt(x.증감)}</td><td class="table-cell text-right">${x.증감률 === null ? '<span class="badge bg-amber-50 text-amber-700">신규</span>' : `<span class="badge ${x.증감률 >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}">${x.증감률 >= 0 ? "+" : ""}${x.증감률}%</span>`}</td></tr>`).join("")}</tbody>
+        <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold">합계</td><td class="table-cell text-right font-bold">${fmt(t.o)}</td><td class="table-cell text-right font-bold">${fmt(t.c)}</td><td class="table-cell text-right font-bold ${t.c - t.o < 0 ? "text-red-600" : ""}">${t.c - t.o >= 0 ? "+" : ""}${fmt(t.c - t.o)}</td><td class="table-cell text-right font-bold">${t.o ? ((t.c - t.o) / t.o * 100).toFixed(1) + "%" : "-"}</td></tr></tfoot></table></div>
+      </section>`;
+    }).join("");
+    return `<div class="space-y-6">
+      <section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">통계 · 내보내기 — ${esc(state.year)}년</h2>
+      <p class="mt-2 text-sm text-slate-500">검토(재배정·수정)가 반영된 최신 분석 기준입니다.</p></section>
+      ${sections}${cmpSection}</div>`;
+  }
+
+  // ───────────────────────── 5 중장기 예측 / 설정 ─────────────────────────
+  function renderForecast() {
+    return `<div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 5</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">중장기 예산 예측</h2><p class="mt-2 text-sm text-slate-500">예산 표준화·벤치마크 기반 예측 단계로, 실적 데이터가 여러 연도 쌓이면 활성화됩니다.</p></section>${emptyState("개발 예정 — 다년도 실적 DB가 준비되면 이 화면에서 표준금액·팩터 기반 예측을 제공합니다.")}</div>`;
+  }
+
+  function renderSettings() {
+    const ds = state.status?.datasets || [];
+    const ovs = state.overrides || {};
+    const ovRows = ["손익", "자본"].flatMap(b => (ovs[b] || []).map(o => ({...o, budget: b})));
+    const learned = state.learned || {};
+    const edits = state.bizEdits || [];
+    return `<div class="space-y-6">
+      <section><p class="text-sm font-semibold text-blue-700">운영 관리</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">데이터 관리</h2>
+      <p class="mt-2 text-sm text-slate-500">모든 원자료는 백엔드 DB(data/budget.db)에만 저장됩니다.</p></section>
+
+      <section class="panel p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div><h3 class="section-title">🔒 연도 마감 (잠금)</h3>
+          <p class="section-help">검토·학습까지 끝난 연도를 마감하면 <b>업로드·분석·재배정·수정이 전부 차단</b>되어, 이후 학습이 업그레이드되어도 완료된 연도의 숫자가 절대 바뀌지 않습니다. 조회·통계·Excel 내보내기는 계속 가능합니다.</p></div>
+          <div class="flex flex-wrap gap-2">
+            ${state.status?.locked
+              ? `<button class="btn-secondary" data-action="unlock-year">🔓 ${esc(state.year)}년 잠금 해제</button>`
+              : `<button class="btn-primary" data-action="lock-year">🔒 ${esc(state.year)}년 마감(잠금)</button>`}
+          </div>
+        </div>
+        ${Object.keys(state.status?.locks || {}).length ? `<div class="mt-4 flex flex-wrap gap-2">${Object.entries(state.status.locks).map(([y, at]) => `<span class="badge bg-amber-50 text-amber-800">🔒 ${y}년 (${esc(at)})</span>`).join("")}</div>` : `<p class="mt-4 text-xs text-slate-400">마감된 연도가 없습니다.</p>`}
+      </section>
+
+      <section class="panel p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div><h3 class="section-title">🧠 확정 결과 학습</h3>
+          <p class="section-help">학습 DB는 <b>연도 구분 없이 하나</b>입니다 — 어느 연도에서 학습했든 <b>모든 연도 분석에 공통 적용</b>됩니다. <b>상세 화면의 재배정은 저장 즉시 자동 학습</b>(사람 확정)되고, 아래 버튼은 검토가 끝난 연도의 <b>자동 매칭 결과까지 통째로</b> 전체 학습 DB에 추가하는 일괄 학습입니다. 같은 텍스트의 전표는 유사도 계산보다 학습 결과를 우선 적용(확신도 0.99, 사람 확정 &gt; 자동 확정).</p></div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary" data-action="learn">${esc(state.year)}년 확정 결과를 전체 학습 DB에 추가</button>
+            <button class="btn-secondary" data-action="clear-learned">학습 초기화</button>
+          </div>
+        </div>
+        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">학습된 매핑 총계 (전체 연도 공용)</p><p class="mt-1 text-2xl font-bold">${(learned["총계"] || 0).toLocaleString()}건</p></div>
+          <div class="rounded-xl bg-blue-50 p-4"><p class="text-xs font-semibold text-blue-700">사람 확정(재배정)</p><p class="mt-1 text-2xl font-bold text-blue-950">${(learned["수동확정"] || 0).toLocaleString()}건</p></div>
+          <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">자동 확정</p><p class="mt-1 text-2xl font-bold">${(learned["자동확정"] || 0).toLocaleString()}건</p></div>
+        </div>
+        <p class="mt-4 text-xs text-slate-400">권장 절차: 상세 검토·재배정(자동 학습) → 일괄 학습 → <b>연도 마감(잠금)</b> → 다음 연도 분석 시 자동 적용.</p>
+      </section>
+
+      <section class="panel p-6">
+        <h3 class="section-title">📚 기준정보 마스터</h3>
+        <p class="section-help">예산과목(계정코드·속성)·부서코드(처지사) 마스터 — 속성(일반/제조/건가/자산) 교정, ERP 과목 정규화, 계획행 처지사 보정에 사용됩니다. 조직개편·계정 신설 시 새 파일을 올려 갱신하세요(같은 코드는 덮어씀).</p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl bg-slate-50 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-500">예산과목 마스터</p><button class="btn-secondary" data-action="pick-master-item">파일 갱신</button></div><p class="mt-2 text-2xl font-bold">${(state.status?.master?.예산과목 || 0).toLocaleString()}건</p><p class="mt-1 text-xs text-slate-400">양식: 계정코드·이름·주관부서코드·주관부서명·속성·비고</p></div>
+          <div class="rounded-xl bg-slate-50 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-500">부서코드 마스터</p><button class="btn-secondary" data-action="pick-master-dept">파일 갱신</button></div><p class="mt-2 text-2xl font-bold">${(state.status?.master?.부서코드 || 0).toLocaleString()}건</p><p class="mt-1 text-xs text-slate-400">양식: 부서코드·부서명·처지사·비고</p></div>
+        </div>
+        <input id="masterItemFile" class="hidden" type="file" accept=".xlsx">
+        <input id="masterDeptFile" class="hidden" type="file" accept=".xlsx">
+      </section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">등록 데이터셋</h3></div>
+      <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">종류</th><th class="px-4 py-3">연도</th><th class="px-4 py-3">파일</th><th class="px-4 py-3 text-right">행수</th><th class="px-4 py-3">업로드</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${ds.map(d => `<tr><td class="table-cell">${d.id}</td><td class="table-cell"><span class="badge ${d.kind === "plan" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}">${d.kind}</span></td><td class="table-cell">${d.year}</td><td class="table-cell">${esc(d.label)}</td><td class="table-cell text-right">${d.row_count.toLocaleString()}</td><td class="table-cell text-xs text-slate-500">${esc(d.uploaded_at)}</td></tr>`).join("")}</tbody></table></div></section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">수동 재배정 이력 (${esc(state.year)}년)</h3><p class="section-help">삭제하면 다음 분석 실행부터 자동 매칭으로 돌아갑니다.</p></div>
+      ${ovRows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">전표행</th><th class="px-4 py-3">배정 사업명</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${ovRows.map(o => `<tr><td class="table-cell">${o.id}</td><td class="table-cell">${o.budget}</td><td class="table-cell">${o.erp_row_id}</td><td class="table-cell font-semibold">${esc(o.target_name)}</td><td class="table-cell text-xs text-slate-500">${esc(o.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-override="${o.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">재배정 이력이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">수동 추가 사업 (${esc(state.year)}년)</h3><p class="section-help">상세 화면 '＋ 사업 추가'로 등록한 사업입니다. 삭제하면 다음 분석부터 제외됩니다.</p></div>
+      ${(state.manualBiz || []).length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">지사</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3">사업명</th><th class="px-4 py-3 text-right">연예산(천원)</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${state.manualBiz.map(m => `<tr><td class="table-cell">${m.id}</td><td class="table-cell">${m.budget}</td><td class="table-cell">${esc(m.처지사)}</td><td class="table-cell">${esc(m.예산과목)}</td><td class="table-cell font-semibold">${esc(m.사업명)}</td><td class="table-cell text-right">${fmt(m.연예산)}</td><td class="table-cell text-xs text-slate-500">${esc(m.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-manual="${m.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">수동 추가 사업이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">사업 내용 수정 이력 (${esc(state.year)}년)</h3><p class="section-help">상세 화면 ✎로 저장한 수정입니다. 삭제하면 다음 분석부터 원본으로 돌아갑니다.</p></div>
+      ${edits.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">대상 사업</th><th class="px-4 py-3">수정 내용</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${edits.map(e => `<tr><td class="table-cell">${e.id}</td><td class="table-cell">${e.budget}</td><td class="table-cell">${esc(e.처지사)} · ${esc(e.예산과목)} · ${esc(e.사업명)}</td><td class="table-cell text-xs">${esc(Object.entries(e.fields).map(([k, v]) => `${k}→${v === "" ? "(빈칸)" : v}`).join(", "))}</td><td class="table-cell text-xs text-slate-500">${esc(e.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-edit="${e.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">수정 이력이 없습니다.</p>`}</section>
+    </div>`;
+  }
+
+  // ───────────────────────── 렌더 & 라우팅 ─────────────────────────
+  function renderPage() {
+    const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
+                       branches: renderBranches, detail: renderDetail, stats: renderStats,
+                       forecast: renderForecast, settings: renderSettings};
+    $("#page").innerHTML = renderers[state.view]();
+    const [title, subtitle] = viewMeta[state.view];
+    $("#pageTitle").textContent = title;
+    $("#pageSubtitle").textContent = subtitle;
+    document.querySelectorAll("nav [data-view]").forEach(b =>
+      b.classList.toggle("nav-button-active", b.dataset.view === state.view));
+    const ys = $("#yearSelect");
+    const years = state.years.length ? state.years : [state.year];
+    ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
+  }
+
+  async function navigate(view) {
+    state.view = view;
+    try {
+      await loadOverview();
+      if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
+      if (view === "budget" || view === "collect") await loadStatus();
+      if (view === "stats") {
+        state.stats = await api(`/api/stats?year=${state.year}`);
+        state.statsCompare = await api(`/api/stats-compare?year=${state.year}`);
+      }
+      if (view === "settings") {
+        await loadStatus();
+        state.overrides = await api(`/api/overrides?year=${state.year}`);
+        state.learned = await api("/api/learned");
+        state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
+        state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
+      }
+    } catch (e) { toast(e.message); }
+    renderPage();
+    closeMenu();
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  async function changeYear(y) {
+    state.year = String(y);
+    state.det = {...state.det, branch: "", data: null, open: new Set(), sel: new Set(), selBudget: null, editKey: null};
+    await navigate(state.view);
+  }
+
+  function addYearFromInput(inputId) {
+    const el = inputId ? document.getElementById(inputId) : null;
+    const v = el ? el.value.trim() : (prompt("추가할 연도를 입력하세요 (예: 2021)") || "").trim();
+    if (!/^\d{4}$/.test(v)) { toast("연도는 4자리 숫자로 입력하세요."); return; }
+    if (!state.years.includes(v)) {
+      state.years.push(v);
+      state.years.sort((a, b) => String(b).localeCompare(String(a)));
+    }
+    changeYear(v);
+    toast(`${v}년으로 전환했습니다. 계획·zrfm2를 업로드하세요.`);
+  }
+
+  async function runAnalyze(silent) {
+    busy(true, `손익·자본 자동 매칭 분석 중... (${state.year}년, 약 1분)`);
+    try {
+      const res = await api("/api/analyze", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({year: state.year})});
+      const p = res["손익"]["요약"], c = res["자본"]["요약"];
+      if (!silent) toast(`분석 완료 — 손익 ${fmt(p["총 실적(천원)"])}천원 / 자본 ${fmt(c["총 실적(천원)"])}천원`);
+      if (state.det.branch) await loadDetail(state.det.branch);
+      await navigate(state.view);
+      return true;
+    } catch (e) { toast("분석 실패: " + e.message); return false; }
+    finally { busy(false); }
+  }
+
+  async function uploadFile(kind, file) {
+    busy(true, `${kind === "plan" ? "계획" : "zrfm2"} 자료를 ${state.year}년으로 DB에 흡수 중...`);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const info = await api(`/api/upload/${kind}?year=${state.year}`, {method: "POST", body: fd});
+      toast(`흡수 완료 — ${info.rows.toLocaleString()}행 (dataset #${info.dataset_id})`);
+      await navigate(state.view);
+    } catch (e) { toast(e.message); }
+    finally { busy(false); }
+  }
+
+  // ───────────────────────── 이벤트 ─────────────────────────
+  document.addEventListener("click", async e => {
+    const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
+    if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
+    const gy = e.target.closest("[data-goyear]");
+    if (gy) { changeYear(gy.dataset.goyear); return; }
+    const br = e.target.closest("[data-branch]");
+    if (br) {
+      busy(true, "지사 상세 로딩...");
+      try { await loadDetail(br.dataset.branch); state.view = "detail"; renderPage(); }
+      catch (err) { toast(err.message); }
+      finally { busy(false); }
+      return;
+    }
+    const th = e.target.closest("[data-detsort]");
+    if (th) {
+      const k = th.dataset.detsort;
+      if (state.det.sortKey === k) {
+        if (state.det.sortDir === 1) state.det.sortDir = -1;
+        else { state.det.sortKey = ""; state.det.sortDir = 1; }   // 3번째 클릭=기본 정렬
+      } else { state.det.sortKey = k; state.det.sortDir = 1; }
+      renderPage();
+      return;
+    }
+    const ed = e.target.closest("[data-edit]");
+    if (ed) {
+      state.det.editKey = state.det.editKey === ed.dataset.edit ? null : ed.dataset.edit;
+      renderPage();
+      return;
+    }
+    const biz = e.target.closest("[data-biz]");
+    if (biz && !e.target.closest("input") && !e.target.closest("button")) {
+      const k = biz.dataset.biz;
+      state.det.open.has(k) ? state.det.open.delete(k) : state.det.open.add(k);
+      renderPage();
+      return;
+    }
+    const act = e.target.closest("[data-action]")?.dataset.action;
+    if (act === "analyze") runAnalyze();
+    if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
+    if (act === "pick-plan") $("#planFile").click();
+    if (act === "pick-erp") $("#erpFile").click();
+    if (act === "pick-master-item") $("#masterItemFile").click();
+    if (act === "pick-master-dept") $("#masterDeptFile").click();
+    if (act === "clear-sel") { state.det.sel.clear(); state.det.selBudget = null; renderPage(); }
+    if (act === "cancel-edit") { state.det.editKey = null; renderPage(); }
+    if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
+    if (act === "save-add") {
+      const name = $("#abName").value.trim();
+      if (!name) { toast("사업명을 입력하세요."); return; }
+      const body = {
+        year: state.year, budget: $("#abBudget").value,
+        예산과목: $("#abItem").value, 처지사: state.det.branch, 사업명: name,
+        속성: $("#abAttr").value || null,
+        주관부서명: $("#abOwner").value.trim() || null,
+        부서부: $("#abPart").value.trim() || null,
+        연예산: Number($("#abPlan").value) || 0,
+      };
+      busy(true, "사업 추가 저장 중...");
+      try {
+        const r = await api("/api/manual-biz", {method: "POST",
+          headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+        state.det.addOpen = false;
+        toast(r.notice);
+      } catch (err) { toast(err.message); busy(false); return; }
+      const ok = await runAnalyze(true);
+      if (ok) toast(`사업 추가 반영 완료 — '${name}'`);
+    }
+    if (act === "save-edit") {
+      const key = e.target.closest("[data-action]").dataset.ekey;
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === key);
+      if (!b) return;
+      const fields = {
+        "사업명": $("#edName").value.trim(),
+        "속성": $("#edAttr").value.trim(),
+        "주관부서명": $("#edDept").value.trim(),
+        "부서부": $("#edPart").value.trim(),
+      };
+      if (!fields["사업명"]) { toast("사업명은 비울 수 없습니다."); return; }
+      // 예산귀속 지사 변경 = 사업 통째 이동(계획행=biz_edit.처지사, 전표=override.target_dept)
+      const from = state.det.branch;
+      const to = $("#edBranch") ? $("#edBranch").value : from;
+      const moving = !!to && to !== from;
+      const vouchers = (b.전표 || []).map(v => v.erp_row_id);
+      const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+      // 내용이 실제로 바뀐 게 없으면 이력을 남기지 않는다(신규 사업 이동 등).
+      const edited = fields["사업명"] !== b.사업명
+        || fields["속성"] !== String(b.속성 ?? "")
+        || fields["주관부서명"] !== String(b.주관부서명 ?? "")
+        || fields["부서부"] !== String(b.부서부 ?? "");
+      if (moving) {
+        const parts = [`연예산 ${fmt(b.연예산원)}원`, `전표 ${vouchers.length}건`];
+        if (!confirm(`"${fields["사업명"]}" 사업을 ${from} → ${to}(으)로 통째 이동합니다.\n(${parts.join(" + ")})\n\n계속할까요?`)) return;
+        if (hasPlan) fields["처지사"] = to;      // 계획행(연예산)도 함께 이동
+      } else if (!edited) { state.det.editKey = null; renderPage(); return; }
+      busy(true, moving ? "사업 이동 저장 중..." : "사업 내용 저장 중...");
+      try {
+        let r = {notice: ""};
+        if (edited || "처지사" in fields) {
+          r = await api("/api/biz-edit", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                                  처지사: from, 사업명: b.사업명, fields})});
+        }
+        if (moving && vouchers.length) {
+          await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, erp_row_ids: vouchers,
+                                  target_name: fields["사업명"], target_dept: to,
+                                  memo: `사업 통째 이동 ${from}→${to}`})});
+        }
+        state.det.editKey = null;
+        if (!moving) { toast(r.notice); await loadDetail(from); renderPage(); return; }
+      } catch (err) { toast(err.message); busy(false); return; }
+      finally { if (!moving) busy(false); }
+      // 이동은 매칭 결과가 바뀌므로 재분석으로 확정 → 새 지사 화면으로 전환
+      state.det.branch = to;
+      state.det.sel.clear(); state.det.selBudget = null;
+      if (vouchers.length) {
+        const ok = await runAnalyze(true);
+        if (ok) toast(`이동 완료 — "${fields["사업명"]}" → ${to}`);
+      } else {
+        await loadDetail(to);
+        renderPage();
+        busy(false);
+        toast(`이동 완료 — "${fields["사업명"]}" → ${to} (귀속 전표 없음)`);
+      }
+    }
+    if (act === "save-override") {
+      const manual = $("#ovManual").value.trim();
+      const target = manual || $("#ovTarget").value;
+      if (!target) { toast("이동할 사업을 선택하거나 입력하세요."); return; }
+      const destDept = $("#ovDept") ? $("#ovDept").value : "";
+      const isUnmapped = !!state.det.data?.unmapped;
+      // 미매핑 전표는 항상 지사 지정, 일반 전표는 지사가 바뀐 경우만 지정
+      const targetDept = (isUnmapped || destDept !== state.det.branch) ? destDept : null;
+      busy(true, "재배정 저장 중...");
+      try {
+        await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year, budget: state.det.selBudget,
+                                erp_row_ids: [...state.det.sel], target_name: target,
+                                target_dept: targetDept})});
+        state.det.sel.clear(); state.det.selBudget = null;
+        if (targetDept && targetDept !== state.det.branch) state.det.branch = targetDept;
+      } catch (err) { toast(err.message); busy(false); return; }
+      // 저장 즉시 자동 재분석 → 반영된 결과로 새로고침
+      const ok = await runAnalyze(true);
+      if (ok) toast("재배정 반영 완료 — 최신 결과로 갱신했습니다." + (targetDept ? ` (${targetDept}로 이동)` : ""));
+    }
+    if (act === "learn") {
+      busy(true, `${state.year}년 확정 결과를 학습 중...`);
+      try {
+        const r = await api("/api/learn", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year})});
+        toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건)`);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+      finally { busy(false); }
+    }
+    if (act === "lock-year") {
+      if (!confirm(`${state.year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`)) return;
+      try {
+        const r = await api("/api/lock", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year})});
+        toast(r.notice);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    if (act === "unlock-year") {
+      if (!confirm(`${state.year}년 잠금을 해제할까요? 데이터 변경이 다시 가능해집니다.`)) return;
+      try {
+        await api(`/api/lock/${state.year}`, {method: "DELETE"});
+        toast(`${state.year}년 잠금 해제됨`);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    if (act === "clear-learned") {
+      if (!confirm("학습 DB를 모두 지울까요? 다음 분석부터 학습이 적용되지 않습니다.")) return;
+      try { await api("/api/learned", {method: "DELETE"}); toast("학습 초기화 완료"); await navigate("settings"); }
+      catch (err) { toast(err.message); }
+    }
+    const exp = e.target.closest("[data-export]");
+    if (exp) window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
+    const delOv = e.target.closest("[data-del-override]");
+    if (delOv) {
+      try {
+        await api(`/api/override/${delOv.dataset.delOverride}`, {method: "DELETE"});
+        toast("재배정 삭제됨 — 다음 분석 실행부터 반영됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const delMb = e.target.closest("[data-del-manual]");
+    if (delMb) {
+      try {
+        await api(`/api/manual-biz/${delMb.dataset.delManual}`, {method: "DELETE"});
+        toast("수동 추가 사업 삭제됨 — 다음 분석 실행부터 제외됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const delEd = e.target.closest("[data-del-edit]");
+    if (delEd) {
+      try {
+        await api(`/api/biz-edit/${delEd.dataset.delEdit}`, {method: "DELETE"});
+        toast("수정 이력 삭제됨 — 다음 분석 실행부터 원본으로 복원됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+  });
+
+  document.addEventListener("change", async e => {
+    if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
+    if (e.target.id === "planFile" && e.target.files[0]) { uploadFile("plan", e.target.files[0]); e.target.value = ""; return; }
+    if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
+    if ((e.target.id === "masterItemFile" || e.target.id === "masterDeptFile") && e.target.files[0]) {
+      const kind = e.target.id === "masterItemFile" ? "item" : "dept";
+      const file = e.target.files[0];
+      e.target.value = "";
+      busy(true, "마스터 갱신 중...");
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await api(`/api/upload/master?kind=${kind}`, {method: "POST", body: fd});
+        toast(r.notice);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+      finally { busy(false); }
+      return;
+    }
+    const f = e.target.dataset.filter;
+    if (f === "type") { state.type = e.target.value; renderPage(); }
+    if (f === "sort") { state.sort = e.target.value; renderPage(); }
+    const chk = e.target.dataset.detCheck;
+    if (chk === "hideMissing") { state.det.hideMissing = e.target.checked; renderPage(); return; }
+    const det = e.target.dataset.det;
+    if (det === "branch" && e.target.value) {
+      busy(true, "지사 상세 로딩...");
+      try { await loadDetail(e.target.value); } catch (err) { toast(err.message); }
+      finally { busy(false); }
+      renderPage(); return;
+    }
+    if (det === "budget") { state.det.budget = e.target.value; renderPage(); }
+    if (det === "item") { state.det.item = e.target.value; renderPage(); }
+    if (det === "attr") { state.det.attr = e.target.value; renderPage(); }
+    if (e.target.dataset.addBudget) {
+      state.det.add = {budget: e.target.value};
+      renderPage();
+      return;
+    }
+    const vall = e.target.dataset.vall;
+    if (vall) {
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === vall);
+      if (!b) return;
+      const vb = e.target.dataset.vbudget;
+      if (e.target.checked) {
+        if (state.det.selBudget && state.det.selBudget !== vb) {
+          toast("손익과 자본 전표는 함께 재배정할 수 없습니다.");
+          e.target.checked = false;
+          return;
+        }
+        state.det.selBudget = vb;
+        b.전표.forEach(x => state.det.sel.add(x.erp_row_id));
+      } else {
+        b.전표.forEach(x => state.det.sel.delete(x.erp_row_id));
+        if (!state.det.sel.size) state.det.selBudget = null;
+      }
+      renderPage();
+      return;
+    }
+    const v = e.target.dataset.voucher;
+    if (v) {
+      const id = Number(v);
+      if (e.target.checked) {
+        const vb = e.target.dataset.vbudget;
+        if (state.det.selBudget && state.det.selBudget !== vb) {
+          toast("손익과 자본 전표는 함께 재배정할 수 없습니다.");
+          e.target.checked = false;
+          return;
+        }
+        state.det.selBudget = vb;
+        state.det.sel.add(id);
+      } else {
+        state.det.sel.delete(id);
+        if (!state.det.sel.size) state.det.selBudget = null;
+      }
+      renderPage();
+    }
+  });
+
+  // 검색 입력: 결과 영역만 부분 갱신 — 입력창 DOM을 유지해 한글 조합(IME)이
+  // 끊기지 않는다(전체 재렌더 금지).
+  document.addEventListener("input", e => {
+    const f = e.target.dataset.filter;
+    const det = e.target.dataset.det;
+    if (f === "search") {
+      state.search = e.target.value;
+      const el = $("#brResults");
+      if (el) el.innerHTML = brResultsHtml();
+      return;
+    }
+    if (det === "q") {
+      state.det.q = e.target.value;
+      const el = $("#detResults");
+      if (el) el.innerHTML = detResultsHtml();
+    }
+  });
+
+  function openMenu() { $("#sidebar").classList.remove("-translate-x-full"); $("#backdrop").classList.remove("hidden"); }
+  function closeMenu() { if (window.innerWidth >= 1024) return; $("#sidebar").classList.add("-translate-x-full"); $("#backdrop").classList.add("hidden"); }
+  $("#menuButton").addEventListener("click", openMenu);
+  $("#backdrop").addEventListener("click", closeMenu);
+  $("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
+
+  navigate("home");
+  </script>
+</body>
+
+</html>

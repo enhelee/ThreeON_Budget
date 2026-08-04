@@ -26,18 +26,24 @@ def _dept_path(config_dir, year):
     return os.path.join(config_dir, f"지사구성_{year}.json")
 
 
+def normalize_dept_config(items):
+    """지사 구성의 '포함' 값을 불리언으로 표준화(누락·NaN → True)."""
+    return [dict(x, 포함=to_bool(x.get("포함"), True)) for x in items]
+
+
 def load_dept_config(config_dir, year):
     path = _dept_path(config_dir, year)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            return normalize_dept_config(json.load(f))
     return seed_dept_config()
 
 
 def save_dept_config(config_dir, year, items):
     os.makedirs(config_dir, exist_ok=True)
     with open(_dept_path(config_dir, year), "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+        json.dump(normalize_dept_config(items), f, ensure_ascii=False, indent=2,
+                  allow_nan=False)
 
 
 SEED_ITEMS = {
@@ -60,15 +66,54 @@ SEED_ITEMS = {
         {"과목": "건설중인자산-재생고온부품", "대분류": "예비품", "심의대상": False},
         {"과목": "건설중인자산-자산화예비품", "대분류": "예비품", "심의대상": False},
         {"과목": "외주비-열원정기점검", "대분류": "A급정비", "심의대상": False},
-        {"과목": "외주비-열원공사비", "대분류": "건설공사", "심의대상": False},
-        {"과목": "재료비-열원자재비", "대분류": "건설공사", "심의대상": False},
-        {"과목": "외주비-열원기술용역비", "대분류": "건설공사", "심의대상": False},
+        # 건설공사(외주비-열원공사비·재료비-열원자재비·외주비-열원기술용역비)는 계획엔 존재하나
+        # zrfm2에 실적 계정이 없어 실적 자동집계 불가 — 실적 분석 범위 밖(사용자 결정).
+        # '실적반영': False → 계획본엔 그대로 포함, 실적 산출물(양식1·종합표)에서만 제외.
+        {"과목": "외주비-열원공사비", "대분류": "건설공사", "심의대상": False, "실적반영": False},
+        {"과목": "재료비-열원자재비", "대분류": "건설공사", "심의대상": False, "실적반영": False},
+        {"과목": "외주비-열원기술용역비", "대분류": "건설공사", "심의대상": False, "실적반영": False},
     ],
 }
 
 
 def seed_item_config(budget):
-    return [dict(x, 포함=True) for x in SEED_ITEMS[budget]]
+    return [normalize_item_row(dict(x, 포함=True)) for x in SEED_ITEMS[budget]]
+
+
+ITEM_BOOL_FIELDS = {"심의대상": False, "포함": True, "실적반영": True}
+
+
+def to_bool(v, default):
+    """체크박스 값 정규화. None/NaN/'' → default, 'FALSE'/'0' → False.
+
+    st.data_editor가 만든 DataFrame은 일부 행에 없는 열을 NaN으로 채우는데,
+    NaN은 파이썬에서 truthy라 그대로 두면 판정이 뒤집히고 JSON에도
+    비표준 토큰 `NaN`이 기록된다. 저장·로드 양쪽에서 반드시 정규화한다.
+    """
+    if v is None:
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, float) and v != v:      # NaN
+        return default
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s == "":
+            return default
+        return s not in ("false", "0", "no", "n", "아니오", "x")
+    return bool(v)
+
+
+def normalize_item_row(row):
+    """예산과목 구성 1행의 불리언 필드를 표준화(누락·NaN 보정)."""
+    out = dict(row)
+    for k, default in ITEM_BOOL_FIELDS.items():
+        out[k] = to_bool(out.get(k), default)
+    return out
+
+
+def normalize_item_config(items):
+    return [normalize_item_row(x) for x in items]
 
 
 def _item_path(config_dir, year, budget):
@@ -79,14 +124,15 @@ def load_item_config(config_dir, year, budget):
     path = _item_path(config_dir, year, budget)
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            return normalize_item_config(json.load(f))
     return seed_item_config(budget)
 
 
 def save_item_config(config_dir, year, budget, items):
     os.makedirs(config_dir, exist_ok=True)
     with open(_item_path(config_dir, year, budget), "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+        json.dump(normalize_item_config(items), f, ensure_ascii=False, indent=2,
+                  allow_nan=False)
 
 
 # ---------------------------------------------------------------------------
