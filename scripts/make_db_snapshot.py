@@ -72,7 +72,8 @@ for r in conn.execute("SELECT id,year,budget,erp_row_id,target_name,target_dept,
     w(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]} | {r[4]} | {r[5] or '-'} | {r[6]} |\n")
 
 for tbl, title in (("manual_biz", "manual_biz (수동 추가 사업)"),
-                   ("biz_edit", "biz_edit (사업 내용 수정)"),
+                   ("biz_edit", "biz_edit (사업 내용 수정 — 사업명·속성·부서·처지사·연예산·예산과목)"),
+                   ("biz_delete", "biz_delete (사업 삭제 = 분석 제외, 이력 삭제로 복구)"),
                    ("year_lock", "year_lock (연도 마감)")):
     n = conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
     w(f"\n### {title} — {n}건\n")
