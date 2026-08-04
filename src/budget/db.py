@@ -651,7 +651,7 @@ def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     if not run:
         return 0
     sets, vals = [], []
-    for k in ("속성", "사업명", "주관부서명", "부서부", "처지사", "연예산"):
+    for k in ("속성", "사업명", "주관부서명", "부서부", "처지사", "연예산", "예산과목"):
         if k in fields:
             sets.append(f"{k}=?")
             vals.append(fields[k] if fields[k] != "" else None)

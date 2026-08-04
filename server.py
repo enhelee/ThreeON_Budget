@@ -324,7 +324,9 @@ def biz_edit(req: BizEditReq):
     # 처지사 = 예산귀속 지사. 종합표·지사별 집계 기준이라 이 값이 바뀌면 사업이 통째로
     #   이동한다(계획행=여기, 귀속 전표=override.target_dept — 둘 다 매칭 전에 적용).
     # 연예산(천원)도 고칠 수 있다 — 원본 plan_row는 보존하고 분석에만 덧씌운다.
-    allowed = {"사업명", "속성", "주관부서명", "부서부", "처지사", "연예산"}
+    # 예산과목도 고칠 수 있다(계획본 분류 오류 정정). 단 전표의 과목은 ERP 계정코드가
+    #   정하므로 귀속 전표는 옛 과목에 신규로 남는다 — UI가 미리 경고한다.
+    allowed = {"사업명", "속성", "주관부서명", "부서부", "처지사", "연예산", "예산과목"}
     fields = {}
     for k, v in req.fields.items():
         if k not in allowed:
@@ -345,6 +347,8 @@ def biz_edit(req: BizEditReq):
             400, "수정할 필드가 없습니다. (사업명/속성/주관부서명/부서부/처지사/연예산)")
     if "처지사" in fields and not str(fields["처지사"]).strip():
         raise HTTPException(400, "예산귀속 지사는 비울 수 없습니다.")
+    if "예산과목" in fields and not str(fields["예산과목"]).strip():
+        raise HTTPException(400, "예산과목은 비울 수 없습니다.")
     conn = _conn()
     try:
         _guard_unlocked(conn, req.year, "사업 내용 수정")

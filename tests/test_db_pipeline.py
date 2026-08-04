@@ -389,6 +389,20 @@ def test_biz_edit_changes_plan_amount(env):
     assert biz2[biz2["사업명"] == "화성 정기점검 보수공사"].iloc[0]["연예산"] == 10000
 
 
+def test_biz_edit_changes_item(env):
+    """예산과목 수정: 계획행은 새 과목으로 옮겨가고, 전표는 계정코드 과목에 남아 총액 보존."""
+    conn, cfg, out = env
+    dbm.add_biz_edit(conn, "2023", "손익", "수선유지비-열원정기점검", "화성지사",
+                     "화성 옥외배관 도색공사", {"예산과목": "수선유지비-건물/구축물"})
+    res = pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익")
+    biz = dbm.load_biz_lines(conn, res["run_id"])
+    row = biz[biz["사업명"] == "화성 옥외배관 도색공사"]
+    assert len(row) == 1
+    assert row.iloc[0]["예산과목"] == "수선유지비-건물/구축물"      # 과목 이동
+    assert row.iloc[0]["연예산"] == 5000                          # 연예산도 함께 이동
+    assert res["요약"]["총 실적(천원)"] == TOTAL                   # 전표 총액 보존
+
+
 def test_override_forced_new_name(env):
     """신규 전표(D2)에 사용자가 직접 사업명 부여 → 그 이름의 신규 사업으로 강제."""
     conn, cfg, out = env
