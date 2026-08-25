@@ -14,7 +14,18 @@
       const f = wb.SheetNames.find((s) => s.normalize("NFC").includes(preferSheet));
       if (f) sn = f;
     }
-    return XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "" });
+    const ws = wb.Sheets[sn];
+    // 병합셀 펼치기: 병합된 텍스트(예: "가스터빈 제어시스템 성능개선")를 병합 범위 전 행에 채움
+    for (const m of (ws["!merges"] || [])) {
+      const a = ws[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })];
+      if (!a) continue;
+      for (let r = m.s.r; r <= m.e.r; r++) for (let c = m.s.c; c <= m.e.c; c++) {
+        const ad = XLSX.utils.encode_cell({ r, c });
+        if (!ws[ad]) ws[ad] = { t: a.t, v: a.v };
+        else if (String(ws[ad].v == null ? "" : ws[ad].v).trim() === "") ws[ad].v = a.v;
+      }
+    }
+    return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
   }
   // 집계표 파일에서 「계획대비실적」과 「종합표」 두 시트를 각각 AOA로
   async function chipFileToSheets(file) {

@@ -106,6 +106,7 @@
         nameI: nfc(r[8]),
         nameJ,
         vendor: String(r[14] == null ? "" : r[14]).trim(), // O열 공급업체 — 빈텍스트 사업 식별 단서
+        lossCenter: nfc(r[11]), // L열 손익센터 — 검토목록 ERP 조회용
         mgmtCenter,
         org: C.resolveOrg(mgmtCenter, nameJ, nfc(r[8]), orgMap), // 지사 or 처 or null. 본사는 자금관리센터 전체코드→부서코드시트
         bucket: C.bucketOf(acct),
@@ -137,9 +138,9 @@
       const net = arr.reduce((s, x) => s + x.amount, 0);
       if (net === 0) continue; // 1순위: 합0 → 제거
       const b = repItem(arr);
-      stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI, vendor: b.vendor });
+      stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI, vendor: b.vendor, date: b.date, lossCenter: b.lossCenter });
     }
-    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI, vendor: it.vendor });
+    for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI, vendor: it.vendor, date: it.date, lossCenter: it.lossCenter });
 
     // Step A2 (역분개 상쇄): 금액이 정확히 +X/−X로 짝지는 항목쌍 제거 (전표번호·텍스트 달라도).
     if (REVERSAL_CANCEL) {
@@ -169,7 +170,7 @@
       let best = arr[0];
       for (const x of arr) if (Math.abs(x.amount) > Math.abs(best.amount)) best = x;
       const docNos = arr.reduce((a, x) => a.concat(x.docNos || []), []);
-      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName, vendor: best.vendor });
+      result.push({ text: best.text, amount: net, docNos, n: arr.reduce((a, x) => a + (x.n || 1), 0), costName: best.costName, vendor: best.vendor, date: best.date, lossCenter: best.lossCenter });
     }
     // Step C (4순위): 전표번호 다르지만 텍스트 유사한 건 통합. 금액 큰 워딩을 대표로.
     // IDF 가중: 그룹 내 흔한 bigram은 약하게, 구별되는(희귀) bigram은 강하게 → 핵심어가 겹칠 때만 통합.
@@ -854,7 +855,7 @@
         if (corr.has(ckey)) {
           const target = textKey(corr.get(ckey));
           const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
-          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨"]); continue; }
+          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter]); continue; }
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
         const txtNorm = simNorm(it.text + " " + (it.costName || ""));
@@ -870,7 +871,7 @@
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
           const conf = Math.round((soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, ""]);
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (textKey(it.text) === "" ? "빈텍스트·확인요망" : ""), it.date, (it.docNos || []).join(","), it.lossCenter]);
         } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
@@ -958,7 +959,7 @@
     let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
     const _clRows = [];
-    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], (x[5] < CONF_REVIEW ? "검토필요" : ""), "", x[6]]); };
+    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], ((x[5] < CONF_REVIEW || String(x[6] || "").includes("확인")) ? "검토필요" : ""), "", x[6], x[7], x[8], x[9]]); };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
@@ -974,7 +975,7 @@
 
     // 금액 큰 순 정렬(파레토): 위에서부터 큰 건만 검토하면 대부분의 돈을 커버
     _clRows.sort((a, b) => Math.abs(Number(b[3]) || 0) - Math.abs(Number(a[3]) || 0));
-    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고"], ..._clRows];
+    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터"], ..._clRows];
     stats.reviewNeeded = _clRows.filter((r) => r[6] === "검토필요").length;
 
     return {
