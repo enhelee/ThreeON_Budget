@@ -63,6 +63,13 @@
   // null=끄기(완전일치 통합만). NET_SIM 환경변수로 튜닝.
   const NET_SIM_TH = (typeof process !== "undefined" && process.env && process.env.NET_SIM != null)
     ? Number(process.env.NET_SIM) : null;
+  // 강제배정: 임계 미만이어도 같은 조직 최고줄에 억지로 얹을지. 기본 ON(금액정확도 유지).
+  // OFF로 하면 0이어야 할 사업줄 오염은 줄지만, conf 0.2~0.34 정당매칭이 미배분으로 빠져 금액정확도가 하락.
+  // → 담당자 목표(사업별 금액)상 기본 on. FORCE_ASSIGN=0으로 끌 수 있음.
+  const FORCE_ASSIGN = !(typeof process !== "undefined" && process.env && process.env.FORCE_ASSIGN === "0");
+  // 역분개 상쇄: 같은(지사×과목) 안에서 금액이 정확히 +X/−X로 짝지는 전표쌍 제거(전표번호·텍스트 달라도).
+  // 취소전표(9600·9100…)가 원전표와 안 지워지는 것 방지. ⚠️우연 상쇄 위험 → 검증 필요. 기본 on, REVERSAL=0으로 끔.
+  const REVERSAL_CANCEL = !(typeof process !== "undefined" && process.env && process.env.REVERSAL === "0");
   const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
   const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
@@ -70,7 +77,7 @@
   // rows: SheetJS sheet_to_json(header:1) 결과 (2차원 배열). 헤더 1줄 가정.
   // 열: A자금텍스트 B약정항목 C약정항목텍스트 D기간 E전기일 F참조전표 G금액
   //     H텍스트 I이름 J이름 K코스트센터 L손익센터 M내역 N오더 O공급업체 P자금관리센터
-  function parseRaw(rows) {
+  function parseRaw(rows, orgMap) {
     const out = [];
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
@@ -91,7 +98,7 @@
         nameJ,
         vendor: String(r[14] == null ? "" : r[14]).trim(), // O열 공급업체 — 빈텍스트 사업 식별 단서
         mgmtCenter,
-        org: C.resolveOrg(mgmtCenter, nameJ), // 종합표 열(지사 or 처) or null
+        org: C.resolveOrg(mgmtCenter, nameJ, nfc(r[8]), orgMap), // 지사 or 처 or null. 본사는 자금관리센터 전체코드→부서코드시트
         bucket: C.bucketOf(acct),
         ledger: C.ledgerOf(acct),
       });
@@ -124,6 +131,19 @@
       stage.push({ text: b.text, amount: net, docNos: [docNo], n: arr.length, costName: b.nameI, vendor: b.vendor });
     }
     for (const it of noDoc) stage.push({ text: it.text, amount: it.amount, docNos: [], n: 1, costName: it.nameI, vendor: it.vendor });
+
+    // Step A2 (역분개 상쇄): 금액이 정확히 +X/−X로 짝지는 항목쌍 제거 (전표번호·텍스트 달라도).
+    if (REVERSAL_CANCEL) {
+      const posByAmt = new Map(); // 양수 금액 → stage 인덱스 목록
+      for (let i = 0; i < stage.length; i++) if (stage[i].amount > 0) { const k = stage[i].amount; if (!posByAmt.has(k)) posByAmt.set(k, []); posByAmt.get(k).push(i); }
+      const removed = new Set();
+      for (let j = 0; j < stage.length; j++) {
+        if (stage[j].amount >= 0) continue;
+        const arr = posByAmt.get(-stage[j].amount);
+        if (arr && arr.length) { removed.add(arr.pop()); removed.add(j); } // 원전표 1건과 취소전표 1건 짝지어 제거
+      }
+      if (removed.size) stage = stage.filter((_, i) => !removed.has(i));
+    }
 
     // Step B: 텍스트 완전일치끼리 통합. 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거)
     const byText = new Map();
@@ -182,9 +202,27 @@
   // 전체 netting: dept(자금관리센터) × acct 로 그룹핑 후 nettingGroup 적용
   // 경상정비는 예외: 지사(dept)별로 전부 하나로 합산
   function netting(rawItems) {
-    const groups = new Map(); // key: org(또는 fallback) + SEP + acct — 같은 조직·과목만 통합
+    // 이름열(I)의 괄호 하위구분(예: "강남(동남권)"→"동남권"). 종합표는 org로 재합산돼 불변,
+    // netting/매칭에서만 하위그룹을 분리해 사업 매칭 정확도를 높인다.
+    const SUB_TAGS = []; // name-column sub-tag whitelist; empty = disabled (no net gain in tests, re-enable by adding tags)
+    const subTagOf = (nm) => { const s = nfc(nm == null ? "" : String(nm)).replace(/\s/g, ""); return SUB_TAGS.find((t) => s.indexOf(t) >= 0) || ""; };
+    // 전기일 배치 전파: 같은 (조직×과목×전기일)에 텍스트 있는 전표가 있으면, 빈텍스트 전표에
+    // 그 날짜의 대표 텍스트(금액 최대)를 물려줌 — 담당자의 "날짜+키워드" 수기 유추를 코드화.
+    // (부수효과: 빈텍스트가 같은 날짜 역분개 텍스트를 물려받아 상계 제거되기도 함)
+    const propagateByDate = (its) => {
+      const byD = new Map();
+      for (const it of its) { const d = String(it.date == null ? "" : it.date); if (!byD.has(d)) byD.set(d, []); byD.get(d).push(it); }
+      return its.map((it) => {
+        if (textKey(it.text) !== "") return it;
+        const same = (byD.get(String(it.date == null ? "" : it.date)) || []).filter((x) => textKey(x.text) !== "");
+        if (!same.length) return it;
+        const rep = same.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), same[0]);
+        return { ...it, text: rep.text, _dateProp: true };
+      });
+    };
+    const groups = new Map(); // key: org(+하위태그) + SEP + acct — 같은 조직·(하위)·과목만 통합
     for (const it of rawItems) {
-      const orgKey = it.org || ("X:" + it.mgmtCenter);
+      const orgKey = (it.org || ("X:" + it.mgmtCenter)) + (subTagOf(it.nameI) ? "" + subTagOf(it.nameI) : "");
       const k = orgKey + "" + it.acct;
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(it);
@@ -197,6 +235,7 @@
         ledger: items[0].ledger, bucket: items[0].bucket,
         org: items[0].org,
         deptName: items[0].org || items[0].nameI,
+        subTag: subTagOf(items[0].nameI), // 하위구분(예: 동남권). 종합표엔 영향 없음(org로 합산).
       };
       if (meta.bucket === "gyeongsang") {
         // 경상정비: 전표수·전기일·사업명 무관 지사별 1건 합산
@@ -225,21 +264,33 @@
           if (net === 0) continue; // 상계로 0이면 제거
           cha++;
           const b = arr.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), arr[0]);
-          cleaned.push({ ...meta, text: "제" + cha + "차 예비품 입고", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: b.vendor, rule3Fixed: true });
+          cleaned.push({ ...meta, text: "제" + cha + "차 예비품 입고", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: b.vendor, fixedRow: true });
         }
         continue;
       }
-      let netted = nettingGroup(items);
-      // 열원보완및개선: 빈 텍스트 처리
       if (meta.bucket === "boan") {
-        netted = netted.map((x) => {
+        // 열원보완및개선(60909009):
+        //  - 개별 전표 |금액| ≤ 200만(소액구매): 분야 구분 없이 지사별로 합산 → "OO 소액자재구매" 고정 줄
+        //  - 200만 초과: 기존 netting → 텍스트 매칭 (빈텍스트는 예비품/저장품 대체)
+        const SMALL_TH = 2000000;
+        const small = items.filter((x) => Math.abs(x.amount) <= SMALL_TH);
+        const big = items.filter((x) => Math.abs(x.amount) > SMALL_TH);
+        const smallSum = small.reduce((s, x) => s + x.amount, 0);
+        if (smallSum !== 0) {
+          const orgName = meta.org || meta.deptName || "";
+          cleaned.push({ ...meta, text: (orgName ? orgName + " " : "") + "소액자재구매", amount: smallSum, docNos: [], n: small.length, costName: (small[0] || {}).nameI, fixedRow: true });
+        }
+        let netted = nettingGroup(propagateByDate(big)).map((x) => {
           if (textKey(x.text) === "") {
             const startsWith6 = x.docNos.some((d) => d[0] === "6");
             return { ...x, text: startsWith6 ? "저장품 대체" : "예비품 대체" };
           }
           return x;
         });
+        for (const x of netted) cleaned.push({ ...meta, ...x });
+        continue;
       }
+      const netted = nettingGroup(propagateByDate(items));
       for (const x of netted) cleaned.push({ ...meta, ...x });
     }
     return cleaned;
@@ -760,6 +811,9 @@
         }
         return { row, best };
       };
+      // 하위태그(이름열 괄호, 예: 동남권) 기반 사업 구분: 계획 사업명에 그 태그가 들어있으면 같은 하위로 본다.
+      const subTagSet = [...new Set(items.map((x) => x.subTag).filter(Boolean))];
+      for (const p of prows) { p._sub = ""; const pb = nrm(p.biz); for (const t of subTagSet) if (pb.indexOf(t) >= 0) { p._sub = t; break; } }
       const rowsByOrg = {};
       for (const p of prows) (rowsByOrg[p.org] = rowsByOrg[p.org] || []).push(p);
       const vendorToRow = {}; // 런타임 학습: vendor → 계획줄 r (텍스트 매칭에서 배움)
@@ -768,8 +822,8 @@
       for (const it of items) {
         // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
         if (it.bucket === "gyeongsang") continue;
-        // rule3 빈텍스트 → "제N차 예비품 입고" 고정 줄: 매칭 안 하고 그대로 출력
-        if (it.rule3Fixed) { unmatched.push({ org: it.org, acctName: it.acctName, text: it.text, amount: it.amount, _fixedName: true }); continue; }
+        // 고정 줄(rule3 "제N차 예비품 입고" · boan "소액자재구매"): 매칭 안 하고 그대로 출력
+        if (it.fixedRow) { unmatched.push({ org: it.org, acctName: it.acctName, text: it.text, amount: it.amount, _fixedName: true }); continue; }
         if (it.emptyText) { empties.push(it); continue; }
         const io = nrm(it.org);
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
@@ -781,11 +835,14 @@
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
         const txtNorm = simNorm(it.text + " " + (it.costName || ""));
-        // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지
-        const soR = pickBest(prows.filter((p) => p.org === io), tg, txtNorm);
+        // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지. + 하위태그(동남권 등) 우선.
+        const itSub = it.subTag || "";
+        let pool = prows.filter((p) => p.org === io && p._sub === itSub);
+        if (!pool.length) pool = prows.filter((p) => p.org === io); // 같은 하위 없으면 조직 전체로 폴백
+        const soR = pickBest(pool, tg, txtNorm);
         let chosen = null;
         if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
-        else if (soR.row) chosen = soR.row;                                // 같은 조직 내 최고(강제배정, 조직 밖으론 안 감)
+        else if (soR.row && FORCE_ASSIGN) chosen = soR.row;                // (옵션) 임계 미만도 최고줄에 강제배정
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
@@ -860,7 +917,7 @@
   // ── 전체 오케스트레이션: raw + 예산(자본/손익) → 결과 AOA 묶음 ──
   // 입력은 SheetJS sheet_to_json(header:1) 2차원 배열들.
   function runAll(input, C) {
-    const cleaned = netting(parseRaw(input.rawRows || []));
+    const cleaned = netting(parseRaw(input.rawRows || [], input.orgMap));
 
     // 계획(사업명·연예산) 소스: ① 집계표의 계획대비실적 시트 ② (하위호환) 주관부서예산
     let plan = [], usedChip = false;

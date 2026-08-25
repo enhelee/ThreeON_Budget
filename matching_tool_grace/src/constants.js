@@ -104,15 +104,18 @@
   // 종합표 컬럼(지사 또는 처) 해석. 본사(1000)는 이름(J열)에서 처를 뽑는다.
   // 반환: 종합표 열 이름(지사 or 처) | null(종합표에 없는 조직=제외)
   const CHEO_LIST = ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"];
-  function resolveOrg(mgmtCenter, nameJ) {
+  function resolveOrg(mgmtCenter, nameJ, nameI, orgMap) {
     const dept = resolveDept(mgmtCenter);
-    if (dept && isJisa(dept)) return dept;         // 지사
+    if (dept && isJisa(dept)) return dept;         // 지사(자금관리센터 앞 4자리)
     const pre = String(mgmtCenter || "").trim().slice(0, 4);
-    if (pre === "1000") {                           // 본사 → 처 (J열)
-      const j = String(nameJ || "").normalize("NFC");
-      for (const cheo of CHEO_LIST) if (j.includes(cheo)) return cheo;
-      if (/신재생사업부|태양광/.test(j)) return "미래사업처";
-      return null; // 경영지원처·열수송처·빈칸 등 종합표에 없는 처
+    if (pre === "1000") {                           // 본사
+      // ① 자금관리센터 전체코드 → 부서코드시트 → 처 (가장 정확, 전표별). 종합표에 없는 처는 제외(null).
+      if (orgMap) { const full = String(mgmtCenter || "").trim(); if (orgMap[full] !== undefined) return isCheo(orgMap[full]) ? orgMap[full] : null; }
+      // ② orgMap 없거나 코드 미등록 시: J열·I열 키워드 폴백
+      const sig = (String(nameJ || "") + " " + String(nameI || "")).normalize("NFC");
+      for (const cheo of CHEO_LIST) if (sig.includes(cheo)) return cheo;
+      if (/신재생사업부|태양광/.test(sig)) return "미래사업처";
+      return null;
     }
     return null; // 미래개발원 등
   }
