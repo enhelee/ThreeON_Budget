@@ -70,6 +70,13 @@
   // 역분개 상쇄: 같은(지사×과목) 안에서 금액이 정확히 +X/−X로 짝지는 전표쌍 제거(전표번호·텍스트 달라도).
   // 취소전표(9600·9100…)가 원전표와 안 지워지는 것 방지. ⚠️우연 상쇄 위험 → 검증 필요. 기본 on, REVERSAL=0으로 끔.
   const REVERSAL_CANCEL = !(typeof process !== "undefined" && process.env && process.env.REVERSAL === "0");
+  // 전기일 묶음 과목: 같은 (지사×전기일)에 취득한 건 같은 사업으로 본다(담당자 규칙).
+  // 예: 기계장치(20704001) — 5/9 취득분(구입관세·통관·운송·TCP·HMI·성능개선 등)이 다 한 사업(동남권 가스터빈 성능개선).
+  // 날짜별 합산이라 +/− 상쇄도 자동 처리. 대표 사업명=그 날짜 최대금액 텍스트. 연도무관.
+  const DATE_COLLAPSE = new Set([]);
+  // 실적 제외 텍스트: 열수송·배전 인프라 "이설공사 자산취득"(남의 공사로 관로/배전선 옮긴 보상)은 실적 아님.
+  // 여러 지사(강남·삼송·화성 등)에 걸친 체계적 제외. "이설"+"취득" 둘 다 있어야(손익 정상 이설수선 오제외 방지). 연도무관.
+  const EXCLUDE_TEXT = (t) => /이설/.test(t) && /취득/.test(t);
   const AMOUNT_UNIT = 1000;   // 집계표는 천원 단위, raw는 원 단위 → 출력 시 원/1000
   const toUnit = (won) => Math.round((Number(won) || 0) / AMOUNT_UNIT); // 원 → 천원(반올림)
 
@@ -83,6 +90,8 @@
       const r = rows[i];
       const acct = String(r[1] == null ? "" : r[1]).trim();
       if (!acct) continue; // 합계행 등 약정항목 빈 행 제거
+      const text0 = nfc(r[7] == null ? "" : String(r[7])).trim();
+      if (EXCLUDE_TEXT(text0)) continue; // 열수송·배전 인프라 이설공사 자산취득 = 실적 제외(담당자 규칙)
       const amount = Number(r[6]) || 0;
       const mgmtCenter = String(r[15] == null ? "" : r[15]).trim(); // P열 = 조직 키
       const nameJ = nfc(r[9]); // 이름(부서명) — 본사의 처 구분이 여기 있음
@@ -288,6 +297,20 @@
           return x;
         });
         for (const x of netted) cleaned.push({ ...meta, ...x });
+        continue;
+      }
+      if (DATE_COLLAPSE.has(meta.acct)) {
+        // 전기일 묶음: 같은 (지사×전기일) = 같은 사업. 날짜별 합산(+/−상쇄 자동), 대표=최대금액 텍스트.
+        const byDate = new Map();
+        for (const it of items) { const k = String(it.date == null ? "" : it.date); if (!byDate.has(k)) byDate.set(k, []); byDate.get(k).push(it); }
+        for (const [, arr] of byDate) {
+          const net = arr.reduce((s, x) => s + x.amount, 0);
+          if (net === 0) continue; // 그 날짜 전액 상쇄 → 제거
+          const withText = arr.filter((x) => textKey(x.text) !== "");
+          const pool = withText.length ? withText : arr;
+          const rep = pool.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), pool[0]);
+          cleaned.push({ ...meta, text: rep.text, amount: net, docNos: arr.map((x) => x.docNo).filter(Boolean), n: arr.length, costName: rep.nameI, vendor: rep.vendor });
+        }
         continue;
       }
       const netted = nettingGroup(propagateByDate(items));
