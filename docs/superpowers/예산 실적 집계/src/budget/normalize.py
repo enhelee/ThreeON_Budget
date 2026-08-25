@@ -24,6 +24,17 @@ def _clean(s):
     return s.strip()
 
 
+_TEXTKEY = re.compile(r"[\s'\"‘’“”　]+")
+
+
+def text_key(s):
+    """학습·매칭 키용 텍스트 정규화: 공백·따옴표류 제거(표기 흔들림 흡수)."""
+    if s is None:
+        return None
+    out = _TEXTKEY.sub("", str(s))
+    return out or None
+
+
 def normalize_item(name, alias_map):
     """예산과목명을 계획본 표준 표기로 환원. 매핑 없으면 원문 그대로."""
     if name is None:

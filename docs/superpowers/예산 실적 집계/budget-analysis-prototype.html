@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="발전플랜트 유지보수 예산·실적 분석 프로그램 UI 시제품">
+  <title>예산·실적 업무 분석 프로그램</title>
+  <style>*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}html{font-family:Pretendard,Noto Sans KR,Malgun Gothic,system-ui,sans-serif}body{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1));-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}button:focus,input:focus,select:focus{outline:2px solid transparent;outline-offset:2px;--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000);--tw-ring-opacity:1;--tw-ring-color:rgb(59 130 246/var(--tw-ring-opacity,1));--tw-ring-offset-width:2px}.nav-button{display:flex;width:100%;align-items:center;gap:.75rem;border-radius:.75rem;padding:.625rem .75rem;text-align:left;font-size:.875rem;line-height:1.25rem;font-weight:500;--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1));transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.nav-button:hover{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(30 64 175/var(--tw-text-opacity,1))}.nav-button-active{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.nav-button-active:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.metric-card,.panel{border-radius:1rem;border-width:1px;--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.metric-card{padding:1.25rem}.control{border-radius:.75rem;border-width:1px;--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));padding:.5rem .75rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:600;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.btn-primary:disabled{cursor:not-allowed;opacity:.5}.btn-primary{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1));--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.btn-primary:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216/var(--tw-bg-opacity,1))}.btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:600;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,-webkit-backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke,opacity,box-shadow,transform,filter,backdrop-filter,-webkit-backdrop-filter;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.btn-secondary:disabled{cursor:not-allowed;opacity:.5}.btn-secondary{border-width:1px;--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1));--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1));--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.btn-secondary:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.badge{display:inline-flex;align-items:center;border-radius:9999px;padding:.25rem .625rem;font-size:.75rem;line-height:1rem;font-weight:600}.section-title{font-size:1.125rem;line-height:1.75rem;font-weight:700;letter-spacing:-.025em;--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1))}.section-help{margin-top:.25rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.table-head{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1));text-align:left;font-size:.75rem;line-height:1rem;font-weight:600;text-transform:uppercase;letter-spacing:.025em;--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.table-cell{white-space:nowrap;padding:.75rem 1rem;font-size:.875rem;line-height:1.25rem;--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.pointer-events-none{pointer-events:none}.fixed{position:fixed}.sticky{position:sticky}.inset-0{inset:0}.inset-y-0{top:0;bottom:0}.bottom-5{bottom:1.25rem}.left-0{left:0}.right-5{right:1.25rem}.top-0{top:0}.z-20{z-index:20}.z-30{z-index:30}.z-40{z-index:40}.z-50{z-index:50}.mx-1{margin-left:.25rem;margin-right:.25rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-1\.5{margin-bottom:.375rem}.mb-2{margin-bottom:.5rem}.ml-2{margin-left:.5rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mt-4{margin-top:1rem}.mt-5{margin-top:1.25rem}.mt-6{margin-top:1.5rem}.mt-7{margin-top:1.75rem}.mt-8{margin-top:2rem}.block{display:block}.flex{display:flex}.table{display:table}.table-cell{display:table-cell}.grid{display:grid}.hidden{display:none}.h-10{height:2.5rem}.h-11{height:2.75rem}.h-12{height:3rem}.h-2{height:.5rem}.h-3{height:.75rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-6{height:1.5rem}.h-7{height:1.75rem}.h-full{height:100%}.min-h-16{min-height:4rem}.min-h-screen{min-height:100vh}.w-10{width:2.5rem}.w-11{width:2.75rem}.w-12{width:3rem}.w-2{width:.5rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-6{width:1.5rem}.w-7{width:1.75rem}.w-72{width:18rem}.w-full{width:100%}.min-w-0{min-width:0}.min-w-48{min-width:12rem}.max-w-7xl{max-width:80rem}.max-w-sm{max-width:24rem}.flex-1{flex:1 1 0%}.-translate-x-full{--tw-translate-x:-100%;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.resize{resize:both}.grid-cols-\[56px_1fr_80px\]{grid-template-columns:56px 1fr 80px}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.place-items-center{place-items:center}.items-start{align-items:flex-start}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}.gap-5{gap:1.25rem}.gap-6{gap:1.5rem}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-1\.5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.375rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.375rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.space-y-5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.25rem*var(--tw-space-y-reverse))}.space-y-6>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem*var(--tw-space-y-reverse))}.divide-y>:not([hidden])~:not([hidden]){--tw-divide-y-reverse:0;border-top-width:calc(1px*(1 - var(--tw-divide-y-reverse)));border-bottom-width:calc(1px*var(--tw-divide-y-reverse))}.divide-slate-100>:not([hidden])~:not([hidden]){--tw-divide-opacity:1;border-color:rgb(241 245 249/var(--tw-divide-opacity,1))}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:.5rem}.rounded-xl{border-radius:.75rem}.border{border-width:1px}.border-2{border-width:2px}.border-b{border-bottom-width:1px}.border-r{border-right-width:1px}.border-t-2{border-top-width:2px}.border-dashed{border-style:dashed}.border-amber-200{--tw-border-opacity:1;border-color:rgb(253 230 138/var(--tw-border-opacity,1))}.border-amber-300{--tw-border-opacity:1;border-color:rgb(252 211 77/var(--tw-border-opacity,1))}.border-blue-200{--tw-border-opacity:1;border-color:rgb(191 219 254/var(--tw-border-opacity,1))}.border-blue-300{--tw-border-opacity:1;border-color:rgb(147 197 253/var(--tw-border-opacity,1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240/var(--tw-border-opacity,1))}.border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225/var(--tw-border-opacity,1))}.bg-amber-50{--tw-bg-opacity:1;background-color:rgb(255 251 235/var(--tw-bg-opacity,1))}.bg-blue-100{--tw-bg-opacity:1;background-color:rgb(219 234 254/var(--tw-bg-opacity,1))}.bg-blue-50{--tw-bg-opacity:1;background-color:rgb(239 246 255/var(--tw-bg-opacity,1))}.bg-blue-500{--tw-bg-opacity:1;background-color:rgb(59 130 246/var(--tw-bg-opacity,1))}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235/var(--tw-bg-opacity,1))}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245/var(--tw-bg-opacity,1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129/var(--tw-bg-opacity,1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249/var(--tw-bg-opacity,1))}.bg-slate-300{--tw-bg-opacity:1;background-color:rgb(203 213 225/var(--tw-bg-opacity,1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.bg-slate-950{--tw-bg-opacity:1;background-color:rgb(2 6 23/var(--tw-bg-opacity,1))}.bg-slate-950\/30{background-color:rgba(2,6,23,.3)}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity,1))}.bg-white\/20{background-color:hsla(0,0%,100%,.2)}.bg-white\/95{background-color:hsla(0,0%,100%,.95)}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-6{padding:1.5rem}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.py-10{padding-top:2.5rem;padding-bottom:2.5rem}.py-12{padding-top:3rem;padding-bottom:3rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-5{padding-top:1.25rem;padding-bottom:1.25rem}.pb-1{padding-bottom:.25rem}.pt-5{padding-top:1.25rem}.text-center{text-align:center}.text-right{text-align:right}.text-2xl{font-size:1.5rem;line-height:2rem}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xs{font-size:.75rem;line-height:1rem}.font-bold{font-weight:700}.font-medium{font-weight:500}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.leading-5{line-height:1.25rem}.tracking-tight{letter-spacing:-.025em}.tracking-wider{letter-spacing:.05em}.text-amber-700{--tw-text-opacity:1;color:rgb(180 83 9/var(--tw-text-opacity,1))}.text-amber-800{--tw-text-opacity:1;color:rgb(146 64 14/var(--tw-text-opacity,1))}.text-amber-900{--tw-text-opacity:1;color:rgb(120 53 15/var(--tw-text-opacity,1))}.text-amber-950{--tw-text-opacity:1;color:rgb(69 26 3/var(--tw-text-opacity,1))}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216/var(--tw-text-opacity,1))}.text-blue-900{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}.text-blue-950{--tw-text-opacity:1;color:rgb(23 37 84/var(--tw-text-opacity,1))}.text-emerald-700{--tw-text-opacity:1;color:rgb(4 120 87/var(--tw-text-opacity,1))}.text-red-600{--tw-text-opacity:1;color:rgb(220 38 38/var(--tw-text-opacity,1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184/var(--tw-text-opacity,1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139/var(--tw-text-opacity,1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105/var(--tw-text-opacity,1))}.text-slate-700{--tw-text-opacity:1;color:rgb(51 65 85/var(--tw-text-opacity,1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59/var(--tw-text-opacity,1))}.text-slate-900{--tw-text-opacity:1;color:rgb(15 23 42/var(--tw-text-opacity,1))}.text-slate-950{--tw-text-opacity:1;color:rgb(2 6 23/var(--tw-text-opacity,1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity,1))}.accent-blue-600{accent-color:#2563eb}.shadow-sm{--tw-shadow:0 1px 2px 0 rgba(0,0,0,.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-sm,.shadow-xl{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color),0 8px 10px -6px var(--tw-shadow-color)}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.backdrop-blur{--tw-backdrop-blur:blur(8px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(.4,0,.2,1);transition-duration:.15s}.duration-200{transition-duration:.2s}.hover\:border-blue-400:hover{--tw-border-opacity:1;border-color:rgb(96 165 250/var(--tw-border-opacity,1))}.hover\:bg-blue-50\/40:hover{background-color:rgba(239,246,255,.4)}.hover\:bg-slate-50:hover{--tw-bg-opacity:1;background-color:rgb(248 250 252/var(--tw-bg-opacity,1))}.hover\:text-blue-900:hover{--tw-text-opacity:1;color:rgb(30 58 138/var(--tw-text-opacity,1))}@media (min-width:640px){.sm\:block{display:block}.sm\:inline{display:inline}.sm\:inline-flex{display:inline-flex}.sm\:hidden{display:none}.sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.sm\:flex-row{flex-direction:row}.sm\:items-center{align-items:center}.sm\:justify-between{justify-content:space-between}.sm\:p-6{padding:1.5rem}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}}@media (min-width:768px){.md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.md\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (min-width:1024px){.lg\:sticky{position:sticky}.lg\:top-0{top:0}.lg\:flex{display:flex}.lg\:hidden{display:none}.lg\:h-screen{height:100vh}.lg\:translate-x-0{--tw-translate-x:0px;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.lg\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.lg\:p-8{padding:2rem}.lg\:px-8{padding-left:2rem;padding-right:2rem}}@media (min-width:1280px){.xl\:grid-cols-\[\.65fr_1\.35fr\]{grid-template-columns:.65fr 1.35fr}.xl\:grid-cols-\[1\.05fr_\.95fr\]{grid-template-columns:1.05fr .95fr}.xl\:grid-cols-\[1fr_\.75fr\]{grid-template-columns:1fr .75fr}.xl\:flex-row{flex-direction:row}.xl\:items-end{align-items:flex-end}.xl\:justify-between{justify-content:space-between}}</style>
+</head>
+<body>
+  <div class="min-h-screen lg:flex">
+    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/30 lg:hidden" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      <div class="flex items-center gap-3 px-2">
+        <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-slate-950">예산·실적 분석</p>
+          <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
+        </div>
+      </div>
+
+      <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
+        <button class="nav-button nav-button-active" data-view="home"><span class="grid h-7 w-7 place-items-center rounded-lg bg-white/20 text-xs">H</span>홈</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">업무 단계</p>
+        <button class="nav-button" data-view="budget"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">1</span>예산 계획</button>
+        <button class="nav-button" data-view="collect"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">2</span>실적 집계</button>
+        <button class="nav-button" data-view="branches"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3</span>실적 분석</button>
+        <button class="nav-button" data-view="standard"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">4</span>예산 표준화</button>
+        <button class="nav-button" data-view="forecast"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">5</span>중장기 예측</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">관리</p>
+        <button class="nav-button" data-view="settings"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">S</span>설정</button>
+      </nav>
+
+      <div class="rounded-2xl bg-blue-50 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>사내망 · 로컬 저장
+        </div>
+        <p class="mt-2 text-xs leading-5 text-blue-700">불러온 자료는 외부로 전송하지 않고 이 브라우저에만 보관합니다.</p>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div class="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-3">
+            <button id="menuButton" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 lg:hidden" aria-label="메뉴 열기">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <div class="min-w-0">
+              <h1 id="pageTitle" class="truncate text-lg font-bold text-slate-950">홈</h1>
+              <p id="pageSubtitle" class="hidden truncate text-xs text-slate-500 sm:block">최근 3개년 예산과 실적을 확인합니다.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="dataStatus" class="hidden rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:inline-flex">예시 데이터</span>
+            <button class="btn-primary" data-action="import">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0-12 4 4m-4-4L8 7M5 15v4h14v-4"/></svg>
+              <span class="hidden sm:inline">CSV 불러오기</span><span class="sm:hidden">불러오기</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <input id="csvInput" class="hidden" type="file" accept=".csv,text/csv">
+  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
+
+  <script>
+    const STORAGE_KEY = "budget-analysis-prototype-records-v1";
+    const IMPORTED_KEY = "budget-analysis-prototype-imported-v1";
+
+    function makeRecord(year, branch, plan, actual, ratio = 0.62) {
+      const profitPlan = Math.round(plan * ratio);
+      const profitActual = Math.round(actual * ratio);
+      return {
+        year,
+        branch,
+        profitPlan,
+        profitActual,
+        capitalPlan: plan - profitPlan,
+        capitalActual: actual - profitActual
+      };
+    }
+
+    const SAMPLE_TOTALS = {
+      2024: [["북부지사",160,151],["남부지사",190,180],["서부지사",150,142],["중앙지사",145,136],["중부지사",170,159],["동부지사",130,120],["해안지사",125,116],["산단지사",110,101]],
+      2025: [["북부지사",170,163],["남부지사",205,194],["서부지사",160,151],["중앙지사",155,146],["중부지사",180,169],["동부지사",140,128],["해안지사",130,120],["산단지사",120,105]],
+      2026: [["북부지사",180,174],["남부지사",220,205],["서부지사",170,157],["중앙지사",165,150],["중부지사",190,170],["동부지사",150,127],["해안지사",140,112],["산단지사",125,104]]
+    };
+
+    const SAMPLE_RECORDS = Object.entries(SAMPLE_TOTALS).flatMap(([year, rows]) =>
+      rows.map(([branch, plan, actual]) => makeRecord(Number(year), branch, plan, actual))
+    );
+
+    const state = {
+      view: "home",
+      year: null,
+      type: "all",
+      range: 3,
+      sort: "rateDesc",
+      search: "",
+      inflation: 2.5,
+      aging: 1.5
+    };
+
+    let records = loadRecords();
+    state.year = latestYear();
+
+    const viewMeta = {
+      home: ["홈", "최근 3개년 예산과 실적을 확인합니다."],
+      budget: ["예산 계획", "지사 계획을 등록하고 표준예산과 비교합니다."],
+      collect: ["실적 집계", "실적 업로드부터 사업 매칭 검토까지 진행합니다."],
+      branches: ["전체 지사 현황", "입력된 모든 지사의 계획·실적·집행률을 조회합니다."],
+      standard: ["예산 표준화", "과년도 실적을 조합별 벤치마크로 만듭니다."],
+      forecast: ["중장기 예측", "표준금액에 팩터를 적용해 미래 예산을 살펴봅니다."],
+      settings: ["설정", "데이터와 지사·부서 매핑 기준을 관리합니다."]
+    };
+
+    function loadRecords() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return structuredClone(SAMPLE_RECORDS);
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) && parsed.length ? parsed : structuredClone(SAMPLE_RECORDS);
+      } catch {
+        return structuredClone(SAMPLE_RECORDS);
+      }
+    }
+
+    function latestYear() {
+      return records.length ? Math.max(...records.map(r => Number(r.year))) : new Date().getFullYear();
+    }
+
+    function years() {
+      return [...new Set(records.map(r => Number(r.year)))].sort((a, b) => b - a);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[char]));
+    }
+
+    function num(value) {
+      const parsed = Number(String(value ?? "").replaceAll(",", "").trim());
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function amounts(row, type = state.type) {
+      if (type === "profit") return { plan: num(row.profitPlan), actual: num(row.profitActual) };
+      if (type === "capital") return { plan: num(row.capitalPlan), actual: num(row.capitalActual) };
+      return {
+        plan: num(row.profitPlan) + num(row.capitalPlan),
+        actual: num(row.profitActual) + num(row.capitalActual)
+      };
+    }
+
+    function rate(plan, actual) {
+      return plan > 0 ? actual / plan * 100 : null;
+    }
+
+    function aggregate(rows, type = state.type) {
+      return rows.reduce((acc, row) => {
+        const value = amounts(row, type);
+        acc.plan += value.plan;
+        acc.actual += value.actual;
+        return acc;
+      }, { plan: 0, actual: 0 });
+    }
+
+    function yearly(year, type = state.type) {
+      return aggregate(records.filter(r => Number(r.year) === Number(year)), type);
+    }
+
+    function branchesForYear(year, type = state.type) {
+      const map = new Map();
+      records.filter(r => Number(r.year) === Number(year)).forEach(row => {
+        const key = String(row.branch).trim();
+        const value = amounts(row, type);
+        const current = map.get(key) || { branch: key, plan: 0, actual: 0 };
+        current.plan += value.plan;
+        current.actual += value.actual;
+        map.set(key, current);
+      });
+      return [...map.values()].map(row => ({...row, balance: row.plan - row.actual, rate: rate(row.plan, row.actual)}));
+    }
+
+    function formatAmount(value) {
+      return `${Math.round(value).toLocaleString("ko-KR")}억`;
+    }
+
+    function formatRate(value) {
+      return value === null ? "-" : `${value.toFixed(1)}%`;
+    }
+
+    function formatDelta(value) {
+      if (!Number.isFinite(value)) return "비교 데이터 없음";
+      const sign = value > 0 ? "+" : "";
+      return `전년 대비 ${sign}${value.toFixed(1)}%p`;
+    }
+
+    function rateBadge(value) {
+      if (value === null) return '<span class="badge bg-slate-100 text-slate-600">계산 불가</span>';
+      if (value >= 95) return `<span class="badge bg-blue-50 text-blue-700">${formatRate(value)}</span>`;
+      if (value >= 85) return `<span class="badge bg-emerald-50 text-emerald-700">${formatRate(value)}</span>`;
+      return `<span class="badge bg-amber-50 text-amber-700">${formatRate(value)}</span>`;
+    }
+
+    function yearOptions() {
+      return years().map(year => `<option value="${year}" ${year === Number(state.year) ? "selected" : ""}>${year}년</option>`).join("");
+    }
+
+    function filters({includeRange = false, includeSort = false, includeSearch = false} = {}) {
+      return `
+        <div class="flex flex-wrap items-end gap-3">
+          ${includeSearch ? `<label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사명 검색</span><input class="control w-full" data-filter="search" value="${escapeHtml(state.search)}" placeholder="지사명을 입력하세요"></label>` : ""}
+          ${includeRange ? `<label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">조회 범위</span><select class="control" data-filter="range"><option value="3" ${state.range === 3 ? "selected" : ""}>최근 3개년</option><option value="5" ${state.range === 5 ? "selected" : ""}>최근 5개년</option></select></label>` : ""}
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">기준연도</span><select class="control" data-filter="year">${yearOptions()}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산 구분</span><select class="control" data-filter="type"><option value="all" ${state.type === "all" ? "selected" : ""}>전체</option><option value="profit" ${state.type === "profit" ? "selected" : ""}>손익</option><option value="capital" ${state.type === "capital" ? "selected" : ""}>자본</option></select></label>
+          ${includeSort ? `<label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">정렬</span><select class="control" data-filter="sort"><option value="rateDesc" ${state.sort === "rateDesc" ? "selected" : ""}>집행률 높은 순</option><option value="rateAsc" ${state.sort === "rateAsc" ? "selected" : ""}>집행률 낮은 순</option><option value="planDesc" ${state.sort === "planDesc" ? "selected" : ""}>예산 금액 큰 순</option><option value="branchAsc" ${state.sort === "branchAsc" ? "selected" : ""}>지사명 순</option></select></label>` : ""}
+        </div>`;
+    }
+
+    function emptyState(message) {
+      return `<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"><p class="font-semibold text-slate-700">${escapeHtml(message)}</p><button class="btn-primary mt-4" data-action="import">CSV 불러오기</button></div>`;
+    }
+
+    function renderHome() {
+      const current = yearly(state.year);
+      const previous = yearly(Number(state.year) - 1);
+      const currentRate = rate(current.plan, current.actual);
+      const previousRate = rate(previous.plan, previous.actual);
+      const delta = currentRate !== null && previousRate !== null ? currentRate - previousRate : NaN;
+      const availableYears = years().filter(year => year <= Number(state.year)).slice(0, state.range).reverse();
+      const chartRows = availableYears.map(year => ({year, ...yearly(year)}));
+      const maxPlan = Math.max(1, ...chartRows.map(row => row.plan));
+      const topFive = branchesForYear(state.year).sort((a, b) => (b.rate ?? -Infinity) - (a.rate ?? -Infinity)).slice(0, 5);
+
+      return `
+        <div class="space-y-6">
+          <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div><p class="text-sm font-semibold text-blue-700">통합 현황</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">최근 ${state.range}개년 예산·실적 현황</h2><p class="mt-2 text-sm text-slate-500">저장된 연도별 자료를 기준으로 자동 집계합니다.</p></div>
+            ${filters({includeRange: true})}
+          </section>
+
+          ${current.plan === 0 ? emptyState(`${state.year}년 데이터가 없습니다.`) : `
+          <section class="grid gap-4 md:grid-cols-3" aria-label="핵심 지표">
+            <article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 계획</p><span class="badge bg-blue-50 text-blue-700">전체 지사</span></div><p class="mt-4 text-3xl font-bold tracking-tight text-slate-950">${formatAmount(current.plan)}</p><p class="mt-2 text-sm text-slate-500">선택한 예산 구분의 계획 합계</p></article>
+            <article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 누적 실적</p><span class="badge bg-emerald-50 text-emerald-700">집계 완료</span></div><p class="mt-4 text-3xl font-bold tracking-tight text-slate-950">${formatAmount(current.actual)}</p><p class="mt-2 text-sm text-slate-500">선택한 예산 구분의 실적 합계</p></article>
+            <article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 집행률</p><span class="badge ${delta >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}">${formatDelta(delta)}</span></div><p class="mt-4 text-3xl font-bold tracking-tight text-slate-950">${formatRate(currentRate)}</p><p class="mt-2 text-sm text-slate-500">실적 ÷ 계획 × 100</p></article>
+          </section>
+
+          <section class="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
+            <article class="panel p-5 sm:p-6">
+              <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${state.range}개년 계획·실적</h3><p class="section-help">단위: 억 원 · 파랑은 계획, 청록은 실적</p></div><span class="badge bg-slate-100 text-slate-600">${availableYears.length}개 연도</span></div>
+              <div class="mt-7 space-y-6">
+                ${chartRows.map(row => {
+                  const rowRate = rate(row.plan, row.actual);
+                  const planWidth = row.plan / maxPlan * 100;
+                  const actualWidth = row.actual / maxPlan * 100;
+                  return `<div><div class="mb-2 flex items-end justify-between gap-3"><div><span class="font-bold text-slate-800">${row.year}</span><span class="ml-2 text-xs text-slate-500">집행률 ${formatRate(rowRate)}</span></div><div class="text-right text-xs text-slate-500"><span class="font-semibold text-blue-700">${formatAmount(row.plan)}</span><span class="mx-1">/</span><span class="font-semibold text-emerald-700">${formatAmount(row.actual)}</span></div></div><div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-500" style="width:${planWidth}%"></div></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${actualWidth}%"></div></div></div></div>`;
+                }).join("")}
+              </div>
+              <p class="mt-6 flex items-center gap-2 text-xs text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-300"></span>자료가 없는 연도는 계산하거나 추정하지 않습니다.</p>
+            </article>
+
+            <article class="panel overflow-hidden">
+              <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6"><div><h3 class="section-title">집행률 상위 5개 지사</h3><p class="section-help">${state.year}년 · 집행률 높은 순</p></div><button class="text-sm font-semibold text-blue-700 hover:text-blue-900" data-view="branches">전체 지사 현황 →</button></div>
+              <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">순위</th><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">집행률</th></tr></thead><tbody class="divide-y divide-slate-100">${topFive.map((row, index) => `<tr class="hover:bg-slate-50"><td class="table-cell"><span class="grid h-7 w-7 place-items-center rounded-full ${index === 0 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}">${index + 1}</span></td><td class="table-cell font-semibold text-slate-900">${escapeHtml(row.branch)}</td><td class="table-cell text-right">${formatAmount(row.plan)}</td><td class="table-cell text-right">${formatAmount(row.actual)}</td><td class="table-cell text-right">${rateBadge(row.rate)}</td></tr>`).join("")}</tbody></table></div>
+            </article>
+          </section>
+
+          <section class="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p class="font-bold text-amber-950">사업 매칭 검토가 남아 있습니다</p><p class="mt-1 text-sm text-amber-800">확신도가 낮은 항목을 확인하면 집계 정확도가 높아집니다.</p></div><button class="btn-secondary border-amber-300 bg-white text-amber-900" data-view="collect">검토 화면으로 이동</button></section>
+          `}
+        </div>`;
+    }
+
+    function sortBranchRows(rows) {
+      const sorted = [...rows];
+      if (state.sort === "rateAsc") sorted.sort((a, b) => (a.rate ?? Infinity) - (b.rate ?? Infinity));
+      else if (state.sort === "planDesc") sorted.sort((a, b) => b.plan - a.plan);
+      else if (state.sort === "branchAsc") sorted.sort((a, b) => a.branch.localeCompare(b.branch, "ko"));
+      else sorted.sort((a, b) => (b.rate ?? -Infinity) - (a.rate ?? -Infinity));
+      return sorted;
+    }
+
+    function visibleBranchRows() {
+      const query = state.search.trim().toLocaleLowerCase("ko");
+      return sortBranchRows(branchesForYear(state.year).filter(row => row.branch.toLocaleLowerCase("ko").includes(query)));
+    }
+
+    function renderBranches() {
+      const rows = visibleBranchRows();
+      const total = aggregate(rows.map(row => ({profitPlan: row.plan, profitActual: row.actual, capitalPlan: 0, capitalActual: 0})), "profit");
+      return `
+        <div class="space-y-6">
+          <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-blue-700">실적 분석</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">전체 지사 현황</h2><p class="mt-2 text-sm text-slate-500">업로드된 지사명을 그대로 사용하며 모든 지사를 표시합니다.</p></div><button class="btn-secondary" data-action="export">현재 결과 CSV 다운로드</button></section>
+          <section class="panel p-5">${filters({includeSort: true, includeSearch: true})}</section>
+          <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 계획</p><p class="mt-3 text-2xl font-bold">${formatAmount(total.plan)}</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 집행률</p><p class="mt-3 text-2xl font-bold">${formatRate(rate(total.plan, total.actual))}</p></article></section>
+          <section class="panel overflow-hidden">
+            ${rows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">잔액</th><th class="px-4 py-3 text-right">집행률</th></tr></thead><tbody class="divide-y divide-slate-100">${rows.map(row => `<tr class="hover:bg-blue-50/40"><td class="table-cell font-semibold text-slate-900">${escapeHtml(row.branch)}</td><td class="table-cell text-right">${formatAmount(row.plan)}</td><td class="table-cell text-right">${formatAmount(row.actual)}</td><td class="table-cell text-right ${row.balance < 0 ? "text-red-600" : ""}">${formatAmount(row.balance)}</td><td class="table-cell text-right">${rateBadge(row.rate)}</td></tr>`).join("")}</tbody><tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold text-slate-950">합계</td><td class="table-cell text-right font-bold">${formatAmount(total.plan)}</td><td class="table-cell text-right font-bold">${formatAmount(total.actual)}</td><td class="table-cell text-right font-bold">${formatAmount(total.plan - total.actual)}</td><td class="table-cell text-right font-bold">${formatRate(rate(total.plan, total.actual))}</td></tr></tfoot></table></div>` : emptyState("검색 조건에 맞는 지사가 없습니다.")}
+          </section>
+        </div>`;
+    }
+
+    function renderBudget() {
+      return `
+        <div class="space-y-6">
+          <section><p class="text-sm font-semibold text-blue-700">STAGE 1</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 계획 수립</h2><p class="mt-2 text-sm text-slate-500">계획본을 업로드하고 벤치마크와 비교한 뒤 확정합니다.</p></section>
+          <section class="grid gap-3 md:grid-cols-4">${[["01","계획본 업로드","진행 중"],["02","데이터 검증","대기"],["03","표준예산 비교","대기"],["04","계획 확정","대기"]].map(([no,title,status],i) => `<div class="panel p-4 ${i === 0 ? "border-blue-300 bg-blue-50" : ""}"><div class="flex items-center justify-between"><span class="text-xs font-bold ${i === 0 ? "text-blue-700" : "text-slate-400"}">${no}</span><span class="badge ${i === 0 ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}">${status}</span></div><p class="mt-3 font-semibold text-slate-900">${title}</p></div>`).join("")}</section>
+          <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
+            <article class="panel p-6"><h3 class="section-title">지사 예산계획 등록</h3><p class="section-help">엑셀 계획본을 업로드하면 지사명과 예산과목을 검증합니다.</p><button class="mt-6 grid w-full place-items-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-6 py-12 text-center hover:border-blue-400" data-action="import"><span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-blue-700 shadow-sm"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span><span class="mt-4 font-bold text-blue-950">CSV 시제품 데이터를 불러오세요</span><span class="mt-1 text-sm text-blue-700">실제 Streamlit 화면에서는 Excel 업로드로 연결</span></button></article>
+            <article class="panel p-6"><h3 class="section-title">업로드 전 확인</h3><ul class="mt-5 space-y-4 text-sm text-slate-600"><li class="flex gap-3"><span class="badge bg-blue-50 text-blue-700">필수</span><span>구분, 연도, 지사명, 예산과목 확인</span></li><li class="flex gap-3"><span class="badge bg-blue-50 text-blue-700">비교</span><span>표준예산과 차이가 큰 항목 표시</span></li><li class="flex gap-3"><span class="badge bg-blue-50 text-blue-700">저장</span><span>확정 전에는 기존 자료를 덮어쓰지 않음</span></li></ul></article>
+          </section>
+        </div>`;
+    }
+
+    function renderCollect() {
+      return `
+        <div class="space-y-6">
+          <section><p class="text-sm font-semibold text-blue-700">STAGE 2</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">실적 집계와 사업 매칭</h2><p class="mt-2 text-sm text-slate-500">ZRFM2 실적을 정제하고 저확신 항목만 사람이 확인합니다.</p></section>
+          <section class="grid gap-4 md:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-slate-500">업로드 실적</p><p class="mt-3 text-3xl font-bold">9,008건</p><p class="mt-2 text-sm text-emerald-700">검증 완료</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">자동 확정</p><p class="mt-3 text-3xl font-bold">47%</p><p class="mt-2 text-sm text-slate-500">높은 확신도·소액 자동분류</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">검토 필요</p><p class="mt-3 text-3xl font-bold">53%</p><p class="mt-2 text-sm text-amber-700">확신도 0.6 미만</p></article></section>
+          <section class="panel p-6"><div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">사업 매칭 진행률</h3><p class="section-help">예산과목별 후보를 좁혀 사업명과 자동 매칭합니다.</p></div><button class="btn-primary">저확신 항목 검토</button></div><div class="mt-6 h-4 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width:47%"></div></div><div class="mt-2 flex justify-between text-xs text-slate-500"><span>자동 확정 47%</span><span>검토 후 100%</span></div></section>
+          <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">검토 대기 예시</h3></div><div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">전표헤더텍스트</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3">추천 사업</th><th class="px-4 py-3 text-right">확신도</th></tr></thead><tbody class="divide-y divide-slate-100"><tr><td class="table-cell">보일러 주요부 정비</td><td class="table-cell">수선유지비</td><td class="table-cell">보일러 계획예방정비</td><td class="table-cell text-right"><span class="badge bg-amber-50 text-amber-700">0.58</span></td></tr><tr><td class="table-cell">열교환기 부품 교체</td><td class="table-cell">수선유지비</td><td class="table-cell">열교환기 성능개선</td><td class="table-cell text-right"><span class="badge bg-amber-50 text-amber-700">0.52</span></td></tr></tbody></table></div></section>
+        </div>`;
+    }
+
+    function renderStandard() {
+      return `
+        <div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 표준화</h2><p class="mt-2 text-sm text-slate-500">과년도 실적을 네 가지 축으로 묶어 표준금액을 조회합니다.</p></section>
+        <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">${[["지사","업로드 지사명"],["정비등급","외부 마스터"],["투자유형","8종 분류"],["예산과목","계정과목"]].map(([title,help]) => `<article class="panel p-5"><span class="badge bg-blue-50 text-blue-700">분류 축</span><h3 class="mt-3 font-bold">${title}</h3><p class="mt-1 text-sm text-slate-500">${help}</p></article>`).join("")}</section>
+        <section class="panel overflow-hidden"><div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5"><div><h3 class="section-title">벤치마크 조회</h3><p class="section-help">표본수와 산출 연도를 함께 표시해 신뢰도를 판단합니다.</p></div><button class="btn-secondary">정비등급 마스터 업로드</button></div><div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사</th><th class="px-4 py-3">정비등급</th><th class="px-4 py-3">투자유형</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">표준금액</th><th class="px-4 py-3 text-right">표본수</th></tr></thead><tbody class="divide-y divide-slate-100"><tr><td class="table-cell">업로드 지사 A</td><td class="table-cell">A등급</td><td class="table-cell">정기사업</td><td class="table-cell">수선유지비</td><td class="table-cell text-right">18.4억</td><td class="table-cell text-right">24건</td></tr><tr><td class="table-cell">업로드 지사 B</td><td class="table-cell">B등급</td><td class="table-cell">노후설비개체</td><td class="table-cell">자산취득비</td><td class="table-cell text-right">32.7억</td><td class="table-cell text-right">11건</td></tr></tbody></table></div></section></div>`;
+    }
+
+    function renderForecast() {
+      const baseline = yearly(state.year).plan || 1000;
+      const growth = (num(state.inflation) + num(state.aging)) / 100;
+      const projections = Array.from({length: 5}, (_, index) => ({year: Number(state.year) + index + 1, value: baseline * Math.pow(1 + growth, index + 1)}));
+      const max = Math.max(...projections.map(row => row.value), 1);
+      return `
+        <div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 5</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">중장기 예산 예측</h2><p class="mt-2 text-sm text-slate-500">표준예산에 노후화와 물가상승 팩터를 적용합니다.</p></section>
+        <section class="grid gap-6 xl:grid-cols-[.65fr_1.35fr]"><article class="panel p-6"><h3 class="section-title">예측 팩터</h3><div class="mt-6 space-y-5"><label class="block"><span class="mb-2 flex justify-between text-sm font-semibold text-slate-700"><span>연간 물가상승률</span><span>${state.inflation}%</span></span><input class="w-full accent-blue-600" type="range" min="0" max="10" step="0.5" value="${state.inflation}" data-forecast="inflation"></label><label class="block"><span class="mb-2 flex justify-between text-sm font-semibold text-slate-700"><span>연간 노후화 가중</span><span>${state.aging}%</span></span><input class="w-full accent-blue-600" type="range" min="0" max="10" step="0.5" value="${state.aging}" data-forecast="aging"></label></div><div class="mt-6 rounded-xl bg-blue-50 p-4"><p class="text-xs font-semibold text-blue-700">기준 예산</p><p class="mt-1 text-2xl font-bold text-blue-950">${formatAmount(baseline)}</p><p class="mt-1 text-xs text-blue-700">${state.year}년 계획 기준</p></div></article>
+        <article class="panel p-6"><h3 class="section-title">향후 5개년 예측</h3><p class="section-help">두 팩터의 합산 성장률을 적용한 화면 예시입니다.</p><div class="mt-7 space-y-4">${projections.map(row => `<div class="grid grid-cols-[56px_1fr_80px] items-center gap-3"><span class="text-sm font-bold text-slate-700">${row.year}</span><div class="h-7 overflow-hidden rounded-lg bg-slate-100"><div class="h-full rounded-lg bg-blue-500" style="width:${row.value / max * 100}%"></div></div><span class="text-right text-sm font-semibold text-slate-700">${formatAmount(row.value)}</span></div>`).join("")}</div></article></section></div>`;
+    }
+
+    function renderSettings() {
+      const uniqueBranches = new Set(records.map(row => row.branch)).size;
+      return `
+        <div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">운영 관리</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">데이터와 표시 기준</h2><p class="mt-2 text-sm text-slate-500">지사명은 불러온 데이터에서 자동으로 반영됩니다.</p></section>
+        <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-slate-500">저장 연도</p><p class="mt-3 text-2xl font-bold">${years().length}개년</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">등록 지사</p><p class="mt-3 text-2xl font-bold">${uniqueBranches}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">데이터 행</p><p class="mt-3 text-2xl font-bold">${records.length.toLocaleString("ko-KR")}건</p></article></section>
+        <section class="panel p-6"><div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><h3 class="section-title">CSV 데이터 관리</h3><p class="section-help">새 파일을 불러오면 지사명과 연도별 금액이 교체됩니다.</p></div><div class="flex flex-wrap gap-2"><button class="btn-primary" data-action="import">CSV 불러오기</button><button class="btn-secondary" data-action="reset">예시 데이터 복원</button></div></div><div class="mt-6 rounded-xl bg-slate-50 p-4"><p class="text-sm font-semibold text-slate-700">필수 컬럼</p><code class="mt-2 block overflow-x-auto text-xs text-slate-600">연도,지사명,손익계획,손익실적,자본계획,자본실적</code></div></section>
+        <section class="panel p-6"><h3 class="section-title">실제 Streamlit 연결 항목</h3><div class="mt-5 grid gap-3 sm:grid-cols-2"><div class="rounded-xl border border-slate-200 p-4"><p class="font-semibold">지사·부서 매핑</p><p class="mt-1 text-sm text-slate-500">표시명과 적용 시작연도 관리</p></div><div class="rounded-xl border border-slate-200 p-4"><p class="font-semibold">분류 모델 관리</p><p class="mt-1 text-sm text-slate-500">재학습·초기화·버전 확인</p></div></div></section></div>`;
+    }
+
+    function renderPage() {
+      const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect, branches: renderBranches, standard: renderStandard, forecast: renderForecast, settings: renderSettings};
+      document.getElementById("page").innerHTML = renderers[state.view]();
+      const [title, subtitle] = viewMeta[state.view];
+      document.getElementById("pageTitle").textContent = title;
+      document.getElementById("pageSubtitle").textContent = subtitle;
+      document.querySelectorAll("[data-view]").forEach(button => {
+        if (!button.closest("nav")) return;
+        button.classList.toggle("nav-button-active", button.dataset.view === state.view);
+      });
+      document.getElementById("dataStatus").textContent = localStorage.getItem(IMPORTED_KEY) === "true" ? "내 데이터 사용 중" : "예시 데이터";
+    }
+
+    function navigate(view) {
+      if (!viewMeta[view]) return;
+      state.view = view;
+      state.search = "";
+      renderPage();
+      closeMenu();
+      window.scrollTo({top: 0, behavior: "smooth"});
+    }
+
+    function openMenu() {
+      document.getElementById("sidebar").classList.remove("-translate-x-full");
+      document.getElementById("backdrop").classList.remove("hidden");
+    }
+
+    function closeMenu() {
+      if (window.innerWidth >= 1024) return;
+      document.getElementById("sidebar").classList.add("-translate-x-full");
+      document.getElementById("backdrop").classList.add("hidden");
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.remove("hidden");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3200);
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [], cell = "", quoted = false;
+      const source = text.replace(/^\uFEFF/, "");
+      for (let i = 0; i < source.length; i++) {
+        const char = source[i];
+        if (char === '"') {
+          if (quoted && source[i + 1] === '"') { cell += '"'; i++; }
+          else quoted = !quoted;
+        } else if (char === "," && !quoted) { row.push(cell.trim()); cell = ""; }
+        else if ((char === "\n" || char === "\r") && !quoted) {
+          if (char === "\r" && source[i + 1] === "\n") i++;
+          row.push(cell.trim());
+          if (row.some(value => value !== "")) rows.push(row);
+          row = []; cell = "";
+        } else cell += char;
+      }
+      row.push(cell.trim());
+      if (row.some(value => value !== "")) rows.push(row);
+      return rows;
+    }
+
+    function importCsv(text) {
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error("데이터 행이 없습니다.");
+      const headers = rows[0];
+      const required = ["연도","지사명","손익계획","손익실적","자본계획","자본실적"];
+      const indexes = Object.fromEntries(required.map(key => [key, headers.indexOf(key)]));
+      const missing = required.filter(key => indexes[key] < 0);
+      if (missing.length) throw new Error(`필수 컬럼이 없습니다: ${missing.join(", ")}`);
+      const next = rows.slice(1).map((row, index) => ({
+        year: Math.trunc(num(row[indexes["연도"]])),
+        branch: String(row[indexes["지사명"]] || "").trim(),
+        profitPlan: num(row[indexes["손익계획"]]),
+        profitActual: num(row[indexes["손익실적"]]),
+        capitalPlan: num(row[indexes["자본계획"]]),
+        capitalActual: num(row[indexes["자본실적"]])
+      })).filter(row => row.year > 0 && row.branch);
+      if (!next.length) throw new Error("유효한 연도와 지사명이 없습니다.");
+      records = next;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      localStorage.setItem(IMPORTED_KEY, "true");
+      state.year = latestYear();
+      state.view = "home";
+      renderPage();
+      showToast(`${records.length}개 데이터 행을 불러왔습니다.`);
+    }
+
+    function exportCsv() {
+      const rows = visibleBranchRows();
+      const lines = [["연도","지사명","계획","실적","잔액","집행률"], ...rows.map(row => [state.year,row.branch,row.plan,row.actual,row.balance,row.rate === null ? "" : row.rate.toFixed(1)])];
+      const csv = "\uFEFF" + lines.map(row => row.map(value => `"${String(value).replaceAll('"','""')}"`).join(",")).join("\r\n");
+      const blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `전체지사현황_${state.year}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      showToast("현재 조회 결과를 내려받았습니다.");
+    }
+
+    document.addEventListener("click", event => {
+      const viewButton = event.target.closest("[data-view]");
+      if (viewButton) { navigate(viewButton.dataset.view); return; }
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (action === "import") document.getElementById("csvInput").click();
+      if (action === "export") exportCsv();
+      if (action === "reset") {
+        records = structuredClone(SAMPLE_RECORDS);
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(IMPORTED_KEY);
+        state.year = latestYear();
+        renderPage();
+        showToast("예시 데이터를 복원했습니다.");
+      }
+    });
+
+    document.addEventListener("change", event => {
+      const filter = event.target.dataset.filter;
+      if (filter === "year") state.year = Number(event.target.value);
+      if (filter === "type") state.type = event.target.value;
+      if (filter === "range") state.range = Number(event.target.value);
+      if (filter === "sort") state.sort = event.target.value;
+      if (filter) renderPage();
+      const forecast = event.target.dataset.forecast;
+      if (forecast) { state[forecast] = Number(event.target.value); renderPage(); }
+    });
+
+    document.addEventListener("input", event => {
+      if (event.target.dataset.filter !== "search") return;
+      state.search = event.target.value;
+      const cursor = event.target.selectionStart;
+      renderPage();
+      const next = document.querySelector('[data-filter="search"]');
+      if (next) { next.focus(); next.setSelectionRange(cursor, cursor); }
+    });
+
+    document.getElementById("csvInput").addEventListener("change", async event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try { importCsv(await file.text()); }
+      catch (error) { showToast(error.message || "CSV를 불러오지 못했습니다."); }
+      event.target.value = "";
+    });
+
+    document.getElementById("menuButton").addEventListener("click", openMenu);
+    document.getElementById("backdrop").addEventListener("click", closeMenu);
+    window.addEventListener("resize", () => { if (window.innerWidth >= 1024) document.getElementById("backdrop").classList.add("hidden"); });
+
+    renderPage();
+  </script>
+</body>
+</html>

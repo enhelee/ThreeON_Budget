@@ -1,0 +1,1286 @@
+<body>
+  <div class="min-h-screen lg:flex">
+    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/30 lg:hidden" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      <div class="flex items-center gap-3 px-2">
+        <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-slate-950">예산·실적 분석</p>
+          <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
+        </div>
+      </div>
+
+      <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
+        <button class="nav-button nav-button-active" data-view="home"><span class="grid h-7 w-7 place-items-center rounded-lg bg-white/20 text-xs">H</span>홈</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">업무 단계</p>
+        <button class="nav-button" data-view="budget"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">1</span>예산 계획</button>
+        <button class="nav-button" data-view="collect"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">2</span>실적 집계</button>
+        <button class="nav-button" data-view="branches"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3</span>실적 분석</button>
+        <button class="nav-button" data-view="detail"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3+</span>실적분석(상세)</button>
+        <button class="nav-button" data-view="stats"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">4</span>통계·내보내기</button>
+        <button class="nav-button" data-view="forecast"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">5</span>중장기 예측</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">관리</p>
+        <button class="nav-button" data-view="settings"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">S</span>설정</button>
+      </nav>
+
+      <div class="rounded-2xl bg-blue-50 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>사내망 · 백엔드 DB 저장
+        </div>
+        <p class="mt-2 text-xs leading-5 text-blue-700">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div class="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-3">
+            <button id="menuButton" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 lg:hidden" aria-label="메뉴 열기">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <div class="min-w-0">
+              <h1 id="pageTitle" class="truncate text-lg font-bold text-slate-950">홈</h1>
+              <p id="pageSubtitle" class="hidden truncate text-xs text-slate-500 sm:block"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">대상연도
+              <select id="yearSelect" class="control"></select>
+            </label>
+            <button id="addYearBtn" class="btn-secondary hidden sm:inline-flex" title="새 연도 추가">＋연도</button>
+            <button class="btn-primary" data-action="analyze" id="analyzeBtn">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+              <span id="analyzeLabel">분석 실행</span><span id="pendingCount" class="pending-count hidden"></span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
+  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-slate-950/30">
+    <div class="rounded-2xl bg-white px-8 py-6 text-center shadow-xl">
+      <div class="spinner mx-auto"></div>
+      <p id="busyText" class="mt-3 text-sm font-semibold text-slate-700">처리 중...</p>
+    </div>
+  </div>
+
+  <script>
+  "use strict";
+  // ───────────────────────── 상태 ─────────────────────────
+  const state = {
+    view: "home", year: "", years: [],
+    type: "all", search: "", sort: "rateDesc",
+    status: null, branches: null, stats: null, overview: null,
+    learned: null, overrides: null, bizEdits: null,
+    ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
+    pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}
+    det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
+           hideMissing: false, sortKey: "", sortDir: 1,
+           open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
+           // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
+           //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.
+           ovDept: "", ovTarget: "", ovManual: "" },
+  };
+
+  const viewMeta = {
+    home: ["홈", "다년도 실적과 대상연도 집행 현황을 확인합니다."],
+    budget: ["예산 계획", "연도를 선택하고 계획본(양식1)을 업로드해 DB에 등록합니다."],
+    collect: ["실적 집계", "연도를 선택하고 ERP(zrfm2)를 업로드 → 자동 매칭을 실행합니다."],
+    branches: ["실적 분석", "전체 지사의 계획·실적·집행률을 조회합니다."],
+    detail: ["실적분석(상세)", "지사별 사업 목록과 귀속 ERP 전표를 검토·수정합니다."],
+    stats: ["통계·내보내기", "손익/자본 통계와 Excel 산출물을 내려받습니다."],
+    forecast: ["중장기 예측", "표준금액에 팩터를 적용해 미래 예산을 살펴봅니다. (개발 예정)"],
+    settings: ["설정", "데이터셋·수동 재배정·학습·사업수정 이력을 관리합니다."],
+  };
+
+  // ───────────────────────── 공통 유틸 ─────────────────────────
+  const $ = s => document.querySelector(s);
+  const esc = v => String(v ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[c]));
+  const fmt = v => (v === null || v === undefined || isNaN(v)) ? "-" : Math.round(v).toLocaleString("ko-KR");
+  const fmtRate = (p, a) => p > 0 ? (a / p * 100).toFixed(1) + "%" : "-";
+  const rateVal = (p, a) => p > 0 ? a / p * 100 : null;
+
+  function rateBadge(p, a) {
+    const r = rateVal(p, a);
+    if (r === null) return '<span class="badge bg-slate-100 text-slate-600">-</span>';
+    const cls = r >= 95 ? "bg-blue-50 text-blue-700" : r >= 85 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
+    return `<span class="badge ${cls}">${r.toFixed(1)}%</span>`;
+  }
+  function confBadge(c) {
+    if (c === null || c === undefined) return '<span class="badge bg-slate-100 text-slate-600">신규</span>';
+    const n = Number(c);
+    const label = n >= 0.99 ? (n >= 1 ? "수동 1.00" : "학습 0.99") : n.toFixed(2);
+    const cls = n >= 0.8 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
+    return `<span class="badge ${cls}">${label}</span>`;
+  }
+  function gubunBadge(g) {
+    const map = {"계획집행": "bg-blue-50 text-blue-700", "미시행": "bg-slate-100 text-slate-500",
+                 "신규": "bg-amber-50 text-amber-700", "신규(소액집행)": "bg-amber-50 text-amber-700",
+                 "미매핑": "bg-slate-100 text-red-600"};
+    return `<span class="badge ${map[g] || "bg-slate-100 text-slate-600"}">${esc(g)}</span>`;
+  }
+  function realBranches() {
+    return (state.branches || []).map(r => r.branch).filter(b => !b.endsWith(" (미매핑)"));
+  }
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg; t.classList.remove("hidden");
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => t.classList.add("hidden"), 4500);
+  }
+  function busy(on, text) {
+    $("#busyText").textContent = text || "처리 중...";
+    $("#busy").classList.toggle("hidden", !on);
+    $("#busy").classList.toggle("grid", on);
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { msg = (await res.json()).detail || msg; } catch {}
+      throw new Error(msg);
+    }
+    return res.json();
+  }
+
+  // ───────────────────────── 데이터 로드 ─────────────────────────
+  async function loadOverview() {
+    state.overview = (await api("/api/overview")).years;   // 오름차순 [{year, 손익:{}, 자본:{}}]
+    const ys = state.overview.map(r => r.year);
+    for (const y of ys) if (!state.years.includes(y)) state.years.push(y);
+    state.years.sort((a, b) => String(b).localeCompare(String(a)));
+    if (!state.year) state.year = state.years[0] || String(new Date().getFullYear());
+  }
+  async function loadStatus() {
+    state.status = await api(`/api/status?year=${state.year}`);
+  }
+  // 분석에 아직 반영되지 않은 변경 건수 — 저장은 즉시, 분석은 모아서 한 번.
+  async function loadPending() {
+    try { state.pending = await api(`/api/pending?year=${state.year}`); }
+    catch { state.pending = null; }
+  }
+  // 저장 후 공통 처리: 미반영 배지 갱신 + 화면 부분 갱신(분석은 하지 않는다)
+  async function afterSave(msg) {
+    await loadPending();
+    if (state.view === "detail" && state.det.branch) await loadDetail(state.det.branch);
+    renderPage();
+    const n = state.pending?.total || 0;
+    toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
+  }
+  function pendingBarHtml() {
+    const p = state.pending;
+    if (!p || !p.total) return "";
+    const detail = Object.entries(p.counts || {}).map(([k, v]) => `${k} ${v}건`).join(" · ");
+    return `<section class="pending-bar mb-4">
+      <b>분석 미반영 변경 ${p.total}건</b>
+      <span class="text-xs text-amber-800">${esc(detail)}</span>
+      <button class="btn-primary push-right" data-action="analyze">분석 반영 (${p.total})</button>
+    </section>`;
+  }
+  async function loadBranches() {
+    state.branches = (await api(`/api/branches?year=${state.year}`)).rows;
+  }
+  async function loadDetail(branch) {
+    state.det.data = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
+    state.det.branch = branch;
+    state.det.open = new Set(); state.det.sel = new Set();
+    state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null;
+    state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
+  }
+
+  // 재배정에서 '이동할 지사'를 고르면 그 지사의 기존 사업명을 목록에 채운다(연도·지사별 캐시).
+  async function loadOvBiz(branch) {
+    const k = `${state.year}|${branch}`;
+    if (state.ovBiz[k]) return state.ovBiz[k];
+    const d = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
+    state.ovBiz[k] = (d.biz || []).map(b => ({budget: b.budget, 사업명: b.사업명}));
+    return state.ovBiz[k];
+  }
+
+  function amounts(row) {
+    if (state.type === "profit") return { plan: row.profitPlan, actual: row.profitActual };
+    if (state.type === "capital") return { plan: row.capitalPlan, actual: row.capitalActual };
+    return { plan: row.profitPlan + row.capitalPlan, actual: row.profitActual + row.capitalActual };
+  }
+
+  // ───────────────────────── 홈 (다년도) ─────────────────────────
+  function renderHome() {
+    const ov = state.overview || [];
+    const analyzed = ov.filter(r => r["손익"] || r["자본"]);
+    const cur = ov.find(r => String(r.year) === String(state.year));
+    const recent = analyzed.slice(-5);          // 최근 최대 5개년(오름차순)
+    const maxV = Math.max(1, ...recent.flatMap(r => ["손익", "자본"].flatMap(b =>
+      r[b] ? [r[b].계획, r[b].실적] : [])));
+    const yearTotal = b => b ? (b.계획 || 0) : 0;
+
+    const cards = ["손익", "자본"].map(b => {
+      const s = cur?.[b];
+      return `<article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 ${b}예산</p>${s ? `<span class="badge bg-emerald-50 text-emerald-700">분석 완료</span>` : `<span class="badge bg-slate-100 text-slate-500">미실행</span>`}</div>
+        ${s ? `<p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">${fmt(s.실적)} <span class="text-sm font-semibold text-slate-400">천원</span></p>
+        <p class="mt-2 text-sm text-slate-500">계획 ${fmt(s.계획)} · 현재까지 집행률 <b>${s.집행률 ?? "-"}%</b></p>` :
+        `<p class="mt-4 text-sm text-slate-500">'분석 실행'을 눌러 집계하세요.</p>`}</article>`;
+    }).join("");
+    const curAll = cur && (cur["손익"] || cur["자본"]) ? {
+      p: (cur["손익"]?.계획 || 0) + (cur["자본"]?.계획 || 0),
+      a: (cur["손익"]?.실적 || 0) + (cur["자본"]?.실적 || 0),
+    } : null;
+
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div><p class="text-sm font-semibold text-blue-700">통합 현황</p>
+          <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">다년도 예산·실적 현황</h2>
+          <p class="mt-2 text-sm text-slate-500">분석 완료된 모든 연도를 집계합니다. (단위: 천원)</p></div>
+        </section>
+        ${!analyzed.length ? emptyState("아직 분석 이력이 없습니다. ① 계획 업로드 → ② zrfm2 업로드 → 상단 '분석 실행'을 눌러주세요.") : `
+        <section class="grid gap-4 md:grid-cols-3">
+          ${cards}
+          <article class="metric-card"><div class="flex items-center justify-between"><p class="text-sm font-semibold text-slate-500">${state.year}년 전체(손익+자본)</p><span class="badge bg-blue-50 text-blue-700">현재까지</span></div>
+          ${curAll ? `<p class="mt-4 text-2xl font-bold tracking-tight text-slate-950">${fmt(curAll.a)} <span class="text-sm font-semibold text-slate-400">천원</span></p>
+          <p class="mt-2 text-sm text-slate-500">계획 ${fmt(curAll.p)} · 집행률 ${fmtRate(curAll.p, curAll.a)}</p>` : `<p class="mt-4 text-sm text-slate-500">해당 연도 분석 이력이 없습니다.</p>`}</article>
+        </section>
+        <section class="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
+          <article class="panel p-5 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3><p class="section-help">파랑=계획 · 청록=실적 (손익+자본, 천원)</p></div><span class="badge bg-slate-100 text-slate-600">${recent.length}개 연도</span></div>
+            <div class="mt-7 space-y-6">
+              ${recent.map(r => {
+                const p = (r["손익"]?.계획 || 0) + (r["자본"]?.계획 || 0);
+                const a = (r["손익"]?.실적 || 0) + (r["자본"]?.실적 || 0);
+                return `<div><div class="mb-2 flex items-end justify-between gap-3"><div><span class="font-bold text-slate-800 clickable" data-goyear="${r.year}">${r.year}</span><span class="ml-2 text-xs text-slate-500">집행률 ${fmtRate(p, a)}</span></div>
+                <div class="text-right text-xs text-slate-500"><span class="font-semibold text-blue-700">${fmt(p)}</span><span class="mx-1">/</span><span class="font-semibold text-emerald-700">${fmt(a)}</span></div></div>
+                <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-500" style="width:${p / maxV * 100}%"></div></div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${a / maxV * 100}%"></div></div></div></div>`;
+              }).join("")}
+            </div>
+            <p class="mt-6 flex items-center gap-2 text-xs text-slate-500"><span class="h-2 w-2 rounded-full bg-slate-300"></span>연도를 클릭하면 해당 연도로 전환됩니다. 자료가 없는 연도는 계산하지 않습니다.</p>
+          </article>
+          <article class="panel overflow-hidden">
+            <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">각 연도의 최신 분석 기준</p></div><button class="text-sm font-semibold text-blue-700 hover:text-blue-900" data-view="branches">전체 지사 →</button></div>
+            <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">연도</th><th class="px-4 py-3">구분</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">집행률</th></tr></thead>
+            <tbody class="divide-y divide-slate-100">${analyzed.slice().reverse().flatMap(r => ["손익", "자본"].filter(b => r[b]).map(b => `<tr class="hover:bg-slate-50 clickable" data-goyear="${r.year}"><td class="table-cell font-semibold text-slate-900">${r.year}</td><td class="table-cell">${b}</td><td class="table-cell text-right">${fmt(r[b].계획)}</td><td class="table-cell text-right">${fmt(r[b].실적)}</td><td class="table-cell text-right">${rateBadge(r[b].계획, r[b].실적)}</td></tr>`)).join("")}</tbody></table></div>
+          </article>
+        </section>`}
+      </div>`;
+  }
+
+  function emptyState(msg) {
+    return `<div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center"><p class="font-semibold text-slate-700">${esc(msg)}</p></div>`;
+  }
+  function yearPicker(prefix) {
+    return `<div class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">대상연도</span>
+      <select class="control" data-yearpick="1">${state.years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("")}</select></label>
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">새 연도 직접 입력</span>
+      <div class="flex gap-2"><input id="${prefix}NewYear" class="control" style="width:7rem" placeholder="예: 2021" maxlength="4">
+      <button class="btn-secondary" data-action="add-year" data-input="${prefix}NewYear">추가</button></div></label>
+    </div>`;
+  }
+
+  // ───────────────────────── 1 예산 계획 ─────────────────────────
+  function renderBudget() {
+    const ds = (state.status?.datasets || []).filter(d => d.kind === "plan" && String(d.year) === String(state.year));
+    return `
+      <div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 1</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 계획 등록</h2>
+        <p class="mt-2 text-sm text-slate-500">사업별 예산(양식1(월별)) 파일을 업로드하면 행 단위로 백엔드 DB에 흡수됩니다. 원본 파일은 서버에 남지 않습니다.</p></section>
+        ${state.status?.locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태 — 업로드가 차단됩니다.</section>` : ""}
+        <section class="panel p-5">${yearPicker("bp")}</section>
+        <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
+          <article class="panel p-6"><h3 class="section-title">계획본 업로드 — <span class="text-blue-700">${esc(state.year)}년</span>으로 등록</h3>
+            <p class="section-help">헤더 3행 · 데이터 4행부터 — 주관부서명, 부서코드, 처지사, 부서(부), 속성, 예산코드, 예산과목, 사업명, 산출내역, 연예산</p>
+            <button class="mt-6 grid w-full place-items-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-6 py-12 text-center hover:border-blue-400" data-action="pick-plan">
+              <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-blue-700 shadow-sm"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
+              <span class="mt-4 font-bold text-blue-950">계획 Excel(xlsx) 선택</span>
+              <span class="mt-1 text-sm text-blue-700">업로드 즉시 DB로 흡수됩니다</span></button>
+            <input id="planFile" class="hidden" type="file" accept=".xlsx">
+          </article>
+          <article class="panel p-6"><h3 class="section-title">이 연도의 계획 데이터셋</h3>
+            ${ds.length ? `<ul class="mt-5 space-y-3 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between rounded-xl ${i === 0 ? "border border-blue-200 bg-blue-50" : "bg-slate-50"} p-3"><div><p class="font-semibold text-slate-800">${esc(d.label)}</p><p class="text-xs text-slate-500">${d.row_count.toLocaleString()}행 · ${fmt(d.total_amount)}천원 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-blue-100 text-blue-700">사용중</span>' : '<span class="badge bg-slate-100 text-slate-500">이전본</span>'}</li>`).join("")}</ul>` : `<p class="mt-5 text-sm text-slate-500">${esc(state.year)}년 계획이 아직 없습니다.</p>`}
+            <p class="mt-4 text-xs text-slate-400">같은 연도에 여러 번 올리면 <b>가장 최근 업로드</b>가 사용됩니다.</p>
+          </article>
+        </section>
+      </div>`;
+  }
+
+  // ───────────────────────── 2 실적 집계 ─────────────────────────
+  function renderCollect() {
+    const ds = (state.status?.datasets || []).filter(d => d.kind === "erp" && String(d.year) === String(state.year));
+    const runs = state.status?.runs || {};
+    const sums = ["손익", "자본"].map(b => {
+      const s = runs[b]?.summary;
+      if (!s) return `<article class="metric-card"><p class="text-sm font-semibold text-slate-500">${b} 매칭</p><p class="mt-3 text-sm text-slate-500">미실행</p></article>`;
+      return `<article class="metric-card"><p class="text-sm font-semibold text-slate-500">${b} 매칭 결과</p>
+        <p class="mt-3 text-3xl font-bold">${fmt(s["총 실적(천원)"])}<span class="ml-1 text-sm font-semibold text-slate-400">천원</span></p>
+        <p class="mt-2 text-sm text-slate-500">계획집행 ${fmt(s["계획집행 행수"])}행 · 신규 ${fmt(s["신규 행수"])}행 · 학습확정 ${fmt(s["학습확정 전표수"] ?? 0)}건</p></article>`;
+    }).join("");
+    return `
+      <div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 2</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">실적 집계와 사업 매칭</h2>
+        <p class="mt-2 text-sm text-slate-500">ERP(SAP) zrfm2 실적을 업로드하고 자동 매칭을 실행합니다. 저확신 항목은 실적분석(상세)에서 사람이 확인합니다.</p></section>
+        ${state.status?.locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태 — 업로드·분석이 차단됩니다.</section>` : ""}
+        <section class="panel p-5">${yearPicker("cp")}</section>
+        <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
+          <article class="panel p-6"><h3 class="section-title">ERP(zrfm2) 업로드 — <span class="text-blue-700">${esc(state.year)}년</span>으로 등록</h3>
+            <p class="section-help">SAP에서 추출한 zrfm2 원본 그대로 — 합계행·타연도 전표는 자동으로 걸러집니다.</p>
+            <button class="mt-6 grid w-full place-items-center rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 px-6 py-12 text-center hover:border-blue-400" data-action="pick-erp">
+              <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white text-blue-700 shadow-sm"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
+              <span class="mt-4 font-bold text-blue-950">zrfm2 Excel(xlsx) 선택</span>
+              <span class="mt-1 text-sm text-blue-700">업로드 즉시 DB로 흡수 · 원본 미보관</span></button>
+            <input id="erpFile" class="hidden" type="file" accept=".xlsx">
+            <div class="mt-6 flex items-center justify-between rounded-xl bg-slate-50 p-4">
+              <div><p class="font-semibold text-slate-800">자동 매칭 분석 (${esc(state.year)}년)</p><p class="text-xs text-slate-500">손익·자본을 한 번에 실행합니다 (약 1분) · 학습 DB 자동 적용</p></div>
+              <button class="btn-primary" data-action="analyze">분석 실행</button>
+            </div>
+          </article>
+          <article class="panel p-6"><h3 class="section-title">이 연도의 ERP 데이터셋</h3>
+            ${ds.length ? `<ul class="mt-5 space-y-3 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between rounded-xl ${i === 0 ? "border border-emerald-200 bg-emerald-50" : "bg-slate-50"} p-3"><div><p class="font-semibold text-slate-800">${esc(d.label)}</p><p class="text-xs text-slate-500">${d.row_count.toLocaleString()}행 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-emerald-100 text-emerald-700">사용중</span>' : '<span class="badge bg-slate-100 text-slate-500">이전본</span>'}</li>`).join("")}</ul>` : `<p class="mt-5 text-sm text-slate-500">${esc(state.year)}년 ERP 자료가 아직 없습니다.</p>`}
+          </article>
+        </section>
+        <section class="grid gap-4 md:grid-cols-3">${sums}
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">다음 단계</p>
+          <p class="mt-3 text-sm text-slate-600">매칭 결과를 지사별로 검토하고 잘못 붙은 전표를 재배정하세요.</p>
+          <button class="btn-secondary mt-4" data-view="detail">실적분석(상세) →</button></article>
+        </section>
+      </div>`;
+  }
+
+  // ───────────────────────── 3 실적 분석 (전지사) ─────────────────────────
+  // 검색어 입력 시에는 결과 영역(#brResults)만 갱신 — 입력창을 다시 만들지
+  // 않아 한글 조합(IME)이 끊기지 않는다.
+  function brResultsHtml() {
+    const all = (state.branches || []).map(r => ({...r, ...amounts(r)}))
+      .filter(r => r.branch.toLocaleLowerCase("ko").includes(state.search.trim().toLocaleLowerCase("ko")));
+    const rows = all.filter(r => !r.unmapped);
+    const unmappedRows = all.filter(r => r.unmapped);   // 미매핑 가상 지사 → 맨 아래
+    if (state.sort === "rateAsc") rows.sort((a, b) => (rateVal(a.plan, a.actual) ?? Infinity) - (rateVal(b.plan, b.actual) ?? Infinity));
+    else if (state.sort === "planDesc") rows.sort((a, b) => b.plan - a.plan);
+    else if (state.sort === "branchAsc") rows.sort((a, b) => a.branch.localeCompare(b.branch, "ko"));
+    else rows.sort((a, b) => (rateVal(b.plan, b.actual) ?? -Infinity) - (rateVal(a.plan, a.actual) ?? -Infinity));
+    const tot = rows.reduce((a, r) => { a.plan += r.plan; a.actual += r.actual; return a; }, {plan: 0, actual: 0});
+    return `
+        <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 계획</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-slate-400">천원</span></p></article><article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 집행률</p><p class="mt-3 text-2xl font-bold">${fmtRate(tot.plan, tot.actual)}</p></article></section>
+        <section class="panel mt-6 overflow-hidden">
+          ${rows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">잔액</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">검토대상</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${rows.map(r => `<tr class="clickable hover:bg-blue-50/40" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-slate-900">${esc(r.branch)}</td><td class="table-cell text-right">${fmt(r.plan)}</td><td class="table-cell text-right">${fmt(r.actual)}</td><td class="table-cell text-right ${r.plan - r.actual < 0 ? "text-red-600" : ""}">${fmt(r.plan - r.actual)}</td><td class="table-cell text-right">${rateBadge(r.plan, r.actual)}</td><td class="table-cell text-right">${r.lowConf ? `<span class="badge bg-amber-50 text-amber-700">${r.lowConf}건</span>` : '<span class="text-xs text-slate-400">-</span>'}</td></tr>`).join("")}
+          ${unmappedRows.map(r => `<tr class="clickable row-unmapped hover:bg-blue-50/40" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-red-600">${esc(r.branch)}</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right text-slate-400">-</td><td class="table-cell text-right"><span class="badge bg-slate-100 text-red-600">종합표 미포함</span></td><td class="table-cell text-right"><span class="badge bg-slate-100 text-red-600">미매핑 ${r.unmapped}건 · ${fmt(r.unmappedAmt)}천원</span></td></tr>`).join("")}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold text-slate-950">합계</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td class="table-cell text-right font-bold">${fmt(tot.plan - tot.actual)}</td><td class="table-cell text-right font-bold">${fmtRate(tot.plan, tot.actual)}</td><td></td></tr></tfoot></table></div>` : emptyState("분석 이력이 없거나 검색 결과가 없습니다.")}
+        </section>`;
+  }
+
+  function renderBranches() {
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-blue-700">실적 분석</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">전체 지사 현황 — ${esc(state.year)}년</h2><p class="mt-2 text-sm text-slate-500">지사를 클릭하면 상세 검토 화면으로 이동합니다. (단위: 천원)</p></div></section>
+        <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
+          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사명 검색</span><input class="control w-full" data-filter="search" value="${esc(state.search)}" placeholder="지사명을 입력하세요"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산 구분</span><select class="control" data-filter="type"><option value="all" ${state.type === "all" ? "selected" : ""}>전체</option><option value="profit" ${state.type === "profit" ? "selected" : ""}>손익</option><option value="capital" ${state.type === "capital" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">정렬</span><select class="control" data-filter="sort"><option value="rateDesc" ${state.sort === "rateDesc" ? "selected" : ""}>집행률 높은 순</option><option value="rateAsc" ${state.sort === "rateAsc" ? "selected" : ""}>집행률 낮은 순</option><option value="planDesc" ${state.sort === "planDesc" ? "selected" : ""}>예산 금액 큰 순</option><option value="branchAsc" ${state.sort === "branchAsc" ? "selected" : ""}>지사명 순</option></select></label>
+        </div></section>
+        <div id="brResults">${brResultsHtml()}</div>
+      </div>`;
+  }
+
+  // ───────────────────────── 3+ 실적분석(상세) ─────────────────────────
+  const DET_COLS = [
+    ["budget", "구분"], ["예산과목", "예산과목"], ["속성", "속성"], ["사업명", "사업명"],
+    ["연예산원", "연예산(A)"], ["실적원", "실적금액(B)"], ["구분", "상태"], ["확신도", "확신도"],
+  ];
+
+  function detSortArrow(key) {
+    if (state.det.sortKey !== key) return '<span class="text-slate-300">↕</span>';
+    return state.det.sortDir > 0 ? "▲" : "▼";
+  }
+
+  function legend() {
+    return `<div class="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fff;border:1px solid #cbd5e1"></span>계획집행 — 계획 사업에 실적이 붙음</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fef2f2"></span><b>분홍</b> = 미시행 (계획은 있으나 실적 0)</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fffbeb"></span><b>노랑</b> = 신규 (계획에 없던 집행)</span>
+      <span class="flex items-center gap-1.5"><span class="swatch" style="background:#f1f5f9"></span><b>회색</b> = 미매핑 (지사 미확정 — 재배정으로 지사 지정, 종합표 미포함)</span>
+      <span class="flex items-center gap-1.5">확신도: <span class="badge bg-emerald-50 text-emerald-700">0.80↑ 자동확정</span><span class="badge bg-amber-50 text-amber-700">0.80미만 검토 필요</span></span>
+    </div>`;
+  }
+
+  function renderDetail() {
+    const d = state.det;
+    const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
+    if (!d.data) {
+      return `<div class="space-y-6">
+        <section><p class="text-sm font-semibold text-blue-700">STAGE 3+</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">실적분석 (상세) — ${esc(state.year)}년</h2>
+        <p class="mt-2 text-sm text-slate-500">지사를 선택하면 손익·자본 구분 없이 전체 사업 목록이 표시됩니다.</p></section>
+        <section class="panel p-5"><label class="block max-w-sm"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사 선택</span>
+        <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
+        ${!(state.branches || []).length ? `<p class="mt-4 text-sm text-amber-700">분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.</p>` : ""}</section>
+      </div>`;
+    }
+    const locked = !!state.status?.locked;
+    return `
+      <div class="space-y-6">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div><p class="text-sm font-semibold text-blue-700">STAGE 3+ · ${esc(state.year)}년</p>
+          <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">${esc(d.branch)} — 사업별 실적 검토</h2>
+          <p class="mt-2 text-sm text-slate-500">사업 클릭=전표 트리 · 컬럼 제목 클릭=정렬 · ✎=내용 수정 · 전표 체크=재배정. <b>수정은 즉시 저장되고, 분석 반영은 모아서 한 번</b> 하면 됩니다.</p></div>
+          <button class="btn-secondary" data-view="branches">← 전체 지사</button>
+        </section>
+        ${pendingBarHtml()}
+        <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">예산과목</span><select class="control" data-det="item"><option value="">전체</option>${d.data.items.map(it => `<option value="${esc(it)}" ${d.item === it ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">속성</span><select class="control" data-det="attr"><option value="">전체</option>${d.data.attrs.map(a => `<option value="${esc(a)}" ${d.attr === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></label>
+          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-slate-500">사업명 검색</span><input class="control w-full" data-det="q" value="${esc(d.q)}" placeholder="사업명 일부를 입력"></label>
+          <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-slate-600"><input type="checkbox" class="accent-blue-600" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+          ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
+        </div></section>
+        ${!locked && d.addOpen ? addBizFormHtml() : ""}
+        ${locked ? `<section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">🔒 ${esc(state.year)}년은 마감(잠금) 상태입니다 — 조회만 가능하며 재배정·수정이 차단됩니다. (설정 탭에서 해제 가능)</section>` : ""}
+        <div id="detResults">${detResultsHtml()}</div>
+      </div>`;
+  }
+
+  // 수동 사업 추가 폼 — 계획본에 없는 사업을 이 지사에 직접 등록
+  function addBizFormHtml() {
+    const d = state.det;
+    const add = d.add || (d.add = {budget: "손익"});
+    const items = state.status?.items?.[add.budget] || [];
+    return `
+      <section class="panel border-blue-300 bg-blue-50 p-5">
+        <p class="mb-3 text-sm font-bold text-blue-950">＋ 사업 추가 — <b>${esc(d.branch)}</b>에 계획본에 없는 사업을 등록합니다
+          <span class="ml-2 text-xs font-medium text-blue-700">저장 후 자동 재분석되어 목록에 나타나고(실적 없으면 '미시행'), 전표 재배정 대상 사업으로 쓸 수 있습니다.</span></p>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산구분</span>
+            <select id="abBudget" class="control w-full" data-add-budget="1">
+              <option value="손익" ${add.budget === "손익" ? "selected" : ""}>손익</option>
+              <option value="자본" ${add.budget === "자본" ? "selected" : ""}>자본</option></select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산과목 *</span>
+            <select id="abItem" class="control w-full">${items.map(it => `<option value="${esc(it)}">${esc(it)}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">속성 (비우면 마스터 자동)</span>
+            <select id="abAttr" class="control w-full"><option value="">(자동)</option>${["일반", "제조", "건가", "자산"].map(a => `<option value="${a}">${a}</option>`).join("")}</select></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">연예산 (천원)</span><input id="abPlan" class="control w-full" type="number" min="0" placeholder="0"></label>
+          <label class="block sm:col-span-2"><span class="mb-1.5 block text-xs font-semibold text-blue-700">사업명 *</span><input id="abName" class="control w-full" placeholder="사업명을 입력하세요"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">주관부서명</span><input id="abOwner" class="control w-full"></label>
+          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 부서명(부)</span><input id="abPart" class="control w-full"></label>
+        </div>
+        <div class="mt-4 flex gap-2">
+          <button class="btn-primary" data-action="save-add">사업 추가 (자동 재분석)</button>
+          <button class="btn-secondary" data-action="toggle-add">닫기</button>
+        </div>
+      </section>`;
+  }
+
+  // 사업 삭제 확인 상자 — 귀속 전표가 있으면 '어디로 옮길지'를 반드시 고르게 한다.
+  //   전표를 그냥 지우면 ERP 총액과 어긋나므로, 삭제는 언제나 (전표 이동 + 계획행 제외)다.
+  function unassignedName(b) {
+    return `${state.det.branch} ${b.예산과목} 미지정`;
+  }
+  function deleteBoxHtml(b, key) {
+    if (state.det.delKey !== key) return "";
+    const n = (b.전표 || []).length;
+    const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+    // 자기 자신만 제외(이름이 아니라 행 단위) — 동명 사업이 둘일 때 쌍둥이를 대상으로
+    //   고를 수 있어야 중복을 하나로 합칠 수 있다.
+    const others = [...new Set((state.det.data.biz || [])
+      .map((x, idx) => ({...x, _k: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+      .filter(x => x.budget === b.budget && x.예산과목 === b.예산과목 && x._k !== key
+                   && !(hasPlan && x.사업명 === b.사업명))
+      .map(x => x.사업명))].sort((x, y) => String(x).localeCompare(String(y), "ko"));
+    return `
+      <div class="danger-box">
+        <p class="danger-title">사업 삭제 — "${esc(b.사업명)}"</p>
+        ${!hasPlan ? `<p class="danger-text">이 사업은 계획에 없는 <b>${esc(b.구분)}</b> 행입니다 — 귀속 전표를 옮기면 그대로 사라집니다(삭제 기록을 남기지 않습니다).</p>` : ""}
+        ${n ? `
+        <p class="danger-text">귀속 전표 <b>${n}건 · ${fmt(b.실적원)}원</b>이 있습니다. 총액이 어긋나지 않게 <b>먼저 옮길 곳을 고르세요.</b>${hasPlan ? " 옮긴 뒤 이 사업을 삭제합니다." : ""}</p>
+        <label class="mt-3 block max-w-30"><span class="danger-label">전표를 옮길 사업 (같은 지사 · 같은 예산과목)</span>
+          <select id="delTarget" class="control w-full">
+            ${others.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}
+            <option value="__unassigned__" ${others.length ? "" : "selected"}>— 미지정 항목으로 이동 (${esc(unassignedName(b))}) —</option>
+          </select></label>` : `
+        <p class="danger-text">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)}천원</b>)이 이후 분석에서 제외됩니다.</p>`}
+        ${hasPlan ? `<p class="danger-text">원본 계획 자료는 지우지 않습니다 — 설정 탭 <b>'사업 삭제 이력'</b>에서 되돌릴 수 있습니다.</p>` : `<p class="danger-text">되돌리려면 설정 탭 <b>'수동 재배정 이력'</b>에서 해당 이동 기록을 지우면 됩니다.</p>`}
+        <div class="mt-3 flex gap-2">
+          <button class="btn-danger" data-action="confirm-delete" data-ekey="${esc(key)}">${!hasPlan ? "전표 옮기고 정리" : (n ? "옮기고 삭제" : "삭제")}</button>
+          <button class="btn-secondary" data-action="cancel-delete">취소</button>
+        </div>
+      </div>`;
+  }
+
+  // 검색어 입력 시 결과 영역만 갱신(#detResults) — 입력창을 다시 만들지 않아
+  // 한글 조합(IME)이 끊기지 않는다.
+  function detResultsHtml() {
+    const d = state.det;
+    const data = d.data;
+    let biz = data.biz.map((b, idx) => ({...b, _key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}));
+    if (d.budget !== "all") biz = biz.filter(b => b.budget === d.budget);
+    if (d.item) biz = biz.filter(b => b.예산과목 === d.item);
+    if (d.attr) biz = biz.filter(b => String(b.속성 ?? "") === d.attr);
+    if (d.hideMissing) biz = biz.filter(b => b.구분 !== "미시행");
+    if (d.q.trim()) { const q = d.q.trim().toLocaleLowerCase("ko"); biz = biz.filter(b => String(b.사업명 ?? "").toLocaleLowerCase("ko").includes(q)); }
+    if (d.sortKey) {
+      const k = d.sortKey, dir = d.sortDir;
+      biz.sort((a, b) => {
+        const va = a[k], vb = b[k];
+        if (typeof va === "number" || typeof vb === "number")
+          return ((va ?? -Infinity) - (vb ?? -Infinity)) * dir;
+        return String(va ?? "").localeCompare(String(vb ?? ""), "ko") * dir;
+      });
+    }
+    const tot = biz.reduce((a, b) => { a.plan += b.연예산; a.actual += b.실적;
+      a.planWon += b.연예산원; a.actualWon += b.실적원; return a; },
+      {plan: 0, actual: 0, planWon: 0, actualWon: 0});
+    const selCount = d.sel.size;
+    const locked = !!state.status?.locked;
+
+    const rows = biz.map(b => {
+      const key = b._key;
+      const open = d.open.has(key);
+      const editing = d.editKey === key;
+      const allSel = b.전표.length > 0 && b.전표.every(v => d.sel.has(v.erp_row_id));
+      const vhead = !open || !b.전표.length ? "" : `
+        <tr class="voucher-head">
+          <td class="table-cell pl-6 text-xs font-bold text-slate-500" colspan="2">
+          ${locked ? "예산과목" : `<label class="flex items-center gap-2" title="이 사업의 전표 전체 선택/해제"><input type="checkbox" class="accent-blue-600" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>예산과목</span></label>`}</td>
+          <td class="table-cell text-xs font-bold text-slate-500">전표번호</td>
+          <td class="table-cell text-xs font-bold text-slate-500">전표 텍스트(ERP)</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500">전기일</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500">전표금액(원)</td>
+          <td class="table-cell text-right text-xs font-bold text-slate-500" colspan="2">확신도</td>
+          <td></td></tr>`;
+      const vrows = !open ? "" : vhead + b.전표.map(v => `
+        <tr class="voucher-row">
+          <td class="table-cell pl-6" colspan="2">
+          <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-blue-600" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
+          <span class="cell-item text-xs text-slate-600" title="${esc(v.과목 ?? b.예산과목)}">${esc(v.과목 ?? b.예산과목)}</span></label></td>
+          <td class="table-cell cell-doc text-xs text-slate-500">${esc(v.전표번호 ?? "-")}</td>
+          <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
+          <td class="table-cell text-right text-xs text-slate-400">${esc(v.전기일 ?? "")}</td>
+          <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
+          <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}</td>
+          <td></td></tr>`).join("")
+        + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-slate-400" colspan="9">귀속 전표 없음 (미시행)</td></tr>` : "");
+      const editRow = !editing ? "" : `
+        <tr class="edit-row"><td colspan="9" class="p-4">
+          <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p class="mb-3 text-sm font-bold text-blue-950">사업 내용 수정 <span class="ml-2 text-xs font-medium text-blue-700">빈칸으로 저장하면 해당 값이 지워집니다. 저장 즉시 반영 + 이후 분석에도 유지.</span></p>
+            <div class="edit-grid">
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 지사(처.지사)</span>
+                <select id="edBranch" class="control w-full">${realBranches().map(x => `<option value="${esc(x)}" ${x === state.det.branch ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산과목</span>
+                <select id="edItem" class="control w-full">${(((state.status || {}).items || {})[b.budget] || [b.예산과목]).map(x => `<option value="${esc(x)}" ${x === b.예산과목 ? "selected" : ""}>${esc(x)}</option>`).join("")}${(((state.status || {}).items || {})[b.budget] || []).includes(b.예산과목) ? "" : `<option value="${esc(b.예산과목)}" selected>${esc(b.예산과목)} (구성에 없음)</option>`}</select></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">사업명</span><input id="edName" class="control w-full" value="${esc(b.사업명)}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">속성</span><input id="edAttr" class="control w-full" value="${esc(b.속성 ?? "")}" placeholder="예: 제조/자산/건가"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">주관부서명</span><input id="edDept" class="control w-full" value="${esc(b.주관부서명 ?? "")}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">예산귀속 부서명(부)</span><input id="edPart" class="control w-full" value="${esc(b.부서부 ?? "")}"></label>
+              <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">연예산(A) · 천원</span><input id="edPlan" class="control w-full text-right" value="${b.연예산 ?? ""}" placeholder="천원 단위"></label>
+            </div>
+            <p class="mt-2 text-xs text-blue-700"><b>예산귀속 지사</b>를 바꾸면 이 사업이 연예산(A)·귀속 전표까지 <b>통째로</b> 그 지사로 이동합니다(삭제·재생성 아님). <b>예산과목</b>은 같은 예산(${esc(b.budget)}) 안에서만 바꿀 수 있고, 전표의 과목은 ERP 계정코드가 정하므로 <b>귀속 전표는 옛 과목에 신규로 남습니다</b>. <b>주관부서명</b>은 표기용 텍스트라 종합표·지사별 집계는 바뀌지 않습니다. <b>연예산</b>을 고치면 원본 계획본은 그대로 두고 이후 모든 분석·종합표·집행률에 그 값이 쓰입니다.</p>
+            ${deleteBoxHtml(b, key)}
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button class="btn-primary" data-action="save-edit" data-ekey="${esc(key)}">저장</button>
+              <button class="btn-secondary" data-action="cancel-edit">취소</button>
+              <button class="btn-danger-outline push-right" data-action="ask-delete" data-ekey="${esc(key)}">이 사업 삭제</button>
+            </div>
+          </div>
+        </td></tr>`;
+      return `
+        <tr class="clickable ${b.구분 === "미시행" ? "row-missing" : ""} ${String(b.구분).startsWith("신규") ? "row-new" : ""} ${b.구분 === "미매핑" ? "row-unmapped" : ""} hover:bg-blue-50/40" data-biz="${esc(key)}">
+          <td class="table-cell"><span class="badge ${b.budget === "손익" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}">${b.budget}</span></td>
+          <td class="table-cell text-slate-700 cell-item" title="${esc(b.예산과목)}">${esc(b.예산과목)}</td>
+          <td class="table-cell text-slate-500">${esc(b.속성 ?? "-")}</td>
+          <td class="table-cell font-semibold text-slate-900 cell-name" title="${esc(b.사업명)}"><span class="mr-1 inline-block w-3 text-slate-400">${b.전표.length ? (open ? "▾" : "▸") : ""}</span>${esc(b.사업명)}</td>
+          <td class="table-cell text-right">${fmt(b.연예산원)}</td>
+          <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
+          <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
+          <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
+          <td class="table-cell text-right">${locked ? "" : `<button class="grid h-6 w-6 place-items-center rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700" title="사업 내용 수정" data-edit="${esc(key)}">✎</button>`}</td>
+        </tr>${editRow}${vrows}`;
+    }).join("");
+
+    // 이동 대상 지사 — 현재 지사가 실제 지사면 그것이 기본값, 미매핑 가상지사면 미선택
+    const ovDeptSel = d.ovDept || (realBranches().includes(d.branch) ? d.branch : "");
+    // 이동할 사업 목록은 '이동 대상 지사' 기준 — 현재 지사는 화면 데이터, 다른 지사는
+    //   ovBiz 캐시(지사 변경 시 불러옴)에서 가져온다. 그래야 타 지사·처의 기존 사업에
+    //   바로 붙일 수 있다.
+    const ovNames = (() => {
+      if (!selCount || !ovDeptSel) return [];
+      const src = ovDeptSel === d.branch ? data.biz : state.ovBiz[`${state.year}|${ovDeptSel}`];
+      if (!src) return null;                       // null = 아직 안 불러옴
+      return [...new Set(src.filter(b => b.budget === d.selBudget).map(b => b.사업명))].sort(
+        (a, b) => String(a).localeCompare(String(b), "ko"));
+    })();
+    const targetOpts = (() => {
+      if (!selCount) return "";
+      // 첫 항목은 항상 '선택 없음' — 실수로 목록 맨 위 사업에 붙는 것을 막고,
+      //   새 사업명을 직접 입력하는 흐름을 기본값으로 둔다.
+      return `<option value="" ${d.ovTarget ? "" : "selected"}>— 선택 없음 (직접 입력) —</option>`
+        + (ovNames || []).map(n => `<option value="${esc(n)}" ${n === d.ovTarget ? "selected" : ""}>${esc(n)}</option>`).join("");
+    })();
+
+    return `
+        <section class="grid gap-4 sm:grid-cols-3">
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">조회 사업</p><p class="mt-3 text-2xl font-bold">${biz.length}건</p></article>
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">연예산(A)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-slate-400">천원</span></p></article>
+          <article class="metric-card"><p class="text-sm font-semibold text-slate-500">최종 실적금액(B)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.actual)} <span class="text-xs font-semibold text-slate-400">천원</span></p><p class="mt-1 text-xs text-slate-500">집행률 ${fmtRate(tot.plan, tot.actual)}</p></article>
+        </section>
+        ${selCount && !locked ? `<section class="panel sticky top-16 z-10 mt-6 border-blue-300 bg-blue-50 p-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <p class="font-bold text-blue-950">${selCount}건 전표 선택 (${esc(d.selBudget)})</p>
+            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 지사</span>
+              <select id="ovDept" class="control">${ovDeptSel ? "" : '<option value="">— 지사 선택 —</option>'}${realBranches().map(b => `<option value="${esc(b)}" ${b === ovDeptSel ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">이동할 사업 선택 <span class="font-bold">(${esc(ovDeptSel || "지사 미선택")} 기준${ovNames ? ` · ${ovNames.length}건` : ""})</span></span><select id="ovTarget" class="control w-full">${targetOpts}</select></label>
+            <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-blue-700">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용" value="${esc(d.ovManual || "")}"></label>
+            <button class="btn-primary" data-action="save-override">재배정 저장 (자동 재분석)</button>
+            <button class="btn-secondary" data-action="clear-sel">선택 해제</button>
+          </div>
+          <p class="mt-2 text-xs text-blue-700">사업 목록은 <b>이동할 지사</b>의 기존 사업입니다 — 그 지사·처에 이미 있는 사업에 붙이려면 목록에서 고르세요. <b>새 사업</b>으로 옮기려면 <b>'— 선택 없음 —'</b> 그대로 두고 사업명을 직접 입력하면 그 지사의 신규 사업으로 귀속됩니다.</p>
+          </section>` : ""}
+        <section class="panel mt-6 overflow-hidden">
+          <div class="border-b border-slate-200 px-4 py-3">${legend()}</div>
+          ${biz.length ? `<div class="overflow-x-auto"><table class="det-table w-full"><thead class="table-head"><tr>
+            ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 7 ? "text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
+            <th class="text-right">수정</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${rows}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="3"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
+        </section>
+        <p class="mt-4 text-xs text-slate-400">표의 연예산(A)·실적금액(B)·전표금액은 <b>원 단위</b>, 상단 요약 카드는 <b>천원 단위</b>입니다. 재배정은 저장 즉시 자동 재분석되어 반영되고, 그 확정 내용은 자동으로 학습됩니다.</p>`;
+  }
+
+  // ───────────────────────── 4 통계·내보내기 ─────────────────────────
+  function renderStats() {
+    const st = state.stats;
+    if (!st || !Object.keys(st.budgets || {}).length) {
+      return `<div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">통계 · 내보내기 — ${esc(state.year)}년</h2></section>${emptyState("분석 이력이 없습니다. 먼저 분석을 실행하세요.")}</div>`;
+    }
+    const sections = Object.entries(st.budgets).map(([budget, data]) => {
+      const items = data.items;
+      const tot = items.reduce((a, x) => { a.p += x.계획; a.a += x.실적; return a; }, {p: 0, a: 0});
+      const maxA = Math.max(1, ...data.groups.map(g => Math.max(g.계획, g.실적)));
+      return `
+        <section class="panel overflow-hidden">
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-5 sm:p-6">
+            <div><h3 class="section-title">${budget}예산 — 과목별 계획 대비 실적</h3><p class="section-help">${esc(state.year)}년 · 25년 확정 분류체계 · 단위: 천원</p></div>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn-primary" data-export="actual" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">실적 Excel</button>
+              <button class="btn-secondary" data-export="v1" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">zrfm2_V1</button>
+              <button class="btn-secondary" data-export="matched" data-budget="${budget}" title="분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다">matched CSV</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">대분류</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">계획(A)</th><th class="px-4 py-3 text-right">실적(B)</th><th class="px-4 py-3 text-right">└ 계획집행</th><th class="px-4 py-3 text-right">└ 신규</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">사업수</th><th class="px-4 py-3 text-right">미시행</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">${items.map(x => `<tr class="hover:bg-slate-50"><td class="table-cell text-slate-500">${esc(x.대분류)}</td><td class="table-cell font-semibold text-slate-900">${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.계획)}</td><td class="table-cell text-right font-semibold">${fmt(x.실적)}</td><td class="table-cell text-right text-slate-500">${fmt(x.집행)}</td><td class="table-cell text-right text-slate-500">${fmt(x.신규)}</td><td class="table-cell text-right">${rateBadge(x.계획, x.실적)}</td><td class="table-cell text-right">${x.사업수}</td><td class="table-cell text-right ${x.미시행 ? "text-amber-700" : "text-slate-400"}">${x.미시행}</td></tr>`).join("")}</tbody>
+          <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold" colspan="2">합계</td><td class="table-cell text-right font-bold">${fmt(tot.p)}</td><td class="table-cell text-right font-bold">${fmt(tot.a)}</td><td colspan="2"></td><td class="table-cell text-right font-bold">${fmtRate(tot.p, tot.a)}</td><td colspan="2"></td></tr></tfoot></table></div>
+          <div class="border-t border-slate-200 p-5 sm:p-6"><h4 class="text-sm font-bold text-slate-700">지사그룹별 (계획 파랑 · 실적 청록)</h4>
+            <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-slate-800">${esc(g.그룹)}</span><span class="text-xs text-slate-500"><span class="font-semibold text-blue-700">${fmt(g.계획)}</span> / <span class="font-semibold text-emerald-700">${fmt(g.실적)}</span> · ${fmtRate(g.계획, g.실적)}</span></div>
+            <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-500" style="width:${g.계획 / maxA * 100}%"></div></div>
+            <div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
+        </section>`;
+    }).join("");
+    const cmp = state.statsCompare;
+    const cmpSection = !cmp || !cmp.prev ? "" : Object.entries(cmp.budgets).map(([budget, items]) => {
+      const t = items.reduce((a, x) => { a.o += x.전년실적; a.c += x.당년실적; return a; }, {o: 0, c: 0});
+      return `
+      <section class="panel overflow-hidden">
+        <div class="border-b border-slate-200 p-5 sm:p-6"><h3 class="section-title">${budget}예산 — 전년 대비 증감 (${cmp.prev}년 → ${esc(state.year)}년)</h3><p class="section-help">각 연도의 최신 분석 실적 기준 · 단위: 천원</p></div>
+        <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">${cmp.prev}년 실적</th><th class="px-4 py-3 text-right">${esc(state.year)}년 실적</th><th class="px-4 py-3 text-right">증감</th><th class="px-4 py-3 text-right">증감률</th></tr></thead>
+        <tbody class="divide-y divide-slate-100">${items.map(x => `<tr class="hover:bg-slate-50"><td class="table-cell font-semibold text-slate-900">${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.전년실적)}</td><td class="table-cell text-right font-semibold">${fmt(x.당년실적)}</td><td class="table-cell text-right ${x.증감 < 0 ? "text-red-600" : "text-emerald-700"}">${x.증감 >= 0 ? "+" : ""}${fmt(x.증감)}</td><td class="table-cell text-right">${x.증감률 === null ? '<span class="badge bg-amber-50 text-amber-700">신규</span>' : `<span class="badge ${x.증감률 >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}">${x.증감률 >= 0 ? "+" : ""}${x.증감률}%</span>`}</td></tr>`).join("")}</tbody>
+        <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold">합계</td><td class="table-cell text-right font-bold">${fmt(t.o)}</td><td class="table-cell text-right font-bold">${fmt(t.c)}</td><td class="table-cell text-right font-bold ${t.c - t.o < 0 ? "text-red-600" : ""}">${t.c - t.o >= 0 ? "+" : ""}${fmt(t.c - t.o)}</td><td class="table-cell text-right font-bold">${t.o ? ((t.c - t.o) / t.o * 100).toFixed(1) + "%" : "-"}</td></tr></tfoot></table></div>
+      </section>`;
+    }).join("");
+    return `<div class="space-y-6">
+      <section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">통계 · 내보내기 — ${esc(state.year)}년</h2>
+      <p class="mt-2 text-sm text-slate-500">검토(재배정·수정)가 반영된 최신 분석 기준입니다.</p></section>
+      ${sections}${cmpSection}</div>`;
+  }
+
+  // ───────────────────────── 5 중장기 예측 / 설정 ─────────────────────────
+  function renderForecast() {
+    return `<div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 5</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">중장기 예산 예측</h2><p class="mt-2 text-sm text-slate-500">예산 표준화·벤치마크 기반 예측 단계로, 실적 데이터가 여러 연도 쌓이면 활성화됩니다.</p></section>${emptyState("개발 예정 — 다년도 실적 DB가 준비되면 이 화면에서 표준금액·팩터 기반 예측을 제공합니다.")}</div>`;
+  }
+
+  function renderSettings() {
+    const ds = state.status?.datasets || [];
+    const ovs = state.overrides || {};
+    const ovRows = ["손익", "자본"].flatMap(b => (ovs[b] || []).map(o => ({...o, budget: b})));
+    const learned = state.learned || {};
+    const edits = state.bizEdits || [];
+    return `<div class="space-y-6">
+      <section><p class="text-sm font-semibold text-blue-700">운영 관리</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">데이터 관리</h2>
+      <p class="mt-2 text-sm text-slate-500">모든 원자료는 백엔드 DB(data/budget.db)에만 저장됩니다.</p></section>
+
+      <section class="panel p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div><h3 class="section-title">🔒 연도 마감 (잠금)</h3>
+          <p class="section-help">검토·학습까지 끝난 연도를 마감하면 <b>업로드·분석·재배정·수정이 전부 차단</b>되어, 이후 학습이 업그레이드되어도 완료된 연도의 숫자가 절대 바뀌지 않습니다. 조회·통계·Excel 내보내기는 계속 가능합니다.</p></div>
+          <div class="flex flex-wrap gap-2">
+            ${state.status?.locked
+              ? `<button class="btn-secondary" data-action="unlock-year">🔓 ${esc(state.year)}년 잠금 해제</button>`
+              : `<button class="btn-primary" data-action="lock-year">🔒 ${esc(state.year)}년 마감(잠금)</button>`}
+          </div>
+        </div>
+        ${Object.keys(state.status?.locks || {}).length ? `<div class="mt-4 flex flex-wrap gap-2">${Object.entries(state.status.locks).map(([y, at]) => `<span class="badge bg-amber-50 text-amber-800">🔒 ${y}년 (${esc(at)})</span>`).join("")}</div>` : `<p class="mt-4 text-xs text-slate-400">마감된 연도가 없습니다.</p>`}
+      </section>
+
+      <section class="panel p-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div><h3 class="section-title">🧠 AI 학습 (수동 실행)</h3>
+          <p class="section-help">학습 DB는 <b>연도 구분 없이 하나</b>입니다 — 어느 연도에서 학습했든 <b>모든 연도 분석에 공통 적용</b>됩니다. 재배정은 <b>저장 시 학습하지 않습니다</b>(rev13에서 분리) — 검토가 끝난 뒤 아래 버튼으로 한 번에 학습하세요. 같은 텍스트의 전표는 유사도 계산보다 학습 결과를 우선 적용(확신도 0.99, 사람 확정 &gt; 자동 확정)하며, <b>사람이 직접 재배정한 전표는 학습이 덮지 못합니다</b>(확신도 1.0).</p>
+          <p class="mt-2 text-xs font-semibold text-amber-700">순서: ① 상세에서 수정·저장 → ② 상단 <b>분석 반영</b> → ③ 여기서 <b>AI 학습</b> → ④ 연도 마감. 분석 반영 전에 학습하면 방금 한 수정이 학습에 안 들어갑니다.</p></div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary" data-action="learn">${esc(state.year)}년 확정 결과 AI 학습${(state.pending?.learn_pending || 0) ? ` (대기 ${state.pending.learn_pending}건)` : ""}</button>
+            <button class="btn-secondary" data-action="clear-learned">학습 초기화</button>
+          </div>
+        </div>
+        ${(state.pending?.total || 0) ? `<p class="mt-4 text-xs font-semibold text-amber-700">⚠ 분석 미반영 변경 ${state.pending.total}건이 있습니다 — 먼저 상단 '분석 반영'을 누르세요.</p>` : ""}
+        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">학습된 매핑 총계 (전체 연도 공용)</p><p class="mt-1 text-2xl font-bold">${(learned["총계"] || 0).toLocaleString()}건</p></div>
+          <div class="rounded-xl bg-blue-50 p-4"><p class="text-xs font-semibold text-blue-700">사람 확정(재배정)</p><p class="mt-1 text-2xl font-bold text-blue-950">${(learned["수동확정"] || 0).toLocaleString()}건</p></div>
+          <div class="rounded-xl bg-slate-50 p-4"><p class="text-xs font-semibold text-slate-500">자동 확정</p><p class="mt-1 text-2xl font-bold">${(learned["자동확정"] || 0).toLocaleString()}건</p></div>
+        </div>
+        <p class="mt-4 text-xs text-slate-400">'학습 대기'는 재배정한 전표 중 아직 학습표에 없는 건수입니다(텍스트 없는 전표는 학습 대상이 아닙니다).</p>
+      </section>
+
+      <section class="panel p-6">
+        <h3 class="section-title">📚 기준정보 마스터</h3>
+        <p class="section-help">예산과목(계정코드·속성)·부서코드(처지사) 마스터 — 속성(일반/제조/건가/자산) 교정, ERP 과목 정규화, 계획행 처지사 보정에 사용됩니다. 조직개편·계정 신설 시 새 파일을 올려 갱신하세요(같은 코드는 덮어씀).</p>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl bg-slate-50 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-500">예산과목 마스터</p><button class="btn-secondary" data-action="pick-master-item">파일 갱신</button></div><p class="mt-2 text-2xl font-bold">${(state.status?.master?.예산과목 || 0).toLocaleString()}건</p><p class="mt-1 text-xs text-slate-400">양식: 계정코드·이름·주관부서코드·주관부서명·속성·비고</p></div>
+          <div class="rounded-xl bg-slate-50 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-500">부서코드 마스터</p><button class="btn-secondary" data-action="pick-master-dept">파일 갱신</button></div><p class="mt-2 text-2xl font-bold">${(state.status?.master?.부서코드 || 0).toLocaleString()}건</p><p class="mt-1 text-xs text-slate-400">양식: 부서코드·부서명·처지사·비고</p></div>
+        </div>
+        <input id="masterItemFile" class="hidden" type="file" accept=".xlsx">
+        <input id="masterDeptFile" class="hidden" type="file" accept=".xlsx">
+      </section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">등록 데이터셋</h3></div>
+      <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">종류</th><th class="px-4 py-3">연도</th><th class="px-4 py-3">파일</th><th class="px-4 py-3 text-right">행수</th><th class="px-4 py-3">업로드</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${ds.map(d => `<tr><td class="table-cell">${d.id}</td><td class="table-cell"><span class="badge ${d.kind === "plan" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}">${d.kind}</span></td><td class="table-cell">${d.year}</td><td class="table-cell">${esc(d.label)}</td><td class="table-cell text-right">${d.row_count.toLocaleString()}</td><td class="table-cell text-xs text-slate-500">${esc(d.uploaded_at)}</td></tr>`).join("")}</tbody></table></div></section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">수동 재배정 이력 (${esc(state.year)}년)</h3><p class="section-help">삭제하면 다음 분석 실행부터 자동 매칭으로 돌아갑니다.</p></div>
+      ${ovRows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">전표행</th><th class="px-4 py-3">배정 사업명</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${ovRows.map(o => `<tr><td class="table-cell">${o.id}</td><td class="table-cell">${o.budget}</td><td class="table-cell">${o.erp_row_id}</td><td class="table-cell font-semibold">${esc(o.target_name)}</td><td class="table-cell text-xs text-slate-500">${esc(o.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-override="${o.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">재배정 이력이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">수동 추가 사업 (${esc(state.year)}년)</h3><p class="section-help">상세 화면 '＋ 사업 추가'로 등록한 사업입니다. 삭제하면 다음 분석부터 제외됩니다.</p></div>
+      ${(state.manualBiz || []).length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">지사</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3">사업명</th><th class="px-4 py-3 text-right">연예산(천원)</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${state.manualBiz.map(m => `<tr><td class="table-cell">${m.id}</td><td class="table-cell">${m.budget}</td><td class="table-cell">${esc(m.처지사)}</td><td class="table-cell">${esc(m.예산과목)}</td><td class="table-cell font-semibold">${esc(m.사업명)}</td><td class="table-cell text-right">${fmt(m.연예산)}</td><td class="table-cell text-xs text-slate-500">${esc(m.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-manual="${m.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">수동 추가 사업이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">사업 내용 수정 이력 (${esc(state.year)}년)</h3><p class="section-help">상세 화면 ✎로 저장한 수정입니다. 삭제하면 다음 분석부터 원본으로 돌아갑니다.</p></div>
+      ${edits.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">대상 사업</th><th class="px-4 py-3">수정 내용</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">삭제</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${edits.map(e => `<tr><td class="table-cell">${e.id}</td><td class="table-cell">${e.budget}</td><td class="table-cell">${esc(e.처지사)} · ${esc(e.예산과목)} · ${esc(e.사업명)}</td><td class="table-cell text-xs">${esc(Object.entries(e.fields).map(([k, v]) => `${k}→${v === "" ? "(빈칸)" : v}`).join(", "))}</td><td class="table-cell text-xs text-slate-500">${esc(e.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-del-edit="${e.id}">삭제</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">수정 이력이 없습니다.</p>`}</section>
+
+      <section class="panel overflow-hidden"><div class="border-b border-slate-200 p-5"><h3 class="section-title">사업 삭제 이력 (${esc(state.year)}년)</h3><p class="section-help">상세 화면에서 삭제한 사업입니다. 원본 계획 자료는 지워지지 않았으므로, 여기서 <b>되돌리기</b>를 누르면 다음 분석부터 다시 살아납니다.</p></div>
+      ${(state.bizDeletes || []).length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">구분</th><th class="px-4 py-3">삭제한 사업</th><th class="px-4 py-3">전표 처리</th><th class="px-4 py-3">일시</th><th class="px-4 py-3 text-right">되돌리기</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${state.bizDeletes.map(x => `<tr><td class="table-cell">${x.id}</td><td class="table-cell">${x.budget}</td><td class="table-cell">${esc(x.처지사)} · ${esc(x.예산과목)} · <b>${esc(x.사업명)}</b></td><td class="table-cell text-xs text-slate-500">${esc(x.memo || "귀속 전표 없음")}</td><td class="table-cell text-xs text-slate-500">${esc(x.created_at)}</td><td class="table-cell text-right"><button class="btn-secondary" data-restore-del="${x.id}">되돌리기</button></td></tr>`).join("")}</tbody></table></div>` : `<p class="p-5 text-sm text-slate-500">삭제한 사업이 없습니다.</p>`}</section>
+    </div>`;
+  }
+
+  // ───────────────────────── 렌더 & 라우팅 ─────────────────────────
+  function renderPage() {
+    const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
+                       branches: renderBranches, detail: renderDetail, stats: renderStats,
+                       forecast: renderForecast, settings: renderSettings};
+    $("#page").innerHTML = renderers[state.view]();
+    const [title, subtitle] = viewMeta[state.view];
+    $("#pageTitle").textContent = title;
+    $("#pageSubtitle").textContent = subtitle;
+    document.querySelectorAll("nav [data-view]").forEach(b =>
+      b.classList.toggle("nav-button-active", b.dataset.view === state.view));
+    const ys = $("#yearSelect");
+    const years = state.years.length ? state.years : [state.year];
+    ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
+    syncAnalyzeButton();
+  }
+
+  async function navigate(view) {
+    state.view = view;
+    try {
+      await loadOverview();
+      await loadPending();
+      if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
+      if (view === "budget" || view === "collect") await loadStatus();
+      if (view === "stats") {
+        state.stats = await api(`/api/stats?year=${state.year}`);
+        state.statsCompare = await api(`/api/stats-compare?year=${state.year}`);
+      }
+      if (view === "settings") {
+        await loadStatus();
+        state.overrides = await api(`/api/overrides?year=${state.year}`);
+        state.learned = await api("/api/learned");
+        state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
+        state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
+        state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`);
+      }
+    } catch (e) { toast(e.message); }
+    renderPage();
+    closeMenu();
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  async function changeYear(y) {
+    state.year = String(y);
+    state.det = {...state.det, branch: "", data: null, open: new Set(), sel: new Set(), selBudget: null, editKey: null};
+    await navigate(state.view);
+  }
+
+  function addYearFromInput(inputId) {
+    const el = inputId ? document.getElementById(inputId) : null;
+    const v = el ? el.value.trim() : (prompt("추가할 연도를 입력하세요 (예: 2021)") || "").trim();
+    if (!/^\d{4}$/.test(v)) { toast("연도는 4자리 숫자로 입력하세요."); return; }
+    if (!state.years.includes(v)) {
+      state.years.push(v);
+      state.years.sort((a, b) => String(b).localeCompare(String(a)));
+    }
+    changeYear(v);
+    toast(`${v}년으로 전환했습니다. 계획·zrfm2를 업로드하세요.`);
+  }
+
+  async function runAnalyze(silent) {
+    const n = state.pending?.total || 0;
+    const t0 = Date.now();
+    busy(true, `손익·자본 매칭 분석 중... (${state.year}년${n ? `, 미반영 ${n}건 반영` : ""})`);
+    try {
+      const res = await api("/api/analyze", {method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({year: state.year})});
+      const p = res["손익"]["요약"], c = res["자본"]["요약"];
+      const sec = ((Date.now() - t0) / 1000).toFixed(1);
+      if (!silent) {
+        toast(`분석 완료 (${sec}초) — 손익 ${fmt(p["총 실적(천원)"])}천원 / 자본 ${fmt(c["총 실적(천원)"])}천원`);
+      }
+      if (state.det.branch) await loadDetail(state.det.branch);
+      await navigate(state.view);
+      return true;
+    } catch (e) { toast("분석 실패: " + e.message); return false; }
+    finally { busy(false); }
+  }
+
+  // 헤더 분석 버튼 — 미반영 변경이 있으면 '분석 반영 (N)'으로 바뀌고 강조된다.
+  function syncAnalyzeButton() {
+    const btn = $("#analyzeBtn"), label = $("#analyzeLabel"), cnt = $("#pendingCount");
+    if (!btn || !label || !cnt) return;
+    const n = state.pending?.total || 0;
+    label.textContent = n ? "분석 반영" : "분석 실행";
+    btn.classList.toggle("btn-pending", n > 0);
+    btn.title = n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
+    cnt.textContent = n ? String(n) : "";
+    cnt.classList.toggle("hidden", !n);
+  }
+
+  async function uploadFile(kind, file) {
+    busy(true, `${kind === "plan" ? "계획" : "zrfm2"} 자료를 ${state.year}년으로 DB에 흡수 중...`);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const info = await api(`/api/upload/${kind}?year=${state.year}`, {method: "POST", body: fd});
+      toast(`흡수 완료 — ${info.rows.toLocaleString()}행 (dataset #${info.dataset_id})`);
+      await navigate(state.view);
+    } catch (e) { toast(e.message); }
+    finally { busy(false); }
+  }
+
+  // ───────────────────────── 이벤트 ─────────────────────────
+  document.addEventListener("click", async e => {
+    const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
+    if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
+    const gy = e.target.closest("[data-goyear]");
+    if (gy) { changeYear(gy.dataset.goyear); return; }
+    const br = e.target.closest("[data-branch]");
+    if (br) {
+      busy(true, "지사 상세 로딩...");
+      try { await loadDetail(br.dataset.branch); state.view = "detail"; renderPage(); }
+      catch (err) { toast(err.message); }
+      finally { busy(false); }
+      return;
+    }
+    const th = e.target.closest("[data-detsort]");
+    if (th) {
+      const k = th.dataset.detsort;
+      if (state.det.sortKey === k) {
+        if (state.det.sortDir === 1) state.det.sortDir = -1;
+        else { state.det.sortKey = ""; state.det.sortDir = 1; }   // 3번째 클릭=기본 정렬
+      } else { state.det.sortKey = k; state.det.sortDir = 1; }
+      renderPage();
+      return;
+    }
+    const ed = e.target.closest("[data-edit]");
+    if (ed) {
+      state.det.editKey = state.det.editKey === ed.dataset.edit ? null : ed.dataset.edit;
+      renderPage();
+      return;
+    }
+    const biz = e.target.closest("[data-biz]");
+    if (biz && !e.target.closest("input") && !e.target.closest("button")) {
+      const k = biz.dataset.biz;
+      state.det.open.has(k) ? state.det.open.delete(k) : state.det.open.add(k);
+      renderPage();
+      return;
+    }
+    const act = e.target.closest("[data-action]")?.dataset.action;
+    if (act === "analyze") runAnalyze();
+    if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
+    if (act === "pick-plan") $("#planFile").click();
+    if (act === "pick-erp") $("#erpFile").click();
+    if (act === "pick-master-item") $("#masterItemFile").click();
+    if (act === "pick-master-dept") $("#masterDeptFile").click();
+    if (act === "clear-sel") {
+      state.det.sel.clear(); state.det.selBudget = null;
+      state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
+      renderPage();
+    }
+    if (act === "cancel-edit") { state.det.editKey = null; state.det.delKey = null; renderPage(); }
+    if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
+    if (act === "save-add") {
+      const name = $("#abName").value.trim();
+      if (!name) { toast("사업명을 입력하세요."); return; }
+      const body = {
+        year: state.year, budget: $("#abBudget").value,
+        예산과목: $("#abItem").value, 처지사: state.det.branch, 사업명: name,
+        속성: $("#abAttr").value || null,
+        주관부서명: $("#abOwner").value.trim() || null,
+        부서부: $("#abPart").value.trim() || null,
+        연예산: Number($("#abPlan").value) || 0,
+      };
+      busy(true, "사업 추가 저장 중...");
+      try {
+        await api("/api/manual-biz", {method: "POST",
+          headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+        state.det.addOpen = false;
+      } catch (err) { toast(err.message); busy(false); return; }
+      finally { busy(false); }
+      await afterSave(`사업 추가 저장 — "${name}"`);
+    }
+    if (act === "save-edit") {
+      const key = e.target.closest("[data-action]").dataset.ekey;
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === key);
+      if (!b) return;
+      const planIn = $("#edPlan") ? $("#edPlan").value.replace(/,/g, "").trim() : "";
+      if (planIn !== "" && isNaN(Number(planIn))) { toast("연예산은 숫자(천원)로 입력하세요."); return; }
+      const fields = {
+        "사업명": $("#edName").value.trim(),
+        "속성": $("#edAttr").value.trim(),
+        "주관부서명": $("#edDept").value.trim(),
+        "부서부": $("#edPart").value.trim(),
+      };
+      if (!fields["사업명"]) { toast("사업명은 비울 수 없습니다."); return; }
+      const planChanged = planIn !== String(b.연예산 ?? "");
+      if (planChanged) fields["연예산"] = planIn;      // 안 바꿨으면 보내지 않는다
+      // 예산과목 변경 — 전표 과목은 ERP 계정코드가 정하므로 귀속 전표는 옛 과목에 남는다.
+      const newItem = $("#edItem") ? $("#edItem").value : b.예산과목;
+      const itemChanged = !!newItem && newItem !== b.예산과목;
+      if (itemChanged) {
+        const n = (b.전표 || []).length;
+        const warn = n ? `\n\n귀속 전표 ${n}건(${fmt(b.실적원)}원)은 ERP 계정코드가 "${b.예산과목}"이라 그 과목에 신규 사업으로 남습니다. 총액은 보존됩니다.` : "";
+        if (!confirm(`예산과목을 바꿉니다.\n${b.예산과목} → ${newItem}${warn}\n\n계속할까요?`)) return;
+        fields["예산과목"] = newItem;
+      }
+      // 예산귀속 지사 변경 = 사업 통째 이동(계획행=biz_edit.처지사, 전표=override.target_dept)
+      const from = state.det.branch;
+      const to = $("#edBranch") ? $("#edBranch").value : from;
+      const moving = !!to && to !== from;
+      const vouchers = (b.전표 || []).map(v => v.erp_row_id);
+      const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+      // 내용이 실제로 바뀐 게 없으면 이력을 남기지 않는다(신규 사업 이동 등).
+      const edited = planChanged || itemChanged
+        || fields["사업명"] !== b.사업명
+        || fields["속성"] !== String(b.속성 ?? "")
+        || fields["주관부서명"] !== String(b.주관부서명 ?? "")
+        || fields["부서부"] !== String(b.부서부 ?? "");
+      if (moving) {
+        const parts = [`연예산 ${fmt(b.연예산원)}원`, `전표 ${vouchers.length}건`];
+        if (!confirm(`"${fields["사업명"]}" 사업을 ${from} → ${to}(으)로 통째 이동합니다.\n(${parts.join(" + ")})\n\n계속할까요?`)) return;
+        if (hasPlan) fields["처지사"] = to;      // 계획행(연예산)도 함께 이동
+      } else if (!edited) { state.det.editKey = null; renderPage(); return; }
+      busy(true, moving ? "사업 이동 저장 중..." : "사업 내용 저장 중...");
+      try {
+        if (edited || "처지사" in fields) {
+          await api("/api/biz-edit", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                                  처지사: from, 사업명: b.사업명, fields})});
+        }
+        if (moving && vouchers.length) {
+          await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, erp_row_ids: vouchers,
+                                  target_name: fields["사업명"], target_dept: to,
+                                  memo: `사업 통째 이동 ${from}→${to}`})});
+        }
+        state.det.editKey = null;
+        state.det.sel.clear(); state.det.selBudget = null;
+      } catch (err) { toast(err.message); busy(false); return; }
+      finally { busy(false); }
+      // 분석은 하지 않는다 — 화면은 즉시 패치분으로 갱신되고, 확정은 '분석 반영'에서.
+      await afterSave(moving ? `이동 저장 — "${fields["사업명"]}" → ${to}`
+                             : `저장 — "${fields["사업명"]}"`);
+    }
+    if (act === "ask-delete") {
+      state.det.delKey = e.target.closest("[data-action]").dataset.ekey;
+      renderPage();
+    }
+    if (act === "cancel-delete") { state.det.delKey = null; renderPage(); }
+    if (act === "confirm-delete") {
+      const key = e.target.closest("[data-action]").dataset.ekey;
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === key);
+      if (!b) return;
+      const vouchers = (b.전표 || []).map(v => v.erp_row_id);
+      // 계획행이 없는 행(신규·미매핑)은 '그 전표들의 집합'일 뿐이다 — 전표를 옮기면 사라진다.
+      //   여기에 삭제 기록(이름 기준)을 남기면 같은 이름의 계획행까지 지워지므로 남기지 않는다.
+      const hasPlan = !String(b.구분 ?? "").startsWith("신규") && b.구분 !== "미매핑";
+      let moveTo = null;
+      if (vouchers.length) {
+        const pick = $("#delTarget") ? $("#delTarget").value : "";
+        if (!pick) { toast("전표를 옮길 사업을 선택하세요."); return; }
+        moveTo = pick === "__unassigned__" ? unassignedName(b) : pick;
+        if (hasPlan && moveTo === b.사업명) { toast("같은 이름의 사업으로는 옮길 수 없습니다."); return; }
+        const tail = hasPlan ? `\n그 뒤 "${b.사업명}" 사업을 삭제합니다.` : "";
+        if (!confirm(`귀속 전표 ${vouchers.length}건(${fmt(b.실적원)}원)을 "${moveTo}"(으)로 옮깁니다.${tail}\n\n계속할까요?`)) return;
+      } else if (!confirm(`"${b.사업명}" 사업을 삭제합니다. (연예산 ${fmt(b.연예산)}천원, 귀속 전표 없음)\n설정 탭 이력에서 되돌릴 수 있습니다.\n\n계속할까요?`)) {
+        return;
+      }
+      busy(true, hasPlan ? "사업 삭제 중..." : "전표 이동 중...");
+      try {
+        if (moveTo) {
+          await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, erp_row_ids: vouchers,
+                                  target_name: moveTo, target_dept: state.det.branch,
+                                  memo: `사업 정리에 따른 전표 이동 (${b.사업명} → ${moveTo})`})});
+        }
+        if (hasPlan) {
+          await api("/api/biz-delete", {method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                                  처지사: state.det.branch, 사업명: b.사업명,
+                                  memo: moveTo ? `전표 ${vouchers.length}건 → ${moveTo}` : null})});
+        }
+        state.det.delKey = null; state.det.editKey = null;
+        state.det.sel.clear(); state.det.selBudget = null;
+      } catch (err) { toast(err.message); busy(false); return; }
+      finally { busy(false); }
+      await afterSave((hasPlan ? `삭제 저장 — "${b.사업명}"` : `정리 저장 — "${b.사업명}"`)
+                      + (moveTo ? ` (전표 ${vouchers.length}건 → ${moveTo})` : ""));
+    }
+    if (act === "save-override") {
+      const manual = $("#ovManual").value.trim();
+      const target = manual || $("#ovTarget").value;
+      if (!target) { toast("이동할 사업을 목록에서 고르거나, 새 사업명을 직접 입력하세요."); return; }
+      const destDept = $("#ovDept") ? $("#ovDept").value : "";
+      const isUnmapped = !!state.det.data?.unmapped;
+      if (!destDept) { toast("이동할 지사를 선택하세요."); return; }
+      // 미매핑 전표는 항상 지사 지정, 일반 전표는 지사가 바뀐 경우만 지정
+      const targetDept = (isUnmapped || destDept !== state.det.branch) ? destDept : null;
+      const cnt = state.det.sel.size;          // 선택을 비우기 전에 세어둔다
+      const movedDept = targetDept && targetDept !== state.det.branch ? targetDept : null;
+      busy(true, "재배정 저장 중...");
+      try {
+        await api("/api/override", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year, budget: state.det.selBudget,
+                                erp_row_ids: [...state.det.sel], target_name: target,
+                                target_dept: targetDept})});
+        state.det.sel.clear(); state.det.selBudget = null;
+        state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
+      } catch (err) { toast(err.message); busy(false); return; }
+      finally { busy(false); }
+      // 분석은 하지 않는다 — 여러 건 모아서 상단 '분석 반영'으로 한 번에.
+      await afterSave(`재배정 저장 — 전표 ${cnt}건 → "${target}"`
+                      + (movedDept ? ` (${movedDept})` : ""));
+    }
+    if (act === "learn") {
+      busy(true, `${state.year}년 확정 결과를 학습 중...`);
+      try {
+        const r = await api("/api/learn", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year})});
+        toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건)`);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+      finally { busy(false); }
+    }
+    if (act === "lock-year") {
+      if (!confirm(`${state.year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`)) return;
+      try {
+        const r = await api("/api/lock", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year})});
+        toast(r.notice);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    if (act === "unlock-year") {
+      if (!confirm(`${state.year}년 잠금을 해제할까요? 데이터 변경이 다시 가능해집니다.`)) return;
+      try {
+        await api(`/api/lock/${state.year}`, {method: "DELETE"});
+        toast(`${state.year}년 잠금 해제됨`);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    if (act === "clear-learned") {
+      if (!confirm("학습 DB를 모두 지울까요? 다음 분석부터 학습이 적용되지 않습니다.")) return;
+      try { await api("/api/learned", {method: "DELETE"}); toast("학습 초기화 완료"); await navigate("settings"); }
+      catch (err) { toast(err.message); }
+    }
+    const exp = e.target.closest("[data-export]");
+    if (exp) {
+      // 산출물 파일은 분석 때 만들지 않는다(그래야 수정이 빠름) → 첫 다운로드에서 생성.
+      toast("내보내기 준비 중… 분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다. 잠시 기다려 주세요.");
+      window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
+    }
+    const delOv = e.target.closest("[data-del-override]");
+    if (delOv) {
+      try {
+        await api(`/api/override/${delOv.dataset.delOverride}`, {method: "DELETE"});
+        toast("재배정 삭제됨 — 다음 분석 실행부터 반영됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const delMb = e.target.closest("[data-del-manual]");
+    if (delMb) {
+      try {
+        await api(`/api/manual-biz/${delMb.dataset.delManual}`, {method: "DELETE"});
+        toast("수동 추가 사업 삭제됨 — 다음 분석 실행부터 제외됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const delEd = e.target.closest("[data-del-edit]");
+    if (delEd) {
+      try {
+        await api(`/api/biz-edit/${delEd.dataset.delEdit}`, {method: "DELETE"});
+        toast("수정 이력 삭제됨 — 다음 분석 실행부터 원본으로 복원됩니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+    const restore = e.target.closest("[data-restore-del]");
+    if (restore) {
+      try {
+        await api(`/api/biz-delete/${restore.dataset.restoreDel}`, {method: "DELETE"});
+        toast("되돌렸습니다 — 다음 분석 실행부터 그 사업이 다시 살아납니다.");
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+    }
+  });
+
+  document.addEventListener("change", async e => {
+    if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
+    if (e.target.id === "planFile" && e.target.files[0]) { uploadFile("plan", e.target.files[0]); e.target.value = ""; return; }
+    if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
+    if ((e.target.id === "masterItemFile" || e.target.id === "masterDeptFile") && e.target.files[0]) {
+      const kind = e.target.id === "masterItemFile" ? "item" : "dept";
+      const file = e.target.files[0];
+      e.target.value = "";
+      busy(true, "마스터 갱신 중...");
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await api(`/api/upload/master?kind=${kind}`, {method: "POST", body: fd});
+        toast(r.notice);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+      finally { busy(false); }
+      return;
+    }
+    // 재배정 바 입력 보존 — 전표를 하나 더 체크해도 고른 지사·사업이 풀리지 않게
+    //   상태에 담아둔다(재렌더 없음).
+    if (e.target.id === "ovDept") {
+      const dept = e.target.value;
+      state.det.ovDept = dept;
+      state.det.ovTarget = "";                 // 지사가 바뀌면 사업 선택은 초기화
+      if (dept && dept !== state.det.branch && !state.ovBiz[`${state.year}|${dept}`]) {
+        busy(true, `${dept} 사업 목록 조회 중...`);
+        try { await loadOvBiz(dept); } catch (err) { toast(err.message); }
+        finally { busy(false); }
+      }
+      renderPage();
+      return;
+    }
+    if (e.target.id === "ovTarget") { state.det.ovTarget = e.target.value; return; }
+    const f = e.target.dataset.filter;
+    if (f === "type") { state.type = e.target.value; renderPage(); }
+    if (f === "sort") { state.sort = e.target.value; renderPage(); }
+    const chk = e.target.dataset.detCheck;
+    if (chk === "hideMissing") { state.det.hideMissing = e.target.checked; renderPage(); return; }
+    const det = e.target.dataset.det;
+    if (det === "branch" && e.target.value) {
+      busy(true, "지사 상세 로딩...");
+      try { await loadDetail(e.target.value); } catch (err) { toast(err.message); }
+      finally { busy(false); }
+      renderPage(); return;
+    }
+    if (det === "budget") { state.det.budget = e.target.value; renderPage(); }
+    if (det === "item") { state.det.item = e.target.value; renderPage(); }
+    if (det === "attr") { state.det.attr = e.target.value; renderPage(); }
+    if (e.target.dataset.addBudget) {
+      state.det.add = {budget: e.target.value};
+      renderPage();
+      return;
+    }
+    // 사업행 헤더 체크박스 = 그 사업의 전표 전체 선택/해제(라벨 글자는 '예산과목'만)
+    const vall = e.target.dataset.vall;
+    if (vall) {
+      const b = state.det.data.biz.map((x, idx) => ({...x, _key: `${x.budget}|${x.예산과목}|${x.사업명}|${idx}`}))
+        .find(x => x._key === vall);
+      if (!b) return;
+      const vb = e.target.dataset.vbudget;
+      if (e.target.checked) {
+        if (state.det.selBudget && state.det.selBudget !== vb) {
+          toast("손익과 자본 전표는 함께 재배정할 수 없습니다.");
+          e.target.checked = false;
+          return;
+        }
+        state.det.selBudget = vb;
+        b.전표.forEach(x => state.det.sel.add(x.erp_row_id));
+      } else {
+        b.전표.forEach(x => state.det.sel.delete(x.erp_row_id));
+        if (!state.det.sel.size) state.det.selBudget = null;
+      }
+      renderPage();
+      return;
+    }
+    const v = e.target.dataset.voucher;
+    if (v) {
+      const id = Number(v);
+      if (e.target.checked) {
+        const vb = e.target.dataset.vbudget;
+        if (state.det.selBudget && state.det.selBudget !== vb) {
+          toast("손익과 자본 전표는 함께 재배정할 수 없습니다.");
+          e.target.checked = false;
+          return;
+        }
+        state.det.selBudget = vb;
+        state.det.sel.add(id);
+      } else {
+        state.det.sel.delete(id);
+        if (!state.det.sel.size) state.det.selBudget = null;
+      }
+      renderPage();
+    }
+  });
+
+  // 검색 입력: 결과 영역만 부분 갱신 — 입력창 DOM을 유지해 한글 조합(IME)이
+  // 끊기지 않는다(전체 재렌더 금지).
+  document.addEventListener("input", e => {
+    // 직접 입력한 사업명도 재렌더에 견디게 상태로 보관(입력창 DOM은 그대로 → IME 안전)
+    if (e.target.id === "ovManual") { state.det.ovManual = e.target.value; return; }
+    const f = e.target.dataset.filter;
+    const det = e.target.dataset.det;
+    if (f === "search") {
+      state.search = e.target.value;
+      const el = $("#brResults");
+      if (el) el.innerHTML = brResultsHtml();
+      return;
+    }
+    if (det === "q") {
+      state.det.q = e.target.value;
+      const el = $("#detResults");
+      if (el) el.innerHTML = detResultsHtml();
+    }
+  });
+
+  function openMenu() { $("#sidebar").classList.remove("-translate-x-full"); $("#backdrop").classList.remove("hidden"); }
+  function closeMenu() { if (window.innerWidth >= 1024) return; $("#sidebar").classList.add("-translate-x-full"); $("#backdrop").classList.add("hidden"); }
+  $("#menuButton").addEventListener("click", openMenu);
+  $("#backdrop").addEventListener("click", closeMenu);
+  $("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
+
+  navigate("home");
+  </script>
+</body>

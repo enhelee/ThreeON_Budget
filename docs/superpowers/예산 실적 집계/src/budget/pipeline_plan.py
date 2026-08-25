@@ -17,12 +17,15 @@ def run_plan(business_plan_path, config_dir, out_dir, year, budget):
     config_store.save_item_config(config_dir, year, "자본", cap_config)
 
     item_config = pl_config if budget == "손익" else cap_config
-    pl_items = {x["과목"] for x in pl_config if x.get("포함")}
-    cap_items = {x["과목"] for x in cap_config if x.get("포함")}
+    # 예산과목 명칭 통일(계정코드 동일 개명 흡수) — 실적 분석과 동일 기준.
+    # 구성(config)에도 같은 alias를 적용해야 구명으로 등록된 과목이 누락되지 않는다.
+    item_alias = config_store.load_item_alias(config_dir)
+    pl_items = {normalize.normalize_item(x["과목"], item_alias)
+                for x in pl_config if x.get("포함")}
+    cap_items = {normalize.normalize_item(x["과목"], item_alias)
+                 for x in cap_config if x.get("포함")}
 
     df = loaders.load_business_plan(business_plan_path)
-    # 예산과목 명칭 통일(계정코드 동일 개명 흡수) — 실적 분석과 동일 기준
-    item_alias = config_store.load_item_alias(config_dir)
     df["예산과목"] = df["예산과목"].map(lambda x: normalize.normalize_item(x, item_alias))
     missing_rows = missing_mod.collect_missing_rows(df)
     filtered_df, unclassified = classify.classify_rows(df, budget, pl_items, cap_items)

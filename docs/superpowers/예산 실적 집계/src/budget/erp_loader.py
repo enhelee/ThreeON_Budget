@@ -87,10 +87,58 @@ def load_erp(path, sheet=None):
     return pd.DataFrame(recs, columns=ERP_COLUMNS)
 
 
+def _year_str(y):
+    """연도 셀을 문자열로. None/NaN/'' → None."""
+    if y is None:
+        return None
+    if isinstance(y, float) and y != y:      # NaN (pandas가 None을 NaN으로 바꾼 경우)
+        return None
+    s = str(y).strip()
+    return s or None
+
+
 def detect_years(df):
-    """데이터에 등장한 연도 분포 {연도: 건수}."""
+    """데이터에 등장한 연도 분포 {연도: 건수}. 연도 없는 행(합계행 등)은 제외."""
     out = {}
     for y in df["연도"]:
-        if y:
-            out[y] = out.get(y, 0) + 1
+        s = _year_str(y)
+        if s:
+            out[s] = out.get(s, 0) + 1
+    return out
+
+
+# 제외 사유 라벨(zrfm2_V1 '반영구분'에 그대로 표기)
+EXCL_TOTAL = "제외(합계행)"
+EXCL_YEAR = "제외(타연도)"
+
+
+def tag_excluded(df, year):
+    """집계 대상에서 빼야 할 전표에 '제외사유'를 표기한다(행은 삭제하지 않음).
+
+    - 합계행: 계정코드·예산과목·전표번호가 모두 비어 있는 행. zrfm2 마지막
+      줄의 총계(전체 금액의 2배 계상 위험)를 걸러낸다.
+      → 실제로 23·25년 zrfm2 모두 마지막 행에 총계가 들어 있다.
+    - 타연도: 선택 연도와 다른 연도의 전표. 단 파일에 선택 연도가 하나도
+      없으면(연도 표기 없는 추출본 등) 연도 필터를 적용하지 않는다.
+    """
+    out = df.copy()
+    years = detect_years(out)
+    apply_year = bool(year) and str(year) in years
+    reasons = []
+    for _, row in out.iterrows():
+        code = row["계정코드"]
+        item = row["예산과목원문"]
+        doc = row["전표번호"]
+        blank = all(
+            v is None or (isinstance(v, float) and v != v) or str(v).strip() == ""
+            for v in (code, item, doc)
+        )
+        if blank:
+            reasons.append(EXCL_TOTAL)
+            continue
+        if apply_year and _year_str(row["연도"]) != str(year):
+            reasons.append(EXCL_YEAR)
+            continue
+        reasons.append(None)
+    out["제외사유"] = pd.Series(reasons, index=out.index, dtype="object")
     return out
