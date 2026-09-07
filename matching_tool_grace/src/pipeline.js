@@ -20,10 +20,14 @@
     [/\bGT\b/gi, "가스터빈"],
     [/\bHRSG\b/gi, "배열회수보일러"],
   ];
-  // 유사도 매칭용 정규화: 동의어 치환 → 연도·구분자 제거하고 핵심 단어만 남김
+  // 반복 기성/분납 마커: 회차·월·분기·비용인식을 제거해 "N회 기성"류가 한 사업으로 모이게(담당자 규칙: LTSA 등 분기기성 합산).
+  // 변동비·Extra Work처럼 회차마커 없는 건 그대로 남아 별개 사업으로 유지됨.
+  const INSTALLMENT_NOISE = [/\d+\s*회/g, /\d+\s*분기/g, /'?\d+\s*년?\s*\d+\s*월/g, /비용\s*역?\s*인식/g];
+  // 유사도 매칭용 정규화: 동의어 치환 → 반복기성 마커 제거 → 연도·구분자 제거하고 핵심 단어만 남김
   function simNorm(t) {
     let s = (t == null ? "" : String(t)).normalize("NFC");
     for (const [re, rep] of SYNONYMS) s = s.replace(re, rep);
+    for (const re of INSTALLMENT_NOISE) s = s.replace(re, " ");
     return s
       .replace(/\d{4}\s*년도?/g, " ")   // 2025년, 2024년도
       .replace(/['"’”()\[\]（）·:,\-_/]/g, " ")
