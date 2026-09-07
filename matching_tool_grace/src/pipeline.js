@@ -814,6 +814,8 @@
     };
     for (const [code, items] of actByCode) {
       const prows = planByCode.get(code) || [];
+      // 금액매칭 보조: 이 금액(천원)이 같은 과목 계획 사업의 연예산과 정확히 일치하면 그 사업명 힌트(담당자 규칙 ①⑦⑩ 검토용)
+      const annualHint = (amtCheon) => { if (!amtCheon) return ""; const hits = prows.filter((p) => p.annual && p.annual === amtCheon); return hits.length === 1 ? "연예산일치→" + hits[0].biz : (hits.length > 1 ? "연예산일치(다수)" : ""); };
       // 과목 내 사업명 bigram IDF 계산 (지역/분야 등 구분 단어 강조)
       const df = new Map();
       for (const p of prows) { p._g = featSet(p.biz); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
@@ -863,10 +865,10 @@
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
         const ckey = it.org + "|" + it.acct + "|" + textKey(it.text);
         if (corr.has(ckey)) {
-          if (/^제외/.test(nfc(String(corr.get(ckey))).trim())) { log.push([it.org, it.acctName, it.text, toUnit(it.amount), "(제외)", 1, "보정:제외", it.date, (it.docNos || []).join(","), it.lossCenter]); continue; } // 보정사전 "제외" → 실적에서 뺌
+          if (/^제외/.test(nfc(String(corr.get(ckey))).trim())) { log.push([it.org, it.acctName, it.text, toUnit(it.amount), "(제외)", 1, "보정:제외", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; } // 보정사전 "제외" → 실적에서 뺌
           const target = textKey(corr.get(ckey));
           const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
-          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter]); continue; }
+          if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; }
         }
         const tg = featSet(it.text + " " + (it.costName || ""));
         const txtNorm = simNorm(it.text + " " + (it.costName || ""));
@@ -882,7 +884,7 @@
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
           const conf = Math.round((soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (textKey(it.text) === "" ? "빈텍스트·확인요망" : ""), it.date, (it.docNos || []).join(","), it.lossCenter]);
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (textKey(it.text) === "" ? "빈텍스트·확인요망" : ""), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(toUnit(it.amount))]);
         } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
@@ -971,7 +973,7 @@
     let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
     const _clRows = [];
-    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], ((x[5] < CONF_REVIEW || String(x[6] || "").includes("확인")) ? "검토필요" : ""), "", x[6], x[7], x[8], x[9]]); };
+    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], ((x[5] < CONF_REVIEW || String(x[6] || "").includes("확인")) ? "검토필요" : ""), "", x[6], x[7], x[8], x[9], x[10] || ""]); };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
@@ -987,7 +989,7 @@
 
     // 금액 큰 순 정렬(파레토): 위에서부터 큰 건만 검토하면 대부분의 돈을 커버
     _clRows.sort((a, b) => Math.abs(Number(b[3]) || 0) - Math.abs(Number(a[3]) || 0));
-    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터"], ..._clRows];
+    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터", "연예산일치(참고)"], ..._clRows];
     stats.reviewNeeded = _clRows.filter((r) => r[6] === "검토필요").length;
 
     return {
