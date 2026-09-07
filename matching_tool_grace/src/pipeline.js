@@ -15,10 +15,16 @@
       .trim();
   }
 
-  // 유사도 매칭용 정규화: 연도·구분자 제거하고 핵심 단어만 남김
+  // 동의어(약어↔정식명) 정규화: raw·계획 양쪽에 같이 적용돼 매칭됨. 담당자 규칙(GT=가스터빈 등). 확장 쉬움.
+  const SYNONYMS = [
+    [/\bGT\b/gi, "가스터빈"],
+    [/\bHRSG\b/gi, "배열회수보일러"],
+  ];
+  // 유사도 매칭용 정규화: 동의어 치환 → 연도·구분자 제거하고 핵심 단어만 남김
   function simNorm(t) {
-    return (t == null ? "" : String(t))
-      .normalize("NFC")
+    let s = (t == null ? "" : String(t)).normalize("NFC");
+    for (const [re, rep] of SYNONYMS) s = s.replace(re, rep);
+    return s
       .replace(/\d{4}\s*년도?/g, " ")   // 2025년, 2024년도
       .replace(/['"’”()\[\]（）·:,\-_/]/g, " ")
       .replace(/\s+/g, "")
@@ -853,6 +859,7 @@
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
         const ckey = it.org + "|" + it.acct + "|" + textKey(it.text);
         if (corr.has(ckey)) {
+          if (/^제외/.test(nfc(String(corr.get(ckey))).trim())) { log.push([it.org, it.acctName, it.text, toUnit(it.amount), "(제외)", 1, "보정:제외", it.date, (it.docNos || []).join(","), it.lossCenter]); continue; } // 보정사전 "제외" → 실적에서 뺌
           const target = textKey(corr.get(ckey));
           const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
           if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter]); continue; }
@@ -924,7 +931,8 @@
       dep: H.findIndex((h) => h.includes("지사") || h.includes("부서")),
       acct: H.findIndex((h) => h.includes("예산과목") || h.includes("과목")),
       text: H.findIndex((h) => h.includes("전표텍스트")),
-      biz: H.findIndex((h) => h.includes("올바른") || h.includes("사업명")),
+      // "올바른사업명"(사람이 채우는 칸)을 우선. 없을 때만 "사업명". 도구 자동칸("내가붙인사업명") 오독 방지.
+      biz: (H.findIndex((h) => h.includes("올바른")) >= 0) ? H.findIndex((h) => h.includes("올바른")) : H.findIndex((h) => h.includes("사업명")),
     };
     for (let r = hr + 1; r < aoa.length; r++) {
       const row = aoa[r] || [];
