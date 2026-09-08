@@ -6,6 +6,33 @@
 
   function setMsg(t, cls) { msg.textContent = t; msg.className = "msg" + (cls ? " " + cls : ""); }
 
+  // ── 보정사전 기억(localStorage): 한 번 올리면 브라우저가 저장 → 다음부터 자동 적용 ──
+  const CORR_KEY = "budget_corrections_v1";
+  // 저장 크기 줄이기: 헤더 + "올바른사업명"이 채워진 줄만 남김
+  function corrFilter(rows) {
+    if (!rows || !rows.length) return rows || [];
+    let hr = 0;
+    for (let i = 0; i < Math.min(rows.length, 6); i++) {
+      const h = (rows[i] || []).map((x) => String(x == null ? "" : x));
+      if (h.some((v) => v.includes("전표텍스트")) && h.some((v) => v.includes("사업명"))) { hr = i; break; }
+    }
+    const H = (rows[hr] || []).map((x) => String(x == null ? "" : x));
+    let bi = H.findIndex((v) => v.includes("올바른"));
+    if (bi < 0) bi = H.findIndex((v) => v.includes("사업명"));
+    const kept = [rows[hr]];
+    for (let i = hr + 1; i < rows.length; i++) { if (String((rows[i] || [])[bi] == null ? "" : (rows[i] || [])[bi]).trim()) kept.push(rows[i]); }
+    return kept;
+  }
+  function saveCorr(rows) { try { localStorage.setItem(CORR_KEY, JSON.stringify(corrFilter(rows))); } catch (e) {} }
+  function loadCorr() { try { const s = localStorage.getItem(CORR_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function updateCorrStatus() {
+    const el = $("corrStatus"), btn = $("corrClear");
+    const r = loadCorr();
+    const n = r ? Math.max(0, r.length - 1) : 0;
+    if (el) el.textContent = n ? "✅ 저장된 보정사전 사용 중 (" + n + "건) — 새 파일을 올리면 교체됩니다" : "저장된 보정사전 없음 — 한 번 올리면 기억합니다";
+    if (btn) btn.style.display = n ? "" : "none";
+  }
+
   async function fileToRows(file, preferSheet) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(new Uint8Array(buf), { type: "array" });
@@ -72,7 +99,14 @@
       const rawRows = await fileToRows(fRaw, null);
       const cap = $("fCap").files[0] ? await chipFileToSheets($("fCap").files[0]) : { chip: [], jong: [] };
       const pl = $("fPl").files[0] ? await chipFileToSheets($("fPl").files[0]) : { chip: [], jong: [] };
-      const correctionRows = $("fCorr") && $("fCorr").files[0] ? await fileToRows($("fCorr").files[0], null) : [];
+      let correctionRows;
+      if ($("fCorr") && $("fCorr").files[0]) {
+        correctionRows = await fileToRows($("fCorr").files[0], "검토목록");
+        saveCorr(correctionRows);          // 업로드하면 브라우저에 저장(기억)
+        updateCorrStatus();
+      } else {
+        correctionRows = loadCorr() || []; // 파일 없으면 저장된 보정 사용
+      }
 
       const R = BUDGET_PIPELINE.runAll(
         {
@@ -105,4 +139,12 @@
       else if (kind === "checklist") downloadWb([["검토목록(보정사전)", RESULT.checklist]], "검토목록_보정사전.xlsx");
     });
   });
+
+  // 저장된 보정 지우기
+  if ($("corrClear")) $("corrClear").addEventListener("click", () => {
+    try { localStorage.removeItem(CORR_KEY); } catch (e) {}
+    updateCorrStatus();
+    setMsg("저장된 보정사전을 지웠어요.", "okmsg");
+  });
+  updateCorrStatus(); // 페이지 열 때 상태 표시
 })();

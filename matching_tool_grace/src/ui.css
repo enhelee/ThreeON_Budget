@@ -28,3 +28,5 @@ button.primary:disabled { background: #9db8e8; cursor: default; }
 .stat .k { font-size: 12px; color: #667; }
 .hint { font-size: 12px; color: #667; margin-top: 14px; }
 footer { text-align: center; color: #99a; font-size: 11px; margin-top: 26px; }
+
+.corrbar{margin:6px 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}

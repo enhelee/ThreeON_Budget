@@ -32,8 +32,9 @@ ${css}
       <label class="up"><span class="lbl">ERP raw data <em>(필수)</em></span><input type="file" id="fRaw" accept=".xlsx,.xls"><span class="note">실적의 원천 데이터</span></label>
       <label class="up"><span class="lbl">양식3 · 자본예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fCap" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
       <label class="up"><span class="lbl">양식2 · 손익예산 실적 집계표 <em class="opt">(계획만 채운 것)</em></span><input type="file" id="fPl" accept=".xlsx,.xls"><span class="note">이 파일의 종합표 틀·계획을 그대로 읽어 실적을 채웁니다</span></label>
-      <label class="up"><span class="lbl">보정 사전 <em class="opt">(선택)</em></span><input type="file" id="fCorr" accept=".xlsx,.xls"><span class="note">이전에 담당자가 고친 [지사·과목·전표텍스트→올바른사업명] 표. 있으면 자동 적용</span></label>
+      <label class="up"><span class="lbl">보정 사전 <em class="opt">(한 번만 올리면 기억됨)</em></span><input type="file" id="fCorr" accept=".xlsx,.xls"><span class="note">담당자가 고친 [지사·과목·전표텍스트→올바른사업명] 표. <b>한 번 올리면 이 브라우저가 기억</b>해서 다음부턴 자동 적용됩니다</span></label>
     </div>
+    <div class="corrbar"><span id="corrStatus" class="note"></span> <button id="corrClear" class="ghost" type="button" style="display:none">저장된 보정 지우기</button></div>
     <button id="run" class="primary">집계표 생성</button>
     <div id="msg" class="msg"></div>
   </div>

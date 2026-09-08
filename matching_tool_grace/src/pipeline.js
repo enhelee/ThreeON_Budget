@@ -77,6 +77,8 @@
   // OFF로 하면 0이어야 할 사업줄 오염은 줄지만, conf 0.2~0.34 정당매칭이 미배분으로 빠져 금액정확도가 하락.
   // → 담당자 목표(사업별 금액)상 기본 on. FORCE_ASSIGN=0으로 끌 수 있음.
   const FORCE_ASSIGN = !(typeof process !== "undefined" && process.env && process.env.FORCE_ASSIGN === "0");
+  // 소액(≤200만) 처리: 기본 on = Codex방식(텍스트 보존 후 매칭). SMALL_TEXT_MATCH=0 → 옛 방식(무조건 소액자재구매 합산).
+  const SMALL_TEXT_MATCH = !(typeof process !== "undefined" && process.env && process.env.SMALL_TEXT_MATCH === "0");
   // 역분개 상쇄: 같은(지사×과목) 안에서 금액이 정확히 +X/−X로 짝지는 전표쌍 제거(전표번호·텍스트 달라도).
   // 취소전표(9600·9100…)가 원전표와 안 지워지는 것 방지. ⚠️우연 상쇄 위험 → 검증 필요. 기본 on, REVERSAL=0으로 끔.
   const REVERSAL_CANCEL = !(typeof process !== "undefined" && process.env && process.env.REVERSAL === "0");
@@ -284,21 +286,23 @@
           if (net === 0) continue; // 상계로 0이면 제거
           cha++;
           const b = arr.reduce((a, x) => (Math.abs(x.amount) > Math.abs(a.amount) ? x : a), arr[0]);
-          cleaned.push({ ...meta, text: "제" + cha + "차 예비품 입고", amount: net, docNos: [], n: arr.length, costName: b.nameI, vendor: b.vendor, fixedRow: true });
+          cleaned.push({ ...meta, text: "제" + cha + "차 예비품 입고", amount: net, date: b.date, lossCenter: b.lossCenter, docNos: arr.map((x) => x.docNo).filter(Boolean), n: arr.length, costName: b.nameI, vendor: b.vendor, fixedRow: true });
         }
         continue;
       }
       if (meta.bucket === "boan") {
         // 열원보완및개선(60909009):
-        //  - 개별 전표 |금액| ≤ 200만(소액구매): 분야 구분 없이 지사별로 합산 → "OO 소액자재구매" 고정 줄
+        //  - 개별 전표 |금액| ≤ 200만: 텍스트 보존 후 후보 매칭, 불명확한 잔여만 소액 합산
         //  - 200만 초과: 기존 netting → 텍스트 매칭 (빈텍스트는 예비품/저장품 대체)
         const SMALL_TH = 2000000;
         const small = items.filter((x) => Math.abs(x.amount) <= SMALL_TH);
         const big = items.filter((x) => Math.abs(x.amount) > SMALL_TH);
-        const smallSum = small.reduce((s, x) => s + x.amount, 0);
-        if (smallSum !== 0) {
-          const orgName = meta.org || meta.deptName || "";
-          cleaned.push({ ...meta, text: (orgName ? orgName + " " : "") + "소액자재구매", amount: smallSum, docNos: [], n: small.length, costName: (small[0] || {}).nameI, fixedRow: true });
+        // 소액이라도 사업 텍스트를 보존: 명확한 후보가 있으면 먼저 배정한다.(SMALL_TEXT_MATCH=0이면 옛 방식: 무조건 합산)
+        if (SMALL_TEXT_MATCH) {
+          for (const x of nettingGroup(small)) cleaned.push({ ...meta, ...x, smallPurchase: true });
+        } else {
+          const smallSum = small.reduce((s, x) => s + x.amount, 0);
+          if (smallSum !== 0) { const orgName = meta.org || meta.deptName || ""; cleaned.push({ ...meta, text: (orgName ? orgName + " " : "") + "소액자재구매", amount: smallSum, docNos: [], n: small.length, costName: (small[0] || {}).nameI, fixedRow: true }); }
         }
         let netted = nettingGroup(propagateByDate(big)).map((x) => {
           if (textKey(x.text) === "") {
@@ -778,7 +782,7 @@
       actual: find((h) => h.includes("실적")),
     };
     if (ci.actual < 0) ci.actual = header.length - 1;
-    // 계획 줄을 "예산과목 코드"별로만 그룹핑(부서 무관) — 사업명은 raw 전체에서 검색해 매칭
+    // 과목별 색인을 만들고, 실제 후보 선택은 같은 조직 안으로 제한
     const planByCode = new Map();
     let planRows = 0;
     for (let r = hr + 1; r < grid.length; r++) {
@@ -789,6 +793,7 @@
       if (!code) continue;
       if (!planByCode.has(code)) planByCode.set(code, []);
       planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]), annual: (ci.annual >= 0 ? Number(grid[r][ci.annual]) || 0 : 0) });
+      grid[r][ci.actual] = 0; // 입력 파일의 기존 실적을 재사용하지 않고 raw로 재계산
       planRows++;
     }
     // 실적 항목을 예산과목 코드별로 그룹핑
@@ -798,7 +803,7 @@
       if (!actByCode.has(x.acct)) actByCode.set(x.acct, []);
       actByCode.get(x.acct).push(x);
     }
-    // 각 실적 항목 → 같은 과목의 계획 사업명 중 최고 유사도 줄에 배정(부서 무관). 임계 미만은 신규.
+    // 각 실적 항목 → 같은 조직·과목의 후보로 배정
     let filled = 0;
     const unmatched = [];
     const sumByRow = {};
@@ -814,8 +819,8 @@
     };
     for (const [code, items] of actByCode) {
       const prows = planByCode.get(code) || [];
-      // 금액매칭 보조: 이 금액(천원)이 같은 과목 계획 사업의 연예산과 정확히 일치하면 그 사업명 힌트(담당자 규칙 ①⑦⑩ 검토용)
-      const annualHint = (amtCheon) => { if (!amtCheon) return ""; const hits = prows.filter((p) => p.annual && p.annual === amtCheon); return hits.length === 1 ? "연예산일치→" + hits[0].biz : (hits.length > 1 ? "연예산일치(다수)" : ""); };
+      // 금액매칭 힌트도 같은 조직·과목 안에서만 산출
+      const annualHint = (amtCheon, org) => { if (!amtCheon) return ""; const hits = prows.filter((p) => p.org === nrm(org) && p.annual && p.annual === amtCheon); return hits.length === 1 ? "연예산일치→" + hits[0].biz : (hits.length > 1 ? "연예산일치(다수)" : ""); };
       // 과목 내 사업명 bigram IDF 계산 (지역/분야 등 구분 단어 강조)
       const df = new Map();
       for (const p of prows) { p._g = featSet(p.biz); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
@@ -858,18 +863,28 @@
       for (const it of items) {
         // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
         if (it.bucket === "gyeongsang") continue;
-        // 고정 줄(rule3 "제N차 예비품 입고" · boan "소액자재구매"): 매칭 안 하고 그대로 출력
-        if (it.fixedRow) { unmatched.push({ org: it.org, acctName: it.acctName, text: it.text, amount: it.amount, _fixedName: true }); continue; }
-        if (it.emptyText) { empties.push(it); continue; }
+        // 보정사전은 합산 항목에도 우선 적용
         const io = nrm(it.org);
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
         const ckey = it.org + "|" + it.acct + "|" + textKey(it.text);
         if (corr.has(ckey)) {
           if (/^제외/.test(nfc(String(corr.get(ckey))).trim())) { log.push([it.org, it.acctName, it.text, toUnit(it.amount), "(제외)", 1, "보정:제외", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; } // 보정사전 "제외" → 실적에서 뺌
           const target = textKey(corr.get(ckey));
-          const prow = prows.find((p) => p.org === io && textKey(p.biz) === target) || prows.find((p) => textKey(p.biz) === target);
+          const prow = prows.find((p) => p.org === io && textKey(p.biz) === target);
           if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; }
         }
+        if (it.fixedRow) {
+          const exact = prows.filter((p) => p.org === io && textKey(p.biz) === textKey(it.text));
+          if (exact.length === 1) {
+            sumByRow[exact[0].r] = (sumByRow[exact[0].r] || 0) + it.amount;
+            log.push([it.org, it.acctName, it.text, toUnit(it.amount), exact[0].biz, 1, "합산사업명 일치", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+          } else {
+            unmatched.push({ ...it, _fixedName: true });
+            log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "합산사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+          }
+          continue;
+        }
+        if (it.emptyText) { empties.push(it); continue; }
         const tg = featSet(it.text + " " + (it.costName || ""));
         const txtNorm = simNorm(it.text + " " + (it.costName || ""));
         // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지. + 하위태그(동남권 등) 우선.
@@ -877,21 +892,33 @@
         let pool = prows.filter((p) => p.org === io && p._sub === itSub);
         if (!pool.length) pool = prows.filter((p) => p.org === io); // 같은 하위 없으면 조직 전체로 폴백
         const soR = pickBest(pool, tg, txtNorm);
-        let chosen = null;
-        if (soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
-        else if (soR.row && FORCE_ASSIGN) chosen = soR.row;                // (옵션) 임계 미만도 최고줄에 강제배정
+        // 같은 조직·과목의 유일한 연예산 정확일치 + 텍스트 근거를 함께 확인.
+        // 반올림으로 만든 우연 일치나 동액 후보 여러 개는 자동 확정하지 않는다.
+        const amountHits = pool.filter((p) => p.annual > 0 && p.annual === it.amount / AMOUNT_UNIT);
+        const amountRow = amountHits.length === 1 && wDice(tg, amountHits[0]._g, idf, defW) >= SIM_THRESHOLD ? amountHits[0] : null;
+        let chosen = amountRow;
+        if (!chosen && soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
+        else if (!chosen && soR.row && FORCE_ASSIGN) chosen = soR.row;                // (옵션) 임계 미만도 최고줄에 강제배정
+        if (it.smallPurchase && (!chosen || (amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best) < 0.5)) {
+          unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산·사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+          continue;
+        }
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
-          const conf = Math.round((soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (textKey(it.text) === "" ? "빈텍스트·확인요망" : ""), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(toUnit(it.amount))]);
-        } else unmatched.push(it); // 같은 조직에 계획줄 없음 → 신규(해당 조직으로 유지)
+          const conf = Math.round((amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (amountRow ? "연예산 정확일치+텍스트" : (textKey(it.text) === "" ? "빈텍스트·확인요망" : "")), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+        } else {
+          unmatched.push(it);
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "후보 미일치·확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+        }
       }
       // 2패스: 빈텍스트(vendor별) — 학습 vendor면 그 줄 / 조직에 사업 1개면 그 줄 / 아니면 미배분 집계
       const unassigned = {};
       for (const it of empties) {
         const io = nrm(it.org);
-        if (it.vendor && vendorToRow[it.vendor] != null) {
+        if (it.vendor && vendorToRow[it.vendor] != null && (rowsByOrg[io] || []).some((p) => p.r === vendorToRow[it.vendor])) {
           const rr = vendorToRow[it.vendor]; sumByRow[rr] = (sumByRow[rr] || 0) + it.amount;
         } else if ((rowsByOrg[io] || []).length === 1) {
           const rr = rowsByOrg[io][0].r; sumByRow[rr] = (sumByRow[rr] || 0) + it.amount;
@@ -911,7 +938,15 @@
         if (sumByRow[pr.r] != null) { grid[pr.r][ci.actual] = toUnit(sumByRow[pr.r]); if (sumByRow[pr.r]) filled++; }
     // 계획에 없는 실적 → 신규 줄 추가(개별)
     const extra = [];
-    for (const it of unmatched) {
+    const smallRemainders = new Map();
+    const extraItems = unmatched.filter((it) => {
+      if (!it._smallRemainder) return true;
+      const key = JSON.stringify([it.org, it.acct]);
+      if (!smallRemainders.has(key)) smallRemainders.set(key, { ...it, amount: 0 });
+      smallRemainders.get(key).amount += it.amount;
+      return false;
+    }).concat([...smallRemainders.values()].filter((it) => it.amount !== 0));
+    for (const it of extraItems) {
       const row = new Array(Math.max(grid[hr].length, ci.actual + 1)).fill("");
       if (ci.acctName >= 0) row[ci.acctName] = it.acctName;
       if (ci.deptName >= 0) row[ci.deptName] = it.org || "";

@@ -230,5 +230,44 @@ const dRow = withCorr.aoa.find((r) => String(r[6]).includes("동백 열원설비
 ok(Math.round(135435000 / 1000) === (Number(wRow[8]) || 0), "보정사전: 실적이 위험물 사업으로 (실제:" + wRow[8] + ")");
 ok((Number(dRow[8]) || 0) === 0, "보정사전: 동백 사업은 0");
 
+// ── 정확도 개선 회귀: 기존 실적 제거 / 조직 경계 / 금액 근거 / 소액 보존 ──
+const testHeader = chipCorr[0];
+const fixturePlan = (org, biz, annual, actual = 9999, acct = "수선유지비-건물/구축물") =>
+  [1, acct, "", "", org, "", biz, annual, actual];
+const fixtureItem = (org, text, amount, extra = {}) => ({ org, text, amount, acct: "60909001", acctName: "수선유지비-건물/구축물", ledger: "손익", date: 40000, docNos: [], ...extra });
+const inputWithActual = [testHeader, fixturePlan("용인지사", "방수 공사", 500)];
+const resetActual = P.fillChipInPlace(inputWithActual, [], "손익", C);
+ok(resetActual.aoa[1][8] === 0 && inputWithActual[1][8] === 9999, "기존 실적 제거, 입력 배열은 보존");
+const boundaryPlan = [testHeader, fixturePlan("용인지사", "방수 공사", 500), fixturePlan("강남지사", "벽체 방수 공사", 700)];
+const boundaryItem = fixtureItem("용인지사", "벽체 방수 공사", 700000);
+const boundaryCorr = new Map([["용인지사|60909001|" + P.textKey(boundaryItem.text), "벽체 방수 공사"]]);
+const boundaryResult = P.fillChipInPlace(boundaryPlan, [boundaryItem], "손익", C, boundaryCorr);
+ok(boundaryResult.aoa[2][8] === 0, "보정사전도 타 지사 후보로 이동 금지");
+ok(boundaryResult.log[0][10] === "", "타 지사 연예산 일치는 힌트에서 제외");
+const amountPlan = [testHeader, fixturePlan("용인지사", "펌프 점검", 100), fixturePlan("용인지사", "펌프 정밀 점검", 200)];
+const amountResult = P.fillChipInPlace(amountPlan, [fixtureItem("용인지사", "펌프 점검", 200000)], "손익", C);
+ok(amountResult.aoa[2][8] === 200 && amountResult.log[0][6] === "연예산 정확일치+텍스트", "유일 연예산 정확일치와 텍스트 근거를 함께 적용");
+const roundedResult = P.fillChipInPlace(amountPlan, [fixtureItem("용인지사", "펌프 점검", 199999)], "손익", C);
+ok(roundedResult.aoa[1][8] === 200 && roundedResult.log[0][10] === "", "천원 반올림 금액으로 연예산 정확일치를 만들지 않음");
+const multiAmountPlan = [testHeader, fixturePlan("용인지사", "펌프 점검", 200), fixturePlan("용인지사", "펌프 정밀 점검", 200)];
+const multiAmountResult = P.fillChipInPlace(multiAmountPlan, [fixtureItem("용인지사", "펌프 점검", 200000)], "손익", C);
+ok(multiAmountResult.aoa[1][8] === 200 && multiAmountResult.log[0][6] !== "연예산 정확일치+텍스트", "동액 후보 다수는 금액으로 확정하지 않음");
+const fixedItem = fixtureItem("용인지사", "제1차 예비품 입고", 120000, { fixedRow: true });
+const fixedCorrection = new Map([["용인지사|60909001|" + P.textKey(fixedItem.text), "방수 공사"]]);
+const fixedResult = P.fillChipInPlace(inputWithActual, [fixedItem], "손익", C, fixedCorrection);
+ok(fixedResult.aoa[1][8] === 120 && fixedResult.stats.unplanned === 0, "합산항목도 보정사전 우선 적용");
+const smallAcct = "수선유지비-열원보완개선및기타";
+const smallRaw = [new Array(16).fill(""), ["제조", "60909009", smallAcct, "", 40000, "R1", 1200000, "펌프 교체", "용인", "", "", "", "", "", "", "3040001"]];
+const smallClean = P.netting(P.parseRaw(smallRaw));
+ok(smallClean[0].text === "펌프 교체" && smallClean[0].smallPurchase, "소액 원본 사업 텍스트 보존");
+const smallPlan = [testHeader, fixturePlan("용인지사", "펌프 교체", 1200, 0, smallAcct)];
+const smallResult = P.fillChipInPlace(smallPlan, smallClean, "손익", C);
+ok(smallResult.aoa[1][8] === 1200 && smallResult.stats.unplanned === 0, "명확한 소액 사업은 기존 후보 행에 반영");
+const remainingSmall = ["XYZ", "ABC"].map((text) => fixtureItem("용인지사", text, 500000, { acct: "60909009", acctName: smallAcct, smallPurchase: true }));
+const remainderResult = P.fillChipInPlace(smallPlan, remainingSmall, "손익", C);
+ok(remainderResult.stats.unplanned === 1 && remainderResult.aoa.at(-1)[8] === 1000 && remainderResult.log.length === 2, "불명확한 소액은 합산 출력, 검토기록은 각각 보존");
+const unmatchedResult = P.fillChipInPlace(inputWithActual, [fixtureItem("강남지사", "후보 없는 전표", 330000)], "손익", C);
+ok(unmatchedResult.log.length === 1 && unmatchedResult.log[0][5] === 0, "후보 미일치 전표도 검토목록에 포함");
+
 console.log(`\n단위 테스트: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);
