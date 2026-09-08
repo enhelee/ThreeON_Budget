@@ -926,6 +926,8 @@
         else if (!chosen && soR.row && FORCE_ASSIGN && soR.best >= FORCE_FLOOR) chosen = soR.row; // 바닥값 이상만 강제. 미만이면 검토목록
         // 명백한 1위(임계 이상 + 2위와 큰 격차)면 신뢰도 낮아도 검토불요 — 반복 사업(LTSA 기성 등) 매년 재검토 방지
         if (chosen && chosen === soR.row && !amountRow && !kwRow && soR.best >= SIM_THRESHOLD && (soR.best - soR.second) >= CLEAR_GAP) how = "명확한 1위";
+        // 텍스트로 배정된 사업이 "연예산 정확일치 사업"과 같으면 확정(두 신호 일치) — 연료전지 LTSA 등. 유사도 낮아도 검토불요.
+        if (chosen && !amountRow && amountHits.length === 1 && chosen.r === amountHits[0].r) how = "명확(연예산+텍스트 일치)";
         // 소액: 명확히 매칭된 사업(0.5↑)은 사업명 배정. 나머지만 지사별 소액자재구매로 합산(개별 검토 불요 — 합산 금액이 목적).
         if (it.smallPurchase && (!chosen || (amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best) < 0.5)) {
           unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
@@ -1037,7 +1039,7 @@
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
     const _clRows = [];
     // "명확한 1위"·"보정됨"은 신뢰도 낮아도 검토불요. "확인" 문구 있으면 검토필요.
-    const NOREVIEW = ["명확", "보정", "소액합산"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
+    const NOREVIEW = ["명확", "보정", "소액합산", "연예산"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
     const addLog = (lg) => { for (const x of lg || []) { const note = String(x[6] || ""); const review = (note.includes("확인") || (x[5] < CONF_REVIEW && !NOREVIEW.some((k) => note.includes(k)))) ? "검토필요" : ""; _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || ""]); } };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
