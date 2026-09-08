@@ -1078,7 +1078,19 @@
     // 검토 기준: 자재류(예비품·고온부품·저장품·공구)는 지사×과목 총액만 맞으면 됨 → 배정만 되면 통과(사업별 차이 무관).
     // 그 외 과목: 매칭 사업 총액이 집계표와 차이=0이면 통과, 차이≠0이면 검토(사업별 금액 목표).
     const JAEJAE = /자산화예비품|재생고온부품|저장품|공구와기구/;
-    const addLog = (lg) => { for (const x of lg || []) { const note = String(x[6] || ""); const assigned = (x[11] !== "" && x[11] != null); let review; if (JAEJAE.test(nfc(x[1]))) { review = assigned ? "" : ((note.includes("확인") || x[5] < CONF_REVIEW) ? "검토필요" : ""); } else { review = assigned ? (Number(x[12]) !== 0 ? "검토필요" : "") : ((note.includes("확인") || (x[5] < CONF_REVIEW && !NOREVIEW.some((k) => note.includes(k)))) ? "검토필요" : ""); } _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || "", x[11] == null ? "" : x[11], x[12] == null ? "" : x[12]]); } };
+    // 검토 판정: (1)확정문구(금액일치·보정·명확·연예산)면 원칙 통과 (2)자신없는 건(빈텍스트·미일치·저신뢰) 검토
+    //          (3)단, 사업 총액이 집계표보다 크게 어긋나면(BIG_DIFF 이상) 큰 오배정이므로 검토로 노출.
+    // 자재류는 지사×과목 총액 기준 → 배정만 되면 통과.
+    const BIG_DIFF = 50000; // 천원. 이보다 큰 사업 총액 차이만 별도 검토 노출(작은 차이는 통과).
+    const addLog = (lg) => { for (const x of lg || []) {
+      const note = String(x[6] || ""); const assigned = (x[11] !== "" && x[11] != null);
+      const confirmed = NOREVIEW.some((k) => note.includes(k)); // 금액일치·보정·명확·연예산·소액합산
+      const bigOff = assigned && Math.abs(Number(x[12]) || 0) >= BIG_DIFF; // 사업 총액이 크게 어긋남
+      let review;
+      if (JAEJAE.test(nfc(x[1]))) { review = assigned ? "" : ((note.includes("확인") || x[5] < CONF_REVIEW) ? "검토필요" : ""); }
+      else { review = (bigOff || note.includes("확인") || (x[5] < CONF_REVIEW && !confirmed)) ? "검토필요" : ""; }
+      _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || "", x[11] == null ? "" : x[11], x[12] == null ? "" : x[12]]);
+    } };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
