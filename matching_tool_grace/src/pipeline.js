@@ -898,6 +898,12 @@
           const prow = prows.find((p) => p.org === io && textKey(p.biz) === target);
           if (prow) { sumByRow[prow.r] = (sumByRow[prow.r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = prow.r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), prow.biz, 1, "보정됨", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; }
         }
+        // 자재류 과목(예비품·재생고온부품·저장품·공구): 금액이 그 지사 사업의 실적과 유일 정확일치하면 그 사업 확정(담당자 규칙: 금액=맞음). fixedRow·텍스트 공통.
+        if (/자산화예비품|재생고온부품|저장품|공구와기구/.test(nfc(it.acctName))) {
+          const amt = Math.round(it.amount / AMOUNT_UNIT);
+          const amtHit = prows.filter((p) => p.org === io && p.actual0 && Math.round(p.actual0) === amt);
+          if (amtHit.length === 1) { sumByRow[amtHit[0].r] = (sumByRow[amtHit[0].r] || 0) + it.amount; log.push([it.org, it.acctName, it.text, toUnit(it.amount), amtHit[0].biz, 1, "명확(금액일치)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; }
+        }
         if (it.fixedRow) {
           const exact = prows.filter((p) => p.org === io && textKey(p.biz) === textKey(it.text));
           // 금액매칭: 배치 금액이 이 지사 사업의 (업로드 집계표)실적과 유일하게 정확히 일치하면 그 사업 확정(담당자 규칙: 금액 일치=맞음).
