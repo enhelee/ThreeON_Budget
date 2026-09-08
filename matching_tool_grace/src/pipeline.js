@@ -1008,6 +1008,17 @@
       row[ci.actual] = toUnit(it.amount);
       extra.push(row);
     }
+    // 담당자 검토용: 각 로그행에 "매칭사업 집계표실적"과 "내합계−집계표 차이"(천원)를 붙임.
+    // 차이가 크면 오배정 의심(예: 예비품 지사합산 초과, 잘못 붙은 것) → 한눈에 확인.
+    const prowIdx = new Map();
+    for (const [code, prs] of planByCode) for (const p of prs) prowIdx.set(p.org + "|" + code + "|" + textKey(p.biz), p);
+    for (const x of log) {
+      const bkey = x[4] ? textKey(x[4]) : "";
+      const code = C.resolveAcctCode(x[1]);
+      const p = (bkey && code) ? prowIdx.get(nrm(x[0]) + "|" + code + "|" + bkey) : null;
+      if (p) { const chip = Math.round(p.actual0); x[11] = chip; x[12] = toUnit(sumByRow[p.r] || 0) - chip; }
+      else { x[11] = ""; x[12] = ""; }
+    }
     return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length }, log };
   }
 
@@ -1064,7 +1075,10 @@
     const _clRows = [];
     // "명확한 1위"·"보정됨"은 신뢰도 낮아도 검토불요. "확인" 문구 있으면 검토필요.
     const NOREVIEW = ["명확", "보정", "소액합산", "연예산"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
-    const addLog = (lg) => { for (const x of lg || []) { const note = String(x[6] || ""); const review = (note.includes("확인") || (x[5] < CONF_REVIEW && !NOREVIEW.some((k) => note.includes(k)))) ? "검토필요" : ""; _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || ""]); } };
+    // 검토 기준: 자재류(예비품·고온부품·저장품·공구)는 지사×과목 총액만 맞으면 됨 → 배정만 되면 통과(사업별 차이 무관).
+    // 그 외 과목: 매칭 사업 총액이 집계표와 차이=0이면 통과, 차이≠0이면 검토(사업별 금액 목표).
+    const JAEJAE = /자산화예비품|재생고온부품|저장품|공구와기구/;
+    const addLog = (lg) => { for (const x of lg || []) { const note = String(x[6] || ""); const assigned = (x[11] !== "" && x[11] != null); let review; if (JAEJAE.test(nfc(x[1]))) { review = assigned ? "" : ((note.includes("확인") || x[5] < CONF_REVIEW) ? "검토필요" : ""); } else { review = assigned ? (Number(x[12]) !== 0 ? "검토필요" : "") : ((note.includes("확인") || (x[5] < CONF_REVIEW && !NOREVIEW.some((k) => note.includes(k)))) ? "검토필요" : ""); } _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || "", x[11] == null ? "" : x[11], x[12] == null ? "" : x[12]]); } };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
@@ -1080,7 +1094,7 @@
 
     // 금액 큰 순 정렬(파레토): 위에서부터 큰 건만 검토하면 대부분의 돈을 커버
     _clRows.sort((a, b) => Math.abs(Number(b[3]) || 0) - Math.abs(Number(a[3]) || 0));
-    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터", "연예산일치(참고)"], ..._clRows];
+    const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터", "연예산일치(참고)", "매칭사업 집계표실적(천원)", "차이(내합계-집계표)"], ..._clRows];
     stats.reviewNeeded = _clRows.filter((r) => r[6] === "검토필요").length;
 
     return {
