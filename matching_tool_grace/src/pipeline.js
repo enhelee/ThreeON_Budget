@@ -895,6 +895,7 @@
       }
       // 1패스: 텍스트 있는 항목 배정 + vendor→사업 학습
       const empties = [];
+      const jeonggi = []; // 정기점검(60909002) 잔여: 이름없이 반복되는 보수공사 → 뒤에서 지사×과목 총액(예측단위)으로 채움
       for (const it of items) {
         // 경상정비는 계획대비실적에 넣지 않음(정답과 동일) — 종합표에만 반영됨
         if (it.bucket === "gyeongsang") continue;
@@ -958,6 +959,11 @@
         const itSub = it.subTag || "";
         let pool = prows.filter((p) => p.org === io && p._sub === itSub && !amtFilled.has(p.r)); // 금액일치로 이미 채워진 사업은 제외(덧씌움 방지)
         if (!pool.length) pool = prows.filter((p) => p.org === io && !amtFilled.has(p.r)); // 같은 하위 없으면 조직 전체로 폴백
+        // 정기점검(재조정): 취합자료가 "실적=0"이라 알려준 사업엔 generic 보수공사를 얹지 않는다(0줄 오염 방지). 그 조직에 실적>0 사업이 있을 때만.
+        if (code === "60909002" && prows.some((p) => p.org === io && p.actual0 > 0)) {
+          const nz = pool.filter((p) => p.actual0 > 0);
+          if (nz.length) pool = nz;
+        }
         const soR = pickBest(pool, tg, txtNorm);
         // 같은 조직·과목의 유일한 연예산 정확일치 + 텍스트 근거를 함께 확인.
         // 반올림으로 만든 우연 일치나 동액 후보 여러 개는 자동 확정하지 않는다.
@@ -987,6 +993,10 @@
           // 담당자 규칙: 200만원 이하 소액 미매칭은 지사×과목별 "소액자재구매"로 합산(개별 검토 안 함).
           unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산(지사별)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+        } else if (code === "60909002") {
+          // 정기점검보수공사: 개별 못 나눈 반복 보수공사 잔여는 뒤에서 그 지사 정기점검 사업에 집계표실적 한도까지 채움(세부분할 대신 지사×과목 총액=예측단위).
+          jeonggi.push({ it, li: log.length });
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "정기점검 잔여(배분대기)", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
         } else {
           unmatched.push(it);
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "후보 미일치·확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
@@ -1009,6 +1019,22 @@
       for (const k of Object.keys(unassigned)) {
         const u = unassigned[k];
         unmatched.push({ org: u.org, acctName: u.acctName, text: "미배분", amount: u.sum, _unassigned: true });
+      }
+      // 정기점검(60909002) 잔여 배분: 개별로 못 나눈 반복 보수공사를, 그 지사 정기점검 사업의 집계표실적(actual0) 부족분에 큰 것부터 채운다.
+      // → 세부 사업명 분할 대신 지사×과목 총액을 정확히 맞춤(중장기 예측 단위). 큰 사업(가스터빈 등)은 각자 집계표실적만큼 채워져 독립 라인 유지, 한도가 있어 과합침 없음.
+      if (code === "60909002" && jeonggi.length) {
+        const byOrg = {};
+        for (const j of jeonggi) { const io = nrm(j.it.org); (byOrg[io] = byOrg[io] || []).push(j); }
+        for (const io of Object.keys(byOrg)) {
+          let pool = byOrg[io].reduce((s, j) => s + j.it.amount, 0); // 배분할 잔여 총액(원)
+          const targets = prows.filter((p) => p.org === io && p.actual0 > 0)
+            .map((p) => ({ p, short: Math.round(p.actual0) * AMOUNT_UNIT - (sumByRow[p.r] || 0) }))
+            .filter((t) => t.short > 0).sort((a, b) => b.short - a.short); // 부족분 큰 사업부터
+          for (const t of targets) { if (pool <= 0) break; const add = Math.min(pool, t.short); sumByRow[t.p.r] = (sumByRow[t.p.r] || 0) + add; pool -= add; }
+          const rep = prows.filter((p) => p.org === io && p.actual0 > 0).sort((a, b) => b.actual0 - a.actual0)[0] || null; // 대표=최대 정기점검 사업
+          for (const j of byOrg[io]) { log[j.li][4] = rep ? rep.biz : ""; log[j.li][5] = 1; log[j.li][6] = "합본배분(지사 정기점검 총액)"; }
+          if (pool > 0) unmatched.push({ org: byOrg[io][0].it.org, acctName: byOrg[io][0].it.acctName, text: "정기점검 잔여(집계표초과)", amount: pool, _unassigned: true }); // 집계표보다 큰 초과분은 미배분 노출
+        }
       }
     }
     for (const code of planByCode.keys())
@@ -1098,7 +1124,7 @@
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
     const _clRows = [];
     // "명확한 1위"·"보정됨"은 신뢰도 낮아도 검토불요. "확인" 문구 있으면 검토필요.
-    const NOREVIEW = ["명확", "보정", "소액합산", "연예산"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
+    const NOREVIEW = ["명확", "보정", "소액합산", "연예산", "합본배분"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
     // 검토 기준: 자재류(예비품·고온부품·저장품·공구)는 지사×과목 총액만 맞으면 됨 → 배정만 되면 통과(사업별 차이 무관).
     // 그 외 과목: 매칭 사업 총액이 집계표와 차이=0이면 통과, 차이≠0이면 검토(사업별 금액 목표).
     const JAEJAE = /자산화예비품|재생고온부품|저장품|공구와기구/;
