@@ -19,6 +19,8 @@ budget_app의 검증된 매칭 엔진은 그대로 두고, 규격 CSV ↔ 내부
   - 사업장→처지사 : 손익센터 코드. 코드→지사 매핑은 budget_csv로 구성(dept_map_from_budget).
 """
 import csv as _csv
+import json
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -69,6 +71,12 @@ def write_data_csv(zrfm2_path, out_path, year=None, normalize_item_alias=None):
     거래처명=공급업체 코드(이름 아님 — 규격 §3-1 대비 공백 gap), 사업장=손익센터 코드.
     """
     erp = erp_loader.load_erp(zrfm2_path)
+    return write_data_csv_from_df(erp, out_path, year=year,
+                                  normalize_item_alias=normalize_item_alias)
+
+
+def write_data_csv_from_df(erp, out_path, year=None, normalize_item_alias=None):
+    """내부 ERP DataFrame(erp_loader.ERP_COLUMNS 스키마, DB 로드본 포함) → data_{연도}.csv."""
     rows = []
     for _, r in erp.iterrows():
         if year and r["연도"] and str(r["연도"]) != str(year):
@@ -92,6 +100,11 @@ def write_data_csv(zrfm2_path, out_path, year=None, normalize_item_alias=None):
 def write_budget_csv(plan_path, out_path, normalize_item_alias=None):
     """계획본(양식1(월별)) → 규격 budget_{연도}.csv (연예산 원 단위)."""
     df = loaders.load_business_plan(plan_path)
+    return write_budget_csv_from_df(df, out_path, normalize_item_alias=normalize_item_alias)
+
+
+def write_budget_csv_from_df(df, out_path, normalize_item_alias=None):
+    """내부 계획 DataFrame(loaders.PLAN_COLUMNS 스키마, DB 로드본 포함) → budget_{연도}.csv."""
     rows = []
     for _, r in df.iterrows():
         item = r.get("예산과목")
@@ -251,3 +264,217 @@ def resolve_dept_by_code(site_code, dept_map, digits=3):
     if not site_code:
         return None
     return dept_map.get(str(site_code).strip()[:digits])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 팀 v2 앱(예산예측프로그램_팀공유_v2) 「사업 실적 연결」 계약 — 결과 JSON (schemaVersion 1)
+# ══════════════════════════════════════════════════════════════════════════
+# 동료 앱의 checkpoint_actuals.prepare_result()가 읽는 형식. 금액은 **천원**(KRW_THOUSAND),
+# sourceTotals의 amountWon만 원. 검증 규칙(동료 코드 기준):
+#   - sourceYears == [연도] 단일 연도
+#   - groups(13열)·details(8열)·exclusions(8열) 헤더 행이 정확히 일치
+#   - 묶음마다 details 반영 실적 합계 == 묶음 전표 합계 (원 단위로 정확히)
+#   - (원장,지사,과목,집계표 원본행) 중복 금지, 원본행은 1 이상 정수
+#   - 배정/제외한 (원장,지사,과목)은 sourceTotals에 반드시 존재
+# 우리 매칭 결과(erp_annotated)를 이 형식으로 바꾼다. 묶음 = (원장×지사×과목×귀속 사업) 단위,
+# 계획집행은 계획행 원본 행번호(_row)를, 신규는 합성 행번호(NEW_ROW_BASE+n)를 '집계표 원본행'으로 쓴다.
+
+TEAM_JSON_SCHEMA_VERSION = 1
+TEAM_JSON_AMOUNT_UNIT = "KRW_THOUSAND"
+TEAM_JSON_GROUP_HEADER = [
+    "묶음ID", "원장", "지사", "예산과목", "처리방법", "전표 합계(천원)", "사업 실적 합계(천원)",
+    "단수차이(천원)", "전표항목수", "사업수", "대상 사업명", "전표텍스트", "참조전표번호",
+]
+TEAM_JSON_DETAIL_HEADER = [
+    "묶음ID", "원장", "지사", "예산과목", "집계표 원본행", "사업명", "기준 실적(천원)", "반영 실적(천원)",
+]
+TEAM_JSON_EXCLUSION_HEADER = [
+    "원장", "지사", "예산과목", "전표텍스트", "제외 금액(천원)", "담당자 제외 사유", "보정ID", "참조전표번호",
+]
+# 동료 검토 화면(review_data.load_result)이 존재만 확인하는 부가 표 — 헤더만 채운다.
+TEAM_JSON_AUX_TABLES = {
+    "corrections": ["보정ID", "원장", "지사", "예산과목", "사업명", "금액(천원)", "비고"],
+    "differences": ["원장", "지사", "예산과목", "전표텍스트", "금액(천원)", "사유"],
+    "spareDates": ["원장", "지사", "예산과목", "전기일", "양수(천원)", "음수(천원)", "순액(천원)"],
+    "spareSources": ["원장", "지사", "예산과목", "전기일", "전표텍스트", "금액(천원)"],
+}
+UNKNOWN_ORG = "(지사 미확인)"
+UNKNOWN_ACCOUNT = "(과목 미확인)"
+NEW_ROW_BASE = 2_000_000          # 신규 사업(계획행 없음)의 합성 '집계표 원본행' 시작값
+ASSIGNED_GUBUN = ("계획집행", "신규")
+EXCLUDED_GUBUN = ("미반영",)
+NEW_LABEL_PREFIX = "[신규] "
+
+
+def _s(v):
+    """NaN/None → None, 그 외 strip 문자열."""
+    if v is None:
+        return None
+    if isinstance(v, float) and v != v:
+        return None
+    s = str(v).strip()
+    return s or None
+
+
+def _won_int(rec):
+    """전표 금액을 정수 원으로. 금액원이 없으면 금액천원×1000."""
+    w = rec.get("금액원")
+    if w is None or (isinstance(w, float) and w != w):
+        t = rec.get("금액천원")
+        if t is None or (isinstance(t, float) and t != t):
+            return 0
+        return int(round(float(t) * WON_PER_THOUSAND))
+    return int(round(float(w)))
+
+
+def _thousand(won):
+    """정수 원 → 천원 float. repr가 소수 3자리 이하로 나와 동료 검증(Decimal(str)×1000)을 통과한다."""
+    return won / WON_PER_THOUSAND
+
+
+def _row_scope(rec, ledger):
+    """(원장, 지사, 과목) — 정규화 처지사가 없으면 ERP 원문 지사명, 그것도 없으면 '(지사 미확인)'."""
+    org = _s(rec.get("처지사정규")) or _s(rec.get("지사원문")) or UNKNOWN_ORG
+    account = _s(rec.get("과목정규")) or _s(rec.get("예산과목원문")) or UNKNOWN_ACCOUNT
+    return (ledger, org, account)
+
+
+def clean_match_label(label):
+    """'[신규] 이름' → '이름'. None/공란은 None."""
+    s = _s(label)
+    if s is None:
+        return None
+    if s.startswith(NEW_LABEL_PREFIX):
+        s = s[len(NEW_LABEL_PREFIX):].strip()
+    return s or None
+
+
+def build_team_result_json(year, frames_by_budget, meta=None):
+    """{'손익': erp_annotated, '자본': erp_annotated} → 팀 v2 결과 JSON(dict).
+
+    포함 규칙(원장별 run 결과에서):
+      구분 ∈ 계획집행·신규  → 배정(groups/details)
+      구분 = 미반영          → exclusions (선택 해제 과목·지사, 미분류, 미매핑 전표)
+      구분 = ''(타예산)·제외 → 건너뜀 (타예산은 상대 원장 run에서 집계되므로 중복 방지)
+    총액 불변식: Σ sourceTotals = Σ 배정 + Σ 제외 (미배정순액 0).
+    """
+    year_i = int(str(year))
+    groups, details, exclusions = [], [], []
+    source_totals, assigned_won, excluded_won = {}, {}, {}
+    bundles, order = {}, []
+    new_row_counter = NEW_ROW_BASE
+
+    for ledger, frame in frames_by_budget.items():
+        if ledger not in ("손익", "자본"):
+            raise ValueError(f"원장은 손익/자본이어야 합니다: {ledger}")
+        if frame is None or len(frame) == 0:
+            continue
+        cols = set(frame.columns)
+        for rec in frame.to_dict("records"):
+            gubun = _s(rec.get("구분")) or ""
+            if gubun not in ASSIGNED_GUBUN and gubun not in EXCLUDED_GUBUN:
+                continue
+            scope = _row_scope(rec, ledger)
+            won = _won_int(rec)
+            source_totals[scope] = source_totals.get(scope, 0) + won
+            text = _s(rec.get("사업명"))
+            doc = _s(rec.get("전표번호"))
+            if gubun in EXCLUDED_GUBUN:
+                excluded_won[scope] = excluded_won.get(scope, 0) + won
+                exclusions.append([scope[0], scope[1], scope[2], text or "", _thousand(won),
+                                   "미반영(선택 해제 과목·지사 / 미분류 / 미매핑)", "", doc or ""])
+                continue
+            assigned_won[scope] = assigned_won.get(scope, 0) + won
+            label = clean_match_label(rec.get("매칭사업명")) or "(사업명 없음)"
+            plan_row = rec.get("매칭행") if "매칭행" in cols else None
+            try:
+                plan_row = int(plan_row) if plan_row is not None and plan_row == plan_row else None
+            except (TypeError, ValueError):
+                plan_row = None
+            has_plan_row = gubun == "계획집행" and plan_row is not None and plan_row >= 1
+            key = (scope, "계획집행", plan_row) if has_plan_row else (scope, gubun, label)
+            b = bundles.get(key)
+            if b is None:
+                if has_plan_row:
+                    src_row = plan_row
+                else:
+                    src_row = new_row_counter
+                    new_row_counter += 1
+                b = {"scope": scope, "gubun": gubun, "label": label, "src_row": src_row,
+                     "won": 0, "n": 0, "texts": [], "docs": []}
+                bundles[key] = b
+                order.append(key)
+            b["won"] += won
+            b["n"] += 1
+            if text and text not in b["texts"] and len(b["texts"]) < 3:
+                b["texts"].append(text)
+            if doc and doc not in b["docs"] and len(b["docs"]) < 5:
+                b["docs"].append(doc)
+
+    for n, key in enumerate(order, 1):
+        b = bundles[key]
+        ledger, org, account = b["scope"]
+        gid = f"{'P' if ledger == '손익' else 'C'}{n:06d}"
+        amt = _thousand(b["won"])
+        groups.append([gid, ledger, org, account, b["gubun"], amt, amt, 0, b["n"], 1,
+                       b["label"], " / ".join(b["texts"]), ",".join(b["docs"])])
+        details.append([gid, ledger, org, account, b["src_row"], b["label"], amt, amt])
+
+    totals = [{"ledger": s[0], "org": s[1], "account": s[2], "amountWon": w}
+              for s, w in sorted(source_totals.items())]
+    summary = {}
+    for ledger in frames_by_budget:
+        src = sum(w for s, w in source_totals.items() if s[0] == ledger)
+        asg = sum(w for s, w in assigned_won.items() if s[0] == ledger)
+        exc = sum(w for s, w in excluded_won.items() if s[0] == ledger)
+        summary[ledger] = {"sourceWon": src, "assignedWon": asg, "excludedWon": exc,
+                           "unassignedWon": src - asg - exc,
+                           "groups": sum(1 for k in order if k[0][0] == ledger)}
+
+    return {
+        "schemaVersion": TEAM_JSON_SCHEMA_VERSION,
+        "amountUnit": TEAM_JSON_AMOUNT_UNIT,
+        "amountMatching": True,
+        "sourceYears": [year_i],
+        "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generator": {"name": "budget_app", "kind": "matching-engine-export", **(meta or {})},
+        "summary": summary,
+        "sourceTotals": totals,
+        "reconciliation": {
+            "groups": [TEAM_JSON_GROUP_HEADER] + groups,
+            "details": [TEAM_JSON_DETAIL_HEADER] + details,
+            "exclusions": [TEAM_JSON_EXCLUSION_HEADER] + exclusions,
+            **{k: [v] for k, v in TEAM_JSON_AUX_TABLES.items()},
+        },
+    }
+
+
+def write_team_result_json(out_path, result):
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=1)
+    return out_path
+
+
+def write_matched_csv_combined(frames_by_budget, out_path):
+    """손익·자본 run 결과를 합쳐 규격 matched_{연도}.csv(연도 단일 파일) 생성.
+
+    동료 앱(plan_vs_actual.py 등)은 `matched_{연도}.csv` 하나를 읽으므로 두 원장을 합친다.
+    타예산(구분 '')·제외 행은 상대 원장에서 집계되므로 넣지 않는다(중복 방지).
+    사업명 = 매칭사업명('[신규] ' 접두 제거), 미반영은 공란.
+    """
+    keep = list(ASSIGNED_GUBUN) + list(EXCLUDED_GUBUN)
+    parts = []
+    for ledger, frame in frames_by_budget.items():
+        if frame is None or len(frame) == 0:
+            continue
+        f = frame.copy()
+        gub = f["구분"].map(lambda v: _s(v) or "") if "구분" in f.columns \
+            else pd.Series([""] * len(f), index=f.index)
+        f = f[gub.isin(keep)].copy()
+        gub = gub[gub.isin(keep)]
+        if "매칭사업명" in f.columns:
+            f["매칭사업명"] = [clean_match_label(v) if g in ASSIGNED_GUBUN else None
+                            for v, g in zip(f["매칭사업명"], gub)]
+        parts.append(f)
+    combined = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    return write_matched_csv(combined, out_path)

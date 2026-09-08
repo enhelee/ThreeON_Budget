@@ -888,3 +888,30 @@ def export(year: str, budget: str, kind: str = "actual"):
     if not os.path.exists(path):
         raise HTTPException(500, "산출물 생성에 실패했습니다.")
     return FileResponse(path, filename=names[kind])
+
+
+# ── 팀 v2 앱(예산예측프로그램_팀공유_v2) 연계 산출물 ──────────────────────────
+#   json    : 「예산 실적 집계 → 사업 실적 연결」에 올리는 결과 JSON(schemaVersion 1, 천원)
+#   matched / budget / data : 연동규격_INTERFACE CSV 계약(연도 단일 파일, 원 단위)
+#   손익·자본 최신 분석을 한 번에 담으므로 어느 한쪽 분석이라도 최신 파일보다 새로우면 재생성한다.
+
+@app.get("/api/export-team")
+def export_team(year: str, kind: str = "json"):
+    if kind not in pipeline_db.TEAM_BUNDLE_FILES:
+        raise HTTPException(400, "kind는 json|matched|budget|data 중 하나여야 합니다.")
+    path = pipeline_db.team_bundle_paths(OUT_DIR, year)[kind]
+    conn = _conn()
+    try:
+        runs = [dbm.latest_run(conn, year, b) for b in ("손익", "자본")]
+        runs = [r for r in runs if r]
+        if not runs:
+            raise HTTPException(404, "분석 이력이 없습니다. 먼저 손익·자본 분석을 실행하세요.")
+        newest = max(str(r["created_at"]) for r in runs)
+        stale = (not os.path.exists(path) or _mtime_str(path) < newest)
+        if stale:
+            pipeline_db.export_team_bundle(conn, CONFIG_DIR, OUT_DIR, year)
+    finally:
+        conn.close()
+    if not os.path.exists(path):
+        raise HTTPException(500, "연계 산출물 생성에 실패했습니다.")
+    return FileResponse(path, filename=os.path.basename(path))

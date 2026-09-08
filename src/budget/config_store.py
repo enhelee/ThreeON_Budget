@@ -145,6 +145,8 @@ def save_item_config(config_dir, year, budget, items):
 # (계정코드가 다른 서로 다른 과목은 여기에 넣지 말 것. 구성에 없으면 결측 분류.)
 SEED_ITEM_ALIAS = {
     "수선유지비-열원보완개선및기타": "수선유지비-열원보완및개선",
+    # 팀 v2 앱(builtin_categories.ACCOUNT_NAME_ALIASES)과 동일 — '건가-' 접두 표기 통일(2026-09-08)
+    "건가-외주비-열원정기점검": "외주비-열원정기점검",
 }
 
 # 처지사 정규화 override: {ERP 원문 -> 계획 처지사}. 접두/유사도 규칙으로

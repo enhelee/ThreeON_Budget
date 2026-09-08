@@ -77,3 +77,12 @@ def test_to_bool_defaults():
     assert config_store.to_bool(math.nan, False) is False
     assert config_store.to_bool("FALSE", True) is False
     assert config_store.to_bool(0, True) is False
+
+
+def test_seed_item_alias_matches_team_v2_aliases():
+    # 팀 v2 앱 builtin_categories.ACCOUNT_NAME_ALIASES와 동일해야 두 앱의 과목 정규화가 일치한다
+    alias = config_store.seed_item_alias()
+    assert alias["수선유지비-열원보완개선및기타"] == "수선유지비-열원보완및개선"
+    assert alias["건가-외주비-열원정기점검"] == "외주비-열원정기점검"
+    from budget import normalize
+    assert normalize.normalize_item("건가-외주비-열원정기점검", alias) == "외주비-열원정기점검"
