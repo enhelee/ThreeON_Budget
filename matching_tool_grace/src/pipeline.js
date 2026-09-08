@@ -79,6 +79,11 @@
   const FORCE_ASSIGN = !(typeof process !== "undefined" && process.env && process.env.FORCE_ASSIGN === "0");
   // 소액(≤200만) 처리: 기본 on = Codex방식(텍스트 보존 후 매칭). SMALL_TEXT_MATCH=0 → 옛 방식(무조건 소액자재구매 합산).
   const SMALL_TEXT_MATCH = !(typeof process !== "undefined" && process.env && process.env.SMALL_TEXT_MATCH === "0");
+  // 강제배정 바닥값: 유사도가 이 값 미만이면 "아무 사업에나 던지지 말고" 검토목록으로. (담당자 규칙: 판단 가능하게)
+  // 기본 0.12 — "수선유지비 대체"(0.095) 같은 사업단서 없는 노이즈는 걸러지고, "소방용역"(0.235) 같은 약한 진짜매칭은 유지.
+  const FORCE_FLOOR = (typeof process !== "undefined" && process.env && process.env.FORCE_FLOOR != null) ? Number(process.env.FORCE_FLOOR) : 0.12;
+  // 키워드 우선매칭(실험): 희귀 2글자 하나로 덮어쓰면 오배정↑(측정 -4%p) → 기본 off. KEYWORD_MATCH=1로 실험.
+  const KEYWORD_MATCH = (typeof process !== "undefined" && process.env && process.env.KEYWORD_MATCH === "1");
   // 역분개 상쇄: 같은(지사×과목) 안에서 금액이 정확히 +X/−X로 짝지는 전표쌍 제거(전표번호·텍스트 달라도).
   // 취소전표(9600·9100…)가 원전표와 안 지워지는 것 방지. ⚠️우연 상쇄 위험 → 검증 필요. 기본 on, REVERSAL=0으로 끔.
   const REVERSAL_CANCEL = !(typeof process !== "undefined" && process.env && process.env.REVERSAL === "0");
@@ -824,6 +829,8 @@
       // 과목 내 사업명 bigram IDF 계산 (지역/분야 등 구분 단어 강조)
       const df = new Map();
       for (const p of prows) { p._g = featSet(p.biz); for (const g of p._g) df.set(g, (df.get(g) || 0) + 1); }
+      // 고유 식별어(키워드): 과목 내 df<=2 인 희귀 bigram만 (소방·승강기 등). 흔한 어(용역·점검)는 df 커서 자동 제외.
+      for (const p of prows) p._kw = new Set([...p._g].filter((g) => (df.get(g) || 0) <= 2));
       const N = prows.length || 1;
       const idf = new Map();
       for (const [g, d] of df) idf.set(g, Math.log((N + 1) / d) + 1);
@@ -851,6 +858,16 @@
           if (sc > best) { best = sc; row = p; }
         }
         return { row, best };
+      };
+      // 키워드 픽: 전표텍스트에 어떤 사업의 고유 식별어가 가장 많이 들어있나. 유일한 최다면 그 사업(동점·0이면 판단 보류).
+      const keywordPick = (pool, tg) => {
+        let row = null, best = 0, tie = false;
+        for (const p of pool) {
+          let c = 0; for (const g of p._kw) if (tg.has(g)) c++;
+          if (c > best) { best = c; row = p; tie = false; }
+          else if (c === best && c > 0) tie = true;
+        }
+        return (row && best > 0 && !tie) ? row : null;
       };
       // 하위태그(이름열 괄호, 예: 동남권) 기반 사업 구분: 계획 사업명에 그 태그가 들어있으면 같은 하위로 본다.
       const subTagSet = [...new Set(items.map((x) => x.subTag).filter(Boolean))];
@@ -896,9 +913,11 @@
         // 반올림으로 만든 우연 일치나 동액 후보 여러 개는 자동 확정하지 않는다.
         const amountHits = pool.filter((p) => p.annual > 0 && p.annual === it.amount / AMOUNT_UNIT);
         const amountRow = amountHits.length === 1 && wDice(tg, amountHits[0]._g, idf, defW) >= SIM_THRESHOLD ? amountHits[0] : null;
-        let chosen = amountRow;
+        const kwRow = KEYWORD_MATCH ? keywordPick(pool, tg) : null;   // 사업명 고유 키워드가 텍스트에 있으면 우선
+        let chosen = amountRow || kwRow;
+        let how = amountRow ? "연예산 정확일치+텍스트" : (kwRow ? "키워드 일치" : "");
         if (!chosen && soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
-        else if (!chosen && soR.row && FORCE_ASSIGN) chosen = soR.row;                // (옵션) 임계 미만도 최고줄에 강제배정
+        else if (!chosen && soR.row && FORCE_ASSIGN && soR.best >= FORCE_FLOOR) chosen = soR.row; // 바닥값 이상만 강제. 미만이면 검토목록
         if (it.smallPurchase && (!chosen || (amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best) < 0.5)) {
           unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산·사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
@@ -907,8 +926,8 @@
         if (chosen) {
           sumByRow[chosen.r] = (sumByRow[chosen.r] || 0) + it.amount;
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
-          const conf = Math.round((amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (amountRow ? "연예산 정확일치+텍스트" : (textKey(it.text) === "" ? "빈텍스트·확인요망" : "")), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+          const conf = Math.round(((amountRow || kwRow) ? wDice(tg, chosen._g, idf, defW) : soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (how || (textKey(it.text) === "" ? "빈텍스트·확인요망" : "")), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
         } else {
           unmatched.push(it);
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "후보 미일치·확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
