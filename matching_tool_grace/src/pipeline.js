@@ -802,8 +802,10 @@
       const code = C.resolveAcctCode(grid[r][ci.acctName]);
       if (!code) continue;
       if (!planByCode.has(code)) planByCode.set(code, []);
-      planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]), annual: (ci.annual >= 0 ? Number(grid[r][ci.annual]) || 0 : 0) });
-      grid[r][ci.actual] = 0; // 입력 파일의 기존 실적을 재사용하지 않고 raw로 재계산
+      // actual0 = 업로드 집계표의 기존 실적(있으면). 예비품 등 텍스트 없는 합산 배치를 금액으로 사업에 연결할 때 사용(담당자 규칙: 금액 일치=확정).
+      const actual0 = (ci.actual >= 0 ? Number(grid[r][ci.actual]) || 0 : 0);
+      planByCode.get(code).push({ r, biz, org: nrm(grid[r][ci.deptName]), annual: (ci.annual >= 0 ? Number(grid[r][ci.annual]) || 0 : 0), actual0 });
+      grid[r][ci.actual] = 0; // 입력 파일의 기존 실적을 재사용하지 않고 raw로 재계산(예비품 금액매칭은 위 actual0 사본 사용)
       planRows++;
     }
     // 실적 항목을 예산과목 코드별로 그룹핑
@@ -898,9 +900,15 @@
         }
         if (it.fixedRow) {
           const exact = prows.filter((p) => p.org === io && textKey(p.biz) === textKey(it.text));
+          // 금액매칭: 배치 금액이 이 지사 사업의 (업로드 집계표)실적과 유일하게 정확히 일치하면 그 사업 확정(담당자 규칙: 금액 일치=맞음).
+          const amt = Math.round(it.amount / AMOUNT_UNIT);
+          const amtHit = prows.filter((p) => p.org === io && p.actual0 && Math.round(p.actual0) === amt);
           if (exact.length === 1) {
             sumByRow[exact[0].r] = (sumByRow[exact[0].r] || 0) + it.amount;
             log.push([it.org, it.acctName, it.text, toUnit(it.amount), exact[0].biz, 1, "합산사업명 일치", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+          } else if (amtHit.length === 1) {
+            sumByRow[amtHit[0].r] = (sumByRow[amtHit[0].r] || 0) + it.amount;
+            log.push([it.org, it.acctName, it.text, toUnit(it.amount), amtHit[0].biz, 1, "명확(금액일치)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
           } else {
             unmatched.push({ ...it, _fixedName: true });
             log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "합산사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
