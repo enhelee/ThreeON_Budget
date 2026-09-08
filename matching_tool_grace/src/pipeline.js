@@ -22,7 +22,7 @@
   ];
   // 반복 기성/분납 마커: 회차·월·분기·비용인식을 제거해 "N회 기성"류가 한 사업으로 모이게(담당자 규칙: LTSA 등 분기기성 합산).
   // 변동비·Extra Work처럼 회차마커 없는 건 그대로 남아 별개 사업으로 유지됨.
-  const INSTALLMENT_NOISE = [/\d+\s*회/g, /\d+\s*분기/g, /'?\d+\s*년?\s*\d+\s*월/g, /비용\s*역?\s*인식/g];
+  const INSTALLMENT_NOISE = [/\d+\s*회/g, /\d+\s*분기/g, /'?\d+\s*년?\s*\d+\s*월/g, /\d+\s*월\s*분?/g, /비용\s*역?\s*인식/g];
   // 유사도 매칭용 정규화: 동의어 치환 → 반복기성 마커 제거 → 연도·구분자 제거하고 핵심 단어만 남김
   function simNorm(t) {
     let s = (t == null ? "" : String(t)).normalize("NFC");
@@ -963,6 +963,10 @@
           if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = chosen.r;
           const conf = Math.round(((amountRow || kwRow) ? wDice(tg, chosen._g, idf, defW) : soR.best || 0) * 100) / 100; // 매칭 신뢰도(0~1)
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), chosen.biz, conf, (how || (textKey(it.text) === "" ? "빈텍스트·확인요망" : "")), it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+        } else if (Math.abs(it.amount / AMOUNT_UNIT) <= 2000) {
+          // 담당자 규칙: 200만원 이하 소액 미매칭은 지사×과목별 "소액자재구매"로 합산(개별 검토 안 함).
+          unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산(지사별)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
         } else {
           unmatched.push(it);
           log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "후보 미일치·확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
@@ -1016,7 +1020,7 @@
       const bkey = x[4] ? textKey(x[4]) : "";
       const code = C.resolveAcctCode(x[1]);
       const p = (bkey && code) ? prowIdx.get(nrm(x[0]) + "|" + code + "|" + bkey) : null;
-      if (p) { const chip = Math.round(p.actual0); x[11] = chip; x[12] = toUnit(sumByRow[p.r] || 0) - chip; }
+      if (p) { const chip = Math.round(p.actual0); let d = toUnit(sumByRow[p.r] || 0) - chip; if (Math.abs(d) <= 2) d = 0; /* 반올림 오차(±2천원) 흡수 */ x[11] = chip; x[12] = d; }
       else { x[11] = ""; x[12] = ""; }
     }
     return { aoa: grid.concat(extra), stats: { planRows, filled, unplanned: extra.length }, log };

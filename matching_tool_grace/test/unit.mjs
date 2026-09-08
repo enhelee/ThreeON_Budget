@@ -194,7 +194,7 @@ const chipIn = [
 const chipClean = [
   { org: "강남지사", acct: "60909009", ledger: "손익", amount: 480000, text: "노후 전동밸브 개체 교체" }, // → 480
   { org: "강남지사", acct: "60909009", ledger: "손익", amount: 320000, text: "제어분야 경상보수자재 구매(추가)" }, // → 320
-  { org: "용인지사", acct: "60909009", ledger: "손익", amount: 999000, text: "계획에 없는 용인 공사" }, // → 999 신규
+  { org: "용인지사", acct: "60909009", ledger: "손익", amount: 999000, text: "계획에 없는 용인 공사" }, // → 200만↓ 소액 미매칭 → 소액자재구매 합산 999
 ];
 const fr = P.fillChipInPlace(chipIn, chipClean, "손익", C);
 const outRows = fr.aoa;
@@ -204,8 +204,8 @@ ok(rowBy("노후 전동밸브 개체")[bIdx] === 480, "fillChip: 전동밸브 �
 ok(rowBy("제어분야 경상보수 자재구매")[bIdx] === 320, "fillChip: 제어자재 실적 320");
 ok(fr.stats.unplanned === 1, "fillChip: 계획없는 실적 → 신규 1줄 (실제:" + fr.stats.unplanned + ")");
 ok(outRows.length === chipIn.length + 1, "fillChip: 줄 폭증 없음 (입력+신규1)");
-const unp = outRows.find((r) => String(r[6]).includes("(신규)"));
-ok(unp && unp[bIdx] === 999, "fillChip: 신규 실적 999");
+const unp = outRows.find((r) => String(r[6]).includes("소액자재구매"));
+ok(unp && unp[bIdx] === 999, "fillChip: 200만↓ 소액 미매칭 → 소액자재구매 합산 999");
 
 // ── 보정 사전: 오배분을 지정한 사업으로 강제 ──
 const chipCorr = [
