@@ -1,0 +1,30 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #f4f6f8; color: #1c2530; line-height: 1.5; }
+.wrap { max-width: 780px; margin: 0 auto; padding: 28px 20px 60px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.badge { font-size: 12px; background: #2d6cdf; color: #fff; border-radius: 10px; padding: 2px 9px; vertical-align: middle; margin-left: 6px; }
+.sub { color: #566; font-size: 13px; margin: 0 0 20px; }
+.card { background: #fff; border: 1px solid #e3e8ee; border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+.card h2 { font-size: 15px; margin: 0 0 14px; }
+.uploads { display: grid; gap: 10px; margin-bottom: 16px; }
+.up { display: flex; flex-direction: column; gap: 6px; border: 1px dashed #c7d0da; border-radius: 8px; padding: 12px 14px; }
+.up .lbl { font-size: 13px; font-weight: 600; }
+.up em { color: #d64545; font-style: normal; font-weight: 600; }
+.up em.opt { color: #8a94a0; }
+.up .note { font-size: 11px; color: #8a94a0; }
+input[type=file] { font-size: 13px; }
+button { font: inherit; cursor: pointer; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; }
+button.primary { background: #2d6cdf; color: #fff; font-weight: 600; }
+button.primary:disabled { background: #9db8e8; cursor: default; }
+.downloads { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.downloads button { background: #10633f; color: #fff; }
+.downloads button.ghost { background: #eef1f5; color: #33404f; }
+.msg { margin-top: 12px; font-size: 13px; white-space: pre-line; }
+.msg.err { color: #c0392b; }
+.msg.okmsg { color: #10633f; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stat { background: #f7f9fc; border: 1px solid #e6ebf1; border-radius: 8px; padding: 10px 12px; }
+.stat .n { font-size: 20px; font-weight: 700; }
+.stat .k { font-size: 12px; color: #667; }
+.hint { font-size: 12px; color: #667; margin-top: 14px; }
+footer { text-align: center; color: #99a; font-size: 11px; margin-top: 26px; }
