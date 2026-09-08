@@ -5,6 +5,7 @@
 정기점검보수공사 일정·고온부품 계획·투자비·본사 원가분배·돌발사업을 더해 재무팀 참고 양식(25개+ 시트)으로
 내보낸다.
 """
+from views.checkpoint_source import select_actuals
 import glob
 import os
 import streamlit as st
@@ -44,18 +45,20 @@ def render():
     st.divider()
     st.subheader("계산 결과 미리보기 및 내보내기")
 
-    files = sorted(glob.glob("classified_*.csv"))
-    if not files:
-        st.info("먼저 '예산 실적 분석'에서 분류를 확정해주세요 - 표준화 금액 계산의 기반 데이터입니다.")
-        return
+    actuals = select_actuals("forecast_actual_source")
+    if actuals is None:
+        files = sorted(glob.glob("classified_*.csv"))
+        if not files:
+            st.info("먼저 '예산 실적 분석'에서 분류를 확정해주세요 - 표준화 금액 계산의 기반 데이터입니다.")
+            return
 
-    all_df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
-    all_df["연도"] = pd.to_datetime(all_df["전기일"]).dt.year
-    all_df["사업장명"] = all_df["사업장"].apply(lambda v: get_site_display_name(v) if pd.notna(v) else v)
-    actuals = pd.DataFrame({
-        "사업장": all_df["사업장명"], "연도": all_df["연도"],
-        "예산과목": all_df["계정과목"], "금액": all_df["금액"],
-    })
+        all_df = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+        all_df["연도"] = pd.to_datetime(all_df["전기일"]).dt.year
+        all_df["사업장명"] = all_df["사업장"].apply(lambda v: get_site_display_name(v) if pd.notna(v) else v)
+        actuals = pd.DataFrame({
+            "사업장": all_df["사업장명"], "연도": all_df["연도"],
+            "예산과목": all_df["계정과목"], "금액": all_df["금액"],
+        })
 
     budget_path = f"budget_{lf.BASE_YEAR}.csv"
     budget_df = pd.read_csv(budget_path) if os.path.exists(budget_path) else pd.DataFrame()
