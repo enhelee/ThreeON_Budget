@@ -909,6 +909,16 @@
           } else if (amtHit.length === 1) {
             sumByRow[amtHit[0].r] = (sumByRow[amtHit[0].r] || 0) + it.amount;
             log.push([it.org, it.acctName, it.text, toUnit(it.amount), amtHit[0].biz, 1, "명확(금액일치)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+          } else if (/자산화예비품/.test(nfc(it.acctName))) {
+            // 담당자 규칙: 자산화예비품은 금액이 딱 안 맞는 배치는 그 지사 최대 예비품 사업으로 합침(못 나누면 하나로).
+            const cands = prows.filter((p) => p.org === io && p.actual0 > 0).sort((a, b) => b.actual0 - a.actual0);
+            if (cands.length) {
+              sumByRow[cands[0].r] = (sumByRow[cands[0].r] || 0) + it.amount;
+              log.push([it.org, it.acctName, it.text, toUnit(it.amount), cands[0].biz, 1, "예비품 지사합산(대표사업)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+            } else {
+              unmatched.push({ ...it, _fixedName: true });
+              log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "합산사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+            }
           } else {
             unmatched.push({ ...it, _fixedName: true });
             log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "합산사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
