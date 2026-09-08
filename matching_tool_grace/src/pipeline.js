@@ -114,6 +114,7 @@
       if (!acct) continue; // 합계행 등 약정항목 빈 행 제거
       const text0 = nfc(r[7] == null ? "" : String(r[7])).trim();
       if (EXCLUDE_TEXT(text0)) continue; // 열수송·배전 인프라 이설공사 자산취득 = 실적 제외(담당자 규칙)
+      if (acct === "60909001" && /경영지원처\s*총무/.test(nfc(r[9]))) continue; // 경영지원처 총무부(본사 사옥) 건물/구축물 = 지사 실적 아님 → 제외(담당자 규칙)
       const amount = Number(r[6]) || 0;
       const mgmtCenter = String(r[15] == null ? "" : r[15]).trim(); // P열 = 조직 키
       const nameJ = nfc(r[9]); // 이름(부서명) — 본사의 처 구분이 여기 있음
