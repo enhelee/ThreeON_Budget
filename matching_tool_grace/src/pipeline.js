@@ -87,6 +87,8 @@
   const FORCE_FLOOR = (typeof process !== "undefined" && process.env && process.env.FORCE_FLOOR != null) ? Number(process.env.FORCE_FLOOR) : 0.12;
   // 키워드 우선매칭(실험): 희귀 2글자 하나로 덮어쓰면 오배정↑(측정 -4%p) → 기본 off. KEYWORD_MATCH=1로 실험.
   const KEYWORD_MATCH = (typeof process !== "undefined" && process.env && process.env.KEYWORD_MATCH === "1");
+  // 명백한 1위: 유사도 임계 이상 + 2위와 이 격차 이상이면 신뢰도 낮아도 "검토필요" 안 붙임(반복 사업 재검토 방지). 배정은 불변.
+  const CLEAR_GAP = (typeof process !== "undefined" && process.env && process.env.CLEAR_GAP != null) ? Number(process.env.CLEAR_GAP) : 0.1;
   // 역분개 상쇄: 같은(지사×과목) 안에서 금액이 정확히 +X/−X로 짝지는 전표쌍 제거(전표번호·텍스트 달라도).
   // 취소전표(9600·9100…)가 원전표와 안 지워지는 것 방지. ⚠️우연 상쇄 위험 → 검증 필요. 기본 on, REVERSAL=0으로 끔.
   const REVERSAL_CANCEL = !(typeof process !== "undefined" && process.env && process.env.REVERSAL === "0");
@@ -854,13 +856,14 @@
         return s / p._anchorTot; // 이 사업명 고유키가 전표에 얼마나 들어있나 (0~1)
       };
       const pickBest = (pool, tg, txtNorm) => {
-        let row = null, best = 0;
+        let row = null, best = 0, second = 0;
         for (const p of pool) {
           let sc = wDice(tg, p._g, idf, defW);
           if (ANCHOR_W && txtNorm) sc += ANCHOR_W * anchorFrac(p, txtNorm);
-          if (sc > best) { best = sc; row = p; }
+          if (sc > best) { second = best; best = sc; row = p; }
+          else if (sc > second) { second = sc; }
         }
-        return { row, best };
+        return { row, best, second };
       };
       // 키워드 픽: 전표텍스트에 어떤 사업의 고유 식별어가 가장 많이 들어있나. 유일한 최다면 그 사업(동점·0이면 판단 보류).
       const keywordPick = (pool, tg) => {
@@ -921,9 +924,12 @@
         let how = amountRow ? "연예산 정확일치+텍스트" : (kwRow ? "키워드 일치" : "");
         if (!chosen && soR.row && soR.best >= SIM_THRESHOLD) chosen = soR.row;        // 같은 조직 임계 이상
         else if (!chosen && soR.row && FORCE_ASSIGN && soR.best >= FORCE_FLOOR) chosen = soR.row; // 바닥값 이상만 강제. 미만이면 검토목록
+        // 명백한 1위(임계 이상 + 2위와 큰 격차)면 신뢰도 낮아도 검토불요 — 반복 사업(LTSA 기성 등) 매년 재검토 방지
+        if (chosen && chosen === soR.row && !amountRow && !kwRow && soR.best >= SIM_THRESHOLD && (soR.best - soR.second) >= CLEAR_GAP) how = "명확한 1위";
+        // 소액: 명확히 매칭된 사업(0.5↑)은 사업명 배정. 나머지만 지사별 소액자재구매로 합산(개별 검토 불요 — 합산 금액이 목적).
         if (it.smallPurchase && (!chosen || (amountRow ? wDice(tg, chosen._g, idf, defW) : soR.best) < 0.5)) {
           unmatched.push({ ...it, text: (it.org || it.deptName || "") + " 소액자재구매", _fixedName: true, _smallRemainder: true });
-          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산·사업 확인요망", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
+          log.push([it.org, it.acctName, it.text, toUnit(it.amount), "", 0, "소액합산(지사별)", it.date, (it.docNos || []).join(","), it.lossCenter, annualHint(it.amount / AMOUNT_UNIT, it.org)]);
           continue;
         }
         if (chosen) {
@@ -1030,7 +1036,9 @@
     let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장
     const _clRows = [];
-    const addLog = (lg) => { for (const x of lg || []) _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], ((x[5] < CONF_REVIEW || String(x[6] || "").includes("확인")) ? "검토필요" : ""), "", x[6], x[7], x[8], x[9], x[10] || ""]); };
+    // "명확한 1위"·"보정됨"은 신뢰도 낮아도 검토불요. "확인" 문구 있으면 검토필요.
+    const NOREVIEW = ["명확", "보정", "소액합산"]; // 이 문구는 신뢰도 낮아도 검토불요(자동확정·집계용)
+    const addLog = (lg) => { for (const x of lg || []) { const note = String(x[6] || ""); const review = (note.includes("확인") || (x[5] < CONF_REVIEW && !NOREVIEW.some((k) => note.includes(k)))) ? "검토필요" : ""; _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || ""]); } };
     if (input.capChipRows && input.capChipRows.length) {
       const r = fillChipInPlace(input.capChipRows, cleaned, "자본", C, corr);
       chipCap = r.aoa; stats.planRows += r.stats.planRows; stats.filled += r.stats.filled; stats.unplanned += r.stats.unplanned; addLog(r.log);
