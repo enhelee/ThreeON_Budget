@@ -914,6 +914,16 @@
           const amtHit = prows.filter((p) => p.org === io && p.actual0 && Math.round(p.actual0) === amt);
           if (amtHit.length === 1) { sumByRow[amtHit[0].r] = (sumByRow[amtHit[0].r] || 0) + it.amount; if (it.vendor && vendorToRow[it.vendor] == null) vendorToRow[it.vendor] = amtHit[0].r; log.push([it.org, it.acctName, it.text, toUnit(it.amount), amtHit[0].biz, 1, "명확(금액일치)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; }
         }
+        // 크리티칼 포인트 용역(열원정기유지보수 60909008): 전표를 그 지사의 크리티칼 사업으로 합산. 금액 정확히 안 맞아도 통과(담당자 규칙: 비슷하면 넘어감).
+        if (it.acct === "60909008" && /크리티[칼컬]/.test(nfc(it.text))) {
+          const crit = prows.filter((p) => p.org === io && /크리티[칼컬]/.test(nrm(p.biz)));
+          if (crit.length) {
+            let best = crit[0]; if (crit.length > 1) { let bs = -1; const g = featSet(it.text); for (const p of crit) { const sc = wDice(g, p._g, idf, defW); if (sc > bs) { bs = sc; best = p; } } }
+            sumByRow[best.r] = (sumByRow[best.r] || 0) + it.amount;
+            log.push([it.org, it.acctName, it.text, toUnit(it.amount), best.biz, 1, "명확(크리티칼 합산)", it.date, (it.docNos || []).join(","), it.lossCenter, ""]);
+            continue;
+          }
+        }
         if (it.fixedRow) {
           const exact = prows.filter((p) => p.org === io && textKey(p.biz) === textKey(it.text));
           // 금액매칭: 배치 금액이 이 지사 사업의 (업로드 집계표)실적과 유일하게 정확히 일치하면 그 사업 확정(담당자 규칙: 금액 일치=맞음).
