@@ -4,6 +4,7 @@
 정식 섹션은 classified_*.csv(2단계에서 분류 확정한 실적) 기반이고, 아래 테스트 섹션은
 '투자유형 예측 테스트'에서 업로드·확정하고 저장한 결과를 백데이터로 쓴다.
 """
+from views.checkpoint_source import select_actuals
 import glob
 import streamlit as st
 import pandas as pd
@@ -52,6 +53,10 @@ def render():
 
     st.divider()
     st.subheader("정식 · 지사별 실적 표준화")
+    connected = select_actuals("standardization_actual_source")
+    if connected is not None:
+        _render_standardization(connected, grade_hist, section_key="prod")
+        return
     files = sorted(glob.glob("classified_*.csv"))
     if not files:
         st.info("먼저 2단계에서 분류를 확정하고 저장해주세요.")

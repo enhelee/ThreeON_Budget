@@ -3,6 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const msg = $("msg");
   let RESULT = null;
+  let SOURCE_YEARS = [];
 
   function setMsg(t, cls) { msg.textContent = t; msg.className = "msg" + (cls ? " " + cls : ""); }
 
@@ -94,6 +95,7 @@
         },
         BUDGET_CONST
       );
+      SOURCE_YEARS = [...new Set(rawRows.slice(1).map(row => BUDGET_RECONCILE.dateKey(row[4])).filter(Boolean).map(d => Number(d.slice(0, 4))))].sort();
       RESULT = R;
       renderStats(R);
       $("resultCard").style.display = "";
@@ -108,7 +110,15 @@
 
   $("exportJson").addEventListener("click", () => {
     if (!RESULT) return;
-    const data = {schemaVersion: 1, amountUnit: 'KRW_THOUSAND',
+    const totals = new Map();
+    for (const t of RESULT.cleaned) {
+      if (!['손익', '자본'].includes(t.ledger)) continue;
+      const key = JSON.stringify([t.ledger, t.org, t.acctName]);
+      if (!totals.has(key)) totals.set(key, {ledger:t.ledger, org:t.org, account:t.acctName, amountWon:0});
+      totals.get(key).amountWon += t.amount;
+    }
+    const data = {schemaVersion: 1, amountUnit: 'KRW_THOUSAND', sourceYears: SOURCE_YEARS,
+      sourceTotals: [...totals.values()],
       amountMatching: RESULT.amountMatching, reconciliation: RESULT.reconciliation};
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], {type: 'application/json'}));
     const a = document.createElement('a'); a.href = url; a.download = 'checkpoint-result.json';
