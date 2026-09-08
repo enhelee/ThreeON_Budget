@@ -1,0 +1,26 @@
+[theme]
+base = "light"
+
+primaryColor = "#2d5980"
+backgroundColor = "#f2f1ec"
+secondaryBackgroundColor = "#eceae2"
+textColor = "#1e2a3a"
+borderColor = "#c7cbd1"
+dataframeBorderColor = "#c7cbd1"
+linkColor = "#2d5980"
+
+greenColor = "#3f8f5f"
+orangeColor = "#a5701c"
+yellowColor = "#a5701c"
+redColor = "#ab3a3a"
+
+font = "Segoe UI, sans-serif"
+headingFont = "Bahnschrift, Segoe UI Semibold, sans-serif"
+codeFont = "Consolas, monospace"
+
+baseRadius = "0.15rem"
+buttonRadius = "0.15rem"
+showWidgetBorder = true
+showSidebarBorder = true
+
+chartCategoricalColors = ["#2d5980", "#a5701c", "#3f8f5f", "#8aa8c2", "#ab3a3a", "#647186"]

@@ -1,0 +1,62 @@
+# 연도별 실적/예산 데이터 (실제 회사 데이터 - 공유 금지)
+data_*.csv
+classified_*.csv
+matched_*.csv
+budget_*.csv
+year_status.json
+
+# 매핑/마스터 데이터 (사내 조직 정보)
+site_type_map.csv
+account_category_map.csv
+dept_code_master.csv
+account_code_master.csv
+project_master.csv
+extra_projects.csv
+
+# 예산 표준화 (사내 실데이터 기반 정비등급 이력/산출방식/수동수정값)
+site_year_grade.csv
+standardization_method_map.csv
+standardization_overrides.csv
+
+# 중장기 예산 예측 (사내 실데이터 기반)
+hot_parts_plan.csv
+hq_allocation_ratio.csv
+hq_master_table.csv
+hq_temp_projects.csv
+surprise_projects.csv
+longterm_factors.csv
+
+# Test 모드 백데이터 (한 폴더에 모아 저장 - test_data/ 안 내용은 사용자별 연습용 데이터라 공유 금지)
+test_data/
+
+# 분류 모델 학습 데이터/산출물
+training_data.csv
+training_meta.json
+type_classifier.joblib
+
+# 사업명 기반 투자유형 학습 데이터/모델
+project_type_training.csv
+project_type_training.csv.bak_*
+project_type_meta.json
+project_type_model_group.joblib
+project_type_model_major.joblib
+project_type_model_minor.joblib
+
+# 임시 업로드 파일
+temp_upload.xlsx
+temp_budget_upload*.xlsx
+
+# 생성된 결과물(다운로드용 엑셀)
+filled_*.xlsx
+output_template.xlsx
+
+# 사용자가 추가 등록한 양식 (내장 양식 builtin_template_*.xlsx는 제외하고 유지)
+template_*.xlsx
+templates_manifest.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 로컬 개발 도구 설정 (개인 실행 환경 - 팀 공유 대상 아님)
+.claude/

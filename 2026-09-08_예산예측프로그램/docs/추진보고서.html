@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>예산 관리 프로그램 개발 추진 보고서</title>
+</head>
+<body>
+<style>
+  :root{
+    --bg:#F5F4F0;
+    --surface:#FFFFFF;
+    --border:#DEDAD0;
+    --ink:#201F1C;
+    --ink-soft:#5C584F;
+    --ink-faint:#8B8779;
+    --accent:#2B5C63;
+    --accent-soft:#E3EDEB;
+    --flag-border:#B9791A;
+    --flag-bg:#FBF0DC;
+    --flag-ink:#7A5115;
+    --font-heading:"Batang","BatangChe","Noto Serif KR","Times New Roman",serif;
+    --font-body:"Malgun Gothic","Apple SD Gothic Neo",-apple-system,"Segoe UI",sans-serif;
+    --font-mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1B1A17; --surface:#232220; --border:#3A372F;
+      --ink:#ECE9E2; --ink-soft:#B4AFA1; --ink-faint:#847F70;
+      --accent:#6EAFAE; --accent-soft:#233635;
+      --flag-border:#D9A24E; --flag-bg:#3A2E15; --flag-ink:#E7C283;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#1B1A17; --surface:#232220; --border:#3A372F;
+    --ink:#ECE9E2; --ink-soft:#B4AFA1; --ink-faint:#847F70;
+    --accent:#6EAFAE; --accent-soft:#233635;
+    --flag-border:#D9A24E; --flag-bg:#3A2E15; --flag-ink:#E7C283;
+  }
+  :root[data-theme="light"]{
+    --bg:#F5F4F0; --surface:#FFFFFF; --border:#DEDAD0;
+    --ink:#201F1C; --ink-soft:#5C584F; --ink-faint:#8B8779;
+    --accent:#2B5C63; --accent-soft:#E3EDEB;
+    --flag-border:#B9791A; --flag-bg:#FBF0DC; --flag-ink:#7A5115;
+  }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+
+  .rp-page{
+    background:var(--bg); color:var(--ink); font-family:var(--font-body);
+    padding:56px clamp(20px,5vw,64px) 80px; box-sizing:border-box; min-height:100%;
+  }
+  .rp-page *{ box-sizing:border-box; }
+  .rp-doc{ max-width:740px; margin:0 auto; }
+
+  .rp-toolbar{
+    max-width:740px; margin:0 auto 20px; display:flex; justify-content:flex-end;
+  }
+  .rp-print-btn{
+    font-family:var(--font-body); font-size:13px; font-weight:600; color:var(--ink);
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:8px 14px; cursor:pointer;
+  }
+  .rp-print-btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .rp-page :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .rp-status{
+    display:inline-block; font-family:var(--font-mono); font-size:11px; letter-spacing:.04em;
+    color:var(--flag-ink); background:var(--flag-bg); border:1px solid var(--flag-border);
+    border-radius:99px; padding:3px 10px; margin-bottom:18px;
+  }
+
+  .rp-title{
+    font-family:var(--font-heading); font-weight:700; font-size:clamp(26px,3.4vw,34px);
+    line-height:1.35; margin:0 0 22px; text-wrap:balance; color:var(--ink);
+    border-bottom:3px double var(--ink); padding-bottom:20px;
+  }
+
+  .rp-meta{
+    display:grid; grid-template-columns:auto 1fr; gap:6px 18px;
+    font-size:13.5px; color:var(--ink-soft); margin:0 0 40px;
+  }
+  .rp-meta dt{ font-weight:600; color:var(--ink); }
+  .rp-meta dd{ margin:0; }
+  .rp-flag-inline{
+    color:var(--flag-ink); background:var(--flag-bg); border:1px solid var(--flag-border);
+    border-radius:5px; padding:0 6px; font-size:12.5px; white-space:nowrap;
+  }
+
+  .rp-intro{
+    font-size:15px; line-height:1.85; color:var(--ink-soft); margin:0 0 44px;
+    padding-bottom:32px; border-bottom:1px solid var(--border);
+  }
+
+  .rp-section{ margin-bottom:44px; }
+  .rp-section-head{
+    display:flex; align-items:baseline; gap:12px; margin:0 0 18px;
+    border-bottom:2px solid var(--accent); padding-bottom:10px;
+  }
+  .rp-section-num{
+    font-family:var(--font-heading); font-size:15px; font-weight:700; color:var(--accent);
+    flex:0 0 auto;
+  }
+  .rp-section-title{
+    font-family:var(--font-heading); font-size:22px; font-weight:700; margin:0; color:var(--ink);
+  }
+
+  .rp-sub-head{
+    font-size:15px; font-weight:700; color:var(--ink); margin:22px 0 10px;
+  }
+
+  .rp-list{ margin:0; padding:0 0 0 1.3em; }
+  .rp-list li{
+    font-size:14.5px; line-height:1.85; color:var(--ink); margin-bottom:9px;
+  }
+  .rp-list li::marker{ color:var(--accent); }
+  .rp-list .rp-list{ margin-top:6px; }
+  .rp-list .rp-list li{ font-size:14px; color:var(--ink-soft); }
+
+  .rp-flag-block{
+    display:flex; gap:10px; align-items:flex-start;
+    background:var(--flag-bg); border:1px dashed var(--flag-border); border-radius:10px;
+    padding:12px 16px; margin:14px 0; font-size:13.5px; line-height:1.7; color:var(--flag-ink);
+  }
+  .rp-flag-tag{
+    font-family:var(--font-mono); font-size:11px; font-weight:700; letter-spacing:.03em;
+    background:var(--flag-border); color:var(--surface); border-radius:5px;
+    padding:2px 7px; flex:0 0 auto; white-space:nowrap;
+  }
+
+  .rp-table-wrap{ overflow-x:auto; margin:16px 0 8px; }
+  .rp-table{ width:100%; border-collapse:collapse; font-size:13.5px; min-width:520px; }
+  .rp-table caption{ text-align:left; font-size:12px; color:var(--ink-faint); margin-bottom:6px; }
+  .rp-table th, .rp-table td{
+    border:1px solid var(--border); padding:9px 12px; text-align:left; vertical-align:top;
+  }
+  .rp-table thead th{
+    background:var(--accent-soft); color:var(--ink); font-weight:700; white-space:nowrap;
+  }
+  .rp-table td.rp-num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; }
+
+  .rp-footer{
+    margin-top:56px; padding-top:20px; border-top:1px solid var(--border);
+    font-size:12px; color:var(--ink-faint); line-height:1.7;
+  }
+
+  @media print{
+    .rp-toolbar{ display:none; }
+    .rp-page{ padding:0; background:#fff; }
+    .rp-status{ display:none; }
+  }
+
+  @media (max-width:640px){
+    .rp-meta{ grid-template-columns:1fr; }
+  }
+</style>
+
+<div class="rp-toolbar">
+  <button class="rp-print-btn" type="button" onclick="window.print()">인쇄 / PDF로 저장</button>
+</div>
+
+<div class="rp-page">
+  <div class="rp-doc">
+
+    <span class="rp-status">초안 · 편집 전</span>
+
+    <h1 class="rp-title">발전소 유지보수 예산 관리 프로그램<br>개발 추진 보고서</h1>
+
+    <dl class="rp-meta">
+      <dt>작성일</dt><dd>2026. 8. 5.</dd>
+      <dt>작성자</dt><dd><span class="rp-flag-inline">작성 필요</span></dd>
+      <dt>부서</dt><dd><span class="rp-flag-inline">작성 필요</span></dd>
+      <dt>문서 상태</dt><dd>초안 — 보고 전 검토 및 수정 필요</dd>
+    </dl>
+
+    <p class="rp-intro">
+      발전소 유지보수 예산의 계획 수립부터 실적 관리, 향후 10년치 예산 예측까지 한 번에 처리할 수 있는
+      프로그램을 자체적으로 개발 중임. 본 보고서는 추진 배경과 현재까지의 진행 상황, 향후 계획 및
+      기대효과를 보고하기 위해 작성함.
+    </p>
+
+    <section class="rp-section">
+      <div class="rp-section-head">
+        <span class="rp-section-num">Ⅰ</span>
+        <h2 class="rp-section-title">추진배경</h2>
+      </div>
+      <ul class="rp-list">
+        <li>발전소(지사) 유지보수 예산은 각 지사가 작성한 엑셀 파일을 담당자가 매년 수작업으로 모으고 계산해 왔음</li>
+        <li>관리 대상 지사가 19개 이상으로 많고, 매년 반복되는 예산 계획·실적 정리·예측 작업량이 상당해 시간이 많이 소요됨</li>
+        <li>계산 방식이 담당자 개인의 방식에 따라 달라질 수 있어, 결과의 일관성을 보장하기 어려움</li>
+        <li>담당자가 바뀌면 그동안 쌓인 계산 방식과 업무 노하우가 함께 사라지는 문제가 있음</li>
+        <li>이러한 문제를 해결하고자 예산 계획, 실적 관리, 향후 10년치 예산 예측까지 한 번에 처리하는 프로그램을 자체 개발하기로 함</li>
+      </ul>
+    </section>
+
+    <section class="rp-section">
+      <div class="rp-section-head">
+        <span class="rp-section-num">Ⅱ</span>
+        <h2 class="rp-section-title">현황 및 문제점</h2>
+      </div>
+
+      <h3 class="rp-sub-head">1. 기존 방식의 문제점</h3>
+      <ul class="rp-list">
+        <li>지사별 예산 계획과 실적 자료가 여러 개의 엑셀 파일로 나뉘어 있어, 전체 현황을 한눈에 파악하기 어려움</li>
+        <li>실적 자료를 항목별로 나누어 정리하는 작업을 사람이 직접 해야 해서 시간이 오래 걸리고 실수가 발생할 수 있음</li>
+        <li>본사에서 배정하는 예산과 각 지사가 직접 편성하는 예산이 따로 관리되고 있어, 지사별 전체 예산 규모를 확인하려면 여러 자료를 대조해야 함</li>
+        <li>앞으로 10년치 예산을 미리 가늠해 보려면 매번 처음부터 다시 계산해야 해서 반복 작업이 많음</li>
+      </ul>
+
+      <h3 class="rp-sub-head">2. 현재까지의 개발 진행 상황</h3>
+      <ul class="rp-list">
+        <li>예산 계획 엑셀을 올리면 자동으로 정리·저장하는 기능 — 개발 완료</li>
+        <li>실적 자료를 올리면 항목을 자동으로 분류해 주는 기능(사람은 결과만 확인하고 필요한 부분만 수정) — 개발 완료</li>
+        <li>지사별 과거 실적을 바탕으로 적정 예산 수준을 자동으로 계산하는 기능 — 개발 완료</li>
+        <li>올해 예산과 앞의 계산 결과를 바탕으로 2026년부터 2035년까지 10년치 예산을 자동으로 산출하고, 결과를 정해진 보고 양식의 엑셀 파일로 바로 내려받는 기능 — 개발 완료</li>
+        <li>현재는 실제 자료를 넣어 계산 결과가 정확한지 확인하는 검증 단계이며, 정식으로 업무에 사용하기 전 단계임</li>
+      </ul>
+
+      <div class="rp-flag-block">
+        <span class="rp-flag-tag">작성 필요</span>
+        <span>기존 방식(수작업) 대비 소요 시간, 담당 인원 등 구체적인 현황 수치 확인 후 추가 필요.</span>
+      </div>
+    </section>
+
+    <section class="rp-section">
+      <div class="rp-section-head">
+        <span class="rp-section-num">Ⅲ</span>
+        <h2 class="rp-section-title">추진계획</h2>
+      </div>
+
+      <div class="rp-table-wrap">
+        <table class="rp-table">
+          <caption>추진 단계 (예시 — 실제 일정에 맞게 수정 필요)</caption>
+          <thead>
+            <tr><th>단계</th><th>내용</th><th>시기</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1단계</td>
+              <td>핵심 기능 개발 및 자체 검증</td>
+              <td><span class="rp-flag-inline">작성 필요</span> (현재 진행 중)</td>
+            </tr>
+            <tr>
+              <td>2단계</td>
+              <td>일부 지사를 대상으로 시범 운영하며 계산 결과 검증</td>
+              <td><span class="rp-flag-inline">작성 필요</span></td>
+            </tr>
+            <tr>
+              <td>3단계</td>
+              <td>전체 지사로 확대 적용, 정식 업무 사용 전환</td>
+              <td><span class="rp-flag-inline">작성 필요</span></td>
+            </tr>
+            <tr>
+              <td>4단계</td>
+              <td>운영하며 나오는 의견을 반영해 지속적으로 보완</td>
+              <td><span class="rp-flag-inline">작성 필요</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rp-flag-block">
+        <span class="rp-flag-tag">작성 필요</span>
+        <span>각 단계별 목표 일정, 담당 부서·인력, 필요 지원 사항(사내 시스템 연동, 결재 절차 등) 확정 후
+        반영 필요.</span>
+      </div>
+    </section>
+
+    <section class="rp-section">
+      <div class="rp-section-head">
+        <span class="rp-section-num">Ⅳ</span>
+        <h2 class="rp-section-title">추진효과</h2>
+      </div>
+      <ul class="rp-list">
+        <li>반복적으로 여러 엑셀 파일을 모으고 계산하던 시간을 줄일 수 있음</li>
+        <li>담당자가 누구든 동일한 기준으로 계산되어 결과의 일관성과 신뢰도가 높아짐</li>
+        <li>사람이 직접 계산하며 생길 수 있는 실수를 줄일 수 있음</li>
+        <li>앞으로 10년치 예산을 미리 확인할 수 있어, 장기적인 예산 계획을 세우는 데 도움이 됨</li>
+        <li>계산 방식과 그동안의 자료가 프로그램에 남아 있어, 담당자가 바뀌어도 업무가 끊기지 않고 이어짐</li>
+      </ul>
+
+      <div class="rp-flag-block">
+        <span class="rp-flag-tag">작성 필요</span>
+        <span>시범 운영 결과 도출 후 절감 시간, 정확도 개선 등 구체적 수치 추가 필요.</span>
+      </div>
+    </section>
+
+    <p class="rp-footer">
+      본 보고서는 참고용 초안임. 실제 보고 전 내용을 검토하고, "작성 필요" 표시 항목을 확정 정보로
+      보완한 후 사용할 것.
+    </p>
+
+  </div>
+</div>
+</body>
+</html>
