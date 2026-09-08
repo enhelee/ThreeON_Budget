@@ -34,6 +34,9 @@
       .replace(/\s+/g, "")
       .trim();
   }
+  // 보정사전 키: 회차·연도·동의어까지 정규화(simNorm 규칙)해서 "29회/30회/내년껀"이 한 키로 모임 → 한 번 보정하면 매년 재사용.
+  // (textKey는 회차를 남겨 매년 다른 키가 됐던 문제를 해결. netting 등 다른 textKey 사용처는 그대로 둠.)
+  const corrKey = (t) => simNorm(t);
   // 문자 bigram 집합
   function bigrams(s) {
     const set = new Set();
@@ -883,7 +886,7 @@
         // 보정사전은 합산 항목에도 우선 적용
         const io = nrm(it.org);
         // 0) 보정 사전 우선: (조직|과목|전표텍스트)가 등록돼 있으면 그 사업으로 확정
-        const ckey = it.org + "|" + it.acct + "|" + textKey(it.text);
+        const ckey = it.org + "|" + it.acct + "|" + corrKey(it.text);
         if (corr.has(ckey)) {
           if (/^제외/.test(nfc(String(corr.get(ckey))).trim())) { log.push([it.org, it.acctName, it.text, toUnit(it.amount), "(제외)", 1, "보정:제외", it.date, (it.docNos || []).join(","), it.lossCenter, ""]); continue; } // 보정사전 "제외" → 실적에서 뺌
           const target = textKey(corr.get(ckey));
@@ -1000,7 +1003,7 @@
       if (!biz) continue; // 올바른 사업명 안 채운 줄은 스킵
       const code = C.resolveAcctCode(row[ci.acct]) || String(row[ci.acct] || "").trim();
       const org = nfc(row[ci.dep]);
-      const key = org + "|" + code + "|" + textKey(row[ci.text]);
+      const key = org + "|" + code + "|" + corrKey(row[ci.text]);
       map.set(key, biz);
     }
     return map;
