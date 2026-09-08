@@ -177,10 +177,11 @@
       if (removed.size) stage = stage.filter((_, i) => !removed.has(i));
     }
 
-    // Step B: 텍스트 완전일치끼리 통합. 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거)
+    // Step B: 텍스트 통합. 월·연도·회차 정규화(simNorm) 기준 → "계량기 1월분~12월분", "N회 기성" 등 분납/월별이 한 사업으로 합쳐짐(담당자 규칙).
+    // 합0이면 제거(2순위), 아니면 한 줄로 합산(중복 제거). 빈텍스트는 textKey("")로 종전과 동일.
     const byText = new Map();
     for (const s of stage) {
-      const k = textKey(s.text);
+      const k = textKey(s.text) === "" ? "" : simNorm(s.text);
       if (!byText.has(k)) byText.set(k, []);
       byText.get(k).push(s);
     }
