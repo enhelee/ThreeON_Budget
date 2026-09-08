@@ -884,6 +884,14 @@
       const rowsByOrg = {};
       for (const p of prows) (rowsByOrg[p.org] = rowsByOrg[p.org] || []).push(p);
       const vendorToRow = {}; // 런타임 학습: vendor → 계획줄 r (텍스트 매칭에서 배움)
+      // 사전패스: 금액 정확일치 사업을 미리 표시(amtFilled) → 텍스트/강제배정이 그 사업에 덧씌우지 못하게(오배정으로 차이 생기는 것 방지).
+      const amtFilled = new Set();
+      for (const it of items) {
+        if (it.bucket === "gyeongsang" || it.emptyText) continue;
+        const io = nrm(it.org); const a = Math.round(it.amount / AMOUNT_UNIT);
+        const h = prows.filter((p) => p.org === io && p.actual0 && Math.round(p.actual0) === a);
+        if (h.length === 1) amtFilled.add(h[0].r);
+      }
       // 1패스: 텍스트 있는 항목 배정 + vendor→사업 학습
       const empties = [];
       for (const it of items) {
@@ -937,8 +945,8 @@
         const txtNorm = simNorm(it.text + " " + (it.costName || ""));
         // ★ 반드시 같은 조직(지사/처) 안에서만 매칭 — 지사 간 이동 금지. + 하위태그(동남권 등) 우선.
         const itSub = it.subTag || "";
-        let pool = prows.filter((p) => p.org === io && p._sub === itSub);
-        if (!pool.length) pool = prows.filter((p) => p.org === io); // 같은 하위 없으면 조직 전체로 폴백
+        let pool = prows.filter((p) => p.org === io && p._sub === itSub && !amtFilled.has(p.r)); // 금액일치로 이미 채워진 사업은 제외(덧씌움 방지)
+        if (!pool.length) pool = prows.filter((p) => p.org === io && !amtFilled.has(p.r)); // 같은 하위 없으면 조직 전체로 폴백
         const soR = pickBest(pool, tg, txtNorm);
         // 같은 조직·과목의 유일한 연예산 정확일치 + 텍스트 근거를 함께 확인.
         // 반올림으로 만든 우연 일치나 동액 후보 여러 개는 자동 확정하지 않는다.
@@ -1094,7 +1102,8 @@
       const bigOff = assigned && Math.abs(Number(x[12]) || 0) >= BIG_DIFF; // 사업 총액이 크게 어긋남
       let review;
       if (JAEJAE.test(nfc(x[1]))) { review = assigned ? "" : ((note.includes("확인") || x[5] < CONF_REVIEW) ? "검토필요" : ""); }
-      else { review = (bigOff || note.includes("확인") || (x[5] < CONF_REVIEW && !confirmed)) ? "검토필요" : ""; }
+      // 확정 행(금액일치·보정·명확·연예산·차이0)은 통과. 큰 오배정(bigOff)은 확정 아닌 행만 검토(그 사업에 잘못 붙은 전표만 노출).
+      else { review = (!confirmed && (bigOff || note.includes("확인") || x[5] < CONF_REVIEW)) ? "검토필요" : ""; }
       _clRows.push([x[0], x[1], x[2], x[3], x[4], x[5], review, "", x[6], x[7], x[8], x[9], x[10] || "", x[11] == null ? "" : x[11], x[12] == null ? "" : x[12]]);
     } };
     if (input.capChipRows && input.capChipRows.length) {
