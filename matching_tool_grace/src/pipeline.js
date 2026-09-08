@@ -1084,7 +1084,8 @@
     const BIG_DIFF = 50000; // 천원. 이보다 큰 사업 총액 차이만 별도 검토 노출(작은 차이는 통과).
     const addLog = (lg) => { for (const x of lg || []) {
       const note = String(x[6] || ""); const assigned = (x[11] !== "" && x[11] != null);
-      const confirmed = NOREVIEW.some((k) => note.includes(k)); // 금액일치·보정·명확·연예산·소액합산
+      // 확정 = 확정문구(금액일치·보정·명확·연예산) 또는 사업 총액이 집계표와 일치(차이=0). 담당자 규칙: 지사별 합쳐서 총액 맞으면 통과(클라우드 사용료 월별 등).
+      const confirmed = NOREVIEW.some((k) => note.includes(k)) || (assigned && Number(x[12]) === 0);
       const bigOff = assigned && Math.abs(Number(x[12]) || 0) >= BIG_DIFF; // 사업 총액이 크게 어긋남
       let review;
       if (JAEJAE.test(nfc(x[1]))) { review = assigned ? "" : ((note.includes("확인") || x[5] < CONF_REVIEW) ? "검토필요" : ""); }
