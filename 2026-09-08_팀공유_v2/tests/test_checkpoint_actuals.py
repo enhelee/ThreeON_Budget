@@ -65,8 +65,8 @@ def test_reimport_idempotent_and_older_versions_preserved(isolated):
 def test_saved_data_integrity(isolated):
     ca.save_result(encode(),2025)
     path=next(ca.STORE.glob('2025-*.json'))
-    data=json.loads(path.read_text()); data['result']['sourceTotals'][0]['amountWon']=123
-    path.write_text(json.dumps(data))
+    data=json.loads(path.read_text(encoding='utf-8')); data['result']['sourceTotals'][0]['amountWon']=123
+    path.write_text(json.dumps(data), encoding='utf-8')
     with pytest.raises(ValueError): ca.load_saved()
 
 def test_new_menu_renders(isolated):
