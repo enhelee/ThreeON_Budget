@@ -15,23 +15,147 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
+import json
+from urllib.parse import quote
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
-
-from budget import config_store, db as dbm, pipeline_db
+from starlette.middleware.base import BaseHTTPMiddleware
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_DIR = os.path.join(APP_DIR, "config")
-OUT_DIR = os.path.join(APP_DIR, "output")
+
+from budget import auth as authm                      # noqa: E402
+authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
+
+from budget import config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
+
+CONFIG_DIR = os.environ.get("CONFIG_DIR") or os.path.join(APP_DIR, "config")
+OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 WEB_DIR = os.path.join(APP_DIR, "webapp")
+_PARENT = os.path.dirname(APP_DIR)
+SITE_DIR = os.environ.get("SITE_DIR") or next(              # 소개 사이트: 패키지는 docs/, 개발 폴더는 site/
+    (d for d in (os.path.join(_PARENT, "docs"), os.path.join(_PARENT, "site"))
+     if os.path.exists(os.path.join(d, "index.html"))), os.path.join(_PARENT, "docs"))
+AUTH = authm.AuthConfig()
 
 app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None)
 
 
 def _conn():
     return dbm.connect()
+
+
+def _operator(request: Request):
+    """현재 요청의 작업자 이름(감사 로그·이력 표기). 인증 비활성 시 'local'."""
+    return getattr(request.state, "operator", None) or "local"
+
+
+class AuthAuditMiddleware(BaseHTTPMiddleware):
+    """① /api/* 는 세션 쿠키 필수(로그인·상태·헬스체크 제외) ② 변경 요청은 audit_log에 기록.
+
+    공용 비밀번호 1개 체계(사용자 결정)에서 수정 이력은 이 미들웨어가 남기는 audit_log가 근거다:
+    작업자(로그인 때 입력) · 시각 · 메서드 · 경로 · 응답코드 · 요청 요약(JSON 키/식별자, 파일 본문 제외).
+    """
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        operator = None
+        if AUTH.enabled:
+            operator = AUTH.verify(request.cookies.get(AUTH.cookie_name))
+            if path.startswith("/api/") and path not in authm.PUBLIC_API and not operator:
+                return JSONResponse({"detail": "login_required"}, status_code=401)
+        request.state.operator = operator or ("local" if not AUTH.enabled else None)
+
+        body_json = None
+        if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
+                and "application/json" in (request.headers.get("content-type") or "")):
+            raw = await request.body()           # Starlette가 캐시 → 라우트에서 다시 읽을 수 있다
+            if len(raw) <= 65536:
+                try:
+                    body_json = json.loads(raw.decode("utf-8"))
+                except (ValueError, UnicodeDecodeError):
+                    body_json = None
+        response = await call_next(request)
+        if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
+                and path not in ("/api/login", "/api/logout")):
+            if body_json and "password" in body_json:
+                body_json = {k: v for k, v in body_json.items() if k != "password"}
+            try:
+                conn = _conn()
+                try:
+                    dbm.add_audit(conn, request.state.operator, request.method, path,
+                                  response.status_code,
+                                  authm.audit_detail(path, request.url.query, body_json))
+                finally:
+                    conn.close()
+            except Exception:              # 감사 기록 실패가 본 요청을 깨뜨리지 않게
+                pass
+        return response
+
+
+app.add_middleware(AuthAuditMiddleware)
+
+
+# ── 인증 (공용 비밀번호 + 작업자 이름) ─────────────────────────────────────
+
+class LoginReq(BaseModel):
+    password: str
+    name: str
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "auth": AUTH.enabled, "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    op = AUTH.verify(request.cookies.get(AUTH.cookie_name)) if AUTH.enabled else "local"
+    return {"enabled": AUTH.enabled, "operator": op, "logged_in": bool(op)}
+
+
+@app.post("/api/login")
+def login(req: LoginReq, request: Request):
+    if not AUTH.enabled:
+        return {"ok": True, "operator": "local", "enabled": False}
+    name = authm.clean_operator(req.name)
+    if not name:
+        raise HTTPException(400, "작업자 이름을 입력하세요(수정 이력에 기록됩니다).")
+    if not AUTH.check_password(req.password):
+        conn = _conn()
+        try:
+            dbm.add_audit(conn, name, "POST", "/api/login", 401, "비밀번호 불일치")
+        finally:
+            conn.close()
+        raise HTTPException(401, "비밀번호가 맞지 않습니다.")
+    secure = AUTH.cookie_secure or request.url.scheme == "https" \
+        or request.headers.get("x-forwarded-proto") == "https"
+    resp = JSONResponse({"ok": True, "operator": name, "enabled": True})
+    resp.set_cookie(AUTH.cookie_name, AUTH.issue(name), httponly=True, samesite="lax",
+                    secure=secure, max_age=int(AUTH.session_hours * 3600), path="/")
+    conn = _conn()
+    try:
+        dbm.add_audit(conn, name, "POST", "/api/login", 200, "로그인")
+    finally:
+        conn.close()
+    return resp
+
+
+@app.post("/api/logout")
+def logout(request: Request):
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(AUTH.cookie_name, path="/")
+    return resp
+
+
+@app.get("/api/audit")
+def audit(request: Request, limit: int = 100, operator: str = None):
+    conn = _conn()
+    try:
+        return {"rows": dbm.list_audit(conn, limit=min(int(limit), 1000), operator=operator)}
+    finally:
+        conn.close()
 
 
 def _guard_unlocked(conn, year, action="변경"):
@@ -915,3 +1039,150 @@ def export_team(year: str, kind: str = "json"):
     if not os.path.exists(path):
         raise HTTPException(500, "연계 산출물 생성에 실패했습니다.")
     return FileResponse(path, filename=os.path.basename(path))
+
+
+# ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────
+
+@app.get("/api/models")
+def models(name: str = None):
+    conn = _conn()
+    try:
+        out = {"models": ml_registry.list_models(conn, name), "names": list(ml_registry.MODEL_NAMES),
+               "stats": {n: ml_registry.example_stats(conn, n) for n in ml_registry.MODEL_NAMES}}
+        return _clean_json(out)
+    finally:
+        conn.close()
+
+
+@app.post("/api/models/{model_id}/activate")
+def model_activate(model_id: int, request: Request):
+    conn = _conn()
+    try:
+        if not ml_registry.activate_model(conn, model_id):
+            raise HTTPException(404, "모델이 없습니다.")
+        return {"ok": True, "operator": _operator(request)}
+    finally:
+        conn.close()
+
+
+@app.get("/api/models/{model_id}/download")
+def model_download(model_id: int):
+    conn = _conn()
+    try:
+        meta, blob = ml_registry.get_model_blob(conn, model_id=model_id)
+    finally:
+        conn.close()
+    if blob is None:
+        raise HTTPException(404, "모델이 없습니다.")
+    fname = ml_registry.V2_MODEL_FILES.get(meta["name"], f"{meta['name']}_v{meta['version']}.joblib")
+    return Response(blob, media_type="application/octet-stream",
+                    headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(fname)}"})
+
+
+class TrainReq(BaseModel):
+    name: str
+    note: str = None
+
+
+@app.post("/api/train")
+def train(req: TrainReq, request: Request):
+    if req.name not in ml_registry.MODEL_NAMES:
+        raise HTTPException(400, f"모델 이름은 {list(ml_registry.MODEL_NAMES)} 중 하나여야 합니다.")
+    conn = _conn()
+    try:
+        try:
+            return _clean_json(ml_registry.train(conn, req.name, actor=_operator(request), note=req.note))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+@app.get("/api/training")
+def training(name: str, limit: int = 200, unconfirmed: int = 0):
+    conn = _conn()
+    try:
+        return {"rows": ml_registry.list_examples(conn, name, limit=min(int(limit), 2000),
+                                                  only_unconfirmed=bool(unconfirmed)),
+                "stats": ml_registry.example_stats(conn, name)}
+    finally:
+        conn.close()
+
+
+class ExampleReq(BaseModel):
+    name: str
+    rows: list                 # [[text, label], …]
+    confirmed: bool = True
+    source: str = "사람확정"
+
+
+@app.post("/api/training")
+def training_add(req: ExampleReq, request: Request):
+    if req.name not in ml_registry.MODEL_NAMES:
+        raise HTTPException(400, "모델 이름이 올바르지 않습니다.")
+    conn = _conn()
+    try:
+        return ml_registry.add_examples(conn, req.name, [tuple(r[:2]) for r in req.rows if len(r) >= 2],
+                                        source=req.source, actor=_operator(request), confirmed=req.confirmed)
+    finally:
+        conn.close()
+
+
+@app.post("/api/training/import")
+async def training_import(request: Request, name: str, file: UploadFile = File(...)):
+    if name not in ml_registry.MODEL_NAMES:
+        raise HTTPException(400, "모델 이름이 올바르지 않습니다.")
+    content = await file.read()
+    conn = _conn()
+    try:
+        try:
+            return ml_registry.import_csv(conn, name, content, actor=_operator(request))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+    finally:
+        conn.close()
+
+
+class ExampleIdsReq(BaseModel):
+    ids: list
+    label: str = None
+
+
+@app.post("/api/training/confirm")
+def training_confirm(req: ExampleIdsReq, request: Request):
+    conn = _conn()
+    try:
+        return {"updated": ml_registry.confirm_examples(conn, req.ids, actor=_operator(request), label=req.label)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/training/deactivate")
+def training_deactivate(req: ExampleIdsReq, request: Request):
+    conn = _conn()
+    try:
+        return {"updated": ml_registry.deactivate_examples(conn, req.ids, actor=_operator(request))}
+    finally:
+        conn.close()
+
+
+@app.get("/api/training/export.csv")
+def training_export(name: str):
+    conn = _conn()
+    try:
+        csv = ml_registry.export_csv(conn, name)
+    finally:
+        conn.close()
+    return Response(csv.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote('training_' + name + '.csv')}"})
+
+
+# ── 소개·문서 사이트(정적, docs/index.html) — Caddy 없이 단독 실행할 때 /site 로 제공 ──
+
+@app.get("/site")
+@app.get("/site/{path:path}")
+def site(path: str = "index.html"):
+    target = os.path.normpath(os.path.join(SITE_DIR, path or "index.html"))
+    if not target.startswith(os.path.normpath(SITE_DIR)) or not os.path.isfile(target):
+        raise HTTPException(404, "파일이 없습니다.")
+    return FileResponse(target)

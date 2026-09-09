@@ -14,20 +14,26 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import loaders, erp_loader
+from . import loaders, erp_loader, dbcore, ml_registry
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_DB = os.path.join(APP_DIR, "data", "budget.db")
+# DATA_DIR 환경변수(배포 시 볼륨 경로) → 기본 budget_app/data
+DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(APP_DIR, "data")
+DEFAULT_DB = os.path.join(DATA_DIR, "budget.db")
 
 PLAN_COLS = loaders.PLAN_COLUMNS            # 10열
 ERP_COLS = [c for c in erp_loader.ERP_COLUMNS if c != "_erp_row"]
 
 
 def connect(db_path=None):
-    path = db_path or DEFAULT_DB
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    conn = sqlite3.connect(path)
-    conn.execute("PRAGMA journal_mode=WAL")
+    """DB 연결. db_path 지정 → SQLite 파일(테스트·스크립트).
+    미지정 → DATABASE_URL이 PostgreSQL이면 그 서버, 아니면 DATA_DIR/budget.db(SQLite)."""
+    if db_path is None and dbcore.is_postgres_url(dbcore.database_url()):
+        conn = dbcore.connect()
+    else:
+        path = db_path or DEFAULT_DB
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        conn = dbcore.connect(db_path=path)
     init_db(conn)
     return conn
 
@@ -128,7 +134,35 @@ def init_db(conn):
     cur.execute("CREATE INDEX IF NOT EXISTS ix_erp_ds ON erp_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_ml_run ON match_line(run_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_bl_run ON biz_line(run_id)")
+    # 감사 로그(수정 이력) — 공용 비밀번호 체계에서 '누가 언제 무엇을' 남기는 유일한 기록(auth.py)
+    cur.execute("""CREATE TABLE IF NOT EXISTS audit_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at TEXT NOT NULL,
+        operator TEXT,                   -- 로그인 때 입력한 작업자 이름
+        method TEXT NOT NULL, path TEXT NOT NULL,
+        status INTEGER,
+        detail TEXT)""")
+    cur.execute("CREATE INDEX IF NOT EXISTS ix_audit_at ON audit_log(at)")
     conn.commit()
+    ml_registry.init_tables(conn)        # 모델 레지스트리·학습데이터 표
+
+
+def add_audit(conn, operator, method, path, status, detail=None):
+    conn.execute("INSERT INTO audit_log(at,operator,method,path,status,detail) VALUES(?,?,?,?,?,?)",
+                 (_now(), operator, method, path, int(status) if status is not None else None, detail))
+    conn.commit()
+
+
+def list_audit(conn, limit=100, operator=None):
+    q = "SELECT id,at,operator,method,path,status,detail FROM audit_log"
+    p = []
+    if operator:
+        q += " WHERE operator=?"
+        p.append(operator)
+    q += " ORDER BY id DESC LIMIT ?"
+    p.append(int(limit))
+    cols = ["id", "at", "operator", "method", "path", "status", "detail"]
+    return [dict(zip(cols, r)) for r in conn.execute(q, tuple(p)).fetchall()]
 
 
 def _now():

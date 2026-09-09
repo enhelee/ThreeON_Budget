@@ -55,6 +55,8 @@
               <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
               <span id="analyzeLabel">분석 실행</span><span id="pendingCount" class="pending-count hidden"></span>
             </button>
+            <span id="operatorBadge" class="operator-badge hidden" title="로그인 때 입력한 작업자 이름 — 모든 변경이 이 이름으로 기록됩니다"></span>
+            <button id="logoutBtn" class="btn-secondary hidden" data-action="logout">로그아웃</button>
           </div>
         </div>
       </header>
@@ -62,6 +64,20 @@
       <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
     </div>
   </div>
+
+  <div id="loginOverlay" class="login-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <h2 id="loginTitle">예산·실적 분석 — 팀 로그인</h2>
+      <p>팀 공용 비밀번호와 <b>작업자 이름</b>을 입력하세요. 이름은 재배정·수정·삭제 등 모든 변경 이력에 기록됩니다.</p>
+      <label for="loginName">작업자 이름</label>
+      <input id="loginName" class="control" maxlength="40" placeholder="예: 홍길동" required>
+      <label for="loginPw">팀 공용 비밀번호</label>
+      <input id="loginPw" class="control" type="password" autocomplete="current-password" required>
+      <div id="loginMsg" class="login-msg"></div>
+      <div class="mt-3 flex justify-end gap-2"><button type="submit" class="btn-primary">입장</button></div>
+    </form>
+  </div>
+  <input type="file" id="trainingFile" accept=".csv" class="hidden">
 
   <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
   <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-slate-950/30">
@@ -147,9 +163,42 @@
     if (!res.ok) {
       let msg = res.statusText;
       try { msg = (await res.json()).detail || msg; } catch {}
+      if (res.status === 401 && msg === "login_required") {
+        showLogin("세션이 없거나 만료되었습니다. 다시 로그인하세요.");
+        throw new Error("로그인이 필요합니다.");
+      }
       throw new Error(msg);
     }
     return res.json();
+  }
+
+  // ───────────────────────── 인증(공용 비밀번호 + 작업자 이름) ─────────────────────────
+  async function checkAuth() {
+    const st = await (await fetch("/api/auth/status")).json();
+    state.auth = st;
+    const badge = $("#operatorBadge"), lo = $("#logoutBtn");
+    if (st.enabled) {
+      if (!st.logged_in) { showLogin(); return false; }
+      badge.textContent = `작업자 · ${st.operator}`; badge.classList.remove("hidden"); lo.classList.remove("hidden");
+    }
+    return true;
+  }
+  function showLogin(msg) {
+    $("#loginOverlay").classList.remove("hidden");
+    $("#loginMsg").textContent = msg || "";
+    try { const saved = localStorage.getItem("budget_operator"); if (saved && !$("#loginName").value) $("#loginName").value = saved; } catch {}
+    setTimeout(() => ($("#loginName").value ? $("#loginPw") : $("#loginName")).focus(), 50);
+  }
+  async function doLogin() {
+    const name = $("#loginName").value.trim(), pw = $("#loginPw").value;
+    if (!name) { $("#loginMsg").textContent = "작업자 이름을 입력하세요."; return; }
+    try {
+      await api("/api/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({password: pw, name})});
+      $("#loginOverlay").classList.add("hidden"); $("#loginPw").value = "";
+      try { localStorage.setItem("budget_operator", name); } catch {}
+      await checkAuth();
+      await navigate(state.view || "home");
+    } catch (err) { $("#loginMsg").textContent = err.message; }
   }
 
   // ───────────────────────── 데이터 로드 ─────────────────────────
@@ -717,6 +766,50 @@
     return `<div class="space-y-6"><section><p class="text-sm font-semibold text-blue-700">STAGE 5</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">중장기 예산 예측</h2><p class="mt-2 text-sm text-slate-500">예산 표준화(3단계)·중장기 예산 26~35년(4단계)은 팀 공유 앱 <b>예산예측프로그램(팀공유 v2)</b>이 담당합니다. 이 앱의 「통계·내보내기 → 팀 연계 → 결과 JSON」을 v2 앱의 「예산 실적 집계 → 사업 실적 연결」에 올리면, 검토가 끝난 매칭 실적이 표준화·예측 입력으로 연결됩니다.</p></section>${emptyState("이 화면은 안내용입니다 — 3·4단계 계산과 재무팀 양식 내보내기는 예산예측프로그램(팀공유 v2)에서 실행하세요.")}</div>`;
   }
 
+  function renderSettingsExtra() {
+    const audit = state.audit || [];
+    const reg = state.models || {models: [], names: [], stats: {}};
+    const modelsByName = {};
+    for (const m of reg.models) (modelsByName[m.name] ||= []).push(m);
+    const auditRows = audit.length ? audit.map(a => `<tr class="hover:bg-slate-50"><td class="table-cell mono">${esc(a.at)}</td><td class="table-cell font-semibold text-slate-800">${esc(a.operator || "-")}</td><td class="table-cell mono">${esc(a.method)} ${esc(a.path)}</td><td class="table-cell text-right">${a.status}</td><td class="table-cell audit-detail">${esc(a.detail || "")}</td></tr>`).join("")
+      : `<tr><td class="table-cell text-slate-400" colspan="5">기록이 없습니다.</td></tr>`;
+    const modelPanels = reg.names.map(name => {
+      const st = reg.stats[name] || {total: 0, confirmed: 0, unconfirmed: 0, per_class: {}, trainable: false};
+      const vers = modelsByName[name] || [];
+      const verRows = vers.length ? vers.map(m => `<tr class="hover:bg-slate-50"><td class="table-cell font-semibold">v${m.version}${m.active ? ' <span class="badge bg-emerald-50 text-emerald-700">활성</span>' : ""}</td><td class="table-cell mono">${esc(m.trained_at)}</td><td class="table-cell text-right">${m.n_samples ?? "-"}</td><td class="table-cell text-right">${m.n_classes ?? "-"}</td><td class="table-cell text-right">${m.metrics?.cv_accuracy ?? "-"}</td><td class="table-cell">${esc(m.created_by || "-")}</td><td class="table-cell text-slate-500">${esc(m.note || "")}</td><td class="table-cell text-right"><div class="flex flex-wrap justify-end gap-1">${m.active ? "" : `<button class="btn-secondary" data-action="activate-model" data-id="${m.id}">활성화</button>`}<a class="btn-secondary" href="/api/models/${m.id}/download">다운로드</a></div></td></tr>`).join("")
+        : `<tr><td class="table-cell text-slate-400" colspan="8">등록된 모델 버전이 없습니다 — 학습데이터를 채운 뒤 [재학습]을 누르거나 <span class="mono">scripts/v2_model_sync.py --push</span>로 팀 v2 파일을 반입하세요.</td></tr>`;
+      const perClass = Object.entries(st.per_class || {}).map(([k, v]) => `<span class="badge bg-slate-100 text-slate-700">${esc(k)} ${v}</span>`).join(" ");
+      return `<div class="border-t border-slate-200 p-5 sm:p-6">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div><h4 class="text-sm font-bold text-slate-800">${esc(name)}</h4>
+          <p class="section-help">학습데이터 <b>${st.total}</b>건 (사람확정 ${st.confirmed} · 미확정 ${st.unconfirmed}) ${st.trainable ? '<span class="badge bg-emerald-50 text-emerald-700">재학습 가능</span>' : '<span class="badge bg-amber-50 text-amber-700">데이터 부족(20건·2유형 이상)</span>'}</p>
+          <div class="mt-2 flex flex-wrap gap-1">${perClass || '<span class="text-xs text-slate-400">라벨 없음</span>'}</div></div>
+          <div class="flex flex-wrap gap-2">
+            <button class="btn-primary" data-action="train" data-name="${esc(name)}" ${st.trainable ? "" : "disabled"}>재학습 → 새 버전</button>
+            <button class="btn-secondary" data-action="pick-training" data-name="${esc(name)}">학습 CSV 가져오기</button>
+            <a class="btn-secondary" href="/api/training/export.csv?name=${encodeURIComponent(name)}">학습 CSV 내보내기</a>
+          </div>
+        </div>
+        <div class="mt-4 overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">버전</th><th class="px-4 py-3">학습시각</th><th class="px-4 py-3 text-right">표본</th><th class="px-4 py-3 text-right">유형</th><th class="px-4 py-3 text-right">CV정확도</th><th class="px-4 py-3">학습자</th><th class="px-4 py-3">비고</th><th class="px-4 py-3"></th></tr></thead><tbody class="divide-y divide-slate-100">${verRows}</tbody></table></div>
+      </div>`;
+    }).join("");
+    return `
+      <section class="panel overflow-hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 p-5 sm:p-6">
+          <div><h3 class="section-title">🧾 변경 이력 (감사 로그)</h3>
+          <p class="section-help">공용 비밀번호 체계에서 <b>누가·언제·무엇을</b> 바꿨는지의 근거입니다. 로그인 때 입력한 작업자 이름으로 모든 변경 요청(재배정·수정·삭제·추가·분석·학습·마감)이 기록됩니다. 최근 ${audit.length}건.</p></div>
+          <button class="btn-secondary" data-action="reload-audit">새로고침</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full audit-table"><thead class="table-head"><tr><th class="px-4 py-3">시각</th><th class="px-4 py-3">작업자</th><th class="px-4 py-3">요청</th><th class="px-4 py-3 text-right">상태</th><th class="px-4 py-3">요약</th></tr></thead><tbody class="divide-y divide-slate-100">${auditRows}</tbody></table></div>
+      </section>
+
+      <section class="panel overflow-hidden">
+        <div class="p-5 sm:p-6"><h3 class="section-title">🧪 분류 모델 레지스트리 · 학습데이터</h3>
+          <p class="section-help">팀 v2 앱의 투자유형 분류기(scikit-learn)를 <b>DB에 버전으로 보관</b>합니다 — 모델 파일(joblib)·학습시각·표본수·CV정확도·SHA256·학습데이터 스냅샷이 함께 남고, <b>활성</b> 버전 하나만 서비스에 쓰입니다(잘못 학습되면 이전 버전 활성화로 즉시 롤백). 학습데이터는 <b>사람이 확정한 라벨이 자동 예측값보다 우선</b>하며, 재학습은 이 화면의 버튼으로만 실행됩니다(자동 재학습 없음). 팀 v2 앱은 파일에서 모델을 읽으므로 <span class="mono">py scripts/v2_model_sync.py --pull</span>로 활성 버전을 내려받아 씁니다.</p></div>
+        ${modelPanels}
+      </section>`;
+  }
+
   function renderSettings() {
     const ds = state.status?.datasets || [];
     const ovs = state.overrides || {};
@@ -726,6 +819,7 @@
     return `<div class="space-y-6">
       <section><p class="text-sm font-semibold text-blue-700">운영 관리</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">데이터 관리</h2>
       <p class="mt-2 text-sm text-slate-500">모든 원자료는 백엔드 DB(data/budget.db)에만 저장됩니다.</p></section>
+      ${renderSettingsExtra()}
 
       <section class="panel p-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
@@ -824,6 +918,8 @@
         await loadStatus();
         state.overrides = await api(`/api/overrides?year=${state.year}`);
         state.learned = await api("/api/learned");
+        state.audit = (await api("/api/audit?limit=50")).rows;
+        state.models = await api("/api/models");
         state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
         state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
         state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`);
@@ -934,6 +1030,26 @@
     }
     const act = e.target.closest("[data-action]")?.dataset.action;
     if (act === "analyze") runAnalyze();
+    if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
+    if (act === "reload-audit") { await navigate("settings"); return; }
+    if (act === "train") {
+      const name = e.target.closest("[data-action]").dataset.name;
+      if (!confirm(`${name} 모델을 지금 재학습할까요?\n활성 학습데이터로 새 버전을 만들고 그 버전을 활성화합니다(이전 버전은 보관·롤백 가능).`)) return;
+      try {
+        toast("재학습 중… 표본 수에 따라 수 초~수십 초 걸립니다.");
+        const r = await api("/api/train", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name})});
+        toast(`재학습 완료 — v${r.version} · 표본 ${r.n_samples}건 · CV정확도 ${r.metrics?.cv_accuracy ?? "-"}`);
+        await navigate("settings");
+      } catch (err) { toast(err.message); }
+      return;
+    }
+    if (act === "activate-model") {
+      const id = e.target.closest("[data-action]").dataset.id;
+      try { await api(`/api/models/${id}/activate`, {method: "POST"}); toast("활성 버전을 바꿨습니다."); await navigate("settings"); }
+      catch (err) { toast(err.message); }
+      return;
+    }
+    if (act === "pick-training") { state.trainingName = e.target.closest("[data-action]").dataset.name; $("#trainingFile").click(); return; }
     if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
     if (act === "pick-plan") $("#planFile").click();
     if (act === "pick-erp") $("#erpFile").click();
@@ -1299,7 +1415,19 @@
   $("#menuButton").addEventListener("click", openMenu);
   $("#backdrop").addEventListener("click", closeMenu);
   $("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
+  $("#loginForm").addEventListener("submit", e => { e.preventDefault(); doLogin(); });
+  $("#trainingFile").addEventListener("change", async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const fd = new FormData(); fd.append("file", f);
+    try {
+      const r = await api(`/api/training/import?name=${encodeURIComponent(state.trainingName)}`, {method: "POST", body: fd});
+      toast(`학습 CSV 가져오기 — 추가 ${r.inserted} · 갱신 ${r.updated} · 건너뜀 ${r.skipped}`);
+      await navigate("settings");
+    } catch (err) { toast(err.message); }
+    e.target.value = "";
+  });
 
-  navigate("home");
+  checkAuth().then(ok => { if (ok) navigate("home"); }).catch(() => navigate("home"));
   </script>
 </body>
