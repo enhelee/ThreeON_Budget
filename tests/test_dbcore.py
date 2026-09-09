@@ -8,9 +8,11 @@ from budget import dbcore
 
 def test_placeholders_and_autoincrement():
     sql, wants = dbcore.translate(
-        "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT, b BLOB)")
+        "CREATE TABLE IF NOT EXISTS t(id INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT, b BLOB, amt REAL)")
     assert "BIGSERIAL PRIMARY KEY" in sql and "AUTOINCREMENT" not in sql
     assert "BYTEA" in sql and " BLOB" not in sql
+    # PG REAL(float4)은 8자리 원 금액을 깨뜨린다 → DOUBLE PRECISION (실서버 검증에서 발견)
+    assert "amt DOUBLE PRECISION" in sql and " REAL" not in sql
     assert wants is False
     sql, _ = dbcore.translate("SELECT id FROM dataset WHERE kind=? AND year=?")
     assert sql == "SELECT id FROM dataset WHERE kind=%s AND year=%s"

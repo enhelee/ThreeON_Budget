@@ -35,8 +35,14 @@ def check(conn):
 
 
 def migrate(src_path, dst_conn):
+    """SQLite 전체 → 대상 DB **전체 교체**(대상 표를 비운 뒤 복사). 부분 병합이 아니다."""
     import sqlite3
     src = sqlite3.connect(src_path)
+    # 자식 → 부모 순으로 비운다(FK: plan_row/erp_row→dataset, match_line/biz_line→run)
+    for t in reversed(TABLES):
+        dst_conn.execute(f"DELETE FROM {t}")
+    dst_conn.commit()
+    print("  대상 표 비움(전체 교체)")
     for t in TABLES:
         cols = [r[1] for r in src.execute(f"PRAGMA table_info({t})")]
         rows = src.execute(f"SELECT {','.join(cols)} FROM {t}").fetchall()
@@ -55,6 +61,8 @@ def migrate(src_path, dst_conn):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--migrate", action="store_true", help="로컬 SQLite → 현재 DATABASE_URL(PostgreSQL)로 전체 복사")
+    ap.add_argument("--source", default=os.path.join(APP, "data", "budget.db"),
+                    help="이전할 SQLite 파일(기본 data/budget.db). 먼저 scripts/db_정리.py로 이력을 줄이면 빠르다")
     a = ap.parse_args()
     conn = dbm.connect()
     try:
@@ -62,9 +70,8 @@ def main():
             if dbcore.backend_name(conn) != "postgresql":
                 print("DATABASE_URL이 PostgreSQL이 아닙니다 — 이전 대상이 없습니다.")
                 return 2
-            src = os.path.join(APP, "data", "budget.db")
-            print("source:", src)
-            migrate(src, conn)
+            print("source:", a.source)
+            migrate(a.source, conn)
         check(conn)
     finally:
         conn.close()

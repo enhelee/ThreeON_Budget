@@ -14,12 +14,29 @@ if APP_DIR not in sys.path:
 from budget import db as dbm, ml_registry, auth as authm   # noqa: E402
 
 
+PG_TEST_URL = os.environ.get("PG_TEST_URL")   # 설정 시 이 테스트들을 실제 PostgreSQL에서 실행(dbcore 번역 검증)
+
+
+def _reset_pg_tables(url):
+    from budget import dbcore
+    conn = dbcore.connect(url=url)
+    dbm.init_db(conn)
+    for t in ("audit_log", "model_registry", "training_example", "training_snapshot"):
+        conn.execute(f"DELETE FROM {t}")
+    conn.commit()
+    conn.close()
+
+
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("APP_PASSWORD", "team-secret")
     monkeypatch.setenv("SECRET_KEY", "x" * 40)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.setattr(dbm, "DEFAULT_DB", str(tmp_path / "t.db"))
+    if PG_TEST_URL:
+        monkeypatch.setenv("DATABASE_URL", PG_TEST_URL)
+        _reset_pg_tables(PG_TEST_URL)
+    else:
+        monkeypatch.delenv("DATABASE_URL", raising=False)
+        monkeypatch.setattr(dbm, "DEFAULT_DB", str(tmp_path / "t.db"))
     import server
     monkeypatch.setattr(server, "AUTH", authm.AuthConfig())
     from fastapi.testclient import TestClient

@@ -12,6 +12,7 @@ lastrowid)으로 쓰여 있다. PostgreSQL(Supabase·사내 서버)로 갈 때 d
   ?                                   → %s
   INTEGER PRIMARY KEY AUTOINCREMENT   → BIGSERIAL PRIMARY KEY
   BLOB                                → BYTEA
+  REAL                                → DOUBLE PRECISION (PG REAL은 float4 → 금액 정밀도 손실, 실측으로 확인)
   INSERT OR REPLACE INTO t VALUES(…)  → INSERT … ON CONFLICT (pk) DO UPDATE SET … (REPLACE_TABLES)
   INSERT OR IGNORE INTO …             → INSERT … ON CONFLICT DO NOTHING
   PRAGMA table_info(t)                → information_schema.columns 조회(r[1]=컬럼명 유지)
@@ -46,6 +47,9 @@ _RE_PRAGMA_INFO = re.compile(r"^\s*PRAGMA\s+table_info\((\w+)\)\s*$", re.I)
 _RE_PRAGMA = re.compile(r"^\s*PRAGMA\b", re.I)
 _RE_INSERT_TABLE = re.compile(r"^\s*INSERT\s+INTO\s+(\w+)", re.I)
 _RE_BLOB = re.compile(r"\bBLOB\b")
+# ⚠ PostgreSQL의 REAL은 4바이트(유효숫자 ~7자리)라 8자리 원 단위 금액이 깨진다(실측: 손익 −50원, 자본 +144원).
+#   SQLite의 REAL은 8바이트이므로 DOUBLE PRECISION으로 번역해야 두 백엔드 결과가 같다.
+_RE_REAL = re.compile(r"\bREAL\b")
 
 
 def database_url():
@@ -72,6 +76,7 @@ def translate(sql, single=True):
 
     out = _RE_AUTOINC.sub("BIGSERIAL PRIMARY KEY", sql)
     out = _RE_BLOB.sub("BYTEA", out)
+    out = _RE_REAL.sub("DOUBLE PRECISION", out)
     m = _RE_REPLACE.match(out)
     if m:
         table, rest = m.group(1), m.group(2)
