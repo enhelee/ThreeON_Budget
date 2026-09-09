@@ -1,0 +1,53 @@
+# 한 주소로 통합 — 경로별 라우팅. HTTPS는 Render/사내 프록시가 종단(auto_https off).
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT}
+
+encode gzip
+header {
+	X-Content-Type-Options nosniff
+	X-Frame-Options SAMEORIGIN
+	Referrer-Policy strict-origin-when-cross-origin
+	-Server
+}
+
+# ── 소개·문서 사이트 (docs/index.html) ──
+handle /site {
+	redir /site/ permanent
+}
+handle_path /site/* {
+	root * /srv/site
+	file_server
+}
+
+# ── budget_app (FastAPI). SPA는 /app/, API는 절대경로 /api/* ──
+handle /app {
+	redir /app/ permanent
+}
+handle_path /app/* {
+	reverse_proxy 127.0.0.1:8010
+}
+handle /api/* {
+	reverse_proxy 127.0.0.1:8010
+}
+handle /healthz {
+	reverse_proxy 127.0.0.1:8010
+}
+
+# ── forecast_app (Streamlit, baseUrlPath=forecast). 팀 공용 비밀번호를 엣지에서 검사 ──
+handle /forecast* {
+	basic_auth {
+		{$BASIC_USER} {$BASIC_HASH}
+	}
+	reverse_proxy 127.0.0.1:8501
+}
+
+# ── 그 외 = 소개 사이트 ──
+handle {
+	root * /srv/site
+	try_files {path} /index.html
+	file_server
+}

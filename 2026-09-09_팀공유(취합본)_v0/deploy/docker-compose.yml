@@ -1,0 +1,48 @@
+# 사내 서버(최종 목표) 구성 — 같은 이미지 + 영속 볼륨 + (선택) PostgreSQL
+#   docker compose up -d --build                 → SQLite(볼륨) 모드, http://서버IP:8080
+#   docker compose --profile pg up -d --build    → PostgreSQL 컨테이너 포함(.env의 DATABASE_URL을 아래 postgres 주소로)
+# 비밀값은 전부 .env(.env.example 복사)에서 읽는다. .env는 Git에 올리지 않는다.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: threeon-budget:latest
+    container_name: threeon-budget
+    env_file:
+      - ../.env
+    environment:
+      PORT: "8080"
+      COOKIE_SECURE: "${COOKIE_SECURE:-0}"     # 사내 http라면 0, https 프록시 뒤라면 1
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    volumes:
+      - budget_data:/data/budget       # budget.db(SQLite 모드)·config·output
+      - forecast_data:/data/forecast   # v2 앱 CSV·모델·checkpoint_data
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+
+  postgres:
+    profiles: ["pg"]
+    image: postgres:16-alpine
+    container_name: threeon-postgres
+    environment:
+      POSTGRES_DB: "${PG_DB:-budget}"
+      POSTGRES_USER: "${PG_USER:-budget}"
+      POSTGRES_PASSWORD: "${PG_PASSWORD:?PG_PASSWORD를 .env에 설정하세요}"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-budget} -d ${PG_DB:-budget}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  budget_data:
+  forecast_data:
+  pg_data:

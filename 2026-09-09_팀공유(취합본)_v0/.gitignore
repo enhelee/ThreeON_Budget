@@ -1,0 +1,31 @@
+# ── 비밀 ──
+.env
+.env.*
+!.env.example
+# ── 공통 개발 잔재 ──
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.claude/
+.DS_Store
+temp_upload*.xlsx
+# ── budget_app: 실데이터·DB·산출물·연도별 구성 (절대 공유 금지) ──
+budget_app/data/
+budget_app/output/
+budget_app/config/*.json
+*.db
+*.db-wal
+*.db-shm
+# ── forecast_app(v2): 실데이터 CSV·매핑·모델·연결 결과 (폴더 안 .gitignore와 동일 취지) ──
+forecast_app/*.csv
+forecast_app/*.joblib
+forecast_app/*.json
+forecast_app/checkpoint_data/
+forecast_app/test_data/
+forecast_app/filled_*.xlsx
+forecast_app/template_*.xlsx
+!forecast_app/builtin_template_*.xlsx
+# ── 매칭 도구 ──
+matching_tool_src/node_modules/
+matching_tool_src/private/

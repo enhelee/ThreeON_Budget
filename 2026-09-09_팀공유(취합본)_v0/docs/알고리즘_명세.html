@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>예산 실적 자동분석 — 알고리즘 명세 (규칙기반)</title>
+<style>
+  :root{
+    --navy:#1E2761; --ice:#CADCFC; --bg:#FFFFFF; --ink:#1a1a2e;
+    --line:#d8deeb; --soft:#f3f6fc; --warn:#B85042; --ok:#2C5F2D; --gold:#8a6d1a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"Malgun Gothic","Segoe UI",sans-serif; color:var(--ink);
+       background:var(--bg); line-height:1.65; padding:40px 24px; max-width:1080px; margin:0 auto;}
+  h1{font-size:26px; color:var(--navy); margin-bottom:6px;}
+  .sub{color:#5a6478; margin-bottom:28px; font-size:14px;}
+  h2{font-size:19px; color:var(--navy); margin:40px 0 14px; padding-top:18px; border-top:1px solid var(--line);}
+  h3{font-size:15px; color:var(--navy); margin:20px 0 8px;}
+  p{margin-bottom:10px; font-size:14px;}
+  .tag{display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:10px; vertical-align:middle;}
+  .tag.rule{background:var(--ice); color:var(--navy);}
+  .tag.fuzzy{background:#f9e9c8; color:var(--gold);}
+  .tag.human{background:#fde2de; color:var(--warn);}
+  table{border-collapse:collapse; width:100%; font-size:13px; margin:12px 0;}
+  th{background:var(--navy); color:#fff; padding:7px 10px; text-align:left; font-weight:600;}
+  td{border:1px solid var(--line); padding:6px 10px; vertical-align:top;}
+  tr:nth-child(even) td{background:var(--soft);}
+  code{background:var(--soft); border:1px solid var(--line); border-radius:4px; padding:1px 5px; font-size:12.5px;}
+  .flow{display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:14px 0;}
+  .step{flex:1 1 150px; min-width:150px; background:var(--soft); border:1.5px solid var(--navy);
+        border-radius:10px; padding:10px 12px; font-size:12.5px;}
+  .step b{display:block; color:var(--navy); font-size:13px; margin-bottom:4px;}
+  .arrow{align-self:center; font-size:20px; color:var(--navy); flex:0;}
+  .box{border:1.5px solid var(--line); border-radius:10px; padding:14px 16px; margin:12px 0; background:var(--soft);}
+  .box.warn{border-color:var(--warn); background:#fdf3f1;}
+  .box.ok{border-color:var(--ok); background:#f2f8f2;}
+  .ex{font-size:13px; background:#fff; border:1px dashed #99a5c4; border-radius:8px; padding:10px 14px; margin:8px 0;}
+  .ex .lbl{font-weight:700; color:var(--navy);}
+  .score{display:inline-block; min-width:52px; text-align:center; font-weight:700; border-radius:6px; padding:0 6px;}
+  .s-hi{background:#dcf0dc; color:var(--ok);} .s-lo{background:#fde2de; color:var(--warn);}
+  .legend{font-size:12.5px; color:#5a6478; margin:6px 0 0;}
+  .kbd{font-size:12px; color:#5a6478;}
+</style>
+</head>
+<body>
+
+<h1>예산 실적 자동분석 — 알고리즘 명세</h1>
+<div class="sub">
+  유저플로우의 모든 자동 판정은 <b>결정적 규칙기반(rule-based)</b>이며, 유일한 근사 요소는
+  <b>문자열 유사도(rapidfuzz WRatio)</b>입니다. 같은 입력이면 항상 같은 결과가 나오고(재현 가능),
+  모든 판정에 확신도가 남아 사람이 검토·수정할 수 있습니다.
+  <span class="tag rule">규칙</span>=결정적 규칙 &nbsp;<span class="tag fuzzy">유사도</span>=문자열 유사도 사용
+  &nbsp;<span class="tag human">사람</span>=사용자 확인·수정 지점
+</div>
+
+<h2>1. 전체 파이프라인 (INPUT → 규칙 → OUTPUT)</h2>
+<div class="flow">
+  <div class="step"><b>입력</b>계획(사업별예산)<br>+ ERP(zrfm2)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>정제 R1–R2</b>합계행·타연도 전표 제외</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>정규화 R3–R5</b>예산과목·처지사 표준화</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>매칭 R6–R9</b>전표묶음 → 계획사업 귀속</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>신규 R10–R11</b>클러스터링·소액 일괄</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>출력</b>실적.xlsx · 종합표<br>matched CSV · 검토리포트</div>
+</div>
+<p class="legend">불변식: <b>종합표 총실적 + 미반영 + 타예산 = ERP 전체</b> (전표 유실 0). 23년 검증: 손익 자동 71.85M vs 수기 71.89M = −0.06%.</p>
+
+<h2>2. 규칙 목록</h2>
+<table>
+<tr><th style="width:52px">규칙</th><th style="width:190px">이름</th><th style="width:70px">유형</th><th>판정 기준 · 처리</th></tr>
+<tr><td>R1</td><td>합계행 제외</td><td><span class="tag rule">규칙</span></td>
+  <td>계정코드·예산과목·전표번호가 모두 빈 행(zrfm2 마지막 총계) → 집계 제외, <code>제외(합계행)</code> 표기. 이중계상 방지.</td></tr>
+<tr><td>R2</td><td>연도 필터</td><td><span class="tag rule">규칙</span></td>
+  <td>기간/연도(<code>2023.001</code>→2023)가 선택연도와 다르면 <code>제외(타연도)</code>. 파일에 선택연도가 아예 없으면 필터 미적용+경고.</td></tr>
+<tr><td>R3</td><td>예산과목 정규화</td><td><span class="tag rule">규칙</span></td>
+  <td>① 계정코드→마스터 표준명 ② 별칭 맵(<code>예산과목_별칭.json</code>: 계정코드 동일 개명 통일, 예: 열원보완개선및기타→열원보완및개선) ③ 그래도 구성에 없으면 <b>미분류</b>로 보고.</td></tr>
+<tr><td>R4</td><td>처지사 정규화</td><td><span class="tag rule">규칙</span> <span class="tag fuzzy">유사도</span></td>
+  <td>순서대로: ① 별칭 맵(원문 또는 <code>"I열|J열"</code> 복합키) ② 정확 일치 ③ 괄호·공백 제거 후 일치 ④ 접두 관계(후보 유일할 때만) ⑤ 유사도 ≥90 ⑥ J열(부서명(부)) 텍스트에서 지사명 탐지. 전부 실패 → <b>미매핑</b>(강제 귀속 안 함, 리포트 보고).</td></tr>
+<tr><td>R5</td><td>후보 좁히기</td><td><span class="tag rule">규칙</span></td>
+  <td>매칭 후보는 <b>(예산과목 × 처지사)가 같은 계획행</b>으로 한정. 다른 과목·지사로 잘못 귀속될 가능성을 구조적으로 차단.</td></tr>
+<tr><td>R6</td><td><b>참조전표번호 묶음</b></td><td><span class="tag rule">규칙</span></td>
+  <td><b>같은 참조전표번호 = 하나의 내역.</b> 묶음 안에서 |금액| 최대 전표의 텍스트를 대표 사업명으로 사용. → 인지세·수수료 등 부대비용 전표가 본 대금 전표를 따라간다.</td></tr>
+<tr><td>R7</td><td>사업명 유사도 매칭</td><td><span class="tag fuzzy">유사도</span></td>
+  <td>대표 텍스트 vs 계획 사업명들 <b>WRatio</b>(0~100) 계산 → 최고점 계획행에 묶음 전체 귀속. 동점이면 연예산 큰 사업 우선.</td></tr>
+<tr><td>R8</td><td>그룹 정책(기본)</td><td><span class="tag rule">규칙</span></td>
+  <td>(과목×지사)에 계획행이 있으면 유사도가 낮아도 최고점 행에 귀속하되 <b>임의귀속</b>으로 표시(지사·과목 소계는 정확, 사업 배분은 검토 필요). 계획행이 아예 없을 때만 신규.</td></tr>
+<tr><td>R9</td><td>확신도 산출</td><td><span class="tag rule">규칙</span></td>
+  <td>전표별 확신도 = 유사도/100. 계획행 확신도 = 귀속 전표 평균. <b>&lt;0.8이면 검토 대상</b>(화면·비고에 표시). 수동지정=1.0.</td></tr>
+<tr><td>R10</td><td>신규사업 클러스터링</td><td><span class="tag fuzzy">유사도</span></td>
+  <td>귀속 안 된 묶음들을 대표 텍스트 유사도 ≥80로 묶어 사업 단위 행 생성. 표기가 조금씩 다른 월별 전표·<b>부호 상쇄(±) 전표</b>가 한 사업으로 묶여 순액 집계.</td></tr>
+<tr><td>R11</td><td>소액 일괄확정</td><td><span class="tag rule">규칙</span></td>
+  <td>클러스터 |순액| ≤ 2,000천원 → (지사×과목)별 <code>"OO지사 XX과목 집행"</code> 1행으로 묶음.</td></tr>
+<tr><td>R12</td><td>수동 재배정(오버라이드)</td><td><span class="tag human">사람</span></td>
+  <td>사용자가 전표를 다른 사업으로 지정하면 그 <b>전표묶음 전체</b>가 이동(확신도 1.0). DB에 기록되어 재실행해도 유지.</td></tr>
+</table>
+
+<h2>3. 핵심: 텍스트 매칭이 실제로 하는 일</h2>
+
+<h3>3-1. WRatio 유사도란?</h3>
+<p>rapidfuzz의 <b>WRatio</b>는 편집거리(Levenshtein) 기반 유사도 여러 개(전체 비교·부분 문자열·토큰 정렬·토큰 집합)를
+계산해 <b>가장 유리한 값</b>을 취하는 0~100 점수입니다. 띄어쓰기 유무·어순 차이·연도 표기 차이에 강합니다.
+<b>학습된 AI 모델이 아니라 문자열 계산식</b>이므로 결과가 항상 동일하게 재현됩니다.</p>
+
+<div class="ex">
+  <span class="lbl">예시 ① (PPT 슬라이드 6 — 용인지사 무정전 용역, 실측값)</span><br>
+  계획: <code>2023년 무정전전원공급설비 유지보수 용역(연간)</code><br>
+  ERP&nbsp;: <code>용인지사무정전전원공급설비유지보수용역</code> → <span class="score s-lo">65</span>
+  임계값(80) 미만이지만 <b>후보 중 최고점</b> → 그룹정책(R8)으로 이 사업에 귀속하고
+  확신도 0.65·<b>임의귀속 표시</b>(사람 검토 대상) ✔<br>
+  ERP&nbsp;: <code>인지세</code> → <span class="score s-lo">20</span> 텍스트로는 실패하지만…<br>
+  <b>R6 전표번호 묶음</b>: 인지세 전표는 참조전표번호 <code>4600039903</code>이 본 대금 전표와 같음
+  → 본 대금 전표(8,072,425원, |금액| 최대)의 텍스트가 대표가 되어 <b>같은 사업으로 함께 귀속</b> ✔
+</div>
+
+<div class="ex">
+  <span class="lbl">예시 ② (PPT 슬라이드 7 — 계획에 없는 신규사업, 실측값)</span><br>
+  ERP: <code>'23년1월 지능형영상헬멧 클라우드 비용</code> +146,459원<br>
+  ERP: <code>23년1월 지능형영상헬멧 클라우드 비용</code> −146,459원 (역인식)<br>
+  ERP: <code>'23년1월 지능형 영상헬멧 클라우드 비용</code> +146,459원 (최종 집행)<br>
+  → (과목×지사)에 계획행 없음 → 신규. 세 전표의 텍스트 유사도가 서로 <span class="score s-hi">98</span>이므로
+  <b>R10이 한 클러스터로 묶어</b> 「지능형영상헬멧 클라우드 비용」 1개 사업,
+  <b>순액 146,459원</b>으로 집계(상쇄 전표 유실 없음) ✔
+</div>
+
+<h3>3-2. 매칭 의사결정 흐름</h3>
+<div class="flow">
+  <div class="step"><b>1. 후보 한정</b>같은 (예산과목 × 처지사)의 계획행만 (R5)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>2. 전표 묶음</b>같은 참조전표번호 = 한 내역, 대표 텍스트 선정 (R6)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>3. 유사도 계산</b>대표 텍스트 vs 계획 사업명 WRatio (R7)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>4-a. 귀속</b>≥80 확정귀속<br>&lt;80 임의귀속 표시 (R8·R9)</div>
+</div>
+<div class="flow">
+  <div class="step"><b>4-b. 신규</b>계획행 없는 그룹 → 텍스트 클러스터링 (R10)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>5. 소액 정리</b>순액 ≤2,000천원 일괄확정 (R11)</div>
+  <div class="arrow">→</div>
+  <div class="step"><b>6. 사람 검토</b>확신도&lt;0.8 화면 표시 → 재배정 저장 (R12)</div>
+</div>
+
+<div class="box warn">
+  <b>‘AI 분류’의 실체 (정확한 이해)</b><br>
+  PPT의 “AI를 통해 자동 분류”에 해당하는 부분은 현재 <b>LLM·머신러닝이 아니라 규칙 + 문자열 유사도</b>로
+  구현되어 있습니다. 이렇게 한 이유: ① 예산 수치는 <b>재현 가능성·감사 추적</b>이 필수(같은 입력→같은 출력)
+  ② 분리망에서 외부 AI API 사용 불가 ③ 23년 검증에서 수기 대비 −0.06%로 충분히 정확.
+  유사도로 못 잡는 케이스는 확신도로 드러나며 사람이 재배정(R12)하면 DB에 남아 다음 실행에도 유지됩니다.
+</div>
+
+<h2>4. 총액 보존 (검증 불변식)</h2>
+<div class="box ok">
+  모든 ERP 전표는 정확히 한 곳에 배정됩니다:<br>
+  <b>계획집행 + 신규 (종합표 반영)</b> ∪ <b>미반영</b>(선택 안 된 과목·지사/미분류/미매핑)
+  ∪ <b>타예산</b>(손익↔자본) ∪ <b>제외</b>(합계행·타연도)<br>
+  → 어떤 조합으로 필터를 걸어도 <code>종합표 + 미반영 + 타예산 + 제외 = ERP 전체</code>가 항상 성립.
+  전표가 조용히 사라지는 일이 없습니다.
+</div>
+
+<h2>5. 사람이 개입하는 지점 (PPT 흐름과 일치)</h2>
+<table>
+<tr><th>지점</th><th>화면</th><th>동작</th></tr>
+<tr><td>확신도 낮은 매칭(&lt;0.8)</td><td>③ 결과 검토 — 사업 트리에 확신도 표시, 필터 제공</td><td>전표 선택 → 올바른 사업으로 재배정 저장</td></tr>
+<tr><td>신규사업 이름</td><td>사업 트리(🟡 신규)</td><td>직접 입력한 이름의 사업으로 강제 지정</td></tr>
+<tr><td>미매핑 처지사</td><td>검토리포트(I열/J열/과목/금액)</td><td><code>처지사_별칭.json</code>에 <code>"I열|J열": "처지사"</code> 추가</td></tr>
+<tr><td>과목·지사 구성</td><td>①·② 탭 구성 편집기</td><td>포함/실적반영 체크 — 제외분은 ‘미반영’으로 보존</td></tr>
+</table>
+
+<p class="kbd" style="margin-top:36px">budget_app · 규칙 구현 위치: src/budget/erp_loader.py(R1·R2) · normalize.py(R3·R4) ·
+matching.py(R5–R11) · db.py+pipeline_db.py(R12) · 검증: tests/ 54건</p>
+</body>
+</html>

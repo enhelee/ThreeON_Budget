@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),P=require('../src/pipeline.js'),R=require('../src/reconcile.js'),C=require('../src/constants.js');
+const acct='60909002',acctName='수선유지비-열원정기점검',org='동탄지사';
+let serial=0;
+const raw=(text,amount,date,extra={})=>({org,acct,acctName,bucket:C.bucketOf(acct),ledger:'손익',mgmtCenter:'3100',sourceRow:++serial,text,amount,date,docNo:'같은번호',...extra});
+const plan=(name,value,o=org,a=acctName)=>[a,o,name,value];
+const fill=(rows,ps,cs=[])=>R.fill([['예산과목','예산귀속 부서명(처.지사)','사업명','최종 실적금액'],...ps],P.netting(rows),'손익',C,cs);
+let count=0;const check=(name,fn)=>{fn();count++;};
+check('같은 지사·과목·전기일 양수와 음수 전체 순액',()=>{const r=fill([raw('예비품 불출',150000,45761),raw('자재 환입',-50000,'2025-04-14')],[plan('정기점검 예비품 대체',100)]);assert.equal(r.spareDates.length,1);assert.equal(r.spareDates[0][8],100);assert.equal(r.spareDates[0][12],'반영');assert.equal(r.spareSources.length,2);});
+check('같은 전표번호·같은 텍스트라도 다른 날짜는 분리',()=>{const ts=P.netting([raw('예비품 불출',70000,45761),raw('예비품 불출',30000,45762)]);assert.equal(ts.length,2);const r=R.fill([['예산과목','예산귀속 부서명(처.지사)','사업명','최종 실적금액'],plan('예비품 대체',100)],ts,'손익',C);assert.equal(r.matches.length,0);assert.equal(r.spareDates.length,2);});
+check('다른 날짜의 동일 + - 금액도 서로 상쇄하지 않음',()=>{const r=fill([raw('예비품 불출',100000,45761),raw('예비품 환입',-100000,45762)],[plan('예비품 대체',100)]);assert.equal(r.spareDates.length,2);assert.equal(r.spareDates[0][8],100);assert.equal(r.spareDates[1][8],-100);});
+check('같은 날짜 전액 상쇄도 증빙 보존',()=>{const r=fill([raw('예비품 불출',100000,45761),raw('예비품 환입',-100000,45761)],[plan('예비품 대체',100)]);assert.equal(r.spareDates[0][12],'상쇄(0원)');assert.equal(r.spareSources.length,2);assert.equal(r.matches.length,0);});
+check('예비품 날짜별 묶음에서 양수 일부만 떼어 맞추지 않음',()=>{const r=fill([raw('예비품 불출 A',100000,45761),raw('예비품 불출 B',50000,45761),raw('예비품 환입',-20000,45761)],[plan('예비품 대체',100)]);assert.equal(r.matches.length,0);assert.equal(r.spareDates[0][8],130);});
+check('날짜 누락 전표를 한 묶음으로 합치지 않음',()=>{const r=fill([raw('예비품 불출',70000,''),raw('예비품 환입',30000,null)],[plan('예비품 대체',100)]);assert.equal(r.spareDates.length,2);assert(r.spareDates.every(r=>r[12]==='검토필요'));});
+check('타 지사·타 과목과 합산 금지',()=>{const rows=[raw('예비품 불출',70000,45761),raw('예비품 불출',30000,45761,{org:'판교지사'}),raw('예비품 불출',30000,45761,{acct:'60909009',acctName:'수선유지비-열원보완및개선'})];const r=fill(rows,[plan('예비품 대체',100)]);assert.equal(r.spareDates.length,3);assert.equal(r.matches.length,0);});
+check('예비품 날짜 묶음은 일반 용역 사업과 동액이어도 배정 금지',()=>{const r=fill([raw('예비품 불출',100000,45761)],[plan('냉난방 용역',100)]);assert.equal(r.matches.length,0);});
+check('다른 두 날짜가 같은 사업금액이면 임의 선점 금지',()=>{const r=fill([raw('예비품 불출',100000,45761),raw('예비품 불출',100000,45762)],[plan('예비품 대체',100)]);assert.equal(r.matches.length,0);assert(r.spareDates.every(r=>r[13].includes('서로 다른 전기일')));});
+check('같은 날짜 묶음과 예비품 사업의 유일 합산 조합',()=>{const r=fill([raw('예비품 불출',300000,45761)],[plan('예비품 입고 A',100),plan('예비품 입고 B',200)]);assert.equal(r.matches.length,1);assert.equal(r.matches[0][9],2);});
+check('과거 보정도 다른 전기일을 합쳐 맞추지 못함',()=>{const r=fill([raw('예비품 불출 A',70000,45761),raw('예비품 불출 B',30000,45762)],[plan('예비품 대체',100)],[{id:'OLD',org,acct,targets:['예비품 대체'],label:'예비품 대체',texts:[{text:'예비품 불출 A'},{text:'예비품 불출 B'}],requireAmount:false,action:'assign'}]);assert.equal(r.matches.length,0);assert.equal(r.corrections[0][5],'검토필요');});
+check('다양한 전기일 표현 및 잘못된 날짜',()=>{for(const x of [45761,'45761','2025-04-14','2025/04/14','20250414','2025년 4월 14일',new Date('2025-04-14T00:00:00Z')])assert.equal(R.dateKey(x),'2025-04-14');assert.equal(R.dateKey('2025-02-30'),'');});
+check('빈 텍스트 열원보완 자재도 날짜별 분리',()=>{const a=P.netting([raw('',70000,45761,{acct:'60909009',acctName:'수선유지비-열원보완및개선',bucket:'boan'}),raw('',30000,45762,{acct:'60909009',acctName:'수선유지비-열원보완및개선',bucket:'boan'})]);assert.equal(a.length,2);assert(a.every(x=>x.spareDateGroup));});
+
+console.log('예비품 합성 테스트: '+count+' 통과');

@@ -1,0 +1,16 @@
+# 두 앱 통합 이미지의 파이썬 의존성 (python:3.12-slim 기준, 2026-09-09 검증 조합)
+#   forecast_app(v2)이 pandas 2.2.3·streamlit 1.59.0을 고정 → budget_app도 그 조합에서 동작(pd.isna 가드 설계).
+streamlit==1.59.0
+pandas==2.2.3
+numpy<2.3
+openpyxl==3.1.5
+scikit-learn==1.5.2
+joblib==1.5.3
+rapidfuzz==3.14.5
+# budget_app (FastAPI 웹·DB 전환·인증)
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+itsdangerous>=2.2
+python-dotenv>=1.0
+psycopg[binary]>=3.2      # DATABASE_URL=postgresql://… (Supabase / 사내 PostgreSQL)

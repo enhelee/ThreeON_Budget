@@ -1,0 +1,26 @@
+# 이미지에 절대 넣지 않는 것 — 실데이터·비밀·산출물·개발 잔재
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.env
+**/.env
+**/data/
+**/output/
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/checkpoint_data/
+**/test_data/
+**/data_*.csv
+**/budget_*.csv
+**/matched_*.csv
+**/classified_*.csv
+**/*.joblib
+**/training_data.csv
+**/project_type_training*.csv
+**/site_type_map.csv
+**/temp_upload*.xlsx
+budget_app/config/*.json
+matching_tool_src/node_modules
