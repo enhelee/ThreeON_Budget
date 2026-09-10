@@ -6,7 +6,7 @@
 
 ## 2026-09-09 · 배포 준비 — 인증·감사로그 · DB 전환 계층 · 모델 레지스트리 · 단일 이미지 · 소개 사이트 (rev15)
 
-**대상:** `budget_app` + `deploy/` + `site/` + 패키지 `2026-09-09_팀공유(취합본)_v0/`. 테스트 **87 passed**(77 → +10). 문서: [배포가이드.md](배포가이드.md) · [보안설계.md](보안설계.md) · [학습데이터_모델_관리.md](학습데이터_모델_관리.md) · [팀원_실행가이드.md](팀원_실행가이드.md).
+**대상:** `budget_app` + `deploy/` + `site/` + 패키지 `2026-09-09-team-package-v0/`. 테스트 **87 passed**(77 → +10). 문서: [배포가이드.md](배포가이드.md) · [보안설계.md](보안설계.md) · [학습데이터_모델_관리.md](학습데이터_모델_관리.md) · [팀원_실행가이드.md](팀원_실행가이드.md).
 
 ### 사용자 결정(질의 2회)
 ① 지금은 **무료 공개 배포**(Render Docker + Supabase PostgreSQL, 소개는 GitHub Pages; Vercel은 정적 사이트만 적합 — 서버리스 제한으로 앱 부적합), 최종은 **사내 서버** ② DB **SQLite 기본 + `.env`로 PostgreSQL 전환** ③ **공용 비밀번호 1개 + 수정 이력** ④ **한 주소 통합 + Docker Compose** ⑤ 데모가 아닌 **실데이터를 팀원만** 접근(사내 규정 확인 전제, 임시) ⑥ **모델 = DB 레지스트리(메타+BLOB)** ⑦ **학습데이터 = DB 테이블 + 확정 워크플로 + 수동 재학습**.
@@ -18,7 +18,7 @@
 - **프론트** `webapp/index.html`: 로그인 오버레이(이름 필수)·작업자 배지·로그아웃, 설정 탭 2섹션 추가(컴파일 Tailwind 함정 회피 — 직접 CSS). template 동기화.
 - **배포 구성** `deploy/`: 단일 이미지 Dockerfile(python:3.12-slim + Caddy + supervisord: uvicorn:8010 · streamlit:8501 `baseUrlPath=forecast` CWD=/data/forecast · caddy:$PORT), Caddyfile(`/`사이트·`/app` `/api`·`/forecast` basic_auth(bcrypt 기동 시 계산)·보안 헤더), docker-compose(볼륨·`--profile pg`), render.yaml, `.env.example`, `.dockerignore`, 통합 requirements(streamlit 1.59·pandas 2.2.3·psycopg 3). ⚠ 이 PC에 Docker 없어 이미지 빌드 미검증.
 - **소개 사이트** `site/index.html`(패키지 `docs/index.html`, GitHub Pages·서버 `/`·FastAPI `/site`): 파이프라인·구조·검증 수치·계약·배포·보안·학습·역할·문서 지도. 라이트/다크 토큰, Gothic A1 + IBM Plex Sans KR/Mono.
-- **패키지** `2026-09-09_팀공유(취합본)_v0/`(ASCII 폴더명 `budget_app/ forecast_app/ docs/ deploy/ matching_tool_src/`, 루트 Dockerfile·render.yaml·.env.example·.gitignore·실행기 3종·README). 199파일 5.3MB, 유출 검사 통과.
+- **패키지** `2026-09-09-team-package-v0/`(ASCII 폴더명 `budget_app/ forecast_app/ docs/ deploy/ matching_tool_src/`, 루트 Dockerfile·render.yaml·.env.example·.gitignore·실행기 3종·README). 199파일 5.3MB, 유출 검사 통과.
 - 로컬 `budget_app/.env` 생성(gitignore) — 팀 공용 비밀번호 초기값은 바꿔 쓸 것. `requirements.txt`에 itsdangerous·python-dotenv·scikit-learn·joblib 추가(psycopg는 PG 사용 시).
 
 ### 검증
