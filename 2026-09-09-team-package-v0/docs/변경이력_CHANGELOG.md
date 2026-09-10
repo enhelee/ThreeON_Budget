@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-09-10 · Render 배포 디버깅 — Caddy 설정 파괴 버그 · 폴더명 ASCII화 (rev16)
+
+**대상:** `deploy/Caddyfile`·`deploy/entrypoint.sh`, 패키지 폴더명. Render 첫 배포 2회 실패를 실측으로 규명.
+
+### 실패 ① invalid Dockerfile path
+`render.yaml`의 `dockerfilePath`가 `2026-09-09_팀공유(취합본)_v0/Dockerfile`(한글+괄호)일 때 Render가
+경로를 인식하지 못함 → 폴더명을 `2026-09-09-team-package-v0`(영문·숫자·하이픈)로 전체 rename.
+문서 6곳·`build_package.py`·루트 render.yaml 동시 갱신. 커밋 `15dc06f`.
+
+### 실패 ② Failed deploy — entrypoint의 sed가 Caddyfile을 깨뜨림 (근본 원인)
+`APP_PASSWORD`가 비었을 때 `sed -i '/basic_auth {/,/}/d'`로 인증 블록을 지우는 코드가 있었는데,
+범위 종료 패턴 `/}/`가 **`{$BASIC_USER} {$BASIC_HASH}` 줄의 `}`에 먼저 걸려** 2줄만 지우고
+닫는 중괄호를 고아로 남긴다. 결과: `handle /forecast* { 
+ }` → Caddy 문법 오류
+(`parsed 'handle' as a site address`) → 웹서버 기동 실패 → 헬스체크 실패 → 배포 실패.
+Render에서 비밀번호를 아직 입력하지 않은 상태(sync:false)라 정확히 이 경로를 탔다.
+
+**수정**: Caddyfile을 손대지 않는 **import 조각 방식**으로 교체.
+- `Caddyfile`: `/forecast` 블록 안에서 `import /srv/deploy/forecast_auth.caddy`
+- `entrypoint.sh`: 비밀번호 있으면 `basic_auth {...}`를 조각 파일로 기록, 없으면 **빈 파일** 생성
+- 실측 검증(로컬 Caddy 2.8.4 `validate`): 비밀번호 있음 → Valid, 없음 → Valid,
+  **옛 방식 재현 → Error**(원인 확정)
+
+### 실측: Render 무료 플랜 용량 대비 우리 앱
+Render 무료 = **0.1 CPU / 512MB**. 로컬 측정(가벼운 상태): forecast_app 240MB + budget_app 159MB
++ Caddy 25MB = **424MB / 512MB(83%)**. 분석 실행·Excel 내보내기·중장기 예측은 이보다 훨씬 더 쓰므로
+무료 단일 컨테이너로는 실사용이 어렵다는 결론. Vercel Hobby는 **2GB / 1 vCPU / 300초**로 훨씬 여유롭지만
+컨테이너가 **요청 단위·상태 없음**이어서 Streamlit(forecast_app)은 구조적으로 불가.
+
+---
+
 ## 2026-09-09 · 배포 준비 — 인증·감사로그 · DB 전환 계층 · 모델 레지스트리 · 단일 이미지 · 소개 사이트 (rev15)
 
 **대상:** `budget_app` + `deploy/` + `site/` + 패키지 `2026-09-09-team-package-v0/`. 테스트 **87 passed**(77 → +10). 문서: [배포가이드.md](배포가이드.md) · [보안설계.md](보안설계.md) · [학습데이터_모델_관리.md](학습데이터_모델_관리.md) · [팀원_실행가이드.md](팀원_실행가이드.md).
