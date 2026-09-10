@@ -19,7 +19,7 @@ services:
       - key: SECRET_KEY
         generateValue: true         # Render가 무작위 생성(세션 서명)
       - key: DATABASE_URL
-        sync: false                 # Supabase 연결 문자열(Transaction pooler, port 6543 권장)
+        sync: false                 # Supabase 연결 문자열(Session pooler, port 5432 — 상주 컨테이너용)
       - key: COOKIE_SECURE
         value: "1"
       - key: BASIC_USER

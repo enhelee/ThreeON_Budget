@@ -198,7 +198,10 @@ def connect(db_path=None, url=None):
             import psycopg
         except ImportError as exc:      # pragma: no cover
             raise RuntimeError("PostgreSQL 사용에는 `pip install psycopg[binary]`가 필요합니다.") from exc
-        return PgConnection(psycopg.connect(url))
+        # prepare_threshold=None: 서버측 prepared statement 사용 안 함.
+        # Supavisor transaction 모드(6543)는 prepared statement를 지원하지 않아
+        # psycopg 기본값(5회 후 자동 prepare)이면 오류가 난다. session 모드(5432)에서도 무해.
+        return PgConnection(psycopg.connect(url, prepare_threshold=None))
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
