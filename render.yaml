@@ -5,8 +5,9 @@
 # 무료 플랜 제약: 15분 미사용 시 슬립(첫 접속 30~60초 지연), 디스크 비영속(재배포 시 초기화) → DB는 Supabase.
 services:
   - type: web
-    name: threeon-budget
+    name: threeon-budget-v2          # 기존 서비스(threeon-budget)와 이름이 겹치면 안 된다
     runtime: docker
+    branch: restructure-phase0      # 검증 끝나면 main 으로 바꾼다
     plan: free
     region: singapore
     dockerfilePath: ./deploy/Dockerfile
