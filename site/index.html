@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThreeON 예산 워크스페이스</title>
+<meta name="description" content="발전플랜트 유지보수 예산 — 계획·실적 매칭·표준화·중장기 예측을 두 앱으로 잇는 팀 프로젝트의 구조, 검증 결과, 배포 경로.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#f3f2ee; --surface:#ffffff; --sunk:#e9e8e2;
+    --ink:#16212b; --ink-2:#4a5561; --ink-3:#7b8590;
+    --line:#d6d9dc; --line-2:#c2c7cc;
+    --steel:#2d6a7a; --steel-soft:#dbe9ec;
+    --heat:#c3611c; --heat-soft:#f6e3d3;
+    --ok:#2f7d4f; --ok-soft:#dcefe2;
+    --display:"Gothic A1","IBM Plex Sans KR","Malgun Gothic",sans-serif;
+    --body:"IBM Plex Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    --mono:"IBM Plex Mono",Consolas,"D2Coding",monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0f161c; --surface:#161f27; --sunk:#1d2830;
+      --ink:#e7eaed; --ink-2:#b4bcc4; --ink-3:#7f8992;
+      --line:#2a3540; --line-2:#3a4752;
+      --steel:#6fb3c4; --steel-soft:#173039;
+      --heat:#ee9c55; --heat-soft:#3a2617;
+      --ok:#6fc48e; --ok-soft:#173a26;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0f161c; --surface:#161f27; --sunk:#1d2830;
+    --ink:#e7eaed; --ink-2:#b4bcc4; --ink-3:#7f8992;
+    --line:#2a3540; --line-2:#3a4752;
+    --steel:#6fb3c4; --steel-soft:#173039;
+    --heat:#ee9c55; --heat-soft:#3a2617;
+    --ok:#6fc48e; --ok-soft:#173a26;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:var(--steel);text-decoration:none;border-bottom:1px solid transparent}
+  a:hover,a:focus-visible{border-bottom-color:currentColor}
+  :focus-visible{outline:2px solid var(--heat);outline-offset:3px;border-radius:2px}
+  h1,h2,h3,h4{font-family:var(--display);letter-spacing:-.01em;text-wrap:balance;margin:0}
+  h2{font-size:1.55rem;font-weight:900;line-height:1.2}
+  h3{font-size:1.05rem;font-weight:700;margin-top:1.6rem}
+  p{margin:.6rem 0;max-width:68ch}
+  code,.mono{font-family:var(--mono);font-size:.86em}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--heat);font-weight:500}
+  .num{font-variant-numeric:tabular-nums;font-family:var(--mono)}
+
+  /* 마스트헤드 */
+  .mast{border-bottom:1px solid var(--line);background:var(--surface)}
+  .mast-in{max-width:1180px;margin:0 auto;padding:2.4rem 1.5rem 2rem;display:grid;grid-template-columns:1.1fr .9fr;gap:2rem;align-items:end}
+  .mast h1{font-size:clamp(2rem,4.2vw,3.1rem);font-weight:900;line-height:1.08}
+  .mast h1 span{color:var(--heat)}
+  .lede{font-size:1.02rem;color:var(--ink-2);max-width:56ch}
+  .facts{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem 1.6rem;border-left:2px solid var(--heat);padding-left:1.1rem;font-size:.86rem}
+  .facts dt{color:var(--ink-3);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono)}
+  .facts dd{margin:0 0 .35rem;font-weight:600}
+
+  /* 파이프라인 띠 — 페이지의 테제 */
+  .pipe{max-width:1180px;margin:0 auto;padding:1.4rem 1.5rem 0}
+  .pipe-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line-2);border-radius:6px;overflow:hidden;background:var(--surface)}
+  .stage{padding:1rem 1.1rem 1.1rem;border-right:1px solid var(--line);min-height:9.2rem;position:relative}
+  .stage:last-child{border-right:0}
+  .stage .k{font-family:var(--mono);font-size:.7rem;color:var(--ink-3);letter-spacing:.1em}
+  .stage .t{font-family:var(--display);font-weight:900;font-size:1.05rem;margin:.25rem 0 .35rem}
+  .stage .d{font-size:.82rem;color:var(--ink-2);margin:0;max-width:none}
+  .stage.app-a{background:linear-gradient(0deg,var(--steel-soft) 0 3px,transparent 3px)}
+  .stage.app-b{background:linear-gradient(0deg,var(--heat-soft) 0 3px,transparent 3px)}
+  .owners{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.7rem;font-size:.82rem}
+  .owner{display:flex;gap:.6rem;align-items:baseline}
+  .swatch{width:.9rem;height:.9rem;border-radius:2px;flex:none;transform:translateY(.15rem)}
+  .joint{margin:.9rem 0 0;padding:.75rem 1rem;border:1px dashed var(--heat);border-radius:6px;background:var(--heat-soft);font-size:.86rem;display:flex;gap:.8rem;align-items:baseline;flex-wrap:wrap}
+  .joint b{font-family:var(--display)}
+
+  /* 본문 2단 */
+  .wrap{max-width:1180px;margin:0 auto;padding:2.2rem 1.5rem 4rem;display:grid;grid-template-columns:220px minmax(0,1fr);gap:2.6rem}
+  nav.toc{position:sticky;top:1.2rem;align-self:start;font-size:.84rem}
+  nav.toc ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--line)}
+  nav.toc li a{display:block;padding:.38rem .9rem;color:var(--ink-2);border-left:2px solid transparent;margin-left:-1px}
+  nav.toc li a:hover{color:var(--ink);border-left-color:var(--line-2);border-bottom-color:transparent}
+  nav.toc .toc-note{margin-top:1.2rem;color:var(--ink-3);font-size:.76rem;line-height:1.5}
+  main{min-width:0}
+  section{padding:0 0 2.4rem;border-bottom:1px solid var(--line);margin-bottom:2.4rem}
+  section:last-child{border-bottom:0}
+  .sec-head{display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.4rem}
+  .sec-head .eyebrow{min-width:7ch}
+
+  table{border-collapse:collapse;width:100%;font-size:.86rem;background:var(--surface)}
+  .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;margin:.9rem 0}
+  th,td{padding:.55rem .75rem;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:500;background:var(--sunk)}
+  tr:last-child td{border-bottom:0}
+  td.r,th.r{text-align:right}
+  .tag{display:inline-block;font-family:var(--mono);font-size:.68rem;padding:.1rem .45rem;border-radius:3px;border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap}
+  .tag.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+  .tag.heat{background:var(--heat-soft);color:var(--heat);border-color:transparent}
+  .tag.steel{background:var(--steel-soft);color:var(--steel);border-color:transparent}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+  .box{border:1px solid var(--line);border-radius:6px;padding:1rem 1.1rem;background:var(--surface)}
+  .box h4{font-family:var(--display);font-weight:700;font-size:.95rem;margin-bottom:.4rem}
+  .box ul{margin:.3rem 0 0;padding-left:1.1rem;font-size:.86rem}
+  .box li{margin:.25rem 0}
+  .box.now{border-top:3px solid var(--heat)}
+  .box.final{border-top:3px solid var(--steel)}
+
+  pre{margin:.8rem 0;padding:.9rem 1rem;background:var(--sunk);border:1px solid var(--line);border-radius:6px;overflow-x:auto;font-family:var(--mono);font-size:.78rem;line-height:1.55;color:var(--ink)}
+  .arch{display:grid;grid-template-columns:1fr auto 1fr;gap:.8rem;align-items:stretch;margin:.9rem 0}
+  .node{border:1px solid var(--line-2);border-radius:6px;padding:.85rem 1rem;background:var(--surface);font-size:.84rem}
+  .node .nm{font-family:var(--display);font-weight:900;font-size:1rem}
+  .node .pt{font-family:var(--mono);font-size:.7rem;color:var(--ink-3)}
+  .node ul{margin:.4rem 0 0;padding-left:1rem}
+  .node li{margin:.15rem 0}
+  .link{align-self:center;text-align:center;font-family:var(--mono);font-size:.72rem;color:var(--heat);padding:0 .3rem;line-height:1.5}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:.6rem 0}
+  .steps li{counter-increment:s;position:relative;padding:.35rem 0 .35rem 2.4rem;border-bottom:1px dashed var(--line);font-size:.9rem}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:.35rem;width:1.6rem;height:1.6rem;border-radius:50%;background:var(--steel);color:#fff;font-family:var(--mono);font-size:.74rem;display:grid;place-items:center}
+  .foot{border-top:1px solid var(--line);color:var(--ink-3);font-size:.78rem;padding:1.4rem 1.5rem 2.4rem;max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+
+  @media (max-width: 900px){
+    .mast-in{grid-template-columns:1fr;gap:1.4rem}
+    .pipe-grid{grid-template-columns:1fr 1fr}
+    .stage{border-bottom:1px solid var(--line)}
+    .wrap{grid-template-columns:1fr;gap:1.4rem}
+    nav.toc{position:static}
+    nav.toc ol{display:flex;flex-wrap:wrap;gap:.2rem;border-left:0}
+    nav.toc li a{border:1px solid var(--line);border-radius:999px;padding:.25rem .7rem;margin:0}
+    .two,.arch{grid-template-columns:1fr}
+    .link{transform:rotate(90deg);padding:.4rem 0}
+  }
+  @media (max-width: 560px){ .pipe-grid{grid-template-columns:1fr} .facts{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="mast-in">
+    <div>
+      <div class="eyebrow">ThreeON · 발전플랜트 유지보수 예산</div>
+      <h1>계획에서 실적, 실적에서<br><span>10개년 소요 전망</span>까지</h1>
+      <p class="lede">지사 19곳이 엑셀로 올리는 예산계획과 SAP 실적 전표(zrfm2)를 자동으로 맞춰 보고, 그 결과를 정비등급별 표준금액과 2026~2035년 예산 전망의 근거로 넘기는 팀 프로젝트입니다. 두 사람이 나눠 만든 두 앱이 <b>결과 JSON</b> 한 파일로 이어집니다.</p>
+    </div>
+    <dl class="facts">
+      <div><dt>단계</dt><dd>① 계획 → ② 실적 매칭 → ③ 표준화 → ④ 중장기 전망</dd></div>
+      <div><dt>기준일</dt><dd>2026-09-09 · rev15</dd></div>
+      <div><dt>검증 연도</dt><dd>2023 · 2025 (ERP 전체 = 종합표, 미배정 0)</dd></div>
+      <div><dt>테스트</dt><dd class="num">budget_app 87 · forecast_app 183 passed</dd></div>
+      <div><dt>배포</dt><dd>지금 Render + Supabase(팀 전용) → 최종 사내 서버</dd></div>
+      <div><dt>단위</dt><dd>천원(집계) · 원(전표·계약 파일)</dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="pipe" aria-label="파이프라인">
+  <div class="pipe-grid">
+    <div class="stage app-a"><div class="k">STAGE 01</div><div class="t">예산 계획 수립</div><p class="d">양식1(월별) 업로드 → 지사×예산과목 계획본. 손익 8과목·자본 11과목, 심의대상 ≥ 50,000천원 분리.</p></div>
+    <div class="stage app-a"><div class="k">STAGE 02</div><div class="t">실적 집계·사업 매칭</div><p class="d">zrfm2 전표를 (예산과목×처지사) 2-키로 계획 사업에 귀속. 총액 보존, 재배정·수정·학습, 연도 마감.</p></div>
+    <div class="stage app-b"><div class="k">STAGE 03</div><div class="t">예산 표준화</div><p class="d">지사×과목×정비등급(MI/TI/CI 등) 표준금액 — 등급별 평균·최근실적·N개년 평균, 수동 보정.</p></div>
+    <div class="stage app-b"><div class="k">STAGE 04</div><div class="t">중장기 예산 26~35년</div><p class="d">26년 확정값+본사배분, 27년~ 표준금액×팩터 복리, 정기점검·고온부품·투자비 가산 → 재무팀 양식 엑셀.</p></div>
+  </div>
+  <div class="owners">
+    <div class="owner"><span class="swatch" style="background:var(--steel)"></span><span><b>budget_app</b> · FastAPI + SQLite/PostgreSQL · 사용자 파트 · <code>/app</code></span></div>
+    <div class="owner"><span class="swatch" style="background:var(--heat)"></span><span><b>forecast_app</b>(팀공유 v2) · Streamlit · 동료 파트 · <code>/forecast</code></span></div>
+  </div>
+  <div class="joint"><b>이음새</b> <span>budget_app 「통계·내보내기 → 팀 연계 → 결과 JSON」 → forecast_app 「사업 실적 연결」. schemaVersion 1 · 천원 · 묶음/사업별 배정/제외/원천합계. 2023·2025년 연결 완료, 미배정 0원.</span></div>
+</div>
+
+<div class="wrap">
+  <nav class="toc" aria-label="목차">
+    <ol>
+      <li><a href="#status">현황 요약</a></li>
+      <li><a href="#arch">두 앱의 구조</a></li>
+      <li><a href="#verify">검증 결과</a></li>
+      <li><a href="#contract">연계 계약</a></li>
+      <li><a href="#deploy">배포 경로</a></li>
+      <li><a href="#security">보안 설계</a></li>
+      <li><a href="#ml">학습데이터·모델</a></li>
+      <li><a href="#team">역할·일정</a></li>
+      <li><a href="#docs">문서 지도</a></li>
+    </ol>
+    <p class="toc-note">패키지 <code>2026-09-09-team-package-v0</code>의 <code>docs/index.html</code>이 이 페이지입니다. GitHub Pages·사내 서버 <code>/</code>에서 같은 파일을 제공합니다.</p>
+  </nav>
+
+  <main>
+    <section id="status">
+      <div class="sec-head"><span class="eyebrow">현황</span><h2>무엇이 완성되어 있고, 무엇이 남았나</h2></div>
+      <div class="tbl"><table>
+        <thead><tr><th>영역</th><th>상태</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>① 계획본 생성</td><td><span class="tag ok">완료</span></td><td>2025 계획 1,700행(손익 103,384,950 · 자본 69,867,520천원) 종합표 SUMIFS = 데이터시트 총액 일치</td></tr>
+          <tr><td>② 실적 매칭·검토·학습</td><td><span class="tag ok">완료</span></td><td>23·25년 미매핑 0, 종합표 = ERP 전체. 학습표 10,888건. 저장/분석/학습 3분리(수정 0.04초)</td></tr>
+          <tr><td>②→③ 연계(결과 JSON)</td><td><span class="tag ok">개통</span></td><td>동료 검증 모듈 <code>checkpoint_actuals.prepare_result</code> 통과, v2에 2023·2025 연결(사업행 2,531)</td></tr>
+          <tr><td>③ 표준화 · ④ 중장기 예측</td><td><span class="tag ok">완료(동료)</span></td><td>forecast_app v2, 테스트 183. 「연결한 사업 실적」 입력 선택 가능</td></tr>
+          <tr><td>투자유형 분류·학습</td><td><span class="tag ok">완료(동료)</span> + <span class="tag steel">레지스트리</span></td><td>v2 분류기 3종을 budget_app DB에 버전·스냅샷으로 보관, 수동 재학습·롤백</td></tr>
+          <tr><td>인증·수정 이력</td><td><span class="tag ok">완료</span></td><td>팀 공용 비밀번호 + 작업자 이름 → <code>audit_log</code>. <code>/forecast</code>는 엣지 기본인증</td></tr>
+          <tr><td>DB 전환(SQLite ↔ PostgreSQL)</td><td><span class="tag ok">실서버 검증</span></td><td>로컬 PostgreSQL 16.4에 실데이터 이전 후 전체 API 워크로드 통과, 내보내기 합계 SQLite와 원 단위 동일. PG <code>REAL</code> 정밀도 손실을 발견해 <code>DOUBLE PRECISION</code>으로 교정</td></tr>
+          <tr><td>단일 이미지 배포(Docker)</td><td><span class="tag ok">라우팅 실증</span> · <span class="tag heat">빌드 미검증</span></td><td>Caddy :8080 → FastAPI :8010 + Streamlit :8501(/forecast)을 Windows에서 실제 구동해 <code>/</code>·<code>/app/</code>·<code>/api</code>·<code>/forecast</code>(기본인증 401→200) 확인. Dockerfile 빌드 단계만 Render 첫 배포에서 확인</td></tr>
+          <tr><td>개인 계정·레이트 리밋</td><td><span class="tag">다음</span></td><td>Supabase Auth 또는 사용자 표. <code>audit_log.operator</code>가 이미 사람 단위</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="arch">
+      <div class="sec-head"><span class="eyebrow">구조</span><h2>두 앱, 한 주소, 한 DB</h2></div>
+      <p>코드를 합치지 않고 <b>파일 계약</b>으로 잇는다. 사내 분리망(오프라인) 전제를 두 앱이 공유하므로 외부 CDN·API 호출이 없다.</p>
+      <div class="arch">
+        <div class="node">
+          <div class="nm">budget_app</div><div class="pt">FastAPI · :8010 · /app /api</div>
+          <ul>
+            <li>정적 SPA(원자료 미보유) + REST</li>
+            <li>SQLite 1파일 또는 <code>DATABASE_URL</code> PostgreSQL</li>
+            <li>매칭 엔진 <code>src/budget/</code> — 정규화·2-키 매칭·WRatio·학습 우선</li>
+            <li>지시 테이블(override·biz_edit·manual_biz·biz_delete) → 원자료 불변</li>
+            <li>모델 레지스트리·학습데이터·감사로그</li>
+          </ul>
+        </div>
+        <div class="link">결과 JSON →<br>matched/budget/data CSV →<br>← 모델 파일(pull)</div>
+        <div class="node">
+          <div class="nm">forecast_app</div><div class="pt">Streamlit · :8501 · /forecast</div>
+          <ul>
+            <li>실적 업로드(zrfm2 정제)·투자유형 분류·대시보드·리포트</li>
+            <li>사업 실적 연결(결과 JSON 검증·버전 보관)</li>
+            <li>예산 표준화(정비등급 이력 import, 방식 맵, override)</li>
+            <li>중장기 예산 26~35년 · 재무팀 양식 25+시트 내보내기</li>
+            <li>CSV 파일 저장(볼륨) · 모델은 레지스트리에서 pull</li>
+          </ul>
+        </div>
+      </div>
+      <p>앞단의 <b>Caddy</b>가 <code>/</code>(이 사이트)·<code>/app</code>·<code>/api</code>·<code>/forecast</code>를 한 포트로 묶고, <code>supervisord</code>가 세 프로세스를 한 컨테이너에서 돌린다. 무료 PaaS가 컨테이너 1개·포트 1개만 허용하기 때문이며, 사내 서버도 같은 이미지를 쓴다.</p>
+    </section>
+
+    <section id="verify">
+      <div class="sec-head"><span class="eyebrow">검증</span><h2>숫자가 맞는지 — 총액 보존 불변식</h2></div>
+      <p>모든 검증의 기준은 하나다: <b>종합표 총액 + 미반영 + 타예산 = 해당 예산 ERP 전체(유실 0)</b>. 결과 JSON도 같은 식을 승계한다: Σ원천 = Σ배정 + Σ제외, 미배정 0.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>연도</th><th>원장</th><th class="r">연결금액(원)</th><th class="r">천원</th><th class="r">기존 기준치(천원)</th><th class="r">묶음</th><th class="r">미배정</th><th>동료 검증</th></tr></thead>
+        <tbody>
+          <tr><td>2025</td><td>손익</td><td class="r num">98,554,800,525</td><td class="r num">98,554,801</td><td class="r num">98,554,801</td><td class="r num">1,137</td><td class="r num">0</td><td><span class="tag ok">통과</span></td></tr>
+          <tr><td>2025</td><td>자본</td><td class="r num">49,709,177,979</td><td class="r num">49,709,178</td><td class="r num">49,709,178</td><td class="r num">181</td><td class="r num">0</td><td><span class="tag ok">통과</span></td></tr>
+          <tr><td>2023</td><td>손익</td><td class="r num">72,164,031,575</td><td class="r num">72,164,032</td><td class="r num">72,164,028~032</td><td class="r num">1,072</td><td class="r num">0</td><td><span class="tag ok">통과</span></td></tr>
+          <tr><td>2023</td><td>자본</td><td class="r num">55,820,722,469</td><td class="r num">55,820,722</td><td class="r num">55,820,726</td><td class="r num">141</td><td class="r num">0</td><td><span class="tag ok">통과</span></td></tr>
+        </tbody>
+      </table></div>
+      <p>수기 취합본과의 대조(2025 손익): 자동 98,554,801 vs 수기 98,345,148천원, 차이 +209,651(0.21%)은 전부 <em>본사귀속 완전포착</em>(건물/구축물 +204,889)과 반올림으로 규명되었고, 최대 쟁점이던 경상정비 39,368,679천원은 정확히 일치했다. 자본의 −16.5M 차이는 zrfm2에 계정이 없는 건설공사 3과목(범위 밖)이다.</p>
+    </section>
+
+    <section id="contract">
+      <div class="sec-head"><span class="eyebrow">계약</span><h2>결과 JSON — 3·4단계로 들어가는 유일한 문</h2></div>
+      <p>forecast_app의 <code>checkpoint_actuals.prepare_result()</code>가 읽고 검증한다. 하나라도 어기면 업로드가 거부된다: 단일 연도, 헤더 문자열·순서 일치, 묶음 합계 = 사업별 배정 합계(원 단위 정확), (원장·지사·과목·원본행) 중복 금지, 배정·제외한 범위가 원천합계에 존재.</p>
+<pre>{ "schemaVersion": 1, "amountUnit": "KRW_THOUSAND", "amountMatching": true, "sourceYears": [2025],
+  "sourceTotals": [ {"ledger":"손익","org":"동탄지사","account":"수선유지비-열원정기점검","amountWon": 400000}, … ],
+  "reconciliation": {
+    "groups":     [["묶음ID","원장","지사","예산과목","처리방법","전표 합계(천원)","사업 실적 합계(천원)","단수차이(천원)",
+                    "전표항목수","사업수","대상 사업명","전표텍스트","참조전표번호"], ["P000001","손익","동탄지사",…]],
+    "details":    [["묶음ID","원장","지사","예산과목","집계표 원본행","사업명","기준 실적(천원)","반영 실적(천원)"], …],
+    "exclusions": [["원장","지사","예산과목","전표텍스트","제외 금액(천원)","담당자 제외 사유","보정ID","참조전표번호"], …] } }</pre>
+      <p>budget_app 매핑: 묶음 = (원장×처지사정규×과목정규×귀속 사업), 계획집행은 양식1 계획행 번호를, 신규는 합성 번호 2,000,000+n을 「집계표 원본행」으로 쓴다. 구분 <em>미반영</em>은 제외 표로, 타예산·합계행은 상대 원장에서 집계되므로 넣지 않는다. 함께 나오는 <code>matched_{연도}.csv</code>·<code>budget_{연도}.csv</code>·<code>data_{연도}.csv</code>는 연동규격 CSV(연도 단일, 원 단위).</p>
+    </section>
+
+    <section id="deploy">
+      <div class="sec-head"><span class="eyebrow">배포</span><h2>지금은 무료로 팀 검토, 최종은 사내 서버</h2></div>
+      <div class="two">
+        <div class="box now">
+          <h4>지금 — Render(Docker) + Supabase(PostgreSQL) + GitHub Pages</h4>
+          <ul>
+            <li>단일 이미지 → Render Free 웹서비스, HTTPS 자동. 15분 미사용 시 슬립(첫 접속 30~60초)</li>
+            <li>디스크 비영속 → DB는 Supabase 무료 500MB(영속·백업). <code>DATABASE_URL</code>만 바꾼다</li>
+            <li>이 소개 페이지는 GitHub Pages(무료·영구). Vercel은 정적 페이지에만 적합 — 서버리스 제한(10~60초, 영속 프로세스 없음)으로 Streamlit·분석 API 부적합</li>
+            <li>실데이터를 외부 클라우드에 두는 기간은 <b>임시</b>. 사내 규정 확인, 종료 시 Supabase 정리</li>
+          </ul>
+        </div>
+        <div class="box final">
+          <h4>최종 — 사내 서버(분리망)</h4>
+          <ul>
+            <li><code>docker compose up -d</code> 한 줄. 볼륨 <code>budget_data</code>·<code>forecast_data</code>, 선택 <code>--profile pg</code>로 PostgreSQL 컨테이너</li>
+            <li>인터넷 없는 서버: 인터넷 PC에서 <code>docker save</code> → 반입 → <code>docker load</code>. 이미지 안에 pip·Caddy 전부 포함</li>
+            <li>Docker가 없으면 <code>pip download</code>로 오프라인 설치 후 uvicorn·streamlit 직접 실행</li>
+            <li>이관 후 Render·Supabase 자원 삭제, 개인 계정 전환 검토</li>
+          </ul>
+        </div>
+      </div>
+      <ol class="steps">
+        <li>GitHub에 <code>2026-09-09-team-package-v0</code> 업로드 — <code>.gitignore</code>가 <code>.env</code>·DB·CSV를 걸러준다</li>
+        <li>Supabase 프로젝트 생성 → Transaction pooler 연결문자열 → 로컬 <code>py scripts/db_check.py</code>로 스키마 검증(필요 시 <code>--migrate</code>)</li>
+        <li>Render Blueprint(<code>render.yaml</code>) 적용 → 환경변수 <code>APP_PASSWORD</code>·<code>DATABASE_URL</code> 입력 → 빌드 5~8분 → <code>/healthz</code></li>
+        <li>팀에 주소·비밀번호(비밀 메모)·작업자 이름 규칙 공지</li>
+      </ol>
+    </section>
+
+    <section id="security">
+      <div class="sec-head"><span class="eyebrow">보안</span><h2>공개 URL에서 실데이터를 팀만 다루기</h2></div>
+      <div class="tbl"><table>
+        <thead><tr><th>층</th><th>장치</th><th>구현</th></tr></thead>
+        <tbody>
+          <tr><td>엣지</td><td>HTTPS 종단, 보안 헤더, <code>/forecast</code> basic_auth(bcrypt, 기동 시 계산)</td><td><code>deploy/Caddyfile</code>, <code>entrypoint.sh</code></td></tr>
+          <tr><td>앱</td><td>팀 공용 비밀번호 + <b>작업자 이름</b> → HMAC 서명 쿠키(HttpOnly·SameSite·Secure, 12시간)</td><td><code>auth.py</code>, <code>AuthAuditMiddleware</code></td></tr>
+          <tr><td>이력</td><td>변경 API마다 <code>audit_log</code>(시각·작업자·경로·상태·요약, 비밀번호 제외). 실패 로그인도 기록</td><td>설정 탭 「변경 이력」, <code>GET /api/audit</code></td></tr>
+          <tr><td>비밀</td><td>코드·Git·이미지에 없음. <code>.env</code>(gitignore)·Render 환경변수·Supabase 대시보드에만</td><td><code>.env.example</code>, <code>.dockerignore</code></td></tr>
+          <tr><td>데이터</td><td>원자료 표 불변, 연도 마감(423 차단), 실데이터 파일 전부 gitignore</td><td>기존 설계 + 패키지 <code>.gitignore</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>공용 비밀번호 1개로도 이력이 남는 이유: 로그인 화면이 이름을 <b>필수</b>로 받고 그 이름이 세션에 서명되어, 이후 모든 변경 요청이 그 이름으로 기록되기 때문이다. 개인 계정으로 바꿀 때도 <code>operator</code> 열은 그대로 쓴다.</p>
+    </section>
+
+    <section id="ml">
+      <div class="sec-head"><span class="eyebrow">학습</span><h2>모델은 버전으로, 학습데이터는 확정 워크플로로</h2></div>
+      <p>v2 분류기 3종(전표텍스트→투자유형, 사업명→투자유형, 사업명→투자유형세부)은 파일로만 있어 "누가 무엇으로 학습했는지"가 없었다. 이제 budget_app DB의 <code>model_registry</code>(메타+joblib BLOB+SHA256+활성 플래그)·<code>training_example</code>(입력·라벨·출처·확정·작업자)·<code>training_snapshot</code>(재학습 시점 CSV)이 보관한다.</p>
+      <ol class="steps">
+        <li>데이터 유입 — v2 파일 반입(<code>v2_model_sync.py --push</code>), CSV 가져오기, 자동예측(미확정)</li>
+        <li>사람 확정 — 확정 라벨은 자동값이 덮지 못한다. 잘못된 예제는 비활성(삭제 아님)</li>
+        <li>수동 재학습 — 관리자 [재학습] 버튼(최소 20건·2유형). 스냅샷 저장 → 학습 → 새 버전 활성. 자동 재학습 없음</li>
+        <li>검증·롤백 — CV 정확도·확정비율 확인, 나쁘면 이전 버전 [활성화] 즉시 롤백. 전부 감사로그</li>
+        <li>v2 반영 — <code>v2_model_sync.py --pull</code>로 활성 버전을 v2 파일명으로 내려받음(동료 코드 무수정)</li>
+      </ol>
+      <p>매칭 학습표(<code>learned_match</code> 10,888건)는 성격이 다른 규칙표라 기존대로 DB에 두고, 실행은 설정 탭 [AI 학습] 1회 원칙을 유지한다.</p>
+    </section>
+
+    <section id="team">
+      <div class="sec-head"><span class="eyebrow">팀</span><h2>역할과 일정</h2></div>
+      <div class="tbl"><table>
+        <thead><tr><th>영역</th><th>담당</th><th>산출</th></tr></thead>
+        <tbody>
+          <tr><td>계획본 · 실적 매칭 · 검토/학습 웹 · 팀 연계 내보내기 · 인증/감사 · 레지스트리 · 배포 구성</td><td>사용자 파트(budget_app)</td><td>실적본 xlsx, zrfm2_V1, matched CSV, 결과 JSON</td></tr>
+          <tr><td>실적 업로드 정제 · 투자유형 분류 · 대시보드/리포트 · 표준화 · 중장기 예측 · 사업 실적 연결</td><td>동료 파트(forecast_app v2)</td><td>표준금액 표, 26~35년 재무팀 양식 xlsx</td></tr>
+          <tr><td>매칭 HTML 도구(브라우저 단독, SheetJS)</td><td>동료(Codex 작업본)</td><td><code>matching/예산실적정리.html</code>, 소스 <code>matching_tool_src/</code></td></tr>
+        </tbody>
+      </table></div>
+      <div class="tbl"><table>
+        <thead><tr><th>시점</th><th>이정표</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2026-07-22</td><td>1·2단계 최초 구축, 연동규격 합의, GitHub 최초 업로드</td></tr>
+          <tr><td class="num">2026-08-04</td><td>FastAPI 웹 전환, 저장/분석/학습 3분리, 23·25년 검증 완료, 이관 패키지</td></tr>
+          <tr><td class="num">2026-09-08</td><td>팀 v2 반입·비교분석, 결과 JSON 연계 개통(rev14), 통합 업로드 패키지</td></tr>
+          <tr><td class="num">2026-09-09</td><td>인증·감사로그, DB 전환 계층, 모델 레지스트리, 단일 이미지 배포 구성, 이 사이트(rev15)</td></tr>
+          <tr><td>다음</td><td>Render+Supabase 실배포 → 팀 검토 → 사내 서버 이관 → 개인 계정</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="docs">
+      <div class="sec-head"><span class="eyebrow">문서</span><h2>문서 지도</h2></div>
+      <div class="tbl"><table>
+        <thead><tr><th>문서</th><th>읽는 이유</th></tr></thead>
+        <tbody>
+          <tr><td><a href="팀프로젝트_통합_README_2026-09-08.md">팀프로젝트_통합_README</a></td><td>팀 전체 진입점 — 두 앱 실행·연결 절차·역할</td></tr>
+          <tr><td><a href="배포가이드.md">배포가이드</a></td><td>Render+Supabase 절차, Vercel 검토 결과, 사내 서버 Compose·오프라인 반입</td></tr>
+          <tr><td><a href="보안설계.md">보안설계</a></td><td>위협·대응 표, 인증 흐름, 비밀 관리 규칙</td></tr>
+          <tr><td><a href="학습데이터_모델_관리.md">학습데이터_모델_관리</a></td><td>레지스트리 구조, 확정 워크플로, 동기화 명령</td></tr>
+          <tr><td><a href="팀원_실행가이드.md">팀원_실행가이드</a></td><td>PC 실행·공개 URL·일상 작업 순서·FAQ</td></tr>
+          <tr><td><a href="비교분석_및_병합_보고서_2026-09-08.md">비교분석_및_병합_보고서</a></td><td>GitHub ↔ 로컬 비교, 미해결 4건의 결말, 검증 수치</td></tr>
+          <tr><td><a href="연동규격_INTERFACE.md">연동규격_INTERFACE</a> §8</td><td>결과 JSON·CSV 계약(헤더·검증 규칙·매핑)</td></tr>
+          <tr><td><a href="통합_인수인계_MASTER.md">통합_인수인계_MASTER</a> · <a href="변경이력_CHANGELOG.md">변경이력</a></td><td>budget_app 구조·규칙 R1~R15·API·주의사항, rev별 의사결정</td></tr>
+          <tr><td><a href="알고리즘_명세.html">알고리즘_명세</a> · <a href="PRD_V1.html">PRD_V1</a> · <a href="PRD_팀현행_V1비교_2026-09-08.html">PRD(팀 현행)</a></td><td>매칭 규칙 시각 문서, 제품 요구</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+  </main>
+</div>
+
+<footer class="foot">
+  <span>ThreeON 예산 워크스페이스 · 팀 통합판 2026-09-09 · 실데이터·비밀은 이 사이트와 저장소에 포함되지 않습니다.</span>
+  <span class="mono">budget_app rev15 · forecast_app 2026-09-08_팀공유_v2 (66968fa)</span>
+</footer>
+</body>
+</html>

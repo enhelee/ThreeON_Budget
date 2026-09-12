@@ -1,0 +1,55 @@
+# 한 주소로 통합 — 경로별 라우팅. HTTPS는 Render/사내 프록시가 종단(auto_https off).
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT}
+
+encode gzip
+header {
+	X-Content-Type-Options nosniff
+	X-Frame-Options SAMEORIGIN
+	Referrer-Policy strict-origin-when-cross-origin
+	-Server
+}
+
+# ── 소개·문서 사이트 (docs/index.html) ──
+handle /site {
+	redir /site/ permanent
+}
+handle_path /site/* {
+	root * /srv/site
+	file_server
+}
+
+# ── budget_app (FastAPI). SPA는 /app/, API는 절대경로 /api/* ──
+handle /app {
+	redir /app/ permanent
+}
+handle_path /app/* {
+	reverse_proxy 127.0.0.1:8010
+}
+handle /api/* {
+	reverse_proxy 127.0.0.1:8010
+}
+handle /healthz {
+	reverse_proxy 127.0.0.1:8010
+}
+
+# ── forecast_app (Streamlit, baseUrlPath=forecast). 팀 공용 비밀번호를 엣지에서 검사 ──
+handle /forecast* {
+	# 인증 조각은 기동 시 entrypoint.sh가 생성한다(APP_PASSWORD 있으면 basic_auth, 없으면 빈 파일).
+	# ⚠ 예전엔 여기에 basic_auth 블록을 직접 쓰고 비밀번호가 없을 때 sed로 지웠는데,
+	#   `{$BASIC_USER} {$BASIC_HASH}` 줄에 `}`가 들어 있어 sed 범위가 일찍 끝나 닫는 괄호가
+	#   고아로 남고 Caddyfile 문법이 깨졌다(Render 배포 실패의 원인). import 방식으로 교체.
+	import /srv/deploy/forecast_auth.caddy
+	reverse_proxy 127.0.0.1:8501
+}
+
+# ── 그 외 = 소개 사이트 ──
+handle {
+	root * /srv/site
+	try_files {path} /index.html
+	file_server
+}

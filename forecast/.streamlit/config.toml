@@ -1,0 +1,28 @@
+[theme]
+base = "light"
+primaryColor = "#0f62fe"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f4"
+textColor = "#161616"
+borderColor = "#e0e0e0"
+dataframeBorderColor = "#e0e0e0"
+linkColor = "#0043ce"
+greenColor = "#198038"
+orangeColor = "#8a3800"
+yellowColor = "#8e6a00"
+redColor = "#da1e28"
+font = "Arial, Apple SD Gothic Neo, Malgun Gothic, sans-serif"
+headingFont = "Arial, Apple SD Gothic Neo, Malgun Gothic, sans-serif"
+codeFont = "Consolas, monospace"
+baseRadius = "0.25rem"
+buttonRadius = "0.25rem"
+showWidgetBorder = true
+showSidebarBorder = true
+chartCategoricalColors = ["#0f62fe", "#009d9a", "#6929c4", "#1192e8", "#9f1853", "#525252"]
+
+[theme.sidebar]
+backgroundColor = "#161616"
+secondaryBackgroundColor = "#262626"
+textColor = "#f4f4f4"
+primaryColor = "#78a9ff"
+borderColor = "#393939"

@@ -1,0 +1,43 @@
+/* Carbon-inspired, locally rendered workspace; no external fonts or assets. */
+[data-testid="stMainBlockContainer"] { max-width: 1440px; padding: 2.4rem 3rem 4rem; }
+[data-testid="stAppViewContainer"] { font-variant-numeric: tabular-nums; }
+[data-testid="stSidebar"] { min-width: 250px; max-width: 280px; }
+[data-testid="stSidebarUserContent"] { padding-top: 1.6rem; }
+[data-testid="stSidebar"] hr { border-color: #393939; margin: 1.4rem 0; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    min-height: 42px; padding: 7px 10px; margin: 2px 0; border-radius: 3px;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) { background: #393939; box-shadow: inset 3px 0 #78a9ff; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover { background: #262626; }
+.threeon-brand { padding: 0 8px 22px; border-bottom: 1px solid #393939; margin-bottom: 24px; }
+.threeon-brand b { color:#fff; font-size:24px; letter-spacing:-1px; }
+.threeon-brand b span { color:#78a9ff; }
+.threeon-brand small { display:block; color:#c6c6c6; margin-top:5px; font-size:12px; }
+h1 { font-size: 2rem !important; font-weight: 600 !important; letter-spacing: -.035em !important; padding-bottom: .4rem !important; }
+h2 { font-size: 1.5rem !important; font-weight: 500 !important; }
+h3 { font-size: 1.15rem !important; font-weight: 600 !important; }
+[data-testid="stCaptionContainer"] { color: #525252; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color: #c6c6c6; }
+[data-testid="stMetric"] { background: #f4f4f4; border-top: 2px solid #0f62fe; padding: 20px 22px; min-height: 128px; }
+[data-testid="stMetricLabel"] { color: #525252; font-size: 13px; }
+[data-testid="stMetricValue"] { font-weight: 500; font-size: 30px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+[data-testid="stExpander"] { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; }
+[data-testid="stExpander"] summary { padding: 15px 18px; }
+[data-testid="stFileUploaderDropzone"] { background: #f4f4f4; border: 1px dashed #a8a8a8; border-radius: 4px; padding: 24px; }
+[data-testid="stButton"] button, [data-testid="stDownloadButton"] button { min-height: 42px; font-weight: 500; }
+[data-testid="stButton"] button:focus-visible, [data-testid="stDownloadButton"] button:focus-visible { outline: 2px solid #0f62fe; outline-offset: 3px; }
+[data-testid="stDataFrame"], [data-testid="stDataEditor"] { border: 1px solid #e0e0e0; border-radius: 4px; }
+[data-testid="stAlert"] { border-radius: 4px; font-size: 14px; }
+.flow-strip { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid #e0e0e0; margin:12px 0 24px; }
+.flow-step { padding:16px 20px; border-right:1px solid #e0e0e0; background:#f4f4f4; }
+.flow-step:last-child { border-right:0; }
+.flow-step span { font-size:12px; color:#0043ce; display:block; margin-bottom:5px; letter-spacing:.06em; }
+.flow-step strong { font-weight:500; font-size:15px; }
+@media (max-width: 760px) {
+    [data-testid="stMainBlockContainer"] { padding:1.4rem 1rem 3rem; }
+    h1 {font-size:1.6rem !important;}
+    .flow-strip {grid-template-columns:1fr;}
+    .flow-step {border-right:0;border-bottom:1px solid #e0e0e0;}
+    .flow-step:last-child {border-bottom:0;}
+    [data-testid="stMetric"] {padding:16px;}
+}
