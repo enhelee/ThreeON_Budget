@@ -40,7 +40,11 @@ RUN pip install -r /srv/deploy/requirements.txt
 COPY app/ /srv/app/
 COPY --from=web /static/ /srv/app/static/
 COPY forecast/ /srv/forecast/
+# 소개 사이트 = site/index.html + docs/ 의 문서들.
+# index.html 이 「문서 지도」에서 형제 파일(통합_인수인계_MASTER.md 등 12개)을
+# 상대경로로 링크하므로, 둘을 같은 폴더에 놓지 않으면 그 링크가 전부 404 가 된다.
 COPY site/ /srv/site/
+COPY docs/ /srv/site/
 COPY deploy/Caddyfile deploy/supervisord.conf deploy/entrypoint.sh /srv/deploy/
 RUN chmod +x /srv/deploy/entrypoint.sh \
  && mkdir -p /data/budget/config /data/budget/output /data/forecast \
