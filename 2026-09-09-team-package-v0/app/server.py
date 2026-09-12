@@ -19,7 +19,8 @@ import json
 from urllib.parse import quote
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -32,7 +33,13 @@ from budget import config_store, db as dbm, dbcore, ml_registry, pipeline_db   #
 
 CONFIG_DIR = os.environ.get("CONFIG_DIR") or os.path.join(APP_DIR, "config")
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
-WEB_DIR = os.path.join(APP_DIR, "webapp")
+# 프론트는 Vite 빌드 산출물(static/) 하나뿐이다. 빌드 전 원본은 web/ 에 있다.
+#   로컬:   cd app/web && npm install && npm run build
+#   도커:   Dockerfile 의 node 스테이지가 만들어 /srv/app/static/ 으로 넣는다
+# 예전 webapp/index.html(단일 149KB)은 web/ 로 쪼개져 삭제되었다. 폴백을 두지 않는 이유는,
+# 빌드가 실패했을 때 조용히 옛 화면을 서비스하는 것이 눈에 띄게 실패하는 것보다 나쁘기 때문이다.
+STATIC_DIR = os.path.join(APP_DIR, "static")
+WEB_DIR = STATIC_DIR
 _PARENT = os.path.dirname(APP_DIR)
 SITE_DIR = os.environ.get("SITE_DIR") or next(              # 소개 사이트: 패키지는 docs/, 개발 폴더는 site/
     (d for d in (os.path.join(_PARENT, "docs"), os.path.join(_PARENT, "site"))
@@ -188,7 +195,17 @@ def _clean_json(obj):
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(WEB_DIR, "index.html"))
+    page = os.path.join(WEB_DIR, "index.html")
+    if not os.path.isfile(page):
+        raise HTTPException(500, "프론트가 빌드되지 않았습니다 — `cd app/web && npm install && npm run build` 를 실행하세요.")
+    return FileResponse(page)
+
+
+@app.get("/app")
+@app.get("/app/{path:path}")
+def app_redirect(path: str = ""):
+    """예전 주소(/app/)를 새 루트로 영구 이동 — 팀원이 저장해 둔 북마크를 지킨다."""
+    return RedirectResponse("/", status_code=301)
 
 
 # ── 자료 업로드 (DB 흡수, 원본 미보관) ──────────────────────────────────
@@ -1186,3 +1203,8 @@ def site(path: str = "index.html"):
     if not target.startswith(os.path.normpath(SITE_DIR)) or not os.path.isfile(target):
         raise HTTPException(404, "파일이 없습니다.")
     return FileResponse(target)
+
+
+# ── Vite 빌드 자산 (해시 파일명 → 장기 캐시 가능) ──────────────────────
+if os.path.isdir(os.path.join(STATIC_DIR, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")

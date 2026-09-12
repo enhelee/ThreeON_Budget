@@ -1,10 +1,21 @@
 # ThreeON 예산 프로젝트 — 단일 이미지(한 주소) 배포
 #   Caddy(:$PORT, 리버스 프록시·정적 사이트·/forecast 기본인증)
-#   ├─ /            소개·문서 사이트 (docs/)
+#   ├─ /            소개 사이트 (site/)
 #   ├─ /app, /api   budget_app  FastAPI  (127.0.0.1:8010)
 #   └─ /forecast    forecast_app Streamlit (127.0.0.1:8501, baseUrlPath=forecast)
 # 무료 PaaS(Render·HF Spaces)는 컨테이너 1개·포트 1개만 열어주므로 세 프로세스를 supervisord로 한 이미지에 담는다.
 # 사내 서버에서는 docker-compose.yml이 같은 이미지를 볼륨·PostgreSQL과 함께 띄운다.
+# ── 1단계: 프론트 빌드 (Vite) ─────────────────────────────────────────
+# Node 는 빌드에만 쓰고 런타임 이미지에는 넣지 않는다 — 사내 오프라인 서버에는
+# 빌드된 정적 파일만 들어가므로 Node 설치가 필요 없다.
+FROM node:24-alpine AS web
+WORKDIR /build
+COPY app/web/package.json app/web/package-lock.json* ./
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+COPY app/web/ ./
+RUN npm run build          # → /build/../static 이 아니라 vite.config 의 outDir 기준
+
+# ── 2단계: 실행 이미지 ────────────────────────────────────────────────
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -26,13 +37,14 @@ COPY deploy/requirements.txt /srv/deploy/requirements.txt
 RUN pip install -r /srv/deploy/requirements.txt
 
 # 앱 코드
-COPY budget_app/ /srv/budget_app/
-COPY forecast_app/ /srv/forecast_app/
-COPY docs/ /srv/site/
+COPY app/ /srv/app/
+COPY --from=web /static/ /srv/app/static/
+COPY forecast/ /srv/forecast/
+COPY site/ /srv/site/
 COPY deploy/Caddyfile deploy/supervisord.conf deploy/entrypoint.sh /srv/deploy/
 RUN chmod +x /srv/deploy/entrypoint.sh \
  && mkdir -p /data/budget/config /data/budget/output /data/forecast \
- && rm -rf /srv/budget_app/data /srv/budget_app/output /srv/budget_app/.env
+ && rm -rf /srv/app/data /srv/app/output /srv/app/.env
 
 # 실행 시 덮어쓸 수 있는 기본값 (.env / PaaS 환경변수)
 ENV PORT=8080 \

@@ -35,7 +35,12 @@ def client(tmp_path, monkeypatch):
         monkeypatch.setenv("DATABASE_URL", PG_TEST_URL)
         _reset_pg_tables(PG_TEST_URL)
     else:
-        monkeypatch.delenv("DATABASE_URL", raising=False)
+        # 삭제가 아니라 빈 문자열로 둔다. server.py 는 import 시점에
+        # load_dotenv_if_present(APP_DIR) 로 app/.env 를 읽는데, override=False 는
+        # "키가 이미 있으면 건드리지 않는다"는 뜻이라 지워버리면 개발자의 실제
+        # DATABASE_URL 이 되살아나 테스트가 운영 PostgreSQL 에 붙어 행을 쓴다.
+        # dbcore.database_url() 은 빈 문자열을 SQLite 로 처리한다.
+        monkeypatch.setenv("DATABASE_URL", "")
         monkeypatch.setattr(dbm, "DEFAULT_DB", str(tmp_path / "t.db"))
     import server
     monkeypatch.setattr(server, "AUTH", authm.AuthConfig())

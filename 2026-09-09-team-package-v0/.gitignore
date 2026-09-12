@@ -1,31 +1,79 @@
-# ── 비밀 ──
+# ─────────────────────────────────────────────────────────────
+# 사내 실데이터·비밀값은 절대 커밋하지 않는다.
+# private은 실수의 마지막 방어선이지 첫 방어선이 아니다.
+# ─────────────────────────────────────────────────────────────
+
+# 비밀값
 .env
 .env.*
 !.env.example
-# ── 공통 개발 잔재 ──
+
+# 앱 상태 (DB·설정·산출물) — 전부 로컬/볼륨에서 생성된다
+app/data/
+app/output/
+app/config/*.json
+app/static/
+
+# forecast_app 실데이터 — 연도별 실적/예산, 조직 마스터
+forecast/data_*.csv
+forecast/classified_*.csv
+forecast/matched_*.csv
+forecast/budget_*.csv
+forecast/year_status.json
+forecast/site_type_map.csv
+forecast/account_category_map.csv
+forecast/dept_code_master.csv
+forecast/account_code_master.csv
+forecast/project_master.csv
+forecast/extra_projects.csv
+forecast/site_year_grade.csv
+forecast/standardization_method_map.csv
+forecast/standardization_overrides.csv
+forecast/hot_parts_plan.csv
+forecast/hq_allocation_ratio.csv
+forecast/hq_master_table.csv
+forecast/hq_temp_projects.csv
+forecast/surprise_projects.csv
+forecast/longterm_factors.csv
+forecast/test_data/
+forecast/checkpoint_data/
+
+# forecast_app 학습 모델·산출물
+forecast/training_data.csv
+forecast/training_meta.json
+forecast/type_classifier.joblib
+forecast/project_type_training.csv
+forecast/project_type_training.csv.bak_*
+forecast/project_type_meta.json
+forecast/project_type_model_*.joblib
+
+# forecast_app 임시·생성 파일 (내장 양식 builtin_template_*.xlsx는 유지)
+forecast/temp_upload.xlsx
+forecast/temp_budget_upload*.xlsx
+forecast/filled_*.xlsx
+forecast/output_template.xlsx
+forecast/template_*.xlsx
+forecast/templates_manifest.json
+
+# 엑셀 임시 잠금 파일
+~$*.xlsx
+~$*.xls
+
+# Python
 __pycache__/
 *.pyc
-.venv/
+*.pyo
 .pytest_cache/
+.venv/
+venv/
+
+# Node (Phase 1~ 프론트 빌드)
+node_modules/
+.vite/
+
+# 편집기·OS
 .claude/
+.vscode/
+.idea/
 .DS_Store
-temp_upload*.xlsx
-# ── budget_app: 실데이터·DB·산출물·연도별 구성 (절대 공유 금지) ──
-budget_app/data/
-budget_app/output/
-budget_app/config/*.json
-*.db
-*.db-wal
-*.db-shm
-# ── forecast_app(v2): 실데이터 CSV·매핑·모델·연결 결과 (폴더 안 .gitignore와 동일 취지) ──
-forecast_app/*.csv
-forecast_app/*.joblib
-forecast_app/*.json
-forecast_app/checkpoint_data/
-forecast_app/test_data/
-forecast_app/filled_*.xlsx
-forecast_app/template_*.xlsx
-!forecast_app/builtin_template_*.xlsx
-# ── 매칭 도구 ──
-matching_tool_src/node_modules/
-matching_tool_src/private/
+Thumbs.db

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="발전플랜트 유지보수 예산·실적 분석 프로그램">
+  <title>예산·실적 업무 분석 프로그램</title>
+</head>
+<body>
+
+  <div class="min-h-screen lg:flex">
+    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/30 lg:hidden" aria-hidden="true"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      <div class="flex items-center gap-3 px-2">
+        <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-slate-950">예산·실적 분석</p>
+          <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
+        </div>
+      </div>
+
+      <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
+        <button class="nav-button nav-button-active" data-view="home"><span class="grid h-7 w-7 place-items-center rounded-lg bg-white/20 text-xs">H</span>홈</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">업무 단계</p>
+        <button class="nav-button" data-view="budget"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">1</span>예산 계획</button>
+        <button class="nav-button" data-view="collect"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">2</span>실적 집계</button>
+        <button class="nav-button" data-view="branches"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3</span>실적 분석</button>
+        <button class="nav-button" data-view="detail"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">3+</span>실적분석(상세)</button>
+        <button class="nav-button" data-view="stats"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">4</span>통계·내보내기</button>
+        <button class="nav-button" data-view="forecast"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">5</span>중장기 예측</button>
+        <p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">관리</p>
+        <button class="nav-button" data-view="settings"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">S</span>설정</button>
+      </nav>
+
+      <div class="rounded-2xl bg-blue-50 p-4">
+        <div class="flex items-center gap-2 text-sm font-semibold text-blue-900">
+          <span class="h-2 w-2 rounded-full bg-emerald-500"></span>사내망 · 백엔드 DB 저장
+        </div>
+        <p class="mt-2 text-xs leading-5 text-blue-700">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
+      </div>
+    </aside>
+
+    <div class="min-w-0 flex-1">
+      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div class="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div class="flex min-w-0 items-center gap-3">
+            <button id="menuButton" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 lg:hidden" aria-label="메뉴 열기">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+            <div class="min-w-0">
+              <h1 id="pageTitle" class="truncate text-lg font-bold text-slate-950">홈</h1>
+              <p id="pageSubtitle" class="hidden truncate text-xs text-slate-500 sm:block"></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">대상연도
+              <select id="yearSelect" class="control"></select>
+            </label>
+            <button id="addYearBtn" class="btn-secondary hidden sm:inline-flex" title="새 연도 추가">＋연도</button>
+            <button class="btn-primary" data-action="analyze" id="analyzeBtn">
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+              <span id="analyzeLabel">분석 실행</span><span id="pendingCount" class="pending-count hidden"></span>
+            </button>
+            <span id="operatorBadge" class="operator-badge hidden" title="로그인 때 입력한 작업자 이름 — 모든 변경이 이 이름으로 기록됩니다"></span>
+            <button id="logoutBtn" class="btn-secondary hidden" data-action="logout">로그아웃</button>
+          </div>
+        </div>
+      </header>
+
+      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
+    </div>
+  </div>
+
+  <div id="loginOverlay" class="login-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <form id="loginForm" class="login-card" autocomplete="off">
+      <h2 id="loginTitle">예산·실적 분석 — 팀 로그인</h2>
+      <p>팀 공용 비밀번호와 <b>작업자 이름</b>을 입력하세요. 이름은 재배정·수정·삭제 등 모든 변경 이력에 기록됩니다.</p>
+      <label for="loginName">작업자 이름</label>
+      <input id="loginName" class="control" maxlength="40" placeholder="예: 홍길동" required>
+      <label for="loginPw">팀 공용 비밀번호</label>
+      <input id="loginPw" class="control" type="password" autocomplete="current-password" required>
+      <div id="loginMsg" class="login-msg"></div>
+      <div class="mt-3 flex justify-end gap-2"><button type="submit" class="btn-primary">입장</button></div>
+    </form>
+  </div>
+  <input type="file" id="trainingFile" accept=".csv" class="hidden">
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
+  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-slate-950/30">
+    <div class="rounded-2xl bg-white px-8 py-6 text-center shadow-xl">
+      <div class="spinner mx-auto"></div>
+      <p id="busyText" class="mt-3 text-sm font-semibold text-slate-700">처리 중...</p>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

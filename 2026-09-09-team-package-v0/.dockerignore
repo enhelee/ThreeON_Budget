@@ -22,5 +22,7 @@
 **/project_type_training*.csv
 **/site_type_map.csv
 **/temp_upload*.xlsx
-budget_app/config/*.json
+app/config/*.json
+**/node_modules
+**/static/
 matching_tool_src/node_modules

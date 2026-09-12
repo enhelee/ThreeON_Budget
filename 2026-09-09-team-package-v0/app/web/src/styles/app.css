@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────
+   기존 webapp/index.html 의 인라인 컴파일본에서 복원한 원본 스타일.
+   값은 컴파일된 CSS 에서 그대로 옮겼으므로 빌드 결과가 동일해야 한다.
+   (Tailwind 3.4.17 고정 — package.json)
+   ───────────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    font-family: Pretendard, "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  button:focus,
+  input:focus,
+  select:focus {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* 좌측 사이드바 버튼 — 모든 화면에서 고정 노출된다 */
+  .nav-button {
+    @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-600 transition;
+  }
+  .nav-button:hover {
+    @apply bg-blue-50 text-blue-800;
+  }
+  .nav-button-active {
+    @apply bg-blue-600 text-white shadow-sm;
+  }
+  .nav-button-active:hover {
+    @apply bg-blue-700 text-white;
+  }
+
+  /* 카드 — .panel 은 패딩 없음, .metric-card 는 p-5 포함 */
+  .metric-card,
+  .panel {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+  .metric-card {
+    @apply p-5;
+  }
+
+  /* 입력 컨트롤 (input · select) */
+  .control {
+    @apply rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm;
+  }
+
+  /* 버튼 */
+  .btn-primary,
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition;
+  }
+  .btn-primary:disabled,
+  .btn-secondary:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .btn-primary {
+    @apply bg-blue-600 text-white shadow-sm;
+  }
+  .btn-primary:hover {
+    @apply bg-blue-700;
+  }
+  .btn-secondary {
+    @apply border border-slate-300 bg-white text-slate-700;
+  }
+  .btn-secondary:hover {
+    @apply bg-slate-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+
+  .section-title {
+    @apply text-lg font-bold tracking-tight text-slate-900;
+  }
+  .section-help {
+    @apply mt-1 text-sm text-slate-500;
+  }
+
+  /* 표 — 열 폭 기준은 통합_인수인계_MASTER.md 참조 */
+  .table-head {
+    @apply bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+  .table-cell {
+    @apply whitespace-nowrap px-4 py-3 text-sm text-slate-700;
+  }
+}

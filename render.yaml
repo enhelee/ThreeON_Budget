@@ -9,7 +9,7 @@ services:
     runtime: docker
     plan: free
     region: singapore
-    dockerfilePath: ./2026-09-09-team-package-v0/Dockerfile
+    dockerfilePath: ./2026-09-09-team-package-v0/deploy/Dockerfile
     dockerContext: ./2026-09-09-team-package-v0
     healthCheckPath: /healthz
     autoDeploy: true

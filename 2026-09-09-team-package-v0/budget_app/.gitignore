@@ -1,9 +1,0 @@
-output/
-config/*.json
-__pycache__/
-*.pyc
-.pytest_cache/
-data/
-.env
-.env.*
-!.env.example
