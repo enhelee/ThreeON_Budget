@@ -1,4 +1,4 @@
-import { navigate } from "./router.js"
+import { bootRoute, navigate, parseHash } from "./router.js"
 import { hideGate, rememberView, showGate } from "./views/gate.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -9,7 +9,7 @@ export async function api(path, opts = {}) {
     let msg = res.statusText;
     try { msg = (await res.json()).detail || msg; } catch {}
     if (res.status === 401 && msg === "login_required") {
-      rememberView(state.view);
+      rememberView(location.hash);
       showGate("세션이 없거나 만료되었습니다. 다시 로그인하세요.");
       throw new Error("로그인이 필요합니다.");
     }
@@ -39,9 +39,11 @@ export async function doLogin() {
     await api("/api/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({password: pw, name})});
     try { localStorage.setItem("budget_operator", name); } catch {}
     await checkAuth();              // 여기서 hideGate() 까지 처리된다
-    // 401 로 튕기기 전에 보던 화면이 있으면 그리로 돌아간다.
-    const back = state.returnView; state.returnView = null;
-    await navigate(back || state.view || "home");
+    // 401 로 튕기기 전에 보던 주소가 있으면 그리로 돌아간다(지사까지 그대로).
+    const back = state.returnHash; state.returnHash = null;
+    const t = back ? parseHash(back) : null;
+    if (t) await navigate(t.view, {branch: t.branch});
+    else await bootRoute();
   } catch (err) { $("#gateMsg").textContent = err.message; }
 }
 

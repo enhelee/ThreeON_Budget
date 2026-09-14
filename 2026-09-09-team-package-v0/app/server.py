@@ -15,7 +15,9 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
+import glob
 import json
+import re
 from urllib.parse import quote
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -33,6 +35,9 @@ from budget import config_store, db as dbm, dbcore, ml_registry, pipeline_db   #
 
 CONFIG_DIR = os.environ.get("CONFIG_DIR") or os.path.join(APP_DIR, "config")
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
+# 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
+# 값을 주지 않으면 "dev" — 화면만 보고 배포본인지 로컬 개발본인지 구분된다.
+APP_REV = os.environ.get("APP_REV") or "dev"
 # 프론트는 Vite 빌드 산출물(static/) 하나뿐이다. 빌드 전 원본은 web/ 에 있다.
 #   로컬:   cd app/web && npm install && npm run build
 #   도커:   Dockerfile 의 node 스테이지가 만들어 /srv/app/static/ 으로 넣는다
@@ -113,7 +118,8 @@ class LoginReq(BaseModel):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "auth": AUTH.enabled, "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
+    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV,
+            "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
 
 
 @app.get("/api/auth/status")
@@ -422,6 +428,33 @@ def overview():
         return _clean_json({"years": rows})
     finally:
         conn.close()
+
+
+@app.get("/api/export-status")
+def export_status(year: str = None):
+    """메인 대시보드 '이음새' 박스용 - 팀 연계 산출물을 마지막으로 넘긴 연도와 시각.
+
+    /api/export-team 은 GET 이라 audit_log 에 남지 않는다(감사 기록은 변경 요청만 남긴다).
+    그래서 '언제 넘겼는가'는 OUT_DIR 에 떨어진 파일의 수정시각으로 읽는다 -
+    파일 자체가 산출물이므로 이것이 사실에 가장 가깝다.
+
+    반환: {"last": {"year","at"} | None, "exports": [...], (year 지정 시) "files": {kind: at|None}}
+    """
+    tmpl = pipeline_db.TEAM_BUNDLE_FILES["json"]
+    pre, post = tmpl.split("{y}")
+    pat = re.compile(re.escape(pre) + r"(\d{4})" + re.escape(post) + "$")
+    hits = []
+    for path in glob.glob(os.path.join(OUT_DIR, tmpl.format(y="*"))):
+        m = pat.match(os.path.basename(path))
+        if m:
+            hits.append({"year": m.group(1), "at": _mtime_str(path)})
+    hits.sort(key=lambda h: h["at"])
+    out = {"last": hits[-1] if hits else None, "exports": hits}
+    if year:
+        out["year"] = str(year)
+        out["files"] = {k: (_mtime_str(f) if os.path.exists(f) else None)
+                        for k, f in pipeline_db.team_bundle_paths(OUT_DIR, str(year)).items()}
+    return out
 
 
 # ── 학습 (완료 자료 → 텍스트-사업 매핑 축적) ────────────────────────────

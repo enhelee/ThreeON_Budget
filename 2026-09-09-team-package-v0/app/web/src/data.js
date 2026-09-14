@@ -15,6 +15,18 @@ export async function loadOverview() {
   if (!state.year) state.year = state.years[0] || String(new Date().getFullYear());
 }
 
+// 메인 대시보드 전용 — 실패해도 화면 전체를 막지 않는다(해당 카드만 '-' 로 뜬다).
+
+export async function loadHealth() {
+  try { state.health = await api("/healthz"); }
+  catch { state.health = null; }
+}
+
+export async function loadExportStatus() {
+  try { state.exportStatus = await api(`/api/export-status?year=${state.year}`); }
+  catch { state.exportStatus = null; }
+}
+
 export async function loadStatus() {
   state.status = await api(`/api/status?year=${state.year}`);
 }

@@ -99,7 +99,7 @@ export function hideGate() {
   $("#appShell").hidden = false
 }
 
-/** 로그인 후 돌아갈 화면. 401 로 튕기기 직전에 보던 화면을 기억해 둔다. */
-export function rememberView(view) {
-  if (view) state.returnView = view
+/** 로그인 후 돌아갈 주소. 401 로 튕기기 직전에 보던 «#/...» 를 기억해 둔다. */
+export function rememberView(hash) {
+  if (hash) state.returnHash = hash
 }

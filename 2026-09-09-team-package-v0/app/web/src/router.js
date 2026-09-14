@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadOverview, loadPending, loadStatus } from "./data.js"
+import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadOverview, loadPending, loadStatus } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -12,6 +12,63 @@ import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
 import { renderStats } from "./views/stats.js"
+
+// ───────────────────────── 해시 라우팅 ─────────────────────────
+// 주소의 «#/...» 조각이 "지금 어느 화면인가"의 단일 근거다.
+//
+//   화면을 바꾸는 길 → navigate() 하나뿐. navigate() 가 주소를 맞춘다.
+//   반대 방향(뒤로가기·새로고침·링크로 들어옴) → hashchange 가 navigate() 를 부른다.
+//
+// 양방향이 같은 함수로 모이므로 순환이 생길 수 있는데, navigate() 가 state 를
+// 먼저 바꾸고 주소를 나중에 맞추기 때문에 hashchange 쪽 비교가 곧바로 no-op 이 된다.
+// 플래그를 두지 않는 이유가 이것이다.
+
+const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "branches",
+                   detail: "detail", stats: "stats", forecast: "forecast", settings: "settings"};
+const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
+
+/** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
+export function viewHash(view, branch) {
+  const h = VIEW_HASH[view] || "home";
+  return h === "detail" && branch ? `#/detail/${encodeURIComponent(branch)}` : `#/${h}`;
+}
+
+/** 주소 조각 → {view, branch}. 모르는 주소면 null. */
+export function parseHash(hash = location.hash) {
+  const m = /^#\/([^/]+)\/?(.*)$/.exec(hash);
+  if (!m) return null;
+  const view = HASH_VIEW[m[1]];
+  if (!view) return null;
+  let branch = "";
+  if (view === "detail" && m[2]) {
+    try { branch = decodeURIComponent(m[2]); } catch { branch = m[2]; }
+  }
+  return {view, branch};
+}
+
+/** 현재 state 에 맞춰 주소를 갱신한다(화면 전환을 navigate 밖에서 한 경우용). */
+export function syncHash(opts = {}) {
+  const h = viewHash(state.view, state.det.branch);
+  if (location.hash === h) return;
+  if (opts.replace) location.replace(location.pathname + location.search + h);
+  else location.hash = h;
+}
+
+/** 뒤로가기·새로고침·직접 입력으로 주소가 바뀌었을 때. */
+export function onHashChange() {
+  const t = parseHash();
+  if (!t) { syncHash({replace: true}); return; }   // 모르는 주소는 지금 화면으로 되돌린다
+  const same = t.view === state.view &&
+               (t.view !== "detail" || t.branch === state.det.branch);
+  if (same) return;                               // navigate() 가 방금 맞춘 주소 — 할 일 없음
+  navigate(t.view, {branch: t.branch});
+}
+
+/** 첫 진입: 주소에 화면이 적혀 있으면 그 화면으로, 없으면 홈으로. */
+export function bootRoute() {
+  const t = parseHash();
+  return t ? navigate(t.view, {branch: t.branch}) : navigate("home");
+}
 
 export function renderPage() {
   const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
@@ -29,12 +86,26 @@ export function renderPage() {
   syncAnalyzeButton();
 }
 
-export async function navigate(view) {
+export async function navigate(view, opts = {}) {
+  // 3+ 상세는 주소가 지사까지 담는다. 주소에서 온 호출("branch" 키가 있는 경우)은
+  // 그 값이 곧 진실이다 - 지사가 적혀 있으면 불러오고, 비어 있으면 선택을 푼다.
+  // 키가 없는 내부 호출(changeYear 등)은 보던 지사를 그대로 둔다.
+  if (view === "detail" && "branch" in opts && opts.branch !== state.det.branch) {
+    if (opts.branch) {
+      try { await loadDetail(opts.branch); }
+      catch (e) { toast(e.message); }             // 없어진 지사면 지사 선택 화면이 뜬다
+    } else {
+      state.det = {...state.det, branch: "", data: null, open: new Set(), sel: new Set(),
+                   selBudget: null, editKey: null, delKey: null};
+    }
+  }
   state.view = view;
+  syncHash();
   try {
     await loadOverview();
     await loadPending();
     if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
+    if (view === "home") { await loadHealth(); await loadExportStatus(); }
     if (view === "budget" || view === "collect") await loadStatus();
     if (view === "stats") {
       state.stats = await api(`/api/stats?year=${state.year}`);

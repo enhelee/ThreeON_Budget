@@ -2,7 +2,9 @@ export const state = {
   view: "home", year: "", years: [],
   type: "all", search: "", sort: "rateDesc",
   status: null, branches: null, stats: null, overview: null,
-  returnView: null,  // 401 로 게이트에 튕기기 직전 보던 화면 — 로그인 후 여기로 돌아간다
+  health: null,        // GET /healthz — DB 종류·인증 여부·리비전 (메인 헤더/카드)
+  exportStatus: null,  // GET /api/export-status — 팀 연계 산출물을 마지막으로 넘긴 연도·시각
+  returnHash: null,  // 401 로 게이트에 튕기기 직전 보던 주소 — 로그인 후 여기로 돌아간다
   learned: null, overrides: null, bizEdits: null,
   ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
   pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}
@@ -15,7 +17,7 @@ export const state = {
 };
 
 export const viewMeta = {
-  home: ["홈", "다년도 실적과 대상연도 집행 현황을 확인합니다."],
+  home: ["메인", "계획·실적·전망의 오늘 기준 현황입니다. 숫자는 모두 DB 실측치입니다."],
   budget: ["예산 계획", "연도를 선택하고 계획본(양식1)을 업로드해 DB에 등록합니다."],
   collect: ["실적 집계", "연도를 선택하고 ERP(zrfm2)를 업로드 → 자동 매칭을 실행합니다."],
   branches: ["실적 분석", "전체 지사의 계획·실적·집행률을 조회합니다."],
