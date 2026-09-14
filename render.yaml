@@ -22,8 +22,8 @@ services:
         sync: false                 # Supabase 연결 문자열(Session pooler, port 5432 — 상주 컨테이너용)
       - key: COOKIE_SECURE
         value: "1"
-      - key: BASIC_USER
-        value: team
+      - key: APP_REV
+        value: rev17                # 메인 헤더에 찍히는 리비전 라벨(사람이 읽는 값)
       - key: SESSION_HOURS
         value: "12"
       - key: PORT

@@ -14,25 +14,16 @@ header {
 	-Server
 }
 
-# ── 소개·문서 사이트 (docs/index.html) ──
-handle /site {
-	redir /site/ permanent
-}
-handle_path /site/* {
-	root * /srv/site
-	file_server
-}
-
-# ── budget_app (FastAPI). SPA는 /app/, API는 절대경로 /api/* ──
-handle /app {
-	redir /app/ permanent
-}
-handle_path /app/* {
-	reverse_proxy 127.0.0.1:8010
+# ── 옛 주소 /app/ → 루트로 영구 이동 ──
+# 팀원이 저장해 둔 북마크를 지킨다. 예전에는 handle_path 로 «/app» 을 떼고 프록시했는데,
+# 그러면 FastAPI 가 그 요청을 «/» 로 보게 되어 SPA 를 그냥 돌려줬다(301 이 나가지 않았다).
+# 주소창이 /app/ 에 머무르므로 "주소 하나" 라는 목표와도 어긋났다.
+handle /app* {
+	redir / permanent
 }
 # ⚠ Vite 빌드 SPA 는 자산을 절대경로 /assets/... 로 부른다(base:"/").
-#   이 블록이 없으면 아래 "그 외 = 소개 사이트" 로 떨어져 CSS·JS 가 404 가 되고,
-#   HTML 만 뜬 빈 화면이 된다. 파일명에 해시가 붙으므로 캐시는 길게 잡아도 안전하다.
+#   파일명에 해시가 붙으므로 캐시를 길게 잡아도 안전하다(반대로 index.html 은
+#   매번 재검증해야 한다 — server.py 의 no-cache 주석 참조).
 handle /assets/* {
 	header Cache-Control "public, max-age=31536000, immutable"
 	reverse_proxy 127.0.0.1:8010
@@ -80,8 +71,9 @@ handle /forecast* {
 }
 
 # ── 그 외 = 앱(SPA) ──
-# Phase 2: 루트가 소개 사이트가 아니라 로그인 게이트 → 작업공간이 된다.
-# 팀원에게 알려줄 주소가 하나로 합쳐진다. 소개·문서는 /site/ 에 그대로 남는다.
+# 루트가 로그인 게이트 → 작업공간이다. 팀원에게 알려줄 주소는 이것 하나뿐이다.
+# Phase 5: 소개·문서 사이트(/site)는 삭제했다 — SPA 가 소개를 흡수했고, 문서는
+# 저장소의 docs/ 에서 본다. 웹으로 문서를 서빙할 이유가 사라졌다.
 handle {
 	reverse_proxy 127.0.0.1:8010
 }
