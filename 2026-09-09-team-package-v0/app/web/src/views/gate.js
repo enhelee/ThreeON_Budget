@@ -4,74 +4,73 @@ import { state } from "../state.js"
 // ─────────────────────────────────────────────────────────────
 // 로그인 게이트 — 비로그인 상태에서 보이는 유일한 화면.
 //
-// 원칙: 실적 금액·연도·건수 같은 운영 수치를 한 글자도 노출하지 않는다.
-//   제목 · 소개 · 4단계 · 로그인 폼이 전부다. 숫자가 필요한 요약은
-//   로그인 뒤 메인 화면(#/home)의 몫이다.
+// 구성은 «제목 + 간단한 설명 + 로그인» 세 덩어리로 끝낸다.
+// 운영 수치(금액·건수·집행률)는 한 글자도 노출하지 않는다 —
+// 그건 로그인 뒤 메인 화면의 몫이다.
 //
-// 색: 어두운 톤. 로그인 뒤 작업공간은 밝은 톤(slate-50)이라 색이 바뀌며
-//   "들어왔다"는 전환감이 생긴다.
+// 디자인은 작업공간(/app/)과 같은 컨셉으로 맞춘다. 배경 slate-50,
+// 흰 panel 카드, 파란 강조. 실제로 앱과 **같은 컴포넌트 클래스**
+// (.panel · .control · .btn-primary · .section-help)를 그대로 쓰므로
+// 나중에 그 스타일을 고치면 게이트도 같이 따라온다.
 // ─────────────────────────────────────────────────────────────
 
-const STAGES = [
-  ["①", "예산 계획 수립", "지사별 계획을 양식1로 취합"],
-  ["②", "실적 집계·매칭", "SAP 전표를 계획 사업에 자동 귀속"],
-  ["③", "예산 표준화", "정비등급별 표준금액 산출"],
-  ["④", "중장기 전망", "2026~2035년 소요 추정"],
-]
+const STAGES = ["예산 계획", "실적 집계·매칭", "예산 표준화", "중장기 전망"]
 
-function stageHtml() {
-  return STAGES.map(([n, title, desc]) => `
-    <li class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-      <p class="text-xs font-semibold text-amber-500">${n} ${title}</p>
-      <p class="mt-1 text-xs leading-5 text-slate-400">${desc}</p>
-    </li>`).join("")
+function stageFlow() {
+  return STAGES.map((s, i) => `
+    <span class="inline-flex items-center gap-1.5">
+      <span class="grid h-5 w-5 place-items-center rounded-md bg-blue-50 text-[0.65rem] font-bold text-blue-700">${i + 1}</span>
+      <span class="text-xs font-medium text-slate-600">${s}</span>
+    </span>
+    ${i < STAGES.length - 1 ? '<span class="text-slate-300" aria-hidden="true">→</span>' : ""}`).join("")
 }
 
 export function renderGate() {
   return `
-  <div class="min-h-screen bg-slate-950 text-slate-100 lg:grid lg:grid-cols-[1.05fr_.95fr]">
+  <div class="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+    <div class="panel w-full max-w-md p-7 sm:p-9">
 
-    <section class="flex flex-col justify-center gap-9 px-6 py-14 sm:px-10 lg:px-14">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-500">
-          THREEON · 발전플랜트 유지보수 예산
-        </p>
-        <h1 class="mt-5 text-3xl font-black leading-[1.15] tracking-tight sm:text-4xl">
-          계획에서 실적,<br>실적에서 <span class="text-amber-500">10개년 소요 전망</span>까지
-        </h1>
-        <p class="mt-6 max-w-xl text-sm leading-7 text-slate-400">
-          지사 19곳이 엑셀로 올리는 예산계획과 SAP 실적 전표(zrfm2)를 자동으로 맞춰 보고,
-          그 결과를 정비등급별 표준금액과 2026~2035년 예산 전망의 근거로 넘기는 팀 프로젝트입니다.
-        </p>
+      <div class="flex items-center gap-3">
+        <div class="grid h-11 w-11 place-items-center rounded-xl bg-blue-600 text-white" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/>
+          </svg>
+        </div>
+        <div>
+          <p class="font-bold text-slate-950">예산·실적 분석</p>
+          <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
+        </div>
       </div>
-      <ol class="grid max-w-xl gap-2.5 sm:grid-cols-2">${stageHtml()}</ol>
-    </section>
 
-    <section class="flex items-center justify-center px-6 pb-16 lg:bg-white/[0.02] lg:py-14">
-      <form id="gateForm" class="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/70 p-7 shadow-2xl" autocomplete="off">
-        <h2 class="text-lg font-bold text-white">팀 로그인</h2>
-        <p class="mt-1.5 text-xs leading-5 text-slate-400">
-          팀 공용 비밀번호와 <b class="text-slate-200">작업자 이름</b>을 입력하세요.
-          이름은 재배정·수정·삭제 등 모든 변경 이력에 기록됩니다.
+      <h1 class="mt-7 text-2xl font-bold leading-snug tracking-tight text-slate-950">
+        계획에서 실적,<br>실적에서 <span class="text-blue-700">10개년 소요 전망</span>까지
+      </h1>
+      <p class="section-help leading-6">
+        지사 19곳의 예산계획과 SAP 실적 전표를 자동으로 맞춰 보고,
+        그 결과를 정비등급별 표준금액과 2026~2035년 예산 전망의 근거로 넘깁니다.
+      </p>
+
+      <div class="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-y border-slate-200 py-3">
+        ${stageFlow()}
+      </div>
+
+      <form id="gateForm" class="mt-6" autocomplete="off">
+        <label for="gateName" class="block text-xs font-semibold text-slate-700">작업자 이름</label>
+        <input id="gateName" class="control mt-1.5 w-full" maxlength="40" placeholder="예: 홍길동" required>
+
+        <label for="gatePw" class="mt-4 block text-xs font-semibold text-slate-700">팀 공용 비밀번호</label>
+        <input id="gatePw" class="control mt-1.5 w-full" type="password" autocomplete="current-password" required>
+
+        <p id="gateMsg" class="mt-3 min-h-[1.1rem] text-xs font-medium text-red-600"></p>
+
+        <button type="submit" class="btn-primary w-full">입장</button>
+
+        <p class="mt-4 text-xs leading-5 text-slate-500">
+          작업자 이름은 재배정·수정·삭제 등 <b class="text-slate-700">모든 변경 이력에 기록</b>됩니다. 실명을 입력하세요.
         </p>
-
-        <label for="gateName" class="mt-6 block text-xs font-semibold text-slate-300">작업자 이름</label>
-        <input id="gateName" maxlength="40" placeholder="예: 홍길동" required
-               class="mt-1.5 w-full rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-600">
-
-        <label for="gatePw" class="mt-4 block text-xs font-semibold text-slate-300">팀 공용 비밀번호</label>
-        <input id="gatePw" type="password" autocomplete="current-password" required
-               class="mt-1.5 w-full rounded-xl border border-white/15 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-100">
-
-        <p id="gateMsg" class="mt-3 min-h-[1.1rem] text-xs font-medium text-red-400"></p>
-
-        <button type="submit"
-                class="mt-2 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-400">
-          입장
-        </button>
       </form>
-    </section>
 
+    </div>
   </div>`
 }
 
