@@ -1,4 +1,5 @@
 import { navigate } from "./router.js"
+import { hideGate, rememberView, showGate } from "./views/gate.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
 
@@ -8,7 +9,8 @@ export async function api(path, opts = {}) {
     let msg = res.statusText;
     try { msg = (await res.json()).detail || msg; } catch {}
     if (res.status === 401 && msg === "login_required") {
-      showLogin("세션이 없거나 만료되었습니다. 다시 로그인하세요.");
+      rememberView(state.view);
+      showGate("세션이 없거나 만료되었습니다. 다시 로그인하세요.");
       throw new Error("로그인이 필요합니다.");
     }
     throw new Error(msg);
@@ -23,29 +25,24 @@ export async function checkAuth() {
   state.auth = st;
   const badge = $("#operatorBadge"), lo = $("#logoutBtn");
   if (st.enabled) {
-    if (!st.logged_in) { showLogin(); return false; }
+    if (!st.logged_in) { showGate(); return false; }
     badge.textContent = `작업자 · ${st.operator}`; badge.classList.remove("hidden"); lo.classList.remove("hidden");
   }
+  hideGate();                       // 인증됨 · 또는 인증 자체가 꺼진 사내망 모드
   return true;
 }
 
-export function showLogin(msg) {
-  $("#loginOverlay").classList.remove("hidden");
-  $("#loginMsg").textContent = msg || "";
-  try { const saved = localStorage.getItem("budget_operator"); if (saved && !$("#loginName").value) $("#loginName").value = saved; } catch {}
-  setTimeout(() => ($("#loginName").value ? $("#loginPw") : $("#loginName")).focus(), 50);
-}
-
 export async function doLogin() {
-  const name = $("#loginName").value.trim(), pw = $("#loginPw").value;
-  if (!name) { $("#loginMsg").textContent = "작업자 이름을 입력하세요."; return; }
+  const name = $("#gateName").value.trim(), pw = $("#gatePw").value;
+  if (!name) { $("#gateMsg").textContent = "작업자 이름을 입력하세요."; return; }
   try {
     await api("/api/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({password: pw, name})});
-    $("#loginOverlay").classList.add("hidden"); $("#loginPw").value = "";
     try { localStorage.setItem("budget_operator", name); } catch {}
-    await checkAuth();
-    await navigate(state.view || "home");
-  } catch (err) { $("#loginMsg").textContent = err.message; }
+    await checkAuth();              // 여기서 hideGate() 까지 처리된다
+    // 401 로 튕기기 전에 보던 화면이 있으면 그리로 돌아간다.
+    const back = state.returnView; state.returnView = null;
+    await navigate(back || state.view || "home");
+  } catch (err) { $("#gateMsg").textContent = err.message; }
 }
 
 // ───────────────────────── 데이터 로드 ─────────────────────────

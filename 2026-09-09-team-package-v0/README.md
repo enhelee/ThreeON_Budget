@@ -77,10 +77,11 @@ cd app && python -m pytest -q      # 87 passed (약 6분)
 
 | 경로 | 내용 |
 |---|---|
-| `/` | 소개 사이트 → *Phase 2에서 로그인 게이트로 교체* |
-| `/app/` `/api/*` | app (FastAPI) |
-| `/forecast` | forecast (Streamlit) |
-| `/healthz` | 헬스체크 |
+| **`/`** | **로그인 게이트 → 작업공간** ★ 팀원에게 알려줄 주소는 이것 하나 |
+| `/app/` | `/` 로 301 (예전 북마크 보호) |
+| `/api/*` `/assets/*` `/healthz` | API · 프론트 자산 · 헬스체크 |
+| `/site/` | 소개·문서 사이트 — *Phase 5에서 앱으로 흡수 후 삭제* |
+| `/forecast` | forecast (Streamlit) — *Phase 6에서 앱으로 흡수 후 삭제* |
 
 Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보드에서 `APP_PASSWORD`·`DATABASE_URL`을 입력하면 됩니다.
 자세한 절차는 [docs/배포가이드.md](docs/배포가이드.md).

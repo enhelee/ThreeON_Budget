@@ -55,9 +55,9 @@ handle /forecast* {
 	reverse_proxy 127.0.0.1:8501
 }
 
-# ── 그 외 = 소개 사이트 ──
+# ── 그 외 = 앱(SPA) ──
+# Phase 2: 루트가 소개 사이트가 아니라 로그인 게이트 → 작업공간이 된다.
+# 팀원에게 알려줄 주소가 하나로 합쳐진다. 소개·문서는 /site/ 에 그대로 남는다.
 handle {
-	root * /srv/site
-	try_files {path} /index.html
-	file_server
+	reverse_proxy 127.0.0.1:8010
 }

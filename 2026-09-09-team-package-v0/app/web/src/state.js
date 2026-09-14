@@ -2,6 +2,7 @@ export const state = {
   view: "home", year: "", years: [],
   type: "all", search: "", sort: "rateDesc",
   status: null, branches: null, stats: null, overview: null,
+  returnView: null,  // 401 로 게이트에 튕기기 직전 보던 화면 — 로그인 후 여기로 돌아간다
   learned: null, overrides: null, bizEdits: null,
   ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
   pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}

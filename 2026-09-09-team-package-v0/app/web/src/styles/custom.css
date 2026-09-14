@@ -78,3 +78,9 @@
 .det-table .badge{padding:.12rem .4rem;font-size:.68rem}
 .det-table .voucher-row td,.det-table .voucher-head td{white-space:normal}
 .swatch{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;border:1px solid #e2e8f0;flex:none}
+
+/* ── 로그인 게이트 (Phase 2) ──────────────────────────────────────
+   Tailwind 의 .hidden{display:none} 은 #appShell 의 lg:flex 를 이기지 못한다.
+   lg:flex 가 미디어쿼리라 출력에서 뒤에 오기 때문 — .login-overlay.hidden 을
+   따로 둬야 했던 것과 같은 함정이다. [hidden] 속성으로 확실히 끊는다. */
+[hidden] { display: none !important; }

@@ -441,7 +441,12 @@ $("#backdrop").addEventListener("click", closeMenu);
 
 $("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
 
-$("#loginForm").addEventListener("submit", e => { e.preventDefault(); doLogin(); });
+// 게이트 폼은 views/gate.js 가 매번 새로 그리므로 직접 바인딩하지 않고 위임한다.
+// (예전 #loginForm 은 index.html 에 고정돼 있어 직접 바인딩했지만 이제 없다 —
+//  없는 요소에 addEventListener 를 걸면 모듈 전체가 죽는다.)
+document.addEventListener("submit", e => {
+  if (e.target && e.target.id === "gateForm") { e.preventDefault(); doLogin(); }
+});
 
 $("#trainingFile").addEventListener("change", async e => {
   const f = e.target.files[0];
@@ -455,4 +460,9 @@ $("#trainingFile").addEventListener("change", async e => {
   e.target.value = "";
 });
 
-checkAuth().then(ok => { if (ok) navigate("home"); }).catch(() => navigate("home"));
+// 미인증이면 checkAuth() 안에서 게이트가 뜨고 여기서는 아무것도 하지 않는다.
+// 인증 상태 조회 자체가 실패하면(네트워크 등) 작업공간을 그려 두고 각 API 가
+// 401 을 만나는 시점에 게이트로 넘어가게 한다.
+checkAuth()
+  .then(ok => { if (ok) navigate(state.view || "home"); })
+  .catch(() => navigate("home"));
