@@ -57,6 +57,24 @@ handle /forecast* {
 	#   /forecast 가 누구에게나 열린다. verify 는 세션이 없으면 401 이다.
 	forward_auth 127.0.0.1:8010 {
 		uri /api/auth/verify
+
+		# ⚠ 인증을 물어볼 때는 업그레이드 헤더를 떼고 묻는다.
+		#   전망 앱은 WebSocket(/forecast/_stcore/stream)으로 동작한다. forward_auth 는
+		#   원래 요청의 헤더를 그대로 달고 부속 요청을 보내는데, 거기에 Connection: Upgrade 와
+		#   Upgrade: websocket 이 남아 있으면 uvicorn 이 그것을 «WebSocket 접속 시도»로 읽는다.
+		#   /api/auth/verify 에는 WebSocket 라우트가 없으므로 403 으로 거절되고,
+		#   forward_auth 는 2xx 가 아니면 통과시키지 않으니 진짜 WebSocket 도 함께 끊긴다.
+		#
+		#   실측(2026-09-15 배포):
+		#     브라우저  wss://.../forecast/_stcore/stream -> handshake 403
+		#     서버 로그 "WebSocket /api/auth/verify" 403 / connection rejected
+		#               "GET /api/auth/verify" 204          <- 일반 요청은 정상이었다
+		#   화면은 HTML 까지만 뜨고 Streamlit 이 초기화되지 못해 스켈레톤에서 멈췄다.
+		#
+		#   이 두 줄은 «인증 부속 요청»에만 적용된다 - 아래 reverse_proxy 로 가는 진짜
+		#   WebSocket 은 헤더가 온전하므로 Streamlit 까지 그대로 연결된다.
+		header_up -Connection
+		header_up -Upgrade
 	}
 	reverse_proxy 127.0.0.1:8501
 }
