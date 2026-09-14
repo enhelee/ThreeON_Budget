@@ -224,7 +224,17 @@ def index():
     page = os.path.join(WEB_DIR, "index.html")
     if not os.path.isfile(page):
         raise HTTPException(500, "프론트가 빌드되지 않았습니다 — `cd app/web && npm install && npm run build` 를 실행하세요.")
-    return FileResponse(page)
+    # ⚠ index.html 은 매번 서버에 물어봐야 한다.
+    #   자산(/assets/*)은 파일명에 해시가 붙어 영구 캐시가 안전하지만, 그 파일명을 «가리키는»
+    #   것이 index.html 이다. 이 파일이 캐시에 묶이면 브라우저가 옛 자바스크립트를 계속
+    #   가리키게 되고, 서버에 새 코드를 올려도 사용자 화면은 바뀌지 않는다.
+    #
+    #   실측(2026-09-15 배포): 서버 번들에는 수정이 들어 있는데(assets/index-BRwYOFCn.js)
+    #   화면은 옛 동작 그대로였다. 응답에 Cache-Control 이 아예 없어 브라우저가 자체
+    #   판단으로 캐시한 결과였다.
+    #
+    #   no-cache = "저장은 하되 쓰기 전에 반드시 확인" — 안 바뀌었으면 304 라 비용도 거의 없다.
+    return FileResponse(page, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/app")

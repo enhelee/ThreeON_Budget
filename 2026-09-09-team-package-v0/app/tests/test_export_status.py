@@ -84,3 +84,22 @@ def test_healthz_reports_revision(client, monkeypatch):
     assert c.get("/healthz").json()["rev"] == server.APP_REV
     monkeypatch.setattr(server, "APP_REV", "rev15")
     assert c.get("/healthz").json()["rev"] == "rev15"
+
+
+def test_index_html_is_revalidated_every_time(client, tmp_path, monkeypatch):
+    """index.html 이 캐시에 묶이면 프론트 수정이 사용자에게 영영 닿지 않는다.
+
+    자산은 파일명에 해시가 붙어 영구 캐시가 안전하지만, 그 파일명을 가리키는 것이
+    index.html 이다. 이 파일만은 매번 확인해야 한다(no-cache = 저장하되 재검증).
+
+    실측(2026-09-15 배포): 서버 번들에는 수정이 들어 있는데 화면은 옛 동작 그대로였다.
+    응답에 Cache-Control 이 없어 브라우저가 자체 판단으로 캐시한 결과였다.
+    """
+    c, _ = client
+    import server
+    page = os.path.join(server.WEB_DIR, "index.html")
+    if not os.path.isfile(page):
+        pytest.skip("프론트 빌드 산출물이 없습니다 (npm run build)")
+    r = c.get("/")
+    assert r.status_code == 200
+    assert "no-cache" in r.headers.get("cache-control", "")
