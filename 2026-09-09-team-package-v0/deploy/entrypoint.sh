@@ -17,6 +17,24 @@ mkdir -p "${DATA_DIR:-/data/budget}/config" "${DATA_DIR:-/data/budget}/output" "
 #         wb = load_workbook(template_path)
 #
 #   없을 때만 복사한다 — 팀이 바꿔 둔 양식을 덮어쓰지 않기 위해서다.
+# 지사·과목 구성 JSON 을 저장소 기준으로 한 번 깔아 둔다.
+#
+# ⚠ 앱은 CONFIG_DIR(=/data/budget/config)에서 구성을 읽고 쓰는데, 이미지에 담긴 구성은
+#   /srv/app/config 에 있다. 복사하지 않으면 컨테이너는 «구성이 없는» 상태로 시작해
+#   시드 기본값으로 동작한다 - 저장소에 정리해 둔 연도별 지사·과목 구성이 반영되지 않는다.
+#   (전망 앱 내장 양식과 정확히 같은 종류의 실수다.)
+#
+#   Render 무료 플랜에는 영구 디스크가 없어 /data 가 배포마다 초기화된다. 이 복사가
+#   "배포하면 설정이 사라진다"를 "배포하면 저장소 기준으로 돌아온다"로 바꿔 준다.
+#   사내 서버(docker-compose)는 볼륨을 쓰므로 원래부터 영속이다.
+#
+#   없을 때만 복사한다 - 팀이 화면에서 바꾼 구성을 덮어쓰지 않기 위해서다.
+for _cfg in /srv/app/config/*.json; do
+  [ -e "$_cfg" ] || continue
+  _dest="${CONFIG_DIR:-/data/budget/config}/$(basename "$_cfg")"
+  [ -e "$_dest" ] || cp "$_cfg" "$_dest"
+done
+
 for _tpl in /srv/forecast/builtin_template_*.xlsx; do
   [ -e "$_tpl" ] || continue
   _dest="${FORECAST_DATA_DIR:-/data/forecast}/$(basename "$_tpl")"

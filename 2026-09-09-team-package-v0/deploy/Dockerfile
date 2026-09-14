@@ -1,5 +1,5 @@
 # ThreeON 예산 프로젝트 — 단일 이미지(한 주소) 배포
-#   Caddy(:$PORT, 리버스 프록시·정적 사이트·/forecast 기본인증)
+#   Caddy(:$PORT, 리버스 프록시 · /forecast 는 앱 세션으로 forward_auth)
 #   ├─ /            소개 사이트 (site/)
 #   ├─ /app, /api   budget_app  FastAPI  (127.0.0.1:8010)
 #   └─ /forecast    forecast_app Streamlit (127.0.0.1:8501, baseUrlPath=forecast)
@@ -43,8 +43,6 @@ COPY forecast/ /srv/forecast/
 # 소개 사이트 = site/index.html + docs/ 의 문서들.
 # index.html 이 「문서 지도」에서 형제 파일(통합_인수인계_MASTER.md 등 12개)을
 # 상대경로로 링크하므로, 둘을 같은 폴더에 놓지 않으면 그 링크가 전부 404 가 된다.
-COPY site/ /srv/site/
-COPY docs/ /srv/site/
 COPY deploy/Caddyfile deploy/supervisord.conf deploy/entrypoint.sh /srv/deploy/
 RUN chmod +x /srv/deploy/entrypoint.sh \
  && mkdir -p /data/budget/config /data/budget/output /data/forecast \
@@ -55,9 +53,7 @@ ENV PORT=8080 \
     DATA_DIR=/data/budget \
     CONFIG_DIR=/data/budget/config \
     OUT_DIR=/data/budget/output \
-    SITE_DIR=/srv/site \
     FORECAST_DATA_DIR=/data/forecast \
-    BASIC_USER=team \
     COOKIE_SECURE=1
 
 EXPOSE 8080

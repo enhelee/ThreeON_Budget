@@ -42,6 +42,11 @@ APP_REV = os.environ.get("APP_REV") or "dev"
 # 상대경로가 기본값이다. 로컬 개발은 .env 에 http://localhost:8501/forecast 처럼 절대경로를 준다.
 # Phase 6 에서 전망 기능을 흡수하면 이 변수와 iframe 은 함께 사라진다.
 FORECAST_URL = os.environ.get("FORECAST_URL") or "/forecast"
+# 지금 떠 있는 것이 «어느 커밋인가». Render 가 컨테이너에 자동으로 넣어 주는 값이다.
+# 배포가 실제로 갈렸는지 확인할 때 이것 하나면 끝난다 — 2026-09-15 에 Caddyfile 만 바뀐
+# 배포를 정적 파일 타임스탬프로 판별하려다 헛다리를 짚은 적이 있다(도커 레이어 캐시 때문에
+# 타임스탬프가 그대로였다).
+APP_COMMIT = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("APP_COMMIT") or "")[:7]
 # 프론트는 Vite 빌드 산출물(static/) 하나뿐이다. 빌드 전 원본은 web/ 에 있다.
 #   로컬:   cd app/web && npm install && npm run build
 #   도커:   Dockerfile 의 node 스테이지가 만들어 /srv/app/static/ 으로 넣는다
@@ -50,9 +55,6 @@ FORECAST_URL = os.environ.get("FORECAST_URL") or "/forecast"
 STATIC_DIR = os.path.join(APP_DIR, "static")
 WEB_DIR = STATIC_DIR
 _PARENT = os.path.dirname(APP_DIR)
-SITE_DIR = os.environ.get("SITE_DIR") or next(              # 소개 사이트: 패키지는 docs/, 개발 폴더는 site/
-    (d for d in (os.path.join(_PARENT, "docs"), os.path.join(_PARENT, "site"))
-     if os.path.exists(os.path.join(d, "index.html"))), os.path.join(_PARENT, "docs"))
 AUTH = authm.AuthConfig()
 
 app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None)
@@ -122,7 +124,8 @@ class LoginReq(BaseModel):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "forecast_url": FORECAST_URL,
+    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "commit": APP_COMMIT,
+            "forecast_url": FORECAST_URL,
             "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
 
 
@@ -1255,17 +1258,6 @@ def training_export(name: str):
         conn.close()
     return Response(csv.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote('training_' + name + '.csv')}"})
-
-
-# ── 소개·문서 사이트(정적, docs/index.html) — Caddy 없이 단독 실행할 때 /site 로 제공 ──
-
-@app.get("/site")
-@app.get("/site/{path:path}")
-def site(path: str = "index.html"):
-    target = os.path.normpath(os.path.join(SITE_DIR, path or "index.html"))
-    if not target.startswith(os.path.normpath(SITE_DIR)) or not os.path.isfile(target):
-        raise HTTPException(404, "파일이 없습니다.")
-    return FileResponse(target)
 
 
 # ── Vite 빌드 자산 (해시 파일명 → 장기 캐시 가능) ──────────────────────

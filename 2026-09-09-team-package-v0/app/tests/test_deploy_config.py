@@ -111,3 +111,56 @@ def test_entrypoint_copies_builtin_templates_into_forecast_workdir():
     forecast_dir = os.path.join(os.path.dirname(DEPLOY), "forecast")
     tpls = [f for f in os.listdir(forecast_dir) if f.startswith("builtin_template_")]
     assert tpls, "forecast/ 에 내장 양식이 없습니다"
+
+
+# ── Phase 5 — 배포 단순화 이후 지켜야 할 것들 ────────────────────────────
+
+def test_old_app_path_redirects_instead_of_proxying():
+    """/app/ 은 301 로 루트에 보내야 한다 — 팀원 북마크를 지키면서 주소를 하나로 모은다.
+
+    예전에는 handle_path 로 «/app» 을 떼고 프록시했는데, 그러면 FastAPI 가 그 요청을
+    «/» 로 보게 되어 SPA 를 그냥 돌려줬다. 301 이 나가지 않아 주소창이 /app/ 에 머물렀다.
+    실측(2026-09-15 배포): GET /app/ -> 200 (301 이어야 했다).
+    """
+    body = _strip_comments(_read("Caddyfile"))
+    assert "handle_path /app/*" not in body, "handle_path 는 접두어를 떼어 301 을 무력화합니다"
+    block = re.search(r"handle /app\*\s*\{(.*?)\n\}", body, re.S)
+    assert block and "redir / permanent" in block.group(1)
+
+
+def test_intro_site_is_gone():
+    """소개·문서 사이트(/site)는 SPA 가 흡수했다 — 서빙 경로가 남아 있으면 안 된다."""
+    assert "/srv/site" not in _strip_comments(_read("Caddyfile"))
+    assert "/srv/site" not in _read("Dockerfile")
+    server = os.path.join(os.path.dirname(DEPLOY), "app", "server.py")
+    with open(server, encoding="utf-8") as f:
+        src = f.read()
+    assert "SITE_DIR" not in src and '"/site' not in src
+
+
+def test_entrypoint_seeds_config_json_into_config_dir():
+    """구성 JSON 이 CONFIG_DIR 에 없으면 앱이 시드 기본값으로 시작한다.
+
+    이미지의 구성은 /srv/app/config 에 있고 앱은 CONFIG_DIR 에서 읽는다.
+    Render 무료 플랜은 /data 가 배포마다 초기화되므로, 이 복사가 없으면
+    저장소에 정리해 둔 연도별 지사·과목 구성이 배포된 앱에 영영 반영되지 않는다.
+    """
+    entrypoint = _read("entrypoint.sh")
+    assert "/srv/app/config/*.json" in entrypoint
+    assert "CONFIG_DIR" in entrypoint
+
+
+def test_dead_env_vars_are_removed():
+    """basic_auth 폐지(Phase 4)·/site 삭제(Phase 5)로 죽은 값들.
+
+    남겨 두면 "기본인증이 아직 있나?" 하는 오해를 부른다.
+    """
+    dockerfile = _read("Dockerfile")
+    assert "BASIC_USER" not in dockerfile
+    assert "SITE_DIR" not in dockerfile
+    render = os.path.join(os.path.dirname(os.path.dirname(DEPLOY)), "render.yaml")
+    if os.path.isfile(render):
+        with open(render, encoding="utf-8") as f:
+            blueprint = f.read()
+        assert "BASIC_USER" not in blueprint
+        assert "APP_REV" in blueprint, "메인 헤더 리비전이 dev 로 찍힙니다"
