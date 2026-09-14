@@ -69,3 +69,26 @@ def test_caddy_upstreams_match_processes_supervisord_starts():
     for p in ports:
         assert f"--port {p}" in sup or f"--server.port={p}" in sup, \
             f"Caddy 가 {p} 로 보내는데 supervisord 가 그 포트를 띄우지 않습니다"
+
+
+def test_forward_auth_strips_websocket_upgrade_headers():
+    """전망 앱은 WebSocket 으로 산다 — 인증 부속 요청에 업그레이드 헤더가 남으면 앱이 죽는다.
+
+    forward_auth 는 원래 요청의 헤더를 그대로 달고 /api/auth/verify 로 묻는다.
+    거기에 Connection: Upgrade / Upgrade: websocket 이 남아 있으면 uvicorn 이 그것을
+    WebSocket 접속 시도로 읽고, 그 경로엔 WS 라우트가 없으니 403 으로 거절한다.
+    forward_auth 는 2xx 가 아니면 통과시키지 않으므로 진짜 WebSocket 도 함께 끊긴다.
+
+    실측(2026-09-15 배포): wss://.../forecast/_stcore/stream 핸드셰이크 403,
+    서버 로그 "WebSocket /api/auth/verify" 403 — 같은 경로의 일반 GET 은 204 였다.
+    화면은 HTML 까지만 뜨고 스켈레톤에서 멈췄다.
+    """
+    body = _read("Caddyfile")
+    block = re.search(r"handle /forecast\*\s*\{(.*?)\n\}", body, re.S)
+    assert block, "Caddyfile 에 /forecast 블록이 없습니다"
+    inner = _strip_comments(block.group(1))
+    auth = re.search(r"forward_auth[^\n]*\{(.*?)\n\t\}", inner, re.S)
+    assert auth, "forward_auth 블록을 찾지 못했습니다"
+    for field in ("-Connection", "-Upgrade"):
+        assert f"header_up {field}" in auth.group(1), \
+            f"인증 부속 요청에서 {field[1:]} 헤더를 떼지 않으면 전망 앱의 WebSocket 이 403 으로 끊깁니다"
