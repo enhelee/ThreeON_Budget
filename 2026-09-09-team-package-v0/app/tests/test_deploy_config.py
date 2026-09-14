@@ -92,3 +92,22 @@ def test_forward_auth_strips_websocket_upgrade_headers():
     for field in ("-Connection", "-Upgrade"):
         assert f"header_up {field}" in auth.group(1), \
             f"인증 부속 요청에서 {field[1:]} 헤더를 떼지 않으면 전망 앱의 WebSocket 이 403 으로 끊깁니다"
+
+
+def test_entrypoint_copies_builtin_templates_into_forecast_workdir():
+    """전망 앱은 내장 양식을 상대경로로 읽는다 — 실행 폴더에 없으면 화면이 터진다.
+
+    supervisord 가 FORECAST_DATA_DIR 에서 실행하므로 코드 폴더(/srv/forecast)의 양식이
+    보이지 않는다. 실측(2026-09-15 배포):
+      FileNotFoundError: 'builtin_template_중장기예산.xlsx'
+        longterm_forecast_template.py:168 load_workbook(template_path)
+    """
+    entrypoint = _read("entrypoint.sh")
+    assert "builtin_template_*.xlsx" in entrypoint, \
+        "내장 양식을 실행 폴더로 복사하지 않으면 중장기 예산 화면이 FileNotFoundError 로 터집니다"
+    assert "FORECAST_DATA_DIR" in entrypoint
+
+    # 복사할 원본이 실제로 저장소에 있어야 한다.
+    forecast_dir = os.path.join(os.path.dirname(DEPLOY), "forecast")
+    tpls = [f for f in os.listdir(forecast_dir) if f.startswith("builtin_template_")]
+    assert tpls, "forecast/ 에 내장 양식이 없습니다"

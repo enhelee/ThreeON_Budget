@@ -23,10 +23,23 @@ import { esc } from "../util.js"
 
 const LOAD_TIMEOUT_MS = 15000        // Streamlit 첫 기동이 느릴 수 있어 넉넉히 잡는다
 
-/** iframe 이 가리킬 주소 — 서버가 준 FORECAST_URL 에 embed 플래그를 붙인다. */
+/** iframe 이 가리킬 주소 — 서버가 준 FORECAST_URL 에 embed 플래그를 붙인다.
+ *
+ * ⚠ 경로는 반드시 «/» 로 끝나야 한다.
+ *   슬래시가 없으면 Streamlit 이 307 로 «/forecast/» 로 되돌려 보내는데, 그 Location 이
+ *   상대경로가 아니라 Host 헤더로 만든 **절대 URL** 이고 스킴이 http 다(전망 앱은 앞단에서
+ *   TLS 가 끝났다는 사실을 모른다). https 로 열린 우리 화면에서 그 주소를 따라가려 하면
+ *   혼합 콘텐츠로 차단되어 iframe 도 fetch 도 함께 실패한다.
+ *
+ *   실측(2026-09-15 배포): 5번 탭은 "연결하지 못했습니다" 인데, 같은 앱을 새 탭에서
+ *   «/forecast/?embed=true» 로 열면 정상 표시됐다 — 차이는 슬래시 하나뿐이었다.
+ *   로컬에서도 «/forecast?embed=true» 가 307 Location: http://…/forecast/?embed=true 였다.
+ */
 export function forecastUrl() {
-  const base = state.health?.forecast_url || "/forecast"
-  return base + (base.includes("?") ? "&" : "?") + "embed=true"
+  const raw = state.health?.forecast_url || "/forecast"
+  const [path, query] = raw.split("?")
+  const base = path.endsWith("/") ? path : path + "/"
+  return base + "?" + (query ? query + "&embed=true" : "embed=true")
 }
 
 function notice(title, body, {tone = "warn"} = {}) {

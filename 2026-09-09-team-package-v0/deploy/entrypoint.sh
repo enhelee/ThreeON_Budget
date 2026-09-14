@@ -4,8 +4,24 @@ set -eu
 
 mkdir -p "${DATA_DIR:-/data/budget}/config" "${DATA_DIR:-/data/budget}/output" "${FORECAST_DATA_DIR:-/data/forecast}"
 
-# forecast_app(v2)이 첫 실행에 필요한 내장 양식·매칭 HTML은 코드 폴더에서 읽으므로 복사 불필요.
 # 팀 v2 앱은 상대경로 파일을 CWD에 만든다 → supervisord가 FORECAST_DATA_DIR에서 실행.
+#
+# ⚠ 내장 양식도 «상대경로»로 읽는다(예: longterm_forecast_template.py 의
+#   BUILTIN_TEMPLATE_PATH = "builtin_template_중장기예산.xlsx"). 즉 코드 폴더가 아니라
+#   실행 폴더에서 찾으므로, 여기로 복사해 두지 않으면 화면이 열리는 순간 터진다.
+#   (예전 주석은 "코드 폴더에서 읽으므로 복사 불필요"라고 적혀 있었는데 사실이 아니었다.)
+#
+#   실측(2026-09-15 배포) — 「중장기 예산 (26-35년)」 화면:
+#     FileNotFoundError: [Errno 2] No such file or directory: 'builtin_template_중장기예산.xlsx'
+#       File "/srv/forecast/longterm_forecast_template.py", line 168, in build_schedule_download
+#         wb = load_workbook(template_path)
+#
+#   없을 때만 복사한다 — 팀이 바꿔 둔 양식을 덮어쓰지 않기 위해서다.
+for _tpl in /srv/forecast/builtin_template_*.xlsx; do
+  [ -e "$_tpl" ] || continue
+  _dest="${FORECAST_DATA_DIR:-/data/forecast}/$(basename "$_tpl")"
+  [ -e "$_dest" ] || cp "$_tpl" "$_dest"
+done
 
 # /forecast 인증은 이제 Caddy forward_auth 가 앱(/api/auth/verify)에 물어본다.
 # 기동 시 bcrypt 해시를 만들던 basic_auth 조각은 필요 없어졌다 - 로그인은 앱에서 1회뿐이다.
