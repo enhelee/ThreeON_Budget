@@ -118,14 +118,24 @@ def test_entrypoint_copies_builtin_templates_into_forecast_workdir():
 def test_old_app_path_redirects_instead_of_proxying():
     """/app/ 은 301 로 루트에 보내야 한다 — 팀원 북마크를 지키면서 주소를 하나로 모은다.
 
-    예전에는 handle_path 로 «/app» 을 떼고 프록시했는데, 그러면 FastAPI 가 그 요청을
-    «/» 로 보게 되어 SPA 를 그냥 돌려줬다. 301 이 나가지 않아 주소창이 /app/ 에 머물렀다.
-    실측(2026-09-15 배포): GET /app/ -> 200 (301 이어야 했다).
+    두 번 틀린 자리라 둘 다 고정한다.
+
+    ① handle_path 로 «/app» 을 떼고 프록시하면 FastAPI 가 그 요청을 «/» 로 보고
+       SPA 를 그냥 돌려준다 — 301 라우트에 닿지 못한다.
+    ② Caddy 의 redir 로 처리하면 `redir / permanent` 의 «/» 가 목적지가 아니라
+       **경로 매처**로 파싱된다. 요청 경로가 /app/ 이라 매처가 맞지 않아 리다이렉트가
+       발동하지 않고 빈 200 이 나갔다(실측: Content-Length 0, origin-server: Caddy).
+
+    그래서 접두어를 붙인 채 FastAPI 로 넘기고 301 은 파이썬이 낸다 — 그쪽은 테스트로
+    검증된다(test_export_status.test_old_app_path_returns_301).
     """
     body = _strip_comments(_read("Caddyfile"))
     assert "handle_path /app/*" not in body, "handle_path 는 접두어를 떼어 301 을 무력화합니다"
     block = re.search(r"handle /app\*\s*\{(.*?)\n\}", body, re.S)
-    assert block and "redir / permanent" in block.group(1)
+    assert block, "Caddyfile 에 /app 블록이 없습니다"
+    inner = block.group(1)
+    assert "reverse_proxy 127.0.0.1:8010" in inner
+    assert "redir" not in inner, "Caddy redir 의 첫 인자 «/» 는 매처로 파싱되어 동작하지 않습니다"
 
 
 def test_intro_site_is_gone():
