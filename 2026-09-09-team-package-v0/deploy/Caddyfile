@@ -45,13 +45,19 @@ handle /healthz {
 	reverse_proxy 127.0.0.1:8010
 }
 
-# ── forecast_app (Streamlit, baseUrlPath=forecast). 팀 공용 비밀번호를 엣지에서 검사 ──
+# ── forecast_app (Streamlit, baseUrlPath=forecast). 앱 세션을 엣지에서 확인 ──
 handle /forecast* {
-	# 인증 조각은 기동 시 entrypoint.sh가 생성한다(APP_PASSWORD 있으면 basic_auth, 없으면 빈 파일).
-	# ⚠ 예전엔 여기에 basic_auth 블록을 직접 쓰고 비밀번호가 없을 때 sed로 지웠는데,
-	#   `{$BASIC_USER} {$BASIC_HASH}` 줄에 `}`가 들어 있어 sed 범위가 일찍 끝나 닫는 괄호가
-	#   고아로 남고 Caddyfile 문법이 깨졌다(Render 배포 실패의 원인). import 방식으로 교체.
-	import /srv/deploy/forecast_auth.caddy
+	# 로그인 1회로 끝낸다.
+	#   예전: 앱 로그인 1회 + 브라우저 기본인증 팝업 1회 = 2회. iframe 안에서는 더 어색했다.
+	#   지금: forward_auth 가 앱의 세션 쿠키를 대신 확인한다(2xx = 통과, 그 외 = 그대로 전달).
+	#
+	# ⚠ 대상이 /api/auth/status 가 아니라 /api/auth/verify 인 이유:
+	#   status 는 비로그인에도 200 에 {"logged_in": false} 를 실어 보낸다(SPA 가 게이트를
+	#   띄울지 판단하는 근거). forward_auth 는 2xx 를 곧 통과로 보므로 그것을 쓰면
+	#   /forecast 가 누구에게나 열린다. verify 는 세션이 없으면 401 이다.
+	forward_auth 127.0.0.1:8010 {
+		uri /api/auth/verify
+	}
 	reverse_proxy 127.0.0.1:8501
 }
 

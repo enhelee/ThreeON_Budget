@@ -38,6 +38,10 @@ OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
 # 값을 주지 않으면 "dev" — 화면만 보고 배포본인지 로컬 개발본인지 구분된다.
 APP_REV = os.environ.get("APP_REV") or "dev"
+# 5번 탭(중장기 전망) iframe 이 가리킬 주소. 배포에서는 같은 호스트의 /forecast 라
+# 상대경로가 기본값이다. 로컬 개발은 .env 에 http://localhost:8501/forecast 처럼 절대경로를 준다.
+# Phase 6 에서 전망 기능을 흡수하면 이 변수와 iframe 은 함께 사라진다.
+FORECAST_URL = os.environ.get("FORECAST_URL") or "/forecast"
 # 프론트는 Vite 빌드 산출물(static/) 하나뿐이다. 빌드 전 원본은 web/ 에 있다.
 #   로컬:   cd app/web && npm install && npm run build
 #   도커:   Dockerfile 의 node 스테이지가 만들어 /srv/app/static/ 으로 넣는다
@@ -118,7 +122,7 @@ class LoginReq(BaseModel):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV,
+    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "forecast_url": FORECAST_URL,
             "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
 
 
@@ -126,6 +130,22 @@ def healthz():
 def auth_status(request: Request):
     op = AUTH.verify(request.cookies.get(AUTH.cookie_name)) if AUTH.enabled else "local"
     return {"enabled": AUTH.enabled, "operator": op, "logged_in": bool(op)}
+
+
+@app.get("/api/auth/verify")
+def auth_verify():
+    """Caddy forward_auth 전용 - 로그인했으면 204, 아니면 401.
+
+    /api/auth/status 를 쓸 수 없는 이유: 그 라우트는 비로그인 상태에서도 200 에
+    {"logged_in": false} 를 실어 보낸다(SPA 가 게이트를 띄울지 판단하는 근거다).
+    forward_auth 는 2xx 를 곧 통과로 보므로, 그것을 대상으로 삼으면 /forecast 가
+    누구에게나 열린다.
+
+    이 라우트는 PUBLIC_API 에 넣지 않는다 - 세션이 없으면 AuthAuditMiddleware 가
+    먼저 401 을 돌려주고 여기까지 오지 않는다. 인증이 꺼진 사내망 모드에서는
+    미들웨어가 통과시키므로 204 가 되어 /forecast 도 함께 열린다.
+    """
+    return Response(status_code=204)
 
 
 @app.post("/api/login")

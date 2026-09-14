@@ -7,7 +7,7 @@ import { $, fmt } from "./util.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
-import { renderForecast } from "./views/forecast.js"
+import { mountForecast, renderForecast } from "./views/forecast.js"
 import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
@@ -75,6 +75,7 @@ export function renderPage() {
                      branches: renderBranches, detail: renderDetail, stats: renderStats,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
+  if (state.view === "forecast") mountForecast();   // iframe 성패를 지켜본다
   const [title, subtitle] = viewMeta[state.view];
   $("#pageTitle").textContent = title;
   $("#pageSubtitle").textContent = subtitle;
@@ -106,6 +107,7 @@ export async function navigate(view, opts = {}) {
     await loadPending();
     if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
     if (view === "home") { await loadHealth(); await loadExportStatus(); }
+    if (view === "forecast") await loadHealth();      // iframe 주소(FORECAST_URL)가 여기서 온다
     if (view === "budget" || view === "collect") await loadStatus();
     if (view === "stats") {
       state.stats = await api(`/api/stats?year=${state.year}`);

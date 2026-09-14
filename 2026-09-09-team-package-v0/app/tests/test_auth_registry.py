@@ -143,3 +143,25 @@ def test_v2_file_sync_roundtrip(tmp_path):
     rep2 = ml_registry.import_v2_files(conn, str(v2), actor="sync")
     assert "skipped" in rep2["투자유형_전표텍스트/model"]
     conn.close()
+
+
+def test_forward_auth_target_is_401_until_login(client):
+    """Caddy forward_auth 대상 /api/auth/verify — 2xx 여부가 곧 /forecast 접근 허용이다.
+
+    /api/auth/status 는 비로그인에도 200 을 주므로 이 목적에 쓸 수 없다.
+    그 차이를 여기서 고정한다 — 무너지면 전망 화면이 누구에게나 열린다.
+    """
+    assert client.get("/api/auth/status").status_code == 200        # 비로그인에도 200
+    assert client.get("/api/auth/verify").status_code == 401        # 이쪽은 401 이어야 한다
+
+    client.post("/api/login", json={"password": "team-secret", "name": "홍길동"})
+    assert client.get("/api/auth/verify").status_code == 204
+
+    client.post("/api/logout")
+    assert client.get("/api/auth/verify").status_code == 401
+
+
+def test_healthz_exposes_forecast_url(client):
+    """SPA 의 5번 탭이 iframe 대상을 여기서 읽는다(기본값은 같은 호스트의 /forecast)."""
+    import server
+    assert client.get("/healthz").json()["forecast_url"] == server.FORECAST_URL
