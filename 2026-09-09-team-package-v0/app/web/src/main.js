@@ -3,8 +3,9 @@ import "./styles/app.css"
 import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
+import { renderSidebar } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz } from "./data.js"
-import { addYearFromInput, changeYear, navigate, renderPage, runAnalyze, uploadFile } from "./router.js"
+import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
@@ -20,7 +21,7 @@ document.addEventListener("click", async e => {
   const br = e.target.closest("[data-branch]");
   if (br) {
     busy(true, "지사 상세 로딩...");
-    try { await loadDetail(br.dataset.branch); state.view = "detail"; renderPage(); }
+    try { await loadDetail(br.dataset.branch); state.view = "detail"; syncHash(); renderPage(); }
     catch (err) { toast(err.message); }
     finally { busy(false); }
     return;
@@ -463,6 +464,13 @@ $("#trainingFile").addEventListener("change", async e => {
 // 미인증이면 checkAuth() 안에서 게이트가 뜨고 여기서는 아무것도 하지 않는다.
 // 인증 상태 조회 자체가 실패하면(네트워크 등) 작업공간을 그려 두고 각 API 가
 // 401 을 만나는 시점에 게이트로 넘어가게 한다.
+// 사이드바는 모든 화면에서 같으므로 부팅 때 한 번만 그린다.
+// (활성 표시는 renderPage() 가 화면마다 맞춘다)
+$("#sidebar").innerHTML = renderSidebar();
+
+// 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
+window.addEventListener("hashchange", onHashChange);
+
 checkAuth()
-  .then(ok => { if (ok) navigate(state.view || "home"); })
-  .catch(() => navigate("home"));
+  .then(ok => { if (ok) bootRoute(); })
+  .catch(() => bootRoute());
