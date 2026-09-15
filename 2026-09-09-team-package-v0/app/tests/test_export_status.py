@@ -103,3 +103,17 @@ def test_index_html_is_revalidated_every_time(client, tmp_path, monkeypatch):
     r = c.get("/")
     assert r.status_code == 200
     assert "no-cache" in r.headers.get("cache-control", "")
+
+
+def test_old_app_path_returns_301(client):
+    """옛 주소 /app · /app/... 는 루트로 301 — 팀원 북마크를 지킨다.
+
+    Caddy 는 이 경로를 접두어 그대로 넘겨 주므로(handle_path 아님), 301 을 내는 것은
+    이 파이썬 라우트다. 실측(2026-09-15): Caddy 의 redir 로 처리하려다 «/» 가 매처로
+    파싱되어 빈 200 이 나갔다 — 그래서 판단을 테스트 가능한 쪽에 둔다.
+    """
+    c, _ = client
+    for path in ("/app", "/app/", "/app/anything"):
+        r = c.get(path, follow_redirects=False)
+        assert r.status_code == 301, f"{path} 가 301 이 아닙니다"
+        assert r.headers["location"] == "/"
