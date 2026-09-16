@@ -2,9 +2,10 @@
 // 순수 로직. SheetJS로 파싱한 행 배열을 받아 처리. node/브라우저 공용(UMD).
 (function (root, factory) {
   if (typeof module === "object" && module.exports)
-    module.exports = factory(require("./constants.js"));
-  else root.BUDGET_PIPELINE = factory(root.BUDGET_CONST);
-})(typeof self !== "undefined" ? self : this, function (C) {
+    module.exports = factory(require("./constants.js"), require("./corrections.js"));
+  else root.BUDGET_PIPELINE = factory(root.BUDGET_CONST, root.BUDGET_BUILTIN_CORR);
+})(typeof self !== "undefined" ? self : this, function (C, BUILTIN_CORR) {
+  BUILTIN_CORR = BUILTIN_CORR || [];
   const nfc = (s) => (typeof s === "string" ? s.normalize("NFC") : s);
 
   // 텍스트 정규화: 공백/괄호 정도 무시하고 완전일치 판정용 키
@@ -1117,8 +1118,14 @@
       if (input.capBudgetRows) plan = plan.concat(parseBudget(input.capBudgetRows));
       if (input.plBudgetRows) plan = plan.concat(parseBudget(input.plBudgetRows));
     }
-    // 보정 사전(있으면): (조직|과목|전표텍스트)→올바른 사업명
+    // 보정 사전: ①업로드 파일(있으면) ②내장 보정(담당자 확정, 파일 없이 자동). 업로드분이 내장분을 덮는다.
     const corr = parseCorrections(input.correctionRows || [], C);
+    if (BUILTIN_CORR.length && input.builtinCorrections !== false) {
+      const hdr = ["지사", "예산과목", "전표텍스트", "금액", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명"];
+      const brows = [hdr, ...BUILTIN_CORR.map((e) => [e.org, e.acct, e.text, "", "", "", "", e.biz])];
+      const bmap = parseCorrections(brows, C);
+      for (const [k, v] of bmap) if (!corr.has(k)) corr.set(k, v); // 업로드분에 없는 것만 내장으로 채움
+    }
     // 계획대비실적: 업로드 집계표의 계획 줄을 그대로 두고 실적(B)만 채움
     let chipCap, chipPl, stats = { planRows: 0, filled: 0, unplanned: 0, corrections: corr.size };
     const CONF_REVIEW = 0.5; // 신뢰도 이 미만이면 검토 권장

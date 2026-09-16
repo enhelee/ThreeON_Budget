@@ -7,6 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => fs.readFileSync(path.join(__dirname, p), "utf8");
 const xlsx = read("vendor/xlsx.full.min.js");
 const constants = read("src/constants.js");
+const corrections = read("src/corrections.js");
 const pipeline = read("src/pipeline.js");
 const ui = read("src/ui.js");
 const css = read("src/ui.css");
@@ -60,6 +61,9 @@ ${xlsx}
 </script>
 <script>
 ${constants}
+</script>
+<script>
+${corrections}
 </script>
 <script>
 ${pipeline}
