@@ -14,6 +14,7 @@ import streamlit as st
 from year_status import load_status
 from views import (
     checkpoint_matching_page,
+    grace_matching_page,  # grace 최신 사업매칭(별도 메뉴, 추가만)
     actuals_upload_page,
     budget_upload_page,
     project_matching_page,
@@ -50,7 +51,7 @@ st.title("발전플랜트 유지보수 예산 분석")
 
 CATEGORY_PAGES = {
     "예산 계획 수립": ["예산 계획 업로드"],
-    "예산 실적 집계": ["실적 업데이트(zrfm2)", "사업 매칭", "사업 실적 연결", "계획 대비 실적"],
+    "예산 실적 집계": ["실적 업데이트(zrfm2)", "사업 매칭", "사업 매칭 (grace 최신)", "사업 실적 연결", "계획 대비 실적"],
     "예산 실적 분석": [
         "투자유형 분류 검토", "투자유형 학습 (분류자료)",
         "실적집계 대시보드", "맞춤 리포트",
@@ -77,6 +78,7 @@ PAGE_RENDERERS = {
     ("예산 계획 수립", "예산 계획 업로드"): lambda: budget_upload_page.render(),
     ("예산 실적 집계", "실적 업데이트(zrfm2)"): lambda: actuals_upload_page.render(status),
     ("예산 실적 집계", "사업 매칭"): lambda: project_matching_page.render(status),
+    ("예산 실적 집계", "사업 매칭 (grace 최신)"): lambda: grace_matching_page.render(),
     ("예산 실적 집계", "계획 대비 실적"): lambda: plan_vs_actual_page.render(),
     ("예산 실적 분석", "투자유형 분류 검토"): lambda: classification_review_page.render(status),
     ("예산 실적 분석", "투자유형 학습 (분류자료)"): lambda: project_type_learning_page.render(),
