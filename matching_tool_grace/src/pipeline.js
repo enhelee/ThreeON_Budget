@@ -1161,8 +1161,19 @@
     const checklist = [["지사", "예산과목", "전표텍스트", "금액(천원)", "내가붙인사업명", "신뢰도", "검토필요", "올바른사업명(수정시 작성)", "비고", "전기일", "전표번호", "손익센터", "연예산일치(참고)", "매칭사업 집계표실적(천원)", "차이(내합계-집계표)"], ..._clRows];
     stats.reviewNeeded = _clRows.filter((r) => r[6] === "검토필요").length;
 
+    // ── 팀 인터페이스 산출물 matched_{연도}.csv: 전표 한 줄씩 + 사업명·확신도. ──
+    // 앱 조인키가 (예산과목 × 처지사)이므로 사업장=지사명(코드 아님), 계정과목=정식명으로 넣어 조인이 그대로 맞게 함(→ "전부 신규" 방지).
+    const excelYear = (v) => { const n = Number(v); if (n > 20000 && n < 90000) return new Date(Date.UTC(1899, 11, 30) + n * 86400000).getUTCFullYear(); const m = String(v == null ? "" : v).match(/(20\d{2})/); return m ? Number(m[1]) : null; };
+    const _yc = {};
+    for (const r of _clRows) { const y = excelYear(r[9]); if (y) _yc[y] = (_yc[y] || 0) + 1; }
+    const matchedYear = Number(Object.keys(_yc).sort((a, b) => _yc[b] - _yc[a])[0]) || new Date().getFullYear();
+    // 규격 컬럼: 거래처명·사업장·전기일·전표헤더텍스트·금액(원)·계정과목·사업코드·사업명·매칭확신도
+    const fmtDate = (v) => { const n = Number(v); if (n > 20000 && n < 90000) { const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000); return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0"); } return String(v == null ? "" : v); };
+    const matched = [["거래처명", "사업장", "전기일", "전표헤더텍스트", "금액", "계정과목", "사업코드", "사업명", "매칭확신도"]];
+    for (const r of _clRows) matched.push(["", r[0], fmtDate(r[9]), r[2], Math.round((Number(r[3]) || 0) * AMOUNT_UNIT), r[1], "", r[7] || r[4], r[5]]);
+
     return {
-      cleaned, plan, stats, checklist,
+      cleaned, plan, stats, checklist, matched, matchedYear,
       review: buildReviewSheets(cleaned, C),
       chipCap, chipPl,
       // 종합표: 업로드 집계표의 종합표 틀이 있으면 그걸 채움(분류·행·열 파일 그대로), 없으면 자체 생성

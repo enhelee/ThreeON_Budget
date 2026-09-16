@@ -65,6 +65,16 @@
     return { chip: pick("계획대비실적") , jong: pick("종합") };
   }
 
+  // 팀 인터페이스용 CSV(utf-8-sig): 앱이 바로 읽도록 BOM 포함
+  function downloadCsv(aoa, filename) {
+    const csv = XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet(aoa));
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
   function downloadWb(sheets, filename) {
     const wb = XLSX.utils.book_new();
     for (const [n, aoa] of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), n);
@@ -137,6 +147,7 @@
       else if (kind === "cap") downloadWb([["종합표", RESULT.jongCap], ["계획대비실적", RESULT.chipCap]], "양식3_자본_실적집계.xlsx");
       else if (kind === "review") downloadWb([["지사x과목합계", RESULT.review.pivot], ["정리내역", RESULT.review.items], ["미배분vendor", RESULT.review.vendors]], "netting검토표.xlsx");
       else if (kind === "checklist") downloadWb([["검토목록(보정사전)", RESULT.checklist]], "검토목록_보정사전.xlsx");
+      else if (kind === "matched") downloadCsv(RESULT.matched, "matched_" + (RESULT.matchedYear || "") + ".csv");
     });
   });
 

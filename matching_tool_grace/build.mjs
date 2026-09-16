@@ -47,6 +47,7 @@ ${css}
       <button data-dl="cap">양식3 · 자본 집계표 내려받기</button>
       <button data-dl="review" class="ghost">netting 검토표 내려받기</button>
       <button data-dl="checklist" class="ghost">검토목록(보정사전 초안) 내려받기</button>
+      <button data-dl="matched">matched_연도.csv 내려받기 (팀 파이프라인 연동)</button>
     </div>
     <p class="hint">※ 계획대비실적: 업로드한 집계표의 <b>사업명 줄은 그대로</b> 두고 <b>실적(B)만</b> raw에서 채웁니다. 계획에 아예 없는 (조직×과목)의 실적은 맨 아래에 <b>(계획미반영)</b> 집계 줄로 표시됩니다.</p>
   </div>
