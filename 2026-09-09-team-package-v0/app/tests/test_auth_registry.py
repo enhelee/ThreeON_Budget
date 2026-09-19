@@ -161,7 +161,9 @@ def test_forward_auth_target_is_401_until_login(client):
     assert client.get("/api/auth/verify").status_code == 401
 
 
-def test_healthz_exposes_forecast_url(client):
-    """SPA 의 5번 탭이 iframe 대상을 여기서 읽는다(기본값은 같은 호스트의 /forecast)."""
-    import server
-    assert client.get("/healthz").json()["forecast_url"] == server.FORECAST_URL
+def test_healthz_no_longer_exposes_forecast_url(client):
+    """6-6 에서 5번 탭 iframe 이 사라졌다 — 그 대상 주소(forecast_url)도 함께 사라진다.
+    3·4단계는 /api/forecast/* 가 담당한다(tests/test_forecast_api.py)."""
+    body = client.get("/healthz").json()
+    assert body["ok"] is True
+    assert "forecast_url" not in body

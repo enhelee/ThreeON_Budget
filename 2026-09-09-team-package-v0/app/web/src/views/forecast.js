@@ -1,145 +1,255 @@
+import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
-import { esc } from "../util.js"
+import { esc, fmt } from "../util.js"
 
 // ─────────────────────────────────────────────────────────────
-// 5번 탭 — 중장기 전망 (#/forecast)
+// 5번 탭 — 예산 표준화(3단계) · 중장기 전망(4단계)  (#/forecast)
 //
-// 전망은 아직 별도 앱(Streamlit, 팀공유 v2)이 담당한다. 그것을 같은 화면 안에
-// iframe 으로 끌어와 «주소 하나 · 로그인 한 번»을 완성한다.
+// Phase 6-6. 전망 앱(Streamlit) iframe 을 걷어내고 이 앱의 API(/api/forecast/*)로 그린다.
 //
-//   - 대상 주소는 서버가 정한다(FORECAST_URL → /healthz). 배포에서는 같은
-//     호스트의 /forecast 이므로 상대경로이고, 로컬 개발에서는 :8501 절대경로다.
-//   - ?embed=true 로 Streamlit 자체 툴바·푸터·메뉴를 숨긴다.
-//   - /forecast 접근 허용은 Caddy forward_auth 가 /api/auth/verify 로 확인한다.
-//     즉 이 앱에 로그인돼 있으면 iframe 도 그대로 열린다(기본인증 팝업 없음).
+//   기준연도(base_year) — «어느 해에 세운 가정인가». 헤더의 대상연도(계획·실적 분석 연도)
+//   와 다른 축이라 이 화면에 선택기를 따로 둔다. 기준연도마다 정비등급·고온부품·본사배분·
+//   팩터·임시사업·돌발사업이 한 벌씩이고, 「＋기준연도」는 직전 벌을 복사해 시작한다.
 //
-// 세션이 끊긴 경우 iframe 안에 401 화면이 그려지는데, 그걸 그대로 두면 사용자는
-// 무슨 일인지 알 수 없다. 그래서 여기서 먼저 확인해 안내로 바꾼다 —
-// 다만 확인에 api() 를 쓰지 않는다. api() 는 401 을 만나면 게이트를 띄우므로,
-// iframe 하나 때문에 작업공간 전체가 로그인 화면으로 튕겨 나가게 된다.
+//   하위 탭 셋 — 기준정보(가정 6종 편집·엑셀 가져오기) · 표준화(산출방식·표준금액 편집) ·
+//   중장기 전망(지사별 10개년 표). 편집은 「연도 기준정보」와 같은 방식이다: 입력을 상태에
+//   담고 손댄 표만 저장 버튼에서 보낸다. 핸들러는 forecast_actions.js.
 //
-// Phase 6 에서 전망 기능을 이 앱으로 흡수하면 이 파일의 iframe 은 사라진다.
+//   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-const LOAD_TIMEOUT_MS = 15000        // Streamlit 첫 기동이 느릴 수 있어 넉넉히 잡는다
+const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+const HOT_ITEMS = ["고온부품재생", "신품구매"]
+export const METHODS = ["등급별 평균", "최근실적", "3개년 평균", "5개년 평균"]
+const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
+export const TOTAL = "__total__"
 
-/** iframe 이 가리킬 주소 — 서버가 준 FORECAST_URL 에 embed 플래그를 붙인다.
- *
- * ⚠ 경로는 반드시 «/» 로 끝나야 한다.
- *   슬래시가 없으면 Streamlit 이 307 로 «/forecast/» 로 되돌려 보내는데, 그 Location 이
- *   상대경로가 아니라 Host 헤더로 만든 **절대 URL** 이고 스킴이 http 다(전망 앱은 앞단에서
- *   TLS 가 끝났다는 사실을 모른다). https 로 열린 우리 화면에서 그 주소를 따라가려 하면
- *   혼합 콘텐츠로 차단되어 iframe 도 fetch 도 함께 실패한다.
- *
- *   실측(2026-09-15 배포): 5번 탭은 "연결하지 못했습니다" 인데, 같은 앱을 새 탭에서
- *   «/forecast/?embed=true» 로 열면 정상 표시됐다 — 차이는 슬래시 하나뿐이었다.
- *   로컬에서도 «/forecast?embed=true» 가 307 Location: http://…/forecast/?embed=true 였다.
- */
-export function forecastUrl() {
-  const raw = state.health?.forecast_url || "/forecast"
-  const [path, query] = raw.split("?")
-  const base = path.endsWith("/") ? path : path + "/"
-  return base + "?" + (query ? query + "&embed=true" : "embed=true")
+const num = v => (v === null || v === undefined) ? "" : v
+
+function accountsAll() {
+  const a = state.fc.data?.accounts || {}
+  return [...(a["손익"] || []), ...(a["자본"] || [])]
 }
 
-function notice(title, body, {tone = "warn"} = {}) {
-  const ring = tone === "warn" ? "border-amber-300 bg-amber-50" : "border-slate-300 bg-slate-50"
-  const head = tone === "warn" ? "text-amber-900" : "text-slate-800"
+function sel(opts, value, attrs, labels = {}) {
+  return `<select class="control" ${attrs}>${opts.map(o => `<option value="${esc(o)}" ${String(o) === String(value) ? "selected" : ""}>${esc(labels[o] ?? o)}</option>`).join("")}</select>`
+}
+
+function panel(title, help, body, key) {
+  const dirty = key && state.fc.dirty.has(key)
+  return `<article class="panel overflow-hidden">
+    <div class="border-b border-slate-200 p-5 sm:p-6">
+      <h3 class="section-title">${esc(title)} ${dirty ? '<span class="badge bg-amber-50 text-amber-700">저장 안 됨</span>' : ""}</h3>
+      <p class="section-help leading-6">${help}</p>
+    </div>${body}</article>`
+}
+
+// ── 헤더: 기준연도 · 탭 ──────────────────────────────────────
+
+function header() {
+  const fc = state.fc
+  const years = [...new Set([...fc.baseYears, fc.baseYear])].filter(Boolean).sort()
+  const locked = fc.lockedYears?.length ? fc.lockedYears.join("·") : "없음"
   return `
-    <div class="rounded-2xl border ${ring} px-6 py-8 text-center">
-      <p class="font-bold ${head}">${esc(title)}</p>
-      <p class="mx-auto mt-2 max-w-30 text-sm leading-6 text-slate-600">${esc(body)}</p>
-      <a class="btn-secondary mt-5 inline-flex" href="${forecastUrl()}" target="_blank" rel="noopener">새 탭에서 전망 앱 열기</a>
-    </div>`
+  <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+    <div>
+      <p class="text-sm font-semibold text-blue-700">STAGE 03 · 04</p>
+      <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 표준화 · 중장기 전망</h2>
+      <p class="section-help max-w-30 leading-6">마감된 연도(<b class="text-slate-700">${esc(locked)}</b>)의 분석 결과가 표준금액의 입력입니다. 가정(정비등급·고온부품·본사배분·팩터·임시·돌발사업)은 기준연도마다 한 벌 — 내년 전망을 시작해도 올해 가정이 남습니다.</p>
+    </div>
+    <div class="flex flex-wrap items-end gap-2">
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">전망 기준연도</span>
+        <select class="control" data-fcbase>${years.map(y => `<option value="${esc(y)}" ${y === fc.baseYear ? "selected" : ""}>${esc(y)}년 기준${fc.baseYears.includes(y) ? "" : " (아직 저장된 가정 없음)"}</option>`).join("")}</select></label>
+      <button class="btn-secondary" data-action="fc-add-base" title="직전 기준연도의 가정을 복사해 새 기준연도를 만듭니다">＋기준연도</button>
+    </div>
+  </section>
+  <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ? "btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
 }
 
-export function renderForecast() {
+// ── 기준정보(가정) 탭 ────────────────────────────────────────
+
+function cellInput(key, i, c, v) {
+  const a = `data-fc="${key}" data-idx="${i}" data-field="${esc(c.f)}"`
+  if (c.type === "select") return sel(c.options, v ?? "", a)
+  if (c.type === "bool") return `<input type="checkbox" ${a} ${v ? "checked" : ""}>`
+  if (c.type === "num") return `<input class="control fc-num" type="number" step="any" ${a} value="${esc(num(v))}">`
+  if (c.type === "int") return `<input class="control fc-int" type="number" step="1" ${a} value="${esc(num(v))}">`
+  return `<input class="control" ${a} value="${esc(num(v))}">`
+}
+
+/** 긴 표 편집기 — 행 추가·삭제·셀 편집. cols: [{f, label, type, options}] */
+function longTable(key, cols, rows, empty) {
+  const head = cols.map(c => `<th class="px-3 py-2 ${c.type === "num" ? "text-right" : ""}">${esc(c.label)}</th>`).join("") + '<th class="w-16"></th>'
+  const body = rows.map((r, i) => `<tr>${cols.map(c => `<td class="px-2 py-1">${cellInput(key, i, c, r[c.f])}</td>`).join("")}
+      <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="${key}" data-idx="${i}">삭제</button></td></tr>`).join("")
+  return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${head}</tr></thead>
+    <tbody class="divide-y divide-slate-100">${body || `<tr><td class="table-cell text-slate-400" colspan="${cols.length + 1}">${esc(empty || "없음")}</td></tr>`}</tbody></table>
+    <button class="btn-secondary mt-3" data-fcadd="${key}">＋ 행 추가</button></div>`
+}
+
+function gradesPanel(d) {
+  const by = Number(state.fc.baseYear)
+  const years = [...new Set([...d.grades.map(r => Number(r.연도)), ...Array.from({length: 10}, (_, i) => by + i)])].sort()
+  const sites = [...new Set([...d.sites, ...d.grades.map(r => r.사업장)])]
+  const cell = {}
+  d.grades.forEach(r => { cell[`${r.사업장}|${r.연도}`] = r.등급 })
+  return panel("정비등급 이력", "지사×연도 등급. 과거는 <b>표준화 참고 엑셀</b>, 미래(기준연도~)는 <b>정기점검보수공사 일정</b>에서 가져오거나 직접 칩니다. 중대형CHP MI·TI·CI·간이·HGPI·BSI, 소형CHP A·B·C. 빈 칸 = 그 해 이력 없음. 이력이 하나도 없는 지사는 등급 «표준» 한 종으로 표준화됩니다.", `
+    <div class="flex flex-wrap gap-2 p-5 pb-0">
+      <button class="btn-secondary" data-fcimport="grades">표준화 참고 엑셀에서 가져오기</button>
+      <button class="btn-secondary" data-fcimport="schedule">정기점검 일정 엑셀에서 가져오기</button>
+    </div>
+    <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th>${years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-slate-100">${sites.map(s => `<tr><td class="table-cell font-semibold text-slate-900">${esc(s)}</td>${years.map(y =>
+        `<td class="px-1 py-1 text-center"><input class="control fc-grade" data-fc="grade-cell" data-site="${esc(s)}" data-year="${y}" value="${esc(cell[`${s}|${y}`] || "")}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`, "grades")
+}
+
+function hqMasterPanel(d) {
+  const cols = d.hq_master.columns
+  const rows = d.hq_master.rows
+  const body = rows.map((r, i) => `<tr>${cols.map((c, j) => `<td class="px-2 py-1">${cellInput("hq_master", i, {f: c, type: j < 3 ? "text" : "num"}, r[c])}</td>`).join("")}
+      <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="hq_master" data-idx="${i}">삭제</button></td></tr>`).join("")
+  return panel("본사 원가분배 마스터", "«NN년 본사 원가분배» 양식의 배분 구조·금액을 그대로 씁니다 — 앱이 비율을 다시 계산하지 않습니다. 열은 대분류·중분류·세부내역·기준연도 예산·지사들. 아래 <b>배분비율(계약체결금액)</b>은 본사 임시사업을 지사에 나누는 기준입니다.", `
+    <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-fcimport="hq-master">본사 원가분배 엑셀에서 가져오기 (마스터 + 배분비율)</button></div>
+    <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${cols.map(c => `<th class="px-3 py-2">${esc(c)}</th>`).join("")}<th class="w-16"></th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${body || `<tr><td class="table-cell text-slate-400" colspan="${cols.length + 1}">마스터가 없습니다 — 엑셀에서 가져오세요.</td></tr>`}</tbody></table>
+      <button class="btn-secondary mt-3" data-fcadd="hq_master">＋ 행 추가</button></div>
+    <div class="border-t border-slate-200 px-5 pt-4"><h4 class="text-sm font-bold text-slate-700">배분비율 — 계약체결금액 ${state.fc.dirty.has("hq_ratio") ? '<span class="badge bg-amber-50 text-amber-700">저장 안 됨</span>' : ""}</h4></div>
+    ${longTable("hq_ratio", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "계약체결금액", label: "계약체결금액(천원)", type: "num"}], d.hq_ratio, "배분비율이 없습니다 — 본사 임시사업이 지사에 배분되지 않습니다.")}`, "hq_master")
+}
+
+function manageBody() {
+  const d = state.fc.data
+  if (!d) return emptyState("전망 가정을 불러오지 못했습니다.")
+  const acct = accountsAll()
+  const n = state.fc.dirty.size
   return `
   <div class="space-y-6">
-    <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <p class="text-sm font-semibold text-blue-700">STAGE 04</p>
-        <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">중장기 예산 전망</h2>
-        <p class="section-help max-w-30 leading-6">예산 표준화(3단계)와 2026~2035년 중장기 예산(4단계)입니다. 「통계·내보내기 → 팀 연계 → 결과 JSON」을 이 앱의 «예산 실적 집계 → 사업 실적 연결»에 올리면 검토가 끝난 매칭 실적이 입력으로 이어집니다.</p>
-      </div>
-      <a class="btn-secondary shrink-0" href="${forecastUrl()}" target="_blank" rel="noopener">새 탭에서 열기</a>
-    </section>
-
-    <article id="forecastPanel" class="panel overflow-hidden">
-      <div id="forecastWrap" class="relative w-full" style="height:calc(100vh - 17rem);min-height:34rem">
-        <iframe id="forecastFrame" src="${forecastUrl()}" title="중장기 예산 전망"
-                class="h-full w-full border-0" referrerpolicy="same-origin"></iframe>
-        <div id="forecastOverlay" class="absolute inset-0 grid place-items-center bg-white">
-          <div class="text-center">
-            <div class="spinner mx-auto"></div>
-            <p class="mt-3 text-sm font-semibold text-slate-700">전망 앱을 불러오는 중…</p>
-            <p class="mt-1 text-xs text-slate-500">첫 기동은 수 초 걸릴 수 있습니다.</p>
-          </div>
-        </div>
-      </div>
-    </article>
+    ${gradesPanel(d)}
+    ${panel("팩터", "미래 연도 금액에 곱하는 연간 비율. 활성인 팩터의 (1+비율)을 기준연도부터 복리로 곱합니다. 물가상승률 외에 노후화 등을 더할 수 있습니다.",
+      longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"}], d.factors), "factors")}
+    ${panel("고온부품 계획", "지사×연도×항목(고온부품재생/신품구매) 금액을 그대로 반영합니다 — 팩터를 곱하지 않습니다. «고온부품(NN)» 양식에서 가져올 수 있습니다.", `
+      <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-fcimport="hot-parts">고온부품 엑셀에서 가져오기</button></div>
+      ${longTable("hot_parts", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "항목", label: "항목", type: "select", options: HOT_ITEMS}, {f: "금액", label: "금액(천원)", type: "num"}], d.hot_parts, "고온부품 계획이 없습니다.")}`, "hot_parts")}
+    ${hqMasterPanel(d)}
+    ${panel("본사 일시적 사업", "계획에 없던 본사 사업. 위 배분비율(계약체결금액)로 지사에 자동 배분됩니다.",
+      longTable("hq_temp", [{f: "사업명", label: "사업명"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "연도", label: "연도", type: "int"}, {f: "금액", label: "금액(천원)", type: "num"}], d.hq_temp, "없음"), "hq_temp")}
+    ${panel("지사별 돌발 사업", "표준금액에 없던 지사 사업을 그 해 그 과목에 더합니다.",
+      longTable("surprise", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "금액", label: "금액(천원)", type: "num"}, {f: "사유", label: "사유"}], d.surprise, "없음"), "surprise")}
+    <div class="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+      <button class="btn-primary" id="fcSaveBtn" data-action="fc-save" ${n ? "" : "disabled"}>저장${n ? ` (${n}표)` : ""}</button>
+      <span class="text-xs text-slate-500">손댄 표만 ${esc(state.fc.baseYear)}년 기준으로 저장합니다. 표준화·전망 표는 저장 즉시 다시 계산됩니다.</span>
+    </div>
   </div>`
 }
 
-/** 화면을 그린 뒤 iframe 의 성패를 지켜본다. router.renderPage() 가 부른다. */
-export function mountForecast() {
-  const panel = document.getElementById("forecastPanel")
-  const frame = document.getElementById("forecastFrame")
-  const overlay = document.getElementById("forecastOverlay")
-  if (!panel || !frame) return
+// ── 가져오기 미리보기 ────────────────────────────────────────
 
-  let settled = false
-  const ok = () => { settled = true; if (overlay) overlay.remove() }
-  const fail = (title, body, tone) => {
-    if (settled) return
-    settled = true
-    panel.outerHTML = notice(title, body, {tone})
-  }
+const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정기점검 일정)",
+                      "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율"}
 
-  // ⚠ load 이벤트는 성공의 근거가 못 된다.
-  //   서버가 죽어 있어도 브라우저는 자기 오류 페이지를 iframe 에 싣고 load 를 쏜다.
-  //   (실측: 전망 앱을 내린 채로 열어도 load 가 발생해 빈 흰 화면만 남았다.)
-  //   그래서 load 는 «로딩 오버레이를 걷는» 용도로만 쓰고, 성패는 아래에서 따로 판정한다.
-  frame.addEventListener("load", () => { if (overlay) overlay.remove() })
+function previewPanel() {
+  const p = state.fc.preview
+  if (!p) return ""
+  const rows = p.rows || []
+  const cols = p.columns || (rows[0] ? Object.keys(rows[0]) : [])
+  const mergeable = p.kind !== "hq-master"
+  return `
+  <article class="panel overflow-hidden border-blue-300" id="fcPreview">
+    <div class="border-b border-slate-200 bg-blue-50 p-5 sm:p-6">
+      <h3 class="section-title">가져오기 미리보기 — ${esc(IMPORT_LABEL[p.kind] || p.kind)}</h3>
+      <p class="section-help">${rows.length.toLocaleString()}건을 찾았습니다${p.ratio_rows ? ` · 배분비율 ${p.ratio_rows.length}개 지사` : ""}. 아직 저장되지 않았습니다 — 아래에서 적용 방식을 고르세요.</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        ${mergeable ? '<button class="btn-primary" data-action="fc-apply-merge">기존에 없는 것만 추가</button>' : ""}
+        <button class="${mergeable ? "btn-secondary" : "btn-primary"}" data-action="fc-apply-replace">전체 교체</button>
+        <button class="btn-secondary" data-action="fc-cancel-preview">취소</button>
+      </div>
+    </div>
+    ${rows.length ? `<div class="max-h-80 overflow-auto p-5"><table class="w-full"><thead class="table-head"><tr>${cols.map(c => `<th class="px-3 py-2">${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-slate-100">${rows.slice(0, 100).map(r => `<tr>${cols.map(c => `<td class="table-cell">${esc(typeof r[c] === "number" ? fmt(r[c]) : r[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+      ${rows.length > 100 ? '<p class="mt-2 text-xs text-slate-400">앞 100건만 표시합니다.</p>' : ""}</div>`
+      : '<p class="p-5 text-sm text-amber-700">이 파일에서 해당 자료를 찾지 못했습니다 — 양식·시트명을 확인하세요. 지사 시트명은 지사 이름에서 «지사»·«사업소»를 뗀 것(예: 화성)이어야 합니다.</p>'}
+  </article>`
+}
 
-  // 응답이 아주 없는 경우(연결은 되는데 회신이 없는 경우)의 최후 보루.
-  setTimeout(() => fail(
-    "전망 앱을 불러오지 못했습니다",
-    "전망 앱이 기동 중이거나 응답하지 않습니다. 잠시 뒤 다시 시도하거나 새 탭에서 열어 확인하세요.",
-  ), LOAD_TIMEOUT_MS)
+// ── 표준화(3단계) 탭 ─────────────────────────────────────────
 
-  // 주소를 직접 두드려 성패를 가른다.
-  //   배포: 같은 출처(/forecast)라 상태코드를 그대로 읽는다 — 401 이면 세션 만료.
-  //   로컬: :8501 은 교차 출처라 상태코드를 읽을 수 없다. no-cors 로 «도달 여부»만 본다
-  //         (죽어 있으면 reject, 살아 있으면 opaque 응답).
-  const target = forecastUrl()
-  const crossOrigin = /^https?:\/\//i.test(target) && !target.startsWith(location.origin)
-  fetch(target, crossOrigin ? {mode: "no-cors", cache: "no-store"} : {cache: "no-store"})
-    .then(res => {
-      if (res.type === "opaque") { ok(); return }        // 교차 출처 — 도달 확인까지가 한계
-      if (res.status === 401 || res.status === 403) {
-        fail("로그인 세션이 만료되었습니다",
-             "전망 앱은 이 앱의 로그인 세션으로 열립니다. 다른 화면으로 이동하면 로그인 창이 나타납니다.")
-      } else if (!res.ok) {
-        fail("전망 앱을 불러오지 못했습니다",
-             `전망 앱이 ${res.status} 로 응답했습니다. 잠시 뒤 다시 시도하거나 새 탭에서 열어 확인하세요.`)
-      } else {
-        ok()
-      }
-    })
-    .catch(() => fail(
-      "전망 앱에 연결하지 못했습니다",
-      "전망 앱이 내려가 있거나 기동 중입니다. 잠시 뒤 다시 시도하거나 새 탭에서 열어 확인하세요."))
+function benchBody() {
+  const b = state.fc.bench
+  if (!b) return emptyState("표준화 결과를 불러오지 못했습니다.")
+  const groups = state.fc.data?.site_groups || {}
+  const g = state.fc.benchGroup || "all"
+  const rows = b.rows.filter(r => g === "all" || groups[r.사업장] === g)
+  const ed = state.fc.benchEdits
+  const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
+  const info = b.years_used.length
+    ? `마감 연도 <b>${esc(b.years_used.join("·"))}</b> · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)}천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
+    : '<span class="text-amber-700">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
+  return `
+  <article class="panel overflow-hidden">
+    <div class="border-b border-slate-200 p-5 sm:p-6">
+      <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급)</h3>
+      <p class="section-help leading-6">${info}</p>
+      <p class="section-help">«자동추천»은 실적 패턴(연도별 변동·등급별 편차)으로 방식을 골랐고 근거가 «추천사유»에 있습니다. <b>산출방식</b>을 바꾸면 그 (지사,과목)은 «사용자지정»으로, <b>표준금액</b>을 고치면 그 (지사,과목,등급)은 «수동수정»으로 고정됩니다.${b.has_ltsa ? "" : " ℹ️ «투자유형세부»가 없어 기계장치에서 LTSA/CRI 를 분리하지 못하고 총액을 씁니다."}</p>
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사그룹</span>
+          ${sel(["all", ...GROUPS], g, "data-fcgroup", {all: "전체"})}</label>
+        <button class="btn-primary" data-action="fc-save-bench" ${nEdits ? "" : "disabled"}>변경 저장${nEdits ? ` (${nEdits}건)` : ""}</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr>
+      <th class="px-3 py-2">지사</th><th class="px-3 py-2">구분</th><th class="px-3 py-2">예산과목</th><th class="px-3 py-2">등급</th>
+      <th class="px-3 py-2">산출방식</th><th class="px-3 py-2">방식출처</th><th class="px-3 py-2">추천사유</th>
+      <th class="px-3 py-2 text-right">표준금액(천원)</th><th class="px-3 py-2">비고</th></tr></thead>
+      <tbody class="divide-y divide-slate-100">${rows.length ? rows.map(r => {
+        const mk = `${r.사업장}|${r.예산과목}`, ak = `${mk}|${r.등급}`
+        const mch = mk in ed.methods, ach = ak in ed.overrides
+        return `<tr>
+          <td class="table-cell font-semibold text-slate-900">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
+          <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
+          <td class="px-2 py-1 ${mch ? "bg-amber-50" : ""}">${sel(METHODS, ed.methods[mk] ?? r.산출방식, `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
+          <td class="table-cell text-slate-500">${esc(r.방식출처)}</td><td class="table-cell text-xs text-slate-500">${esc(r.추천사유 || "")}</td>
+          <td class="px-2 py-1 text-right ${ach ? "bg-amber-50" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
+          <td class="table-cell text-xs text-slate-500">${esc(r.비고 || "")}</td></tr>`
+      }).join("") : '<tr><td class="table-cell text-slate-400" colspan="9">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
+  </article>`
+}
 
-  // 세션이 끊긴 것을 더 빨리, 두 환경 모두에서 알아채기 위한 확인.
-  // ⚠ api() 가 아니라 fetch — api() 는 401 에서 게이트를 띄우므로 화면 전체가 튕긴다.
-  fetch("/api/auth/status")
-    .then(r => r.json())
-    .then(st => {
-      if (st.enabled && !st.logged_in) {
-        fail("로그인 세션이 만료되었습니다",
-             "전망 앱은 이 앱의 로그인 세션으로 열립니다. 다른 화면으로 이동하면 로그인 창이 나타납니다.")
-      }
-    })
-    .catch(() => {})            // 상태 조회 실패는 위의 판정에 맡긴다
+// ── 중장기 전망(4단계) 탭 ────────────────────────────────────
+
+function tableBody() {
+  const t = state.fc.table
+  if (!t) return emptyState("전망 표를 불러오지 못했습니다.")
+  const site = state.fc.site || TOTAL
+  const rows = site === TOTAL ? t.total_rows : (t.tables[site] || [])
+  const notes = []
+  if (t.notes.actuals_empty) notes.push(["warn", "마감된 연도의 분석 결과가 없어 표준금액이 비어 있습니다 — 기준연도 이후가 0 으로 보입니다."])
+  if (t.notes.budget_plan_missing) notes.push(["info", `${esc(t.base_year)}년 계획본이 없어 투자비를 0 으로 두고, 표준화 대상 과목의 ${esc(t.base_year)}년도 표준금액으로 대체합니다. 1단계에서 ${esc(t.base_year)}년 계획본을 올리면 확정 예산을 씁니다.`])
+  if (t.notes.grade_empty) notes.push(["info", "정비등급 이력이 없어 등급 «표준» 한 종으로 계산했습니다. 기준정보 탭에서 이력을 가져오면 등급별 표준금액이 살아납니다."])
+  const sums = Object.fromEntries(t.years.map(y => [y, rows.reduce((s, r) => s + (r[String(y)] || 0), 0)]))
+  return `
+  <article class="panel overflow-hidden">
+    <div class="border-b border-slate-200 p-5 sm:p-6">
+      <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-blue-700">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
+      <p class="section-help">기준연도는 계획본(있으면) + 본사배분, 이후는 표준금액 × 팩터 복리. 고온부품은 계획값 그대로, 임시·돌발사업은 그 해에 더합니다. 단위 천원.</p>
+      ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-xl ${tone === "warn" ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"} px-3 py-2 text-xs">${msg}</p>`).join("")}
+      <label class="mt-3 block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사</span>
+        <select class="control" data-fcsite><option value="${TOTAL}" ${site === TOTAL ? "selected" : ""}>전사 합계 (${t.sites.length}개 지사)</option>${t.sites.map(s => `<option value="${esc(s)}" ${s === site ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-slate-100">${rows.map(r => `<tr><td class="table-cell font-semibold text-slate-900">${esc(r.예산과목)}</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(r[String(y)])}</td>`).join("")}</tr>`).join("")}
+      <tr class="bg-slate-50 font-bold"><td class="table-cell text-slate-900">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
+  </article>`
+}
+
+export function renderForecast() {
+  const tab = state.fc.tab || "manage"
+  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : manageBody()
+  return `
+  <div class="space-y-6">
+    ${header()}
+    ${previewPanel()}
+    ${body}
+    <input id="fcImportFile" class="hidden" type="file" accept=".xlsx" data-kind="">
+    <p class="text-xs text-slate-400">비교용 — <a class="underline" href="/forecast/" target="_blank" rel="noopener">(구) 전망 앱을 새 탭에서 열기</a>. Phase 6-8 에서 제거됩니다.</p>
+  </div>`
 }

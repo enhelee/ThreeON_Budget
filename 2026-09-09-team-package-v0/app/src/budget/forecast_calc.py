@@ -109,9 +109,18 @@ SITE_TABLE_LINES = [
 ]
 
 
-def year_multiplier(year: int, factors_df: pd.DataFrame) -> float:
-    """등록된 모든 활성 팩터의 (1+연간비율)을 (year-2026)년만큼 복리로 곱한 배수."""
-    n = year - BASE_YEAR
+def forecast_years(base_year: int = BASE_YEAR) -> list:
+    """기준연도부터 10개년. v2 의 FORECAST_YEARS(2026~2035)는 base_year=2026 인 경우다.
+
+    6-6. 상태가 기준연도 축을 갖게 되었으니(6-5) 계산도 기준연도를 인자로 받는다.
+    기본값을 2026 으로 두어 v2 승계 테스트는 그대로 돈다.
+    """
+    return list(range(int(base_year), int(base_year) + 10))
+
+
+def year_multiplier(year: int, factors_df: pd.DataFrame, base_year: int = BASE_YEAR) -> float:
+    """등록된 모든 활성 팩터의 (1+연간비율)을 (year-기준연도)년만큼 복리로 곱한 배수."""
+    n = year - int(base_year)
     if n <= 0 or factors_df.empty:
         return 1.0
     active = factors_df[factors_df["활성"].astype(bool)] if "활성" in factors_df.columns else factors_df
@@ -229,8 +238,9 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                         hot_parts_df: pd.DataFrame, hq_amount_by_site_acct: dict,
                         hq_temp_alloc: pd.DataFrame, factors_df: pd.DataFrame,
                         surprise_df: pd.DataFrame, investment_df: pd.DataFrame,
-                        budget_lookup: dict = None) -> pd.DataFrame:
-    """한 지사의 2026~2035년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
+                        budget_lookup: dict = None, base_year: int = BASE_YEAR,
+                        years: list = None) -> pd.DataFrame:
+    """한 지사의 기준연도~+9년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
 
     표준화 대상 계정과목(SITE_TABLE_LINES의 "표준화:" 항목)의 당해년도(BASE_YEAR) 금액은
     "지사 자체 몫 + 본사 원가분배 몫"의 합이다("총원가배분(전체) = 본사 + 지사" 원본 양식과 동일한
@@ -238,6 +248,8 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     본사 원가분배 몫은 경상정비/정기유지보수/정기점검/지급수수료/열원보완및개선처럼
     HQ_CATEGORY_TO_ACCOUNT에 있는 계정만 값이 있고(hq_amount_by_site_acct), 나머지 계정은 0이라
     그대로 더해도 무해하다. 다음년도부터는 종전대로 표준화 금액에 팩터를 복리로 곱해 예측한다."""
+    base_year = int(base_year)
+    years = list(years) if years else forecast_years(base_year)
     site_grades = grade_hist[grade_hist["사업장"] == site]
     grade_by_year = dict(zip(site_grades["연도"], site_grades["등급"]))
     latest_known_grade = benchmark.get_current_grade(site, grade_hist)
@@ -264,24 +276,30 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     for label, source in SITE_TABLE_LINES:
         row = {"예산과목": label}
         base_multiplier_year_values = {}
-        for year in FORECAST_YEARS:
-            mult = year_multiplier(year, factors_df)
+        for year in years:
+            mult = year_multiplier(year, factors_df, base_year)
             grade = grade_by_year.get(year, latest_known_grade)
 
             if source.startswith("표준화:"):
                 account = source.split(":", 1)[1]
-                budget_amount = budget_lookup.get((site, account)) if year == BASE_YEAR else None
+                budget_amount = budget_lookup.get((site, account)) if year == base_year else None
                 if budget_amount is not None:
                     site_amount = budget_amount
                 else:
-                    base = std_lookup.get((site, account, grade), 0.0) if grade else 0.0
+                    # 등급 이력이 없는 지사는 benchmark 가 등급을 «표준» 으로 두고 표를 만든다.
+                    # v2 는 지사 목록이 등급 이력에서 나와 이 경로가 없었지만, 여기서는 지사가
+                    # dept_config 에서 오므로 등급 없는 지사가 정상 입력이다 — 그때 0 이 되면
+                    # 기준연도 이후 10년이 통째로 비어 보인다(6-6 실측).
+                    base = std_lookup.get((site, account, grade)) if grade else None
+                    if base is None:
+                        base = std_lookup.get((site, account, "표준"), 0.0)
                     site_amount = base * mult
                 # 26년은 지사 자체 예산(예산계획/표준화)에 본사 원가분배 마스터 표의 배분액을 더한다 -
                 # "총원가배분(전체) = 본사 + 지사"라 두 금액은 서로 다른 부서코드에 잡힌 별도 예산이며
                 # 합쳐야 그 지사의 26년 총액이 된다(경상정비/정기유지보수/정기점검/지급수수료/
                 # 열원보완및개선처럼 HQ_CATEGORY_TO_ACCOUNT에 없는 계정은 본사 배분이 0이라 그대로 더해도 무해).
                 hq_lookup_account = STANDARDIZED_ACCOUNT_TO_HQ_LABEL.get(account, account)
-                hq_part = hq_amount_by_site_acct.get((site, hq_lookup_account), 0.0) if year == BASE_YEAR else 0.0
+                hq_part = hq_amount_by_site_acct.get((site, hq_lookup_account), 0.0) if year == base_year else 0.0
                 amount = site_amount + hq_part
             elif source.startswith("고온부품:"):
                 item = source.split(":", 1)[1]
@@ -300,8 +318,8 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
 
     site_investment = investment_df[investment_df["사업장"] == site]["금액"].sum() if not investment_df.empty else 0.0
     invest_row = {"예산과목": "투자비"}
-    for year in FORECAST_YEARS:
-        invest_row[year] = site_investment * year_multiplier(year, factors_df)
+    for year in years:
+        invest_row[year] = site_investment * year_multiplier(year, factors_df, base_year)
     rows.append(invest_row)
 
     return pd.DataFrame(rows)
@@ -311,13 +329,15 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                        hot_parts_df: pd.DataFrame, hq_master_df: pd.DataFrame,
                        hq_temp_df: pd.DataFrame, hq_ratio_df: pd.DataFrame,
                        factors_df: pd.DataFrame, surprise_df: pd.DataFrame,
-                       investment_df: pd.DataFrame, budget_df: pd.DataFrame = None) -> dict:
+                       investment_df: pd.DataFrame, budget_df: pd.DataFrame = None,
+                       base_year: int = BASE_YEAR, years: list = None) -> dict:
     """지사별 표를 한 번에 계산. 반환: {사업장: DataFrame}"""
     hq_amount = hq_amount_by_site_account(hq_master_df)
     hq_temp_alloc = allocate_hq_temp_projects(hq_temp_df, hq_ratio_df)
     budget_lookup = budget_amount_by_site_account(budget_df) if budget_df is not None else {}
     return {
         site: compute_site_table(site, grade_hist, standard_df, hot_parts_df, hq_amount,
-                                  hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup)
+                                  hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup,
+                                  base_year=base_year, years=years)
         for site in sites
     }
