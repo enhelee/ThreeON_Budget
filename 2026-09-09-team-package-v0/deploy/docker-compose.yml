@@ -19,7 +19,6 @@ services:
       - "${HOST_PORT:-8080}:8080"
     volumes:
       - budget_data:/data/budget       # budget.db(SQLite 모드)·output
-      - forecast_data:/data/forecast   # v2 앱 CSV·모델·checkpoint_data
     restart: unless-stopped
     depends_on:
       postgres:
@@ -45,5 +44,4 @@ services:
 
 volumes:
   budget_data:
-  forecast_data:
   pg_data:

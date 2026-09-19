@@ -271,6 +271,5 @@ export function renderForecast() {
     ${previewPanel()}
     ${body}
     <input id="fcImportFile" class="hidden" type="file" accept=".xlsx" data-kind="">
-    <p class="text-xs text-slate-400">비교용 — <a class="underline" href="/forecast/" target="_blank" rel="noopener">(구) 전망 앱을 새 탭에서 열기</a>. Phase 6-8 에서 제거됩니다.</p>
   </div>`
 }
