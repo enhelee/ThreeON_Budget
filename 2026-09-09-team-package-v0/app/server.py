@@ -33,7 +33,6 @@ authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (D
 
 from budget import config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
 
-CONFIG_DIR = os.environ.get("CONFIG_DIR") or os.path.join(APP_DIR, "config")
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
 # 값을 주지 않으면 "dev" — 화면만 보고 배포본인지 로컬 개발본인지 구분된다.
@@ -350,7 +349,7 @@ def analyze(req: AnalyzeReq):
         out = {}
         for budget in ("손익", "자본"):
             res = pipeline_db.run_actual_db(
-                conn, CONFIG_DIR, OUT_DIR, req.year, budget, new_policy=req.policy,
+                conn, OUT_DIR, req.year, budget, new_policy=req.policy,
                 make_files=False)
             out[budget] = {"run_id": res["run_id"], "요약": res["요약"],
                            "경고": res.get("경고", [])}
@@ -378,11 +377,11 @@ def status(year: str):
         runs = _latest_runs(conn, year)
         ds = dbm.list_datasets(conn)
         years = sorted({d["year"] for d in ds}, reverse=True)
-        item_alias = config_store.load_item_alias(CONFIG_DIR)
+        item_alias = config_store.load_item_alias(conn)
         from budget import normalize as _norm
         items_cfg = {}
         for b in ("손익", "자본"):
-            cfg = config_store.load_item_config(CONFIG_DIR, year, b)
+            cfg = config_store.load_item_config(conn, year, b)
             items_cfg[b] = [_norm.normalize_item(x["과목"], item_alias) for x in cfg
                             if config_store.to_bool(x.get("포함"), True)
                             and config_store.to_bool(x.get("실적반영"), True)]
@@ -985,12 +984,12 @@ def stats(year: str):
         runs = _latest_runs(conn, year)
         if not runs:
             return {"budgets": {}}
-        dept_cfg = config_store.load_dept_config(CONFIG_DIR, year)
+        dept_cfg = config_store.load_dept_config(conn, year)
         group_of = {d["이름"]: d["그룹"] for d in dept_cfg}
         out = {}
         for budget, r in runs.items():
             df = dbm.load_biz_lines(conn, r["id"])
-            item_cfg = config_store.load_item_config(CONFIG_DIR, year, budget)
+            item_cfg = config_store.load_item_config(conn, year, budget)
             cat_of = {x["과목"]: x["대분류"] for x in item_cfg}
             by_item = {}
             by_group = {}
@@ -1093,7 +1092,7 @@ def export(year: str, budget: str, kind: str = "actual"):
                  or _mtime_str(path) < str(run["created_at"]))
         if stale:
             # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
-            pipeline_db.run_actual_db(conn, CONFIG_DIR, OUT_DIR, year, budget,
+            pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
                                       make_files=True, record_run=False)
     finally:
         conn.close()
@@ -1121,7 +1120,7 @@ def export_team(year: str, kind: str = "json"):
         newest = max(str(r["created_at"]) for r in runs)
         stale = (not os.path.exists(path) or _mtime_str(path) < newest)
         if stale:
-            pipeline_db.export_team_bundle(conn, CONFIG_DIR, OUT_DIR, year)
+            pipeline_db.export_team_bundle(conn, OUT_DIR, year)
     finally:
         conn.close()
     if not os.path.exists(path):

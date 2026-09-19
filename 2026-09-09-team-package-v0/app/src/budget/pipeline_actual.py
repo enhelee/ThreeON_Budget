@@ -27,13 +27,13 @@ def _num(v):
         return 0.0
 
 
-def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, budget,
+def run_actual(plan_path, zrfm2_path, master_path, conn, out_dir, year, budget,
                new_policy="group"):
     """파일 기반 실행(하위호환): 파일 로드 후 공용 코어로 위임."""
     plan_df = loaders.load_business_plan(plan_path)
     erp_df = erp_loader.load_erp(zrfm2_path)
     return run_actual_frames(
-        plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
+        plan_df, erp_df, master_path, conn, out_dir, year, budget,
         new_policy=new_policy, zrfm2_src_path=zrfm2_path,
     )
 
@@ -41,7 +41,7 @@ def run_actual(plan_path, zrfm2_path, master_path, config_dir, out_dir, year, bu
 VALID_ATTRS = ("일반", "제조", "건가", "자산")
 
 
-def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
+def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
                       new_policy="group", zrfm2_src_path=None, overrides=None,
                       learned=None, biz_edits=None, attr_map=None, code_to_item=None,
                       deptcode_map=None, manual_biz=None, biz_deletes=None,
@@ -62,18 +62,13 @@ def run_actual_frames(plan_df, erp_df, master_path, config_dir, out_dir, year, b
         아니면(원본 품질 문제) 마스터 값으로 교정. 신규 행 속성도 이걸로 채움.
     code_to_item: {계정코드 -> 과목명} 마스터 — ERP 과목 정규화 보강.
     """
-    # 구성 로드(시드 자동 영속화)
-    dept_config = config_store.load_dept_config(config_dir, year)
-    config_store.save_dept_config(config_dir, year, dept_config)
-    pl_config = config_store.load_item_config(config_dir, year, "손익")
-    cap_config = config_store.load_item_config(config_dir, year, "자본")
-    config_store.save_item_config(config_dir, year, "손익", pl_config)
-    config_store.save_item_config(config_dir, year, "자본", cap_config)
+    # 구성 로드(비어 있으면 load_* 가 시드를 심고 돌려준다)
+    dept_config = config_store.load_dept_config(conn, year)
+    pl_config = config_store.load_item_config(conn, year, "손익")
+    cap_config = config_store.load_item_config(conn, year, "자본")
     item_config = pl_config if budget == "손익" else cap_config
-    item_alias = config_store.load_item_alias(config_dir)
-    dept_alias = config_store.load_dept_alias(config_dir)
-    config_store.save_item_alias(config_dir, item_alias)
-    config_store.save_dept_alias(config_dir, dept_alias)
+    item_alias = config_store.load_item_alias(conn)
+    dept_alias = config_store.load_dept_alias(conn)
 
     def _alias(x):
         return normalize.normalize_item(x["과목"], item_alias)

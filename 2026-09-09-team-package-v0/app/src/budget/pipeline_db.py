@@ -23,7 +23,7 @@ def team_bundle_paths(out_dir, year):
     return {k: os.path.join(out_dir, v.format(y=year)) for k, v in TEAM_BUNDLE_FILES.items()}
 
 
-def export_team_bundle(conn, config_dir, out_dir, year, budgets=("손익", "자본")):
+def export_team_bundle(conn, out_dir, year, budgets=("손익", "자본")):
     """손익·자본 최신 분석을 (기록 없이) 재실행해 팀 v2 연계 파일 4종을 만든다.
 
     - 팀연계_{y}_사업실적연결.json : spec_io.build_team_result_json (schemaVersion 1)
@@ -34,7 +34,7 @@ def export_team_bundle(conn, config_dir, out_dir, year, budgets=("손익", "자�
     """
     frames, run_ids = {}, {}
     for budget in budgets:
-        res = run_actual_db(conn, config_dir, out_dir, year, budget,
+        res = run_actual_db(conn, out_dir, year, budget,
                             make_files=False, record_run=False)
         frames[budget] = res["erp_annotated"]
         run_ids[budget] = res.get("run_id")
@@ -45,7 +45,7 @@ def export_team_bundle(conn, config_dir, out_dir, year, budgets=("손익", "자�
     spec_io.write_team_result_json(paths["json"], result)
     spec_io.write_matched_csv_combined(frames, paths["matched"])
 
-    item_alias = config_store.load_item_alias(config_dir)
+    item_alias = config_store.load_item_alias(conn)
     plan_df = dbm.load_plan_df(conn, year)
     if plan_df is not None:
         spec_io.write_budget_csv_from_df(plan_df, paths["budget"], normalize_item_alias=item_alias)
@@ -58,7 +58,7 @@ def export_team_bundle(conn, config_dir, out_dir, year, budgets=("손익", "자�
     return {"paths": paths, "summary": result["summary"], "run_ids": run_ids}
 
 
-def run_actual_db(conn, config_dir, out_dir, year, budget, new_policy="group",
+def run_actual_db(conn, out_dir, year, budget, new_policy="group",
                   master_path=None, make_files=True, record_run=True):
     """DB의 최신 계획/ERP 데이터셋으로 실적분석 실행 + 결과를 run으로 기록.
 
@@ -89,7 +89,7 @@ def run_actual_db(conn, config_dir, out_dir, year, budget, new_policy="group",
     manual_biz = dbm.list_manual_biz(conn, year, budget)   # 수동 추가 사업
     biz_deletes = dbm.list_biz_deletes(conn, year, budget)  # 삭제(분석 제외) 사업
     res = pipeline_actual.run_actual_frames(
-        plan_df, erp_df, master_path, config_dir, out_dir, year, budget,
+        plan_df, erp_df, master_path, conn, out_dir, year, budget,
         new_policy=new_policy, zrfm2_src_path=None, overrides=overrides,
         learned=learned, biz_edits=biz_edits,
         attr_map=attr_map, code_to_item=code_to_item, deptcode_map=deptcode_map,
