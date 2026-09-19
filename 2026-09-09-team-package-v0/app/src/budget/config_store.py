@@ -6,18 +6,46 @@ import os
 DEPT_GROUPS = ["본사", "중대형CHP", "소형CHP", "DH"]
 SIMUI_THRESHOLD_THOUSAND = 50000
 
-_SEED_DEPTS = {
-    "본사": ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"],
-    "중대형CHP": ["동탄지사", "화성지사", "파주지사", "광교지사", "판교지사", "삼송지사", "대구지사", "청주지사"],
-    "소형CHP": ["수원사업소", "광주전남지사", "강남지사"],
-    "DH": ["중앙지사", "고양사업소", "용인지사", "분당사업소", "세종지사", "김해사업소", "양산지사", "평택지사"],
+# 연도별 지사 구성 시드.
+#
+# ⚠ 이 값들은 «그 연도를 처음 만들 때의 출발점»일 뿐이다. 한 번 심은 뒤의 편집은
+#   전부 DB 에서 일어나므로, 여기를 고쳐도 이미 심어진 연도에는 영향이 없다.
+#
+# 지사는 성격이 바뀐다. 양산지사는 2023년 발전설비 건설 중이라 공식적으로 DH 였고
+# 준공 후 중대형CHP 가 되었다. 대구·청주도 같은 시기에 소형CHP 에서 올라갔다.
+# 연도 축 없는 목록 하나로는 이것을 담을 수 없었고, 그 결과 배포된 앱이 2025년
+# 지사그룹별 집계를 1,973,199천원(양산지사 손익 계획) 어긋나게 내고 있었다.
+SEED_DEPTS_BY_YEAR = {
+    "2023": {
+        "본사": ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"],
+        "중대형CHP": ["동탄지사", "화성지사", "파주지사", "광교지사", "판교지사", "삼송지사"],
+        "소형CHP": ["수원사업소", "대구지사", "청주지사", "광주전남지사", "강남지사"],
+        "DH": ["중앙지사", "고양사업소", "용인지사", "분당사업소", "세종지사",
+               "김해사업소", "양산지사", "평택지사"],
+    },
+    "2025": {
+        "본사": ["플랜트기술처", "안전처", "통합운영처", "건설처", "미래사업처"],
+        "중대형CHP": ["동탄지사", "화성지사", "파주지사", "광교지사", "판교지사",
+                      "삼송지사", "대구지사", "청주지사", "양산지사"],
+        "소형CHP": ["수원사업소", "광주전남지사", "강남지사"],
+        "DH": ["중앙지사", "고양사업소", "용인지사", "분당사업소", "세종지사",
+               "김해사업소", "평택지사"],
+    },
 }
 
 
-def seed_dept_config():
+def _seed_year(year):
+    """시드에 없는 연도는 가장 가까운 과거 연도를 쓴다(없으면 가장 이른 연도)."""
+    years = sorted(SEED_DEPTS_BY_YEAR)
+    past = [y for y in years if y <= str(year)]
+    return past[-1] if past else years[0]
+
+
+def seed_dept_config(year):
+    src = SEED_DEPTS_BY_YEAR[_seed_year(year)]
     out = []
     for g in DEPT_GROUPS:
-        for name in _SEED_DEPTS[g]:
+        for name in src[g]:
             out.append({"이름": name, "그룹": g, "포함": True})
     return out
 
@@ -36,7 +64,7 @@ def load_dept_config(config_dir, year):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return normalize_dept_config(json.load(f))
-    return seed_dept_config()
+    return seed_dept_config(year)
 
 
 def save_dept_config(config_dir, year, items):
@@ -76,7 +104,9 @@ SEED_ITEMS = {
 }
 
 
-def seed_item_config(budget):
+def seed_item_config(year, budget):
+    """과목 시드. 2023·2025 가 같아 아직 연도로 갈리지 않지만, 호출부가 연도를
+    넘기게 해 두면 갈리는 날 여기만 고치면 된다."""
     return [normalize_item_row(dict(x, 포함=True)) for x in SEED_ITEMS[budget]]
 
 
@@ -125,7 +155,7 @@ def load_item_config(config_dir, year, budget):
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return normalize_item_config(json.load(f))
-    return seed_item_config(budget)
+    return seed_item_config(year, budget)
 
 
 def save_item_config(config_dir, year, budget, items):

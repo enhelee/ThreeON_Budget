@@ -29,8 +29,9 @@ import sqlite3
 
 # INSERT OR REPLACE 대상 테이블: (PK 컬럼들, 전체 컬럼 순서) — db.py의 VALUES(?,…) 순서와 동일
 REPLACE_TABLES = {
-    "item_master": (("계정코드",), ("계정코드", "과목명", "주관부서코드", "주관부서명", "속성", "비고")),
-    "dept_master": (("부서코드",), ("부서코드", "부서명", "처지사", "비고")),
+    "item_master": (("year", "계정코드"),
+                    ("year", "계정코드", "과목명", "주관부서코드", "주관부서명", "속성", "비고")),
+    "dept_master": (("year", "부서코드"), ("year", "부서코드", "부서명", "처지사", "비고")),
     "year_lock": (("year",), ("year", "locked_at")),
     "learned_match": (("과목", "텍스트정규"), ("과목", "텍스트정규", "사업명", "source", "source_year", "created_at")),
 }

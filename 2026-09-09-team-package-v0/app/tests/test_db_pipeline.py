@@ -167,8 +167,11 @@ def test_year_lock_and_attr_master(env):
     assert not dbm.is_locked(conn, "2023")
 
     # 마스터 속성 교정: 속성 칸에 과목명이 들어간 계획(25년 자본 원본 케이스)
-    conn.execute("INSERT OR REPLACE INTO item_master VALUES(?,?,?,?,?,?)",
-                 ("60909002", "수선유지비-열원정기점검", None, None, "제조", None))
+    # 마스터는 연도별이다 — 그 해 행으로 넣는다(컬럼도 이름으로 지정한다).
+    conn.execute("INSERT OR REPLACE INTO item_master"
+                 "(year,계정코드,과목명,주관부서코드,주관부서명,속성,비고)"
+                 " VALUES(?,?,?,?,?,?,?)",
+                 ("2023", "60909002", "수선유지비-열원정기점검", None, None, "제조", None))
     conn.commit()
     # 계획의 속성을 고의로 오염시킨 뒤 재분석
     ds = conn.execute("SELECT id FROM dataset WHERE kind='plan'").fetchone()[0]
