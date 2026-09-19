@@ -399,6 +399,141 @@ def status(year: str):
         conn.close()
 
 
+# ── 연도별 기준정보(구성·별칭·마스터) ──────────────────────────────────
+#   구성은 «그 해의 기준»이다. 조회는 연도를 받아 없으면 시드를 심어 돌려주고,
+#   저장은 그 해 한 벌을 통째로 갈아 끼운다. 마감된 연도는 기준도 못 고친다 —
+#   과거 분석 결과가 조용히 바뀌는 것을 막는 의도된 마찰이다.
+
+class DeptCfgReq(BaseModel):
+    year: str
+    rows: list
+
+
+class ItemCfgReq(BaseModel):
+    year: str
+    budget: str
+    rows: list
+
+
+class AliasReq(BaseModel):
+    종류: str
+    rows: dict
+
+
+class CopyYearReq(BaseModel):
+    from_year: str
+    to_year: str
+
+
+@app.get("/api/config/depts")
+def get_dept_config(year: str):
+    conn = _conn()
+    try:
+        return _clean_json({"year": year,
+                            "rows": config_store.load_dept_config(conn, year),
+                            "groups": config_store.DEPT_GROUPS,
+                            "locked": dbm.is_locked(conn, year)})
+    finally:
+        conn.close()
+
+
+@app.put("/api/config/depts")
+def put_dept_config(req: DeptCfgReq):
+    conn = _conn()
+    try:
+        _guard_unlocked(conn, req.year, "기준정보 변경")
+        rows = config_store.save_dept_config(conn, req.year, req.rows)
+        return _clean_json({"year": req.year, "rows": rows})
+    finally:
+        conn.close()
+
+
+@app.get("/api/config/items")
+def get_item_config(year: str, budget: str):
+    conn = _conn()
+    try:
+        return _clean_json({"year": year, "budget": budget,
+                            "rows": config_store.load_item_config(conn, year, budget),
+                            "locked": dbm.is_locked(conn, year)})
+    finally:
+        conn.close()
+
+
+@app.put("/api/config/items")
+def put_item_config(req: ItemCfgReq):
+    if req.budget not in ("손익", "자본"):
+        raise HTTPException(400, "budget은 손익 또는 자본이어야 합니다.")
+    conn = _conn()
+    try:
+        _guard_unlocked(conn, req.year, "기준정보 변경")
+        rows = config_store.save_item_config(conn, req.year, req.budget, req.rows)
+        return _clean_json({"year": req.year, "budget": req.budget, "rows": rows})
+    finally:
+        conn.close()
+
+
+@app.get("/api/config/alias")
+def get_alias():
+    """별칭은 연도 축이 없다 — 오래된 표기가 몇 년 뒤 자료에 다시 나타난다."""
+    conn = _conn()
+    try:
+        return _clean_json({"item": config_store.load_item_alias(conn),
+                            "dept": config_store.load_dept_alias(conn)})
+    finally:
+        conn.close()
+
+
+@app.put("/api/config/alias")
+def put_alias(req: AliasReq):
+    if req.종류 not in ("item", "dept"):
+        raise HTTPException(400, "종류는 item(예산과목) 또는 dept(처지사)여야 합니다.")
+    conn = _conn()
+    try:
+        return _clean_json({"종류": req.종류,
+                            "rows": config_store.save_alias(conn, req.종류, req.rows)})
+    finally:
+        conn.close()
+
+
+@app.get("/api/master/items")
+def get_item_master(year: str):
+    conn = _conn()
+    try:
+        return _clean_json({"year": year, "rows": dbm.list_item_master(conn, year)})
+    finally:
+        conn.close()
+
+
+@app.get("/api/master/depts")
+def get_dept_master(year: str):
+    conn = _conn()
+    try:
+        return _clean_json({"year": year, "rows": dbm.list_dept_master(conn, year)})
+    finally:
+        conn.close()
+
+
+@app.post("/api/config/copy-year")
+def copy_year(req: CopyYearReq):
+    """새 연도는 직전 연도를 복사해 시작한다 — 매년 조금씩만 바뀌기 때문이다."""
+    if req.from_year == req.to_year:
+        raise HTTPException(400, "같은 연도로는 복사할 수 없습니다.")
+    conn = _conn()
+    try:
+        _guard_unlocked(conn, req.to_year, "기준정보 복사")
+        config_store.save_dept_config(
+            conn, req.to_year, config_store.load_dept_config(conn, req.from_year))
+        for b in ("손익", "자본"):
+            config_store.save_item_config(
+                conn, req.to_year, b,
+                config_store.load_item_config(conn, req.from_year, b))
+        dbm.copy_masters(conn, req.from_year, req.to_year)
+        return {"copied": {"from": req.from_year, "to": req.to_year},
+                "master": dbm.master_stats(conn, req.to_year)}
+    finally:
+        conn.close()
+
+
 # ── 연도 마감(잠금) ────────────────────────────────────────────────────
 
 class LockReq(BaseModel):

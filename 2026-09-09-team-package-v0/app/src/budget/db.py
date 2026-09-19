@@ -550,6 +550,37 @@ def load_deptcode_map(conn, year):
                          " WHERE year=? AND 처지사 IS NOT NULL", (y,))}
 
 
+ITEM_MASTER_COLS = ("계정코드", "과목명", "주관부서코드", "주관부서명", "속성", "비고")
+DEPT_MASTER_COLS = ("부서코드", "부서명", "처지사", "비고")
+
+
+def list_item_master(conn, year):
+    rows = conn.execute(
+        f"SELECT {','.join(ITEM_MASTER_COLS)} FROM item_master"
+        " WHERE year=? ORDER BY 계정코드", (str(year),)).fetchall()
+    return [dict(zip(ITEM_MASTER_COLS, r)) for r in rows]
+
+
+def list_dept_master(conn, year):
+    rows = conn.execute(
+        f"SELECT {','.join(DEPT_MASTER_COLS)} FROM dept_master"
+        " WHERE year=? ORDER BY 부서코드", (str(year),)).fetchall()
+    return [dict(zip(DEPT_MASTER_COLS, r)) for r in rows]
+
+
+def copy_masters(conn, from_year, to_year):
+    """그 해 마스터를 통째로 복사한다. 대상 연도에 있던 것은 먼저 지운다 —
+    두 해가 섞이면 어느 기준으로 분석한 것인지 알 수 없게 된다."""
+    for table, cols in (("item_master", ITEM_MASTER_COLS),
+                        ("dept_master", DEPT_MASTER_COLS)):
+        c = ",".join(cols)
+        conn.execute(f"DELETE FROM {table} WHERE year=?", (str(to_year),))
+        conn.execute(
+            f"INSERT INTO {table}(year,{c}) SELECT ?,{c} FROM {table} WHERE year=?",
+            (str(to_year), str(from_year)))
+    conn.commit()
+
+
 def master_stats(conn, year=None):
     """마스터 건수. 연도를 주면 그 해 것만 센다(설정 화면·상태 표시용)."""
     if year is None:
