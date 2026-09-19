@@ -286,7 +286,13 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                 if budget_amount is not None:
                     site_amount = budget_amount
                 else:
-                    base = std_lookup.get((site, account, grade), 0.0) if grade else 0.0
+                    # 등급 이력이 없는 지사는 benchmark 가 등급을 «표준» 으로 두고 표를 만든다.
+                    # v2 는 지사 목록이 등급 이력에서 나와 이 경로가 없었지만, 여기서는 지사가
+                    # dept_config 에서 오므로 등급 없는 지사가 정상 입력이다 — 그때 0 이 되면
+                    # 기준연도 이후 10년이 통째로 비어 보인다(6-6 실측).
+                    base = std_lookup.get((site, account, grade)) if grade else None
+                    if base is None:
+                        base = std_lookup.get((site, account, "표준"), 0.0)
                     site_amount = base * mult
                 # 26년은 지사 자체 예산(예산계획/표준화)에 본사 원가분배 마스터 표의 배분액을 더한다 -
                 # "총원가배분(전체) = 본사 + 지사"라 두 금액은 서로 다른 부서코드에 잡힌 별도 예산이며

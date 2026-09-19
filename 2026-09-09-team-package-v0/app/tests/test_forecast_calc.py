@@ -298,3 +298,22 @@ def test_compute_site_table_columns_follow_base_year():
     row = table[table["예산과목"] == "수선유지비-열원경상정비"].iloc[0]
     assert row[2027] == pytest.approx(100.0)          # 기준연도는 배수 1
     assert row[2028] == pytest.approx(110.0)
+
+
+def test_compute_site_table_falls_back_to_standard_grade_when_site_has_no_grade_history():
+    """등급 이력이 없는 지사 — benchmark 는 등급 «표준» 행을 만든다. 계산부가 그 행을
+    집지 못하면 기준연도 이후가 전부 0 이 된다(6-6 실측). 지사가 dept_config 에서 오는
+    지금은 등급 없는 지사가 정상 입력이다."""
+    grade_hist = pd.DataFrame(columns=["사업장", "연도", "등급"])
+    standard_df = pd.DataFrame([
+        {"사업장": "화성지사", "구분": "손익", "예산과목": "수선유지비-열원경상정비", "등급": "표준", "표준금액": 100.0}])
+    factors = pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.1, "활성": True}])
+    empty_hot = pd.DataFrame(columns=["사업장", "연도", "항목", "금액"])
+    empty_temp_alloc = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액"])
+    empty_surprise = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액", "사유"])
+    empty_investment = pd.DataFrame(columns=["사업장", "지사유형", "금액"])
+    table = lf.compute_site_table("화성지사", grade_hist, standard_df, empty_hot, {}, empty_temp_alloc,
+                                   factors, empty_surprise, empty_investment)
+    row = table[table["예산과목"] == "수선유지비-열원경상정비"].iloc[0]
+    assert row[2026] == pytest.approx(100.0)
+    assert row[2027] == pytest.approx(110.0)
