@@ -423,6 +423,7 @@ class AliasReq(BaseModel):
 class CopyYearReq(BaseModel):
     from_year: str
     to_year: str
+    overwrite: bool = False
 
 
 @app.get("/api/config/depts")
@@ -520,6 +521,21 @@ def get_dept_master(year: str):
         conn.close()
 
 
+def _year_config_is_untouched(conn, year):
+    """그 해 구성이 «읽을 때 자동으로 심긴 시드» 그대로인가.
+
+    설정 화면을 여는 것만으로 그 해 구성이 심긴다. 사람이 손대지 않은 그 상태까지
+    «이미 있음»으로 보고 복사를 막으면, 화면을 한 번 열었다는 이유만으로 연도 복사가
+    영영 막힌다 — 실측으로 걸린 길이다. 마스터가 올라와 있으면 손댄 것으로 본다.
+    """
+    if any(dbm.master_stats(conn, year).values()):
+        return False
+    if config_store.load_dept_config(conn, year) != config_store.seed_dept_config(year):
+        return False
+    return all(config_store.load_item_config(conn, year, b)
+               == config_store.seed_item_config(year, b) for b in ("손익", "자본"))
+
+
 @app.post("/api/config/copy-year")
 def copy_year(req: CopyYearReq):
     """새 연도는 직전 연도를 복사해 시작한다 — 매년 조금씩만 바뀌기 때문이다."""
@@ -528,6 +544,12 @@ def copy_year(req: CopyYearReq):
     conn = _conn()
     try:
         _guard_unlocked(conn, req.to_year, "기준정보 복사")
+        # 손댄 연도를 말없이 덮어쓰지 않는다. 「＋연도」가 실수로 기존 연도를
+        # 가리켰을 때 공들여 맞춘 구성이 사라지는 길을 막는 것이다.
+        if not req.overwrite and not _year_config_is_untouched(conn, req.to_year):
+            raise HTTPException(
+                409, f"{req.to_year}년 기준정보를 이미 손댔습니다 — 덮어쓰려면 "
+                     "overwrite=true 로 다시 요청하세요.")
         config_store.save_dept_config(
             conn, req.to_year, config_store.load_dept_config(conn, req.from_year))
         for b in ("손익", "자본"):

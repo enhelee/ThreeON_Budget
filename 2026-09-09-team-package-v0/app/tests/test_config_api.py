@@ -167,8 +167,45 @@ def test_copy_year_clones_config_and_master(client, tmp_path):
     assert client.get("/api/master/depts?year=2025").json()["rows"]
 
 
+def test_copy_year_allows_target_that_was_only_auto_seeded(client):
+    """설정 화면을 한 번 여는 것만으로 그 해 구성이 심긴다.
+
+    손대지 않은 그 시드까지 «이미 있음»으로 보고 막으면, 화면을 열어 봤다는
+    이유만으로 연도 복사가 영영 막힌다 — 브라우저 실측으로 걸린 길이다.
+    """
+    rows = client.get("/api/config/depts?year=2025").json()["rows"]
+    for x in rows:
+        if x["이름"] == "화성지사":
+            x["그룹"] = "DH"
+    client.put("/api/config/depts", json={"year": "2025", "rows": rows})
+    client.get("/api/config/depts?year=2026")          # 화면을 연 것과 같다 — 시드가 심긴다
+
+    r = client.post("/api/config/copy-year", json={"from_year": "2025", "to_year": "2026"})
+    assert r.status_code == 200, r.text
+    g = {x["이름"]: x["그룹"]
+         for x in client.get("/api/config/depts?year=2026").json()["rows"]}
+    assert g["화성지사"] == "DH"                        # 시드가 아니라 2025 사본이다
+
+
+def test_copy_year_refuses_to_clobber_an_existing_year(client):
+    """이미 기준이 선 연도는 말없이 덮지 않는다.
+
+    「＋연도」가 실수로 기존 연도를 가리켰을 때 공들여 맞춘 구성이 사라지는
+    길을 막는다. 덮어쓰기는 overwrite 로 뜻을 밝혀야 한다.
+    """
+    rows = client.get("/api/config/depts?year=2026").json()["rows"]
+    rows.append({"이름": "지켜야할지사", "그룹": "DH", "포함": True})   # 손댔다
+    client.put("/api/config/depts", json={"year": "2026", "rows": rows})
+    client.get("/api/config/depts?year=2025")
+
+    r = client.post("/api/config/copy-year", json={"from_year": "2025", "to_year": "2026"})
+    assert r.status_code == 409
+    assert any(x["이름"] == "지켜야할지사"
+               for x in client.get("/api/config/depts?year=2026").json()["rows"])
+
+
 def test_copy_year_overwrites_target_without_leftovers(client):
-    """대상 연도에 이미 있던 구성은 통째로 갈아 끼운다 — 두 해가 섞이면 안 된다."""
+    """overwrite 를 밝히면 통째로 갈아 끼운다 — 두 해가 섞이면 안 된다."""
     rows = client.get("/api/config/depts?year=2026").json()["rows"]
     rows.append({"이름": "없어질지사", "그룹": "DH", "포함": True})
     client.put("/api/config/depts", json={"year": "2026", "rows": rows})
@@ -176,7 +213,9 @@ def test_copy_year_overwrites_target_without_leftovers(client):
                for x in client.get("/api/config/depts?year=2026").json()["rows"])
 
     client.get("/api/config/depts?year=2025")
-    client.post("/api/config/copy-year", json={"from_year": "2025", "to_year": "2026"})
+    r = client.post("/api/config/copy-year",
+                    json={"from_year": "2025", "to_year": "2026", "overwrite": True})
+    assert r.status_code == 200
     assert not any(x["이름"] == "없어질지사"
                    for x in client.get("/api/config/depts?year=2026").json()["rows"])
 

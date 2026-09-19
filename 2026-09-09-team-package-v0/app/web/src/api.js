@@ -13,7 +13,9 @@ export async function api(path, opts = {}) {
       showGate("세션이 없거나 만료되었습니다. 다시 로그인하세요.");
       throw new Error("로그인이 필요합니다.");
     }
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
