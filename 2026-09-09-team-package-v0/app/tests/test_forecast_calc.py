@@ -267,3 +267,34 @@ def test_compute_site_table_adds_surprise_project():
     row = table[table["예산과목"] == "공구와기구-열원시설공기구"].iloc[0]
     assert row[2028] == 999.0
     assert row[2027] == 0.0
+
+
+# ---------------------------------------------------------------- 6-6: 기준연도 파라미터
+# v2 는 BASE_YEAR=2026 이 상수였다. 상태가 기준연도 축을 갖게 되었으니(6-5) 계산도
+# 기준연도를 인자로 받는다. 기본값은 2026 그대로라 위의 v2 승계 테스트는 손대지 않는다.
+def test_forecast_years_follow_base_year():
+    assert lf.forecast_years() == list(range(2026, 2036))
+    assert lf.forecast_years(2027) == list(range(2027, 2037))
+
+
+def test_year_multiplier_uses_given_base_year():
+    factors = pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.1, "활성": True}])
+    assert lf.year_multiplier(2027, factors, base_year=2027) == pytest.approx(1.0)
+    assert lf.year_multiplier(2028, factors, base_year=2027) == pytest.approx(1.1)
+
+
+def test_compute_site_table_columns_follow_base_year():
+    grade_hist = pd.DataFrame({"사업장": ["화성지사"], "연도": [2027], "등급": ["간이"]})
+    standard_df = pd.DataFrame([
+        {"사업장": "화성지사", "구분": "손익", "예산과목": "수선유지비-열원경상정비", "등급": "간이", "표준금액": 100.0}])
+    factors = pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.1, "활성": True}])
+    empty_hot = pd.DataFrame(columns=["사업장", "연도", "항목", "금액"])
+    empty_temp_alloc = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액"])
+    empty_surprise = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액", "사유"])
+    empty_investment = pd.DataFrame(columns=["사업장", "지사유형", "금액"])
+    table = lf.compute_site_table("화성지사", grade_hist, standard_df, empty_hot, {}, empty_temp_alloc,
+                                   factors, empty_surprise, empty_investment, base_year=2027)
+    assert [c for c in table.columns if c != "예산과목"] == list(range(2027, 2037))
+    row = table[table["예산과목"] == "수선유지비-열원경상정비"].iloc[0]
+    assert row[2027] == pytest.approx(100.0)          # 기준연도는 배수 1
+    assert row[2028] == pytest.approx(110.0)
