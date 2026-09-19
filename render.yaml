@@ -1,7 +1,7 @@
 # Render Blueprint — 무료 공개 배포(지금 단계). 저장소 루트에 이 파일이 있으면 Render가 자동 인식한다.
 #   1) GitHub 저장소를 Render에 연결 → "New Blueprint" → 이 파일 선택
 #   2) 대시보드에서 APP_PASSWORD, DATABASE_URL(Supabase) 값을 직접 입력(sync: false = Git에 값 없음)
-#   3) 배포 후 https://<서비스이름>.onrender.com/ (소개) · /app/ (budget_app) · /forecast (v2 앱)
+#   3) 배포 후 https://<서비스이름>.onrender.com/ — 주소는 이것 하나다(옥 /app/ 은 301 로 루트로 보낸다)
 # 무료 플랜 제약: 15분 미사용 시 슬립(첫 접속 30~60초 지연), 디스크 비영속(재배포 시 초기화) → DB는 Supabase.
 services:
   - type: web

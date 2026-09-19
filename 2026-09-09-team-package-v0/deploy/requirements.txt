@@ -1,6 +1,8 @@
-# 두 앱 통합 이미지의 파이썬 의존성 (python:3.12-slim 기준, 2026-09-09 검증 조합)
-#   forecast_app(v2)이 pandas 2.2.3·streamlit 1.59.0을 고정 → budget_app도 그 조합에서 동작(pd.isna 가드 설계).
-streamlit==1.59.0
+# 배포 이미지의 파이썬 의존성 (python:3.12-slim 기준, 2026-09-09 검증 조합)
+#   ⚠ pandas 2.2.3 고정은 남긴다. 고정을 시작한 이유(v2 전망 앱과의 동거)는 6-8 에서
+#     사라졌지만, budget_app 이 검증된 조합이 이것이다. pandas 3.0 은 기본 str dtype 이
+#     달라 classify·plan_summary·excel_plan_writer 의 결측 처리가 바뀐다(pd.isna 가드 설계).
+#     올리는 것은 별건으로, 테스트를 보면서 한다.
 pandas==2.2.3
 numpy<2.3
 openpyxl==3.1.5
