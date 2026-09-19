@@ -48,7 +48,6 @@ py -m pytest -q     # 77 passed (약 4~6분) — 팀 v2 폴더가 형제 경로�
 ```
 
 ## 6. 참고
-- `app.py`(Streamlit)·`run.bat`·`run.sh`는 **구버전 UI**입니다 — 기본 실행은 위 웹 시스템.
 - 화면(`webapp/index.html`) 수정은 **새로고침만으로 반영**됩니다. `server.py`·`src/` 수정은 **서버 재시작** 필요.
 - 원자료는 절대 수정되지 않습니다 — 모든 검토·수정은 지시 테이블(override/biz_edit/manual_biz/biz_delete)에 쌓이고 재분석 때 반영되므로, **이력을 지우면 원래대로 돌아갑니다.**
 - 오프라인 분리망: 인터넷 연결된 PC에서 `py -m pip download -r requirements.txt -d pkgs`
