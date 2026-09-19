@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -108,7 +109,40 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ⚠ GZip 은 «가장 안쪽»이어야 한다 — 그래서 AuthAudit 보다 먼저 등록한다.
+#   add_middleware 는 앞에 끼우므로 나중에 등록한 것이 바깥이다.
+#   BaseHTTPMiddleware(AuthAudit·SecurityHeaders)를 거친 응답은 ASGI 수준에서 본문이
+#   여러 조각(more_body=True)으로 흐른다. GZipResponder 는 조각이 이어질 때
+#   «크기를 알 수 없다»고 보고 minimum_size 를 건너뛰고 무조건 압축한다 —
+#   실측: /healthz 같은 100바이트 JSON 도 gzip 으로 나갔다. 안쪽에 두면 본문이 한 덩어리로
+#   도착해 임계값이 제대로 걸린다.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(AuthAuditMiddleware)
+
+
+# ── Caddy 가 내던 HTTP 속성 (Phase 6-8 에서 앱이 넘겨받았다) ──────────────
+# 6-8 에서 Caddy 를 지웠다. 프록시 역할은 uvicorn 이 $PORT 를 직접 열면서 사라지지만,
+# Caddyfile 의 `header {}` 와 `encode gzip` 이 하던 일은 **없어지면 조용하다** —
+# 화면은 그대로 뜨고 보안 헤더만 사라진다. 그래서 여기로 옮기고 테스트로 고정했다
+# (tests/test_http_hardening.py).
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+}
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        for k, v in SECURITY_HEADERS.items():
+            response.headers.setdefault(k, v)   # 라우트가 직접 정한 값이 있으면 그것을 존중
+        return response
+
+
+# 바깥부터: SecurityHeaders → AuthAudit → GZip. 보안 헤더는 감사 미들웨어가 만든
+# 응답에도 붙어야 하므로 가장 바깥이다.
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ── 인증 (공용 비밀번호 + 작업자 이름) ─────────────────────────────────────
@@ -1474,5 +1508,18 @@ def training_export(name: str):
 app.include_router(api_forecast.make_router(_conn, _clean_json))
 
 # ── Vite 빌드 자산 (해시 파일명 → 장기 캐시 가능) ──────────────────────
-if os.path.isdir(os.path.join(STATIC_DIR, "assets")):
-    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+class ImmutableStaticFiles(StaticFiles):
+    """Caddy 의 `handle /assets/*` 캐시 헤더 자리 (6-8).
+
+    파일명에 내용 해시가 붙으므로 «영원히 캐시해도 안전»하다. 내용이 바뀌면 파일명이
+    바뀌고, 그 파일명을 가리키는 index.html 은 no-cache 라 매번 재검증된다(index() 주석).
+    """
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
+# check_dir=False — 빌드 전(static/ 없음)에도 import 가 죽지 않게. 없으면 그냥 404 다.
+app.mount("/assets", ImmutableStaticFiles(directory=os.path.join(STATIC_DIR, "assets"),
+                                          check_dir=False), name="assets")
