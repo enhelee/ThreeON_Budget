@@ -84,3 +84,8 @@
    lg:flex 가 미디어쿼리라 출력에서 뒤에 오기 때문 — .login-overlay.hidden 을
    따로 둬야 했던 것과 같은 함정이다. [hidden] 속성으로 확실히 끊는다. */
 [hidden] { display: none !important; }
+
+/* ── 5번 탭(전망) 편집 표 — 좁은 칸 입력 ── */
+.fc-grade{width:3.6rem;padding:.25rem .3rem;text-align:center}
+.fc-num{width:8.5rem;text-align:right}
+.fc-int{width:5.5rem;text-align:right}

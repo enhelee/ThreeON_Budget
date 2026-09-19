@@ -13,6 +13,13 @@ export const state = {
   // 손댄 표만 저장한다 — 안 바뀐 표까지 보내면 «미반영» 건수가 부풀어
   //   한 번 고치고 한 번 저장했는데 배지에 3건이 잡힌다.
   ycDirty: new Set(),
+  // 5번 탭 — 전망 기준연도(base_year)는 헤더 대상연도와 다른 축이다(«어느 해에 세운 가정인가»).
+  //   data = 그 기준연도의 가정 9종(/api/forecast/state) · bench = 표준화 결과 · table = 전망 표.
+  //   dirty = 손댄 가정 표(저장 버튼에서만 보낸다) · benchEdits = 산출방식·표준금액 편집분.
+  fc: { baseYear: "", baseYears: [], lockedYears: [], tab: "manage",
+        data: null, bench: null, table: null, site: "__total__",
+        dirty: new Set(), preview: null, benchGroup: "all",
+        benchEdits: {methods: {}, overrides: {}} },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
@@ -30,7 +37,7 @@ export const viewMeta = {
   branches: ["실적 분석", "전체 지사의 계획·실적·집행률을 조회합니다."],
   detail: ["실적분석(상세)", "지사별 사업 목록과 귀속 ERP 전표를 검토·수정합니다."],
   stats: ["통계·내보내기", "손익/자본 통계와 Excel 산출물을 내려받습니다."],
-  forecast: ["중장기 예측", "표준화·중장기 전망(3·4단계)을 이 화면 안에서 바로 실행합니다."],
+  forecast: ["중장기 예측", "마감된 연도의 실적으로 표준금액을 만들고(3단계) 기준연도부터 10개년을 전망합니다(4단계)."],
   settings: ["설정", "데이터셋·수동 재배정·학습·사업수정 이력을 관리합니다."],
 };
 

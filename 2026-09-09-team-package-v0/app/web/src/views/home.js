@@ -193,8 +193,9 @@ function bridgeBox() {
   const thisYear = state.exportStatus?.files?.json || null
   return `
   <article class="panel p-5 sm:p-6">
-    <h3 class="section-title">이음새 — 3·4단계로 넘기기</h3>
-    <p class="section-help leading-6">이 앱이 만든 <b class="text-slate-700">팀연계_{연도}_사업실적연결.json</b> 을 예산예측프로그램(팀공유 v2)의 「예산 실적 집계 → 사업 실적 연결」에 올리면 표준화·중장기 전망의 입력이 됩니다. 화면 금액은 천원, 연계 파일은 원 단위입니다.</p>
+    <h3 class="section-title">이음새 — 3·4단계는 이 앱 안에서</h3>
+    <p class="section-help leading-6"><b class="text-slate-700">마감된 연도</b>의 분석 결과가 곧 5번 탭 표준화·중장기 전망의 입력입니다 — 파일을 옮길 필요가 없습니다. 아래 <b class="text-slate-700">팀연계_{연도}_사업실적연결.json</b> 은 외부 공유용으로 남아 있습니다(화면 금액 천원, 연계 파일 원 단위).</p>
+    <button class="btn-secondary mt-3" data-view="forecast">중장기 예측 화면 열기 →</button>
     <dl class="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
       <div class="flex flex-wrap items-baseline gap-x-2">
         <dt class="font-semibold text-slate-500">마지막 내보내기</dt>

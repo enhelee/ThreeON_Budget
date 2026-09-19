@@ -10,6 +10,7 @@ import { state } from "./state.js"
 import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, unassignedName } from "./views/detail.js"
+import { fcChange, fcClick } from "./forecast_actions.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -31,6 +32,8 @@ async function saveAlias(kind, mapping, msg) {
 }
 
 document.addEventListener("click", async e => {
+  // 5번 탭(전망)의 클릭은 forecast_actions.js 가 맡는다 — 이 파일을 더 키우지 않기 위해서다.
+  if (await fcClick(e)) return;
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   const gy = e.target.closest("[data-goyear]");
@@ -395,6 +398,7 @@ document.addEventListener("click", async e => {
 });
 
 document.addEventListener("change", async e => {
+  if (await fcChange(e)) return;                 // 5번 탭(전망) 입력 — forecast_actions.js
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
   // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
   const yc = e.target.closest("[data-yc]");

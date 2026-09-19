@@ -106,3 +106,28 @@ export function amounts(row) {
 }
 
 // ───────────────────────── 홈 (다년도) ─────────────────────────
+
+// ───────────────────────── 5 중장기 예측 (3·4단계) ─────────────────────────
+// 기준연도(base_year)는 헤더 대상연도와 다른 축이다 — 서버가 기본값을 정한다
+// (상태가 있는 최신 기준연도, 없으면 마감 최신연도+1). 사용자가 고른 값은 유지한다.
+
+export async function loadForecastMeta() {
+  const m = await api("/api/forecast/base-years");
+  state.fc.baseYears = m.base_years;
+  state.fc.lockedYears = m.locked_years;
+  if (!state.fc.baseYear) state.fc.baseYear = m.default;
+}
+
+export async function loadForecastState() {
+  state.fc.data = await api(`/api/forecast/state?base_year=${state.fc.baseYear}`);
+  state.fc.dirty = new Set();
+}
+
+export async function loadForecastBench() {
+  state.fc.bench = await api(`/api/forecast/benchmark?base_year=${state.fc.baseYear}`);
+  state.fc.benchEdits = {methods: {}, overrides: {}};
+}
+
+export async function loadForecastTable() {
+  state.fc.table = await api(`/api/forecast/table?base_year=${state.fc.baseYear}`);
+}

@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadBranches, loadDetail, loadExportStatus, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -9,7 +9,7 @@ import { lockBannerHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
-import { mountForecast, renderForecast } from "./views/forecast.js"
+import { renderForecast } from "./views/forecast.js"
 import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
@@ -79,7 +79,6 @@ export function renderPage() {
   $("#page").innerHTML = renderers[state.view]();
   const lb = $("#lockBanner");
   if (lb) lb.innerHTML = loadErrorBannerHtml() + lockBannerHtml();
-  if (state.view === "forecast") mountForecast();   // iframe 성패를 지켜본다
   const [title, subtitle] = viewMeta[state.view];
   $("#pageTitle").textContent = title;
   $("#pageSubtitle").textContent = subtitle;
@@ -124,7 +123,13 @@ export async function navigate(view, opts = {}) {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
   if (view === "home") jobs.push(["서버 정보", loadHealth], ["내보내기 이력", loadExportStatus]);
-  if (view === "forecast") jobs.push(["서버 정보", loadHealth]);   // iframe 주소가 여기서 온다
+  if (view === "forecast") {
+    // 기준연도 → 가정 → (탭에 따라) 표준화 결과 | 전망 표. settle 이 순서대로 돌리므로
+    // 메타가 정한 기준연도를 뒤의 둘이 그대로 쓴다.
+    jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
+    if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench]);
+    if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
+  }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "stats") {
     jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }],
