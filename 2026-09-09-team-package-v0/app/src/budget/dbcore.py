@@ -39,6 +39,7 @@ REPLACE_TABLES = {
 ID_TABLES = {
     "dataset", "plan_row", "erp_row", "override", "run", "manual_biz", "biz_delete", "biz_edit",
     "audit_log", "model_registry", "training_example", "training_snapshot",
+    "hq_temp", "forecast_surprise",          # 전망 상태(6-5) — 자연키 없는 두 표
 }
 
 _RE_AUTOINC = re.compile(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", re.I)

@@ -12,6 +12,8 @@ DB 표로 가고, 엑셀 파서는 지사 표시명 매핑이 `dept_config` 로 
 **모듈 수준 훅**으로 두어 기본은 항등이고, 6-5 에서 `dept_config` 기반 해석기를 끼운다.
 숨은 파일 읽기를 계산 안에 남겨 두지 않기 위해서다.
 """
+import re
+
 import pandas as pd
 
 from . import benchmark, config_store, normalize
@@ -166,12 +168,25 @@ def _hq_row_account_label(major: str, minor: str) -> str | None:
     return HQ_CATEGORY_TO_ACCOUNT.get(key)
 
 
+HQ_MASTER_FIXED_COLS = ("대분류", "중분류", "세부내역")
+# «26년예산»·«27년예산» — 기준연도 총액 열. v2 는 26년예산만 제외했는데 기준연도가
+# 파라미터가 되면(6-5) 열 이름도 해마다 바뀌므로 패턴으로 본다. 그대로면 27년예산이
+# 지사로 잡혀 본사 배분 합계가 두 배가 된다.
+_HQ_BUDGET_COL = re.compile(r"^\d{2,4}년\s*예산$")
+
+
+def is_hq_master_site_col(col) -> bool:
+    """마스터 넓은 표의 열이 지사 열인가(고정 열·기준연도 예산 열이 아닌가)."""
+    c = str(col).strip()
+    return c not in HQ_MASTER_FIXED_COLS and not _HQ_BUDGET_COL.match(c)
+
+
 def hq_amount_by_site_account(hq_master_df: pd.DataFrame) -> dict:
     """{(사업장, 예산과목라벨): 금액} - 마스터 표를 계정과목 라벨 기준으로 합산."""
     result = {}
     if hq_master_df.empty:
         return result
-    site_cols = [c for c in hq_master_df.columns if c not in ("대분류", "중분류", "세부내역", "26년예산")]
+    site_cols = [c for c in hq_master_df.columns if is_hq_master_site_col(c)]
     for _, row in hq_master_df.iterrows():
         label = _hq_row_account_label(row.get("대분류", ""), row.get("중분류", ""))
         if label is None:
