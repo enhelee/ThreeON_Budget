@@ -68,7 +68,7 @@
 | 2 | budget_app/docs/DB_스냅샷.md | DB 스키마·현재 데이터·검증 기준치 |
 | 3 | 변경이력_CHANGELOG.md | rev1~**rev13** 의사결정 이력(왜 이렇게 만들었나) |
 | 4 | 알고리즘_명세.html | 규칙 시각 문서(브라우저로 열기) |
-| 참고 | PRD_V1.html · 연계규격_INTEGRATION.md · 연동규격_INTERFACE.md | 4단계 비전·팀 협업 계약 |
+| 참고 | PRD_V1.html · [연계계약_CONTRACT.md](연계계약_CONTRACT.md) | 4단계 비전·파일 계약(2026-09-20 통합본) |
 
 ## 4. 미착수(다음 개발) — rev14 갱신
 

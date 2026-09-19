@@ -24,10 +24,10 @@ def team_bundle_paths(out_dir, year):
 
 
 def export_team_bundle(conn, out_dir, year, budgets=("손익", "자본")):
-    """손익·자본 최신 분석을 (기록 없이) 재실행해 팀 v2 연계 파일 4종을 만든다.
+    """손익·자본 최신 분석을 (기록 없이) 재실행해 팀 연계 파일 4종을 만든다(연계계약_CONTRACT §3.4).
 
     - 팀연계_{y}_사업실적연결.json : spec_io.build_team_result_json (schemaVersion 1)
-    - matched_{y}.csv / budget_{y}.csv / data_{y}.csv : 연동규격_INTERFACE CSV 계약
+    - matched_{y}.csv / budget_{y}.csv / data_{y}.csv : CSV 계약(연도 단일, 원 단위)
     record_run=False — 새 실행 이력을 남기면 방금 만든 파일이 '최신 run보다 오래됨'이 되어
     매 다운로드마다 재생성된다(server.py /api/export와 같은 함정).
     반환: {"paths": {...}, "summary": JSON summary, "run_ids": {budget: run_id}}

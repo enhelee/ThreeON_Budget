@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-09-19~20 · Phase 6 완료 — 전망 기능 흡수 · 프로세스 하나 · 사내 이관 패키지 · 문서 통합 (rev18)
+
+**대상:** `app/`(5번 탭·`/api/forecast/*`) · `deploy/` · `docs/`. PR #18~#31 + 6-10. 테스트 **277 passed**. 배포 `449ad38`(#29) 실측.
+
+- **3·4단계 흡수(6-2~6-7)**: v2 앱의 표준화·중장기 계산부를 `benchmark.py`·`forecast_calc.py` 로 승계(v2 테스트 33개 함께 이전 → 같은 결과 증명). 상태 9종은 파일이 아니라 DB 표(**`base_year` 축**, 기준연도마다 한 벌). 5번 탭 실구현(iframe 제거), 엑셀 가져오기 4종·재무팀 양식 5종(`rebase_workbook_years` 로 «26년» 양식을 기준연도로 재기준화). 3단계 모집단 = **마감 연도만**. 단위 천원. `template_fill.py` 는 승계 안 함(`/api/export` 가 같은 양식).
+- **프로세스 하나(6-8, #28·#29)**: Caddy·supervisord·Streamlit·`forecast/` 삭제. uvicorn 이 `$PORT` 를 직접 연다. Caddy 가 내던 보안 헤더 3종·gzip·`/assets` immutable 은 `server.py` 미들웨어로 인계(`test_http_hardening.py`). 실측 함정: GZip 은 BaseHTTPMiddleware **안쪽**이어야 `minimum_size` 가 산다. budget_app 의 레거시 Streamlit UI(`app.py`)도 삭제.
+- **사내 이관 패키지(6-9, #31)**: `deploy/onprem/{build_image,load_and_run,check}.{sh,ps1}` + [사내이관_가이드.md](사내이관_가이드.md). 오프라인 서버에서는 절대 빌드하지 않는다(`--no-build`·`pull_policy: never`). Dockerfile `ARG APP_COMMIT` 으로 사내에서도 `/healthz` commit. 실제 Docker 실행은 사용자 PC 에서 첫 검증 예정.
+- **문서 통합(6-10)**: 계약 문서 4개 → [연계계약_CONTRACT.md](연계계약_CONTRACT.md). 배포가이드·보안설계·체크리스트를 6-8 이후 상태로. 이 CHANGELOG 와 `팀프로젝트_통합_README_2026-09-08` 은 역사 문서로 두고 안내만 붙였다.
+- 운영 교훈: Render Auto-Deploy 가 안 걸려 매번 Manual Deploy · 첫 Manual Deploy 가 옛 커밋을 띄운 적 있음 → **배포 판별은 `/healthz` 의 `commit`** 으로.
+
+---
+
 ## 2026-09-10 · Render 배포 디버깅 — Caddy 설정 파괴 버그 · 폴더명 ASCII화 (rev16)
 
 **대상:** `deploy/Caddyfile`·`deploy/entrypoint.sh`, 패키지 폴더명. Render 첫 배포 2회 실패를 실측으로 규명.

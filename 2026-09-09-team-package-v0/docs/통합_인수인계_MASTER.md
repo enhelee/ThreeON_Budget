@@ -4,9 +4,10 @@
 > 작성: 2026-08-04 (rev13) · 상태: **1·2단계(계획·실적분석) + 웹 시스템 완성, 테스트 71 passed**
 >
 > **[rev14 · 2026-09-08 팀 병합]** 팀 전체(두 앱) 진입점은 **`팀프로젝트_통합_README_2026-09-08.md`**. 이 문서는 budget_app 전용.
-> - 3·4단계(표준화·중장기 26~35년)는 동료 앱 **`../예산예측프로그램_팀공유_v2/`**(Streamlit :8501, 테스트 183)가 담당.
+> - **[2026-09-20]** 3·4단계는 Phase 6 로 이 앱의 5번 탭이 됐다(`/api/forecast/*`, 마감 연도 `biz_line` 을 DB 에서 직접). 아래 두 줄은 2026-09-08 당시 기록 — 동료 앱은 6-8 에서 삭제됐고 결과 JSON 은 소비자 없이 계약만 남았다([연계계약_CONTRACT.md](연계계약_CONTRACT.md) §3.4).
+> - (당시) 3·4단계(표준화·중장기 26~35년)는 동료 앱 `../예산예측프로그램_팀공유_v2/`(테스트 183)가 담당.
 >   budget_app은 「4 통계·내보내기 → 팀 연계 → 결과 JSON」(`GET /api/export-team?year=&kind=json|matched|budget|data`)으로
->   손익·자본 매칭 결과를 v2 「사업 실적 연결」에 넘긴다(계약: `연동규격_INTERFACE.md §8`, 구현: `spec_io.build_team_result_json`,
+>   손익·자본 매칭 결과를 v2 「사업 실적 연결」에 넘긴다(계약: `연계계약_CONTRACT.md §3.4`, 구현: `spec_io.build_team_result_json`,
 >   `pipeline_db.export_team_bundle`). 2023·2025 실데이터 검증 통과(미배정 0), 테스트 **77 passed**.
 > - §10 로드맵의 3·4단계 항목은 **v2 구현으로 대체**(우리 `설계_3-4단계_…md`는 개선 제안으로 격하). 아래 본문 수치·구조는 rev13 그대로 유효.
 >
@@ -27,7 +28,7 @@
 | 권장 | 바탕화면 `예산과목.xlsx`, `부서코드.xlsx` | 마스터 원본(내용은 이미 DB에 들어 있음 — 재갱신용) |
 | 권장 | `표준화 검증 자료(23년)/` 폴더 | 23년 원본·수기 정답지(회귀검증용) |
 | 참고 | 루트 `zrfm2.XLSX`, `양식1_월별_템플릿(25년 계획분)_R1.xlsx` | 25년 원본(내용은 이미 DB에 흡수됨) |
-| 참고 | `PRD_V1.html`, `연계규격_INTEGRATION.md`, `연동규격_INTERFACE.md` | 팀 협업 계약 문서 |
+| 참고 | `PRD_V1.html`, [`연계계약_CONTRACT.md`](연계계약_CONTRACT.md) | 파일·인터페이스 계약(2026-09-20 통합본) |
 
 **핵심: `budget_app/data/budget.db` 하나에 모든 원자료·분석결과·사용자 확정·학습이 들어 있습니다.**
 이 파일만 있으면 업로드했던 Excel 원본 없이도 전부 재현됩니다.
@@ -74,8 +75,7 @@ py -m pytest -q                             # 71 passed 확인
 ├─ 변경이력_CHANGELOG.md        ★ rev1~rev12 전체 개발 이력 (상세)
 ├─ 알고리즘_명세.html            ★ 규칙 R1~R12 시각 문서 (오프라인 열람)
 ├─ PRD.html / PRD_V1.html        4단계 비전 PRD (V1이 개정본)
-├─ 연계규격_INTEGRATION.md       3·4단계 팀 분리개발 연계 계약 (matched CSV 기반)
-├─ 연동규격_INTERFACE.md         동료 앱 통합 계약 (spec_io.py가 구현) — §8 결과 JSON(rev14)
+├─ 연계계약_CONTRACT.md          ★ 앱이 받고 내는 파일·인터페이스 계약 — 옛 연계규격·연동규격·통합가이드·필드매핑 4개 통합(2026-09-20)
 ├─ 팀프로젝트_통합_README_2026-09-08.md   ★ 팀 전체(두 앱) 진입점 (rev14)
 ├─ 비교분석_및_병합_보고서_2026-09-08.md   GitHub 팀 저장소 ↔ 로컬 비교·병합 근거 (rev14)
 ├─ 예산예측프로그램_팀공유_v2/   동료 앱(3·4단계 담당, GitHub 2026-09-08_팀공유_v2 그대로) + checkpoint_data/(우리 JSON 연결 결과)
@@ -190,7 +190,7 @@ Excel 산출물 생성**(zrfm2_V1 8.2초)이었다. 그래서 세 가지를 분�
 - `db.py` **SQLite 계층 전부**(스키마·ingest·학습·마감·수동데이터)
 - `excel_actual_writer.py` 산출물 3종(실적.xlsx=Sheet1+종합표SUMIFS+검토리포트 / zrfm2_V1 / matched CSV)
 - `pipeline_plan.py`+`excel_plan_writer.py` 1단계 계획본 생성(레거시 Streamlit 탭에서 사용)
-- `spec_io.py` 팀 연동 CSV 어댑터(연동규격_INTERFACE 구현)
+- `spec_io.py` 팀 연계 파일 어댑터(연계계약_CONTRACT §3.4 구현 — 소비자였던 동료 앱은 사라짐, 외부 도구·감사용 유지)
 
 ---
 
@@ -318,7 +318,7 @@ sed -n '/<body/,$p' webapp/index.html | sed '/^<\/html>$/d' \
 
 - **3단계 예산 표준화**: 확정 다년도 biz_line/matched CSV → (지사×정비등급×투자유형×과목) 벤치마크
 - **4단계 중장기 예측**: 표준금액 × 물가·노후화 팩터 → 10개년 전망 (웹 '5 중장기 예측' 자리 마련됨)
-- 투자유형 분류(8종)는 팀 분담 보류 중 — `연동규격_INTERFACE.md` 계약 참조
+- 투자유형 분류(8종)는 동료 앱 담당이었고 그 앱이 사라짐 — 결말은 `연계계약_CONTRACT.md` §7
 
 ## 11. 문서 지도 (최신성)
 
@@ -327,7 +327,7 @@ sed -n '/<body/,$p' webapp/index.html | sed '/^<\/html>$/d' \
 | 이 문서 + 루트 `HANDOFF.md` + `변경이력_CHANGELOG.md` + `budget_app/README_실행방법.md` | ★ **최신 (rev12, 2026-08-04)** |
 | `budget_app/docs/DB_스냅샷.md` | 최신 — `py scripts/make_db_snapshot.py`로 언제든 재생성 |
 | `알고리즘_명세.html` | R1~R12까지 시각화 — **R13~R15(이동·삭제·개명동기화)는 미반영**, 이 문서 §4 표 참조 |
-| `PRD_V1.html`, `연계규격_INTEGRATION.md`, `연동규격_INTERFACE.md`, `연동_통합가이드.md`, `연동_필드매핑.md` | 유효(계약) — CSV 스키마는 rev12에서 불변 |
+| `PRD_V1.html`, [`연계계약_CONTRACT.md`](연계계약_CONTRACT.md) | 유효(계약) — 옛 4개 통합본(2026-09-20). CSV 스키마는 2026-07-22 이후 불변 |
 | `budget_app/HANDOFF.md` | **1단계(계획본) 전용 상세 문서** — Streamlit 시절 기술이라 실행법은 이 문서를 따를 것 |
 | `run.bat` / `run.sh` / `app.py` | 레거시 Streamlit — 유지보수 안 함. 웹 실행은 `분석프로그램_실행.bat` |
 | 개발 설계 문서 | `budget_app/docs/superpowers/specs/` (최신: `2026-08-04-사업-지사이동-design.md`) |

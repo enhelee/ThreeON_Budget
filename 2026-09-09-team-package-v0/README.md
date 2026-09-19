@@ -96,7 +96,7 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 | 2 | [docs/통합_인수인계_MASTER.md](docs/통합_인수인계_MASTER.md) | 구조·아키텍처·분석 로직 R1~R15·API 명세 |
 | 3 | [docs/DB_스냅샷.md](docs/DB_스냅샷.md) | DB 스키마·현재 데이터·검증 기준치 |
 | 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev15 의사결정 이력 |
-| 5 | [docs/연계규격_INTEGRATION.md](docs/연계규격_INTEGRATION.md) | 두 앱 사이 파일·인터페이스 계약 |
+| 5 | [docs/연계계약_CONTRACT.md](docs/연계계약_CONTRACT.md) | 앱이 받고 내는 파일·인터페이스 계약(옛 계약 4개 통합본) |
 | 6 | [docs/설계_3-4단계_소요전망_파이프라인.md](docs/설계_3-4단계_소요전망_파이프라인.md) | 표준화·중장기 전망 설계 (Phase 6 근거) |
 
 ---
