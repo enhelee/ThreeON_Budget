@@ -4,6 +4,7 @@ import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadLockStates,
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
+import { loadErrorBannerHtml } from "./components/loaderror.js"
 import { lockBannerHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
@@ -77,7 +78,7 @@ export function renderPage() {
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
   const lb = $("#lockBanner");
-  if (lb) lb.innerHTML = lockBannerHtml();
+  if (lb) lb.innerHTML = loadErrorBannerHtml() + lockBannerHtml();
   if (state.view === "forecast") mountForecast();   // iframe 성패를 지켜본다
   const [title, subtitle] = viewMeta[state.view];
   $("#pageTitle").textContent = title;
@@ -88,6 +89,18 @@ export function renderPage() {
   const years = state.years.length ? state.years : [state.year];
   ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
   syncAnalyzeButton();
+}
+
+// 화면 하나를 그리려고 API 를 예닐곱 개 부른다. 이것들을 한 try 로 묶으면
+// 앞의 하나가 죽는 순간 뒤가 통째로 건너뛰어지고, 화면은 «데이터가 없다»처럼 보인다.
+// 실제로 배포 직후 502 한 번에 설정 화면 전체가 빈 것처럼 보여 데이터 소실로 오인됐다
+// (2026-09-19). 그래서 구역마다 따로 실패시키고, 실패한 구역을 배너로 밝힌다.
+async function settle(jobs) {
+  const errs = [];
+  for (const [label, fn] of jobs) {
+    try { await fn(); } catch (e) { errs.push(`${label}: ${e.message}`); }
+  }
+  return errs;
 }
 
 export async function navigate(view, opts = {}) {
@@ -105,30 +118,34 @@ export async function navigate(view, opts = {}) {
   }
   state.view = view;
   syncHash();
-  try {
-    await loadOverview();
-    await loadPending();
-    await loadLockStates();
-    if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
-    if (view === "home") { await loadHealth(); await loadExportStatus(); }
-    if (view === "forecast") await loadHealth();      // iframe 주소(FORECAST_URL)가 여기서 온다
-    if (view === "budget" || view === "collect") await loadStatus();
-    if (view === "stats") {
-      state.stats = await api(`/api/stats?year=${state.year}`);
-      state.statsCompare = await api(`/api/stats-compare?year=${state.year}`);
-    }
-    if (view === "settings") {
-      await loadStatus();
-      state.overrides = await api(`/api/overrides?year=${state.year}`);
-      state.learned = await api("/api/learned");
-      state.audit = (await api("/api/audit?limit=50")).rows;
-      state.models = await api("/api/models");
-      state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
-      state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
-      state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`);
-      await loadYearConfig();
-    }
-  } catch (e) { toast(e.message); }
+  const jobs = [["연도 목록", loadOverview], ["미반영 건수", loadPending],
+                ["마감 상태", loadLockStates]];
+  if (view === "home" || view === "branches" || view === "detail") {
+    jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
+  }
+  if (view === "home") jobs.push(["서버 정보", loadHealth], ["내보내기 이력", loadExportStatus]);
+  if (view === "forecast") jobs.push(["서버 정보", loadHealth]);   // iframe 주소가 여기서 온다
+  if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
+  if (view === "stats") {
+    jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }],
+              ["연도 비교", async () => { state.statsCompare = await api(`/api/stats-compare?year=${state.year}`); }]);
+  }
+  if (view === "settings") {
+    jobs.push(
+      ["현황", loadStatus],
+      ["재배정 이력", async () => { state.overrides = await api(`/api/overrides?year=${state.year}`); }],
+      ["학습 현황", async () => { state.learned = await api("/api/learned"); }],
+      ["감사 로그", async () => { state.audit = (await api("/api/audit?limit=50")).rows; }],
+      ["모델 목록", async () => { state.models = await api("/api/models"); }],
+      ["사업 수정 이력", async () => { state.bizEdits = await api(`/api/biz-edits?year=${state.year}`); }],
+      ["수동 추가 사업", async () => { state.manualBiz = await api(`/api/manual-biz?year=${state.year}`); }],
+      ["사업 삭제 이력", async () => { state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`); }],
+      ["연도 기준정보", loadYearConfig]);
+  }
+  state.loadErrors = await settle(jobs);
+  if (state.loadErrors.length) {
+    toast(`${state.loadErrors.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
+  }
   renderPage();
   closeMenu();
   window.scrollTo({top: 0, behavior: "smooth"});

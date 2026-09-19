@@ -14,6 +14,7 @@ export const state = {
   //   한 번 고치고 한 번 저장했는데 배지에 3건이 잡힌다.
   ycDirty: new Set(),
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
+  loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
