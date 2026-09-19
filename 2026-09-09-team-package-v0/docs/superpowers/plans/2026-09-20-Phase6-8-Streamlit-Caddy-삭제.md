@@ -118,11 +118,11 @@
 
 ## Task 4: 배포 검증
 
-- [x] **Step 1: PR 생성** (`gh pr create --body-file`) — 병합은 사용자가
-- [ ] **Step 2: 병합 후 Render Manual Deploy** (Auto-Deploy 가 동작하지 않는다) — 사용자
-- [ ] **Step 3: `/healthz` 의 `commit` == 병합 커밋 · 배포 `index.html` 번들 해시 == 로컬 `app/static/index.html`**
-- [ ] **Step 4: 보안 헤더 3종과 `/assets` 캐시 헤더를 배포 응답에서 실측** — Caddy 가 내던 것을 FastAPI 가 정말 내는지는 여기서만 증명된다
-- [ ] **Step 5: 계획서 `2026-09-19-Phase6-전망기능-흡수.md` 의 6-8 행을 ✅ 로**
+- [x] **Step 1: PR 생성** — #28 (병합 `5dfd7fb`), 이어서 레거시 UI #29 (병합 `449ad38`) (`gh pr create --body-file`) — 병합은 사용자가
+- [x] **Step 2: 병합 후 Render Manual Deploy** (Auto-Deploy 가 동작하지 않는다) — 사용자
+- [x] **Step 3: `/healthz` 의 `commit` == 병합 커밋 · 배포 `index.html` 번들 해시 == 로컬 `app/static/index.html`**
+- [x] **Step 4: 보안 헤더 3종과 `/assets` 캐시 헤더를 배포 응답에서 실측** — Caddy 가 내던 것을 FastAPI 가 정말 내는지는 여기서만 증명된다
+- [x] **Step 5: 계획서 `2026-09-19-Phase6-전망기능-흡수.md` 의 6-8 행을 ✅ 로**
 
 ---
 
@@ -131,6 +131,10 @@
 - **`app/app.py`·`app/run.bat`·`app/run.sh`** — budget_app 의 **레거시 Streamlit UI** 다. 6-8 이 지우는 Streamlit 은 «전망 앱(v2)»이지 이것이 아니다. 컨테이너에서 돌지도 않는다. 별건으로 판단한다.
 - **`app/requirements.txt` 의 `streamlit>=1.30`** — 위 레거시 UI 용. `deploy/requirements.txt` 쪽만 지운다.
 - **`/api/auth/verify`** — forward_auth 가 사라져도 남긴다(무해하고 테스트가 고정하고 있다).
+
+## 배포 실측 (2026-09-20 밤, `449ad38`)
+
+`/healthz` commit 일치 · 번들 `index-BIPyzdEF.js` 일치 · 보안 헤더 3종 · `/assets` `immutable` + gzip 39.6KB · `index.html` `no-cache` · `/forecast/` 404 · `/app/` 301. 첫 Manual Deploy 는 옛 커밋(`608ab78`)이 떴고 두 번째에 반영됐다 — 배포 뒤에는 반드시 `/healthz` commit 으로 판별할 것.
 
 ## 완료 기준
 
