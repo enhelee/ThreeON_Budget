@@ -136,16 +136,42 @@ export async function changeYear(y) {
   await navigate(state.view);
 }
 
-export function addYearFromInput(inputId) {
+export async function addYearFromInput(inputId) {
   const el = inputId ? document.getElementById(inputId) : null;
   const v = el ? el.value.trim() : (prompt("추가할 연도를 입력하세요 (예: 2021)") || "").trim();
   if (!/^\d{4}$/.test(v)) { toast("연도는 4자리 숫자로 입력하세요."); return; }
-  if (!state.years.includes(v)) {
+  const isNew = !state.years.includes(v);
+  if (isNew) {
     state.years.push(v);
     state.years.sort((a, b) => String(b).localeCompare(String(a)));
   }
-  changeYear(v);
-  toast(`${v}년으로 전환했습니다. 계획·zrfm2를 업로드하세요.`);
+  const copied = isNew ? await copyPrevYearConfig(v) : null;
+  await changeYear(v);
+  toast(copied
+    ? `${v}년으로 전환했습니다 — 기준정보는 ${copied}년 사본입니다. 계획·zrfm2를 업로드하세요.`
+    : `${v}년으로 전환했습니다. 계획·zrfm2를 업로드하세요.`);
+}
+
+// 새 연도는 빈 상태가 아니라 «직전 연도의 사본»으로 시작한다. 기준은 매년
+// 조금씩만 바뀌므로 24개 지사와 19개 과목을 다시 입력하게 둘 이유가 없다.
+// 이미 기준이 선 연도면 서버가 409 로 막는다 — 그때는 조용히 지나간다.
+async function copyPrevYearConfig(to) {
+  const prev = state.years.filter(y => String(y) < to).sort().slice(-1)[0];
+  if (!prev) return null;
+  const ok = confirm(`${to}년 기준정보를 ${prev}년에서 복사해 올까요?\n\n`
+    + "지사 구성·예산과목 구성·기준정보 마스터를 그대로 가져옵니다.\n"
+    + "가져온 뒤 설정 화면에서 고칠 수 있습니다.");
+  if (!ok) return null;
+  try {
+    await api("/api/config/copy-year", {method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({from_year: prev, to_year: to})});
+    return prev;
+  } catch (e) {
+    if (e.status === 409) toast(`${to}년 기준정보가 이미 있어 복사하지 않았습니다.`);
+    else toast(`기준정보 복사 실패: ${e.message}`);
+    return null;
+  }
 }
 
 export async function runAnalyze(silent) {
