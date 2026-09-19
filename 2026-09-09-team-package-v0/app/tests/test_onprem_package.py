@@ -74,6 +74,31 @@ def test_build_passes_commit_into_image():
     assert "APP_COMMIT=${APP_COMMIT}" in dockerfile, "Dockerfile: ENV 로 굳히지 않으면 런타임에 사라집니다"
 
 
+def test_windows_checksum_file_uses_lf():
+    """Windows 에서 빌드한 .sha256 을 Linux 서버가 읽는다 — CRLF 면 sha256sum -c 가 실패한다.
+
+    Set-Content 는 CRLF 를 붙인다. 파일명 뒤에 \\r 이 남으면 «no such file → FAILED».
+    docker 대역 시뮬레이션(2026-09-20)에서 잡은 결함이다.
+    """
+    body = _strip_comments(_read(ONPREM, "build_image.ps1"))
+    assert "WriteAllText" in body and "`n" in body, "checksum 파일은 LF 한 줄로 써야 합니다"
+    assert not re.search(r"Set-Content[^\n]*sha256", body), "Set-Content 는 CRLF 를 붙입니다"
+
+
+def test_windows_build_gzips_the_docker_tar_directly():
+    """tar.gz 는 «gzip 으로 압축한 docker tar» 여야 docker load 가 읽는다.
+
+    `tar -czf x.tar.gz x.tar` 는 docker tar 를 담은 tar 를 만들어 docker load 가 실패한다.
+    게다가 tar.exe 는 PATH 에 따라 GNU tar(Git 동봉)가 잡혀 `C:\\` 의 콜론을 원격 호스트로
+    해석한다(실측 2026-09-20). 외부 도구 없이 .NET GZipStream 으로 처리한다.
+    """
+    body = _strip_comments(_read(ONPREM, "build_image.ps1"))
+    assert "GZipStream" in body
+    assert not re.search(r"^\s*tar\s", body, re.M), "build_image.ps1 은 tar.exe 를 부르면 안 됩니다"
+    sh = _strip_comments(_read(ONPREM, "build_image.sh"))
+    assert "docker save" in sh and "| gzip" in sh
+
+
 def test_scripts_agree_on_image_name():
     """build 가 만드는 이름·compose 가 찾는 이름·load 가 다는 태그가 같아야 한다."""
     compose = _strip_comments(_read(DEPLOY, "docker-compose.yml"))
