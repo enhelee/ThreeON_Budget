@@ -65,7 +65,7 @@
 
 **Files:** Delete `deploy/Caddyfile` · `deploy/supervisord.conf` · Modify `deploy/Dockerfile` · `deploy/entrypoint.sh` · `deploy/docker-compose.yml` · `deploy/requirements.txt` · Rewrite `app/tests/test_deploy_config.py`
 
-- [ ] **Step 1: `test_deploy_config.py` 를 먼저 고친다**
+- [x] **Step 1: `test_deploy_config.py` 를 먼저 고친다**
 
 지금 12개 중 **Caddy·forecast 전제 6개는 삭제**한다(대상이 사라지므로 의미가 없다):
 `test_caddyfile_braces_are_balanced` · `test_forecast_is_guarded_by_forward_auth_not_basic_auth` · `test_forward_auth_target_is_verify_not_status` · `test_caddy_upstreams_match_processes_supervisord_starts` · `test_forward_auth_strips_websocket_upgrade_headers` · `test_entrypoint_copies_builtin_templates_into_forecast_workdir`
@@ -81,9 +81,9 @@
   - `test_requirements_has_no_streamlit`: `deploy/requirements.txt` 에 `streamlit` 부재
   - `test_compose_has_no_forecast_volume`: `docker-compose.yml` 에 `forecast_data` 부재
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
-- [ ] **Step 3: 삭제·수정 실행**
+- [x] **Step 3: 삭제·수정 실행**
   - `git rm deploy/Caddyfile deploy/supervisord.conf`
   - `entrypoint.sh`: 양식 복사 루프 삭제 · `FORECAST_DATA_DIR` mkdir 삭제 · 마지막 줄을
     `exec python -m uvicorn server:app --app-dir /srv/app --host 0.0.0.0 --port "${PORT:-8080}" --proxy-headers --forwarded-allow-ips="*"`
@@ -93,32 +93,32 @@
   - `deploy/requirements.txt`: `streamlit==1.59.0` 삭제, 머리말 주석 갱신. **`pandas==2.2.3` 고정은 남긴다** — 고정 이유가 Streamlit 이었지만 budget_app 이 그 조합에서 검증됐다. 푸는 것은 별건이다.
   - `render.yaml`: 주석의 «/forecast (v2 앱)» 문구 갱신(설정 값은 바뀌지 않는다)
 
-- [ ] **Step 4: 통과 확인** — 전체 회귀. **기대값 256 − 6 + 7(Task 2) + 4(Task 1) = 261**(실측으로 갱신)
+- [x] **Step 4: 통과 확인** — 전체 회귀. 실측 **266 passed** = 256 − 11(옛 deploy 테스트) + 15(새 deploy 테스트) + 6(Task 1)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ---
 
 ## Task 3: `forecast/` 폴더와 v2 잔재를 삭제한다
 
-**Files:** Delete `forecast/`(148 파일) · `실행_2_예산예측프로그램(v2).bat` · Modify `app/web/src/views/forecast.js`
+**Files:** Delete `forecast/`(git 추적 80 파일) · `실행_2_예산예측프로그램(v2).bat` · Modify `app/web/src/views/forecast.js`
 
-- [ ] **Step 1: 승계 누락이 없는지 마지막 확인**
+- [x] **Step 1: 승계 누락이 없는지 마지막 확인**
   - `app/templates/` 에 `builtin_template_표준화.xlsx`·`builtin_template_중장기예산.xlsx` 존재(6-7 에서 옮김)
   - `forecast/builtin_template_손익.xlsx`·`builtin_template_자본.xlsx` 는 `template_fill.py` 용 — **승계 안 함**(사용자 결정 2026-09-20, budget_app `/api/export` 가 같은 양식)
   - `forecast_store.import_v2_csv_dir` 는 **남는다** — 동료 PC 의 CSV 를 읽는 함수이지 v2 코드에 의존하지 않는다. docstring 의 «Streamlit 삭제(6-8) 전에» 문구만 사실에 맞게 고친다
   - `forecast/tests/` 183개 중 승계분(표준화 15 · 중장기 18)은 `app/tests/` 에 있다 — 나머지는 승계 대상이 아니었던 v2 전용
-- [ ] **Step 2: `views/forecast.js` 하단 «(구) 전망 앱을 새 탭에서 열기» 링크 삭제** → `cd app/web && npm run build`
-- [ ] **Step 3: `git rm -r forecast/` · `git rm "실행_2_예산예측프로그램(v2).bat"`**
-- [ ] **Step 4: `README.md`(팀패키지)·`.dockerignore` 에서 v2 전용 줄 정리**
-- [ ] **Step 5: 전체 회귀 + `grep -rn "forecast/" --include=*.py --include=*.js` 로 끊긴 참조 확인**
-- [ ] **Step 6: 커밋**
+- [x] **Step 2: `views/forecast.js` 하단 «(구) 전망 앱을 새 탭에서 열기» 링크 삭제** → `cd app/web && npm run build`
+- [x] **Step 3: `git rm -r forecast/` · `git rm "실행_2_예산예측프로그램(v2).bat"`**
+- [x] **Step 4: `README.md`(팀패키지)·`.dockerignore` 에서 v2 전용 줄 정리** · `실행_mac.sh` 의 forecast 분기도(실측에서 발견)
+- [x] **Step 5: 전체 회귀 + `grep -rn "forecast/" --include=*.py --include=*.js` 로 끊긴 참조 확인**
+- [x] **Step 6: 커밋**
 
 ---
 
 ## Task 4: 배포 검증
 
-- [ ] **Step 1: PR 생성** (`gh pr create --body-file`) — 병합은 사용자가
+- [x] **Step 1: PR 생성** (`gh pr create --body-file`) — 병합은 사용자가
 - [ ] **Step 2: 병합 후 Render Manual Deploy** (Auto-Deploy 가 동작하지 않는다) — 사용자
 - [ ] **Step 3: `/healthz` 의 `commit` == 병합 커밋 · 배포 `index.html` 번들 해시 == 로컬 `app/static/index.html`**
 - [ ] **Step 4: 보안 헤더 3종과 `/assets` 캐시 헤더를 배포 응답에서 실측** — Caddy 가 내던 것을 FastAPI 가 정말 내는지는 여기서만 증명된다
