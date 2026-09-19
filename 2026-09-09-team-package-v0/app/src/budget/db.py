@@ -196,6 +196,14 @@ def init_db(conn):
     cur.execute("""CREATE TABLE IF NOT EXISTS year_lock(
         year TEXT PRIMARY KEY,
         locked_at TEXT NOT NULL)""")
+    # 해제 기록을 year_lock 에 «locked_at=NULL» 로 섞지 않는다 — 그 컬럼은
+    # NOT NULL 이고 운영 PostgreSQL 에 이미 그 제약이 걸려 있다. 표를 나누면
+    # year_lock 은 «잠긴 연도 목록»이라는 뜻을 그대로 유지한다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS year_unlock(
+        year TEXT PRIMARY KEY,
+        unlocked_at TEXT NOT NULL,
+        reason TEXT,
+        operator TEXT)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS manual_biz(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         year TEXT NOT NULL, budget TEXT NOT NULL,
@@ -629,13 +637,86 @@ def delete_manual_biz(conn, biz_id):
 # ---------------------------------------------------------------------------
 
 def lock_year(conn, year):
-    conn.execute("INSERT OR REPLACE INTO year_lock VALUES(?,?)", (str(year), _now()))
+    """마감(재마감 포함). 열려 있던 기록은 닫는다 — 호출 전에 lock_state 로
+    «열린 동안 무엇이 바뀌었는지»를 먼저 읽어 둘 것."""
+    conn.execute("INSERT OR REPLACE INTO year_lock(year,locked_at) VALUES(?,?)",
+                 (str(year), _now()))
+    conn.execute("DELETE FROM year_unlock WHERE year=?", (str(year),))
     conn.commit()
 
 
-def unlock_year(conn, year):
+def unlock_year(conn, year, reason=None, operator=None):
+    """마감을 푼다. 언제·누가·왜 열었는지를 남긴다 — 다시 잠글 때까지의 근거다."""
     conn.execute("DELETE FROM year_lock WHERE year=?", (str(year),))
+    conn.execute("DELETE FROM year_unlock WHERE year=?", (str(year),))
+    conn.execute(
+        "INSERT INTO year_unlock(year,unlocked_at,reason,operator) VALUES(?,?,?,?)",
+        (str(year), _now(), reason, operator))
     conn.commit()
+
+
+def lock_state(conn, year):
+    """{locked, unlocked_at, reason, by} — 배너와 재마감 화면의 근거."""
+    if is_locked(conn, year):
+        return {"locked": True, "unlocked_at": None, "reason": None, "by": None}
+    row = conn.execute(
+        "SELECT unlocked_at,reason,operator FROM year_unlock WHERE year=?",
+        (str(year),)).fetchone()
+    if not row:
+        return {"locked": False, "unlocked_at": None, "reason": None, "by": None}
+    return {"locked": False, "unlocked_at": row[0], "reason": row[1], "by": row[2]}
+
+
+def open_years(conn):
+    """마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너의 근거."""
+    return {r[0]: {"locked": False, "unlocked_at": r[1], "reason": r[2], "by": r[3]}
+            for r in conn.execute(
+                "SELECT year,unlocked_at,reason,operator FROM year_unlock ORDER BY year")}
+
+
+# 감사 로그는 연도를 «본문 요약» 문자열에만 담는다(auth.audit_detail).
+# 그래서 구성·마스터 변경은 그 문자열에 연도가 들어 있는지로 좁힌다 — 느슨하지만,
+# 이 값은 재마감 화면에 보여 주는 참고 요약이지 회계 근거가 아니다.
+_CONFIG_PATHS = ("/api/config/depts", "/api/config/items", "/api/config/copy-year")
+
+
+def changes_since(conn, year, since):
+    """해제 시각 이후 그 연도에 일어난 변경을 센다 — 재마감 승인 화면의 근거.
+
+    거부된 요청(4xx)은 «바뀐 것»이 아니므로 세지 않는다.
+
+    시각 비교가 «이상»(>=)인 이유: _now() 가 초 단위라 해제와 같은 초에 일어난
+    변경이 «초과»(>)에서는 통째로 빠진다. 해제 직후 바로 고치는 것이 오히려
+    정상 경로다. 그 1초 안의 무관한 행을 한둘 더 세는 쪽이 낫다.
+    """
+    out = {}
+    for label, table in (("재배정", "override"), ("사업수정", "biz_edit"),
+                         ("사업삭제", "biz_delete"), ("사업추가", "manual_biz"),
+                         ("분석실행", "run")):
+        n = conn.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE year=? AND created_at >= ?",
+            (str(year), since)).fetchone()[0]
+        if n:
+            out[label] = n
+    ph = ",".join("?" for _ in _CONFIG_PATHS)
+    n = conn.execute(
+        f"SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
+        f" AND path IN ({ph}) AND detail LIKE ?",
+        (since,) + _CONFIG_PATHS + (f"%{year}%",)).fetchone()[0]
+    if n:
+        out["구성"] = n
+    n = conn.execute(
+        "SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
+        " AND path = '/api/config/alias'", (since,)).fetchone()[0]
+    if n:
+        out["별칭"] = n                     # 별칭은 연도 축이 없다 — 전 연도에 걸린다
+    n = conn.execute(
+        "SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
+        " AND path = '/api/upload/master' AND detail LIKE ?",
+        (since, f"%{year}%")).fetchone()[0]
+    if n:
+        out["마스터"] = n
+    return out
 
 
 def is_locked(conn, year):

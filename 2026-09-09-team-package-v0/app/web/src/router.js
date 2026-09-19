@@ -1,9 +1,10 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
+import { lockBannerHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
@@ -75,6 +76,8 @@ export function renderPage() {
                      branches: renderBranches, detail: renderDetail, stats: renderStats,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
+  const lb = $("#lockBanner");
+  if (lb) lb.innerHTML = lockBannerHtml();
   if (state.view === "forecast") mountForecast();   // iframe 성패를 지켜본다
   const [title, subtitle] = viewMeta[state.view];
   $("#pageTitle").textContent = title;
@@ -105,6 +108,7 @@ export async function navigate(view, opts = {}) {
   try {
     await loadOverview();
     await loadPending();
+    await loadLockStates();
     if (view === "home" || view === "branches" || view === "detail") { await loadStatus(); await loadBranches(); }
     if (view === "home") { await loadHealth(); await loadExportStatus(); }
     if (view === "forecast") await loadHealth();      // iframe 주소(FORECAST_URL)가 여기서 온다

@@ -304,22 +304,36 @@ document.addEventListener("click", async e => {
     } catch (err) { toast(err.message); }
     finally { busy(false); }
   }
-  if (act === "lock-year") {
-    if (!confirm(`${state.year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`)) return;
+  // 마감·재마감. 배너의 「다시 마감」은 보고 있는 연도가 아니라 data-year 를 따른다.
+  if (act === "lock-year" || act === "relock-year") {
+    const year = e.target.closest("[data-action]").dataset.year || state.year;
+    const reopened = !!state.lockStates?.[year];
+    const ask = reopened
+      ? `${year}년을 다시 마감할까요? 열린 동안의 변경이 이 값으로 굳습니다.`
+      : `${year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`;
+    if (!confirm(ask)) return;
     try {
       const r = await api("/api/lock", {method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({year: state.year})});
+        body: JSON.stringify({year})});
       toast(r.notice);
-      await navigate("settings");
+      await navigate(state.view);
     } catch (err) { toast(err.message); }
+    return;
   }
+  // 해제는 사유를 받는다 — 마감된 숫자는 대외 보고에 쓰인 값이라,
+  // 나중에 «왜 그 해 숫자가 달라졌지»에 답할 수 있어야 한다.
   if (act === "unlock-year") {
-    if (!confirm(`${state.year}년 잠금을 해제할까요? 데이터 변경이 다시 가능해집니다.`)) return;
+    const year = e.target.closest("[data-action]").dataset.year || state.year;
+    const reason = prompt(`${year}년은 마감된 값입니다.\n` + "여는 이유를 적어 주세요 — 변경 이력에 남고, 다시 마감할 때까지 전 화면에 표시됩니다.");
+    if (!reason || !reason.trim()) return;
     try {
-      await api(`/api/lock/${state.year}`, {method: "DELETE"});
-      toast(`${state.year}년 잠금 해제됨`);
-      await navigate("settings");
+      await api(`/api/lock/${year}`, {method: "DELETE",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({reason: reason.trim()})});
+      toast(`${year}년 마감 해제 — 작업이 끝나면 다시 마감하세요.`);
+      await navigate(state.view);
     } catch (err) { toast(err.message); }
+    return;
   }
   if (act === "clear-learned") {
     if (!confirm("학습 DB를 모두 지울까요? 다음 분석부터 학습이 적용되지 않습니다.")) return;
