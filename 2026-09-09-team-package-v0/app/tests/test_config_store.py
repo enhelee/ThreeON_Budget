@@ -4,19 +4,41 @@ import os
 
 from budget import config_store
 
-def test_seed_dept_config_groups_and_order():
-    items = config_store.seed_dept_config()
+def test_seed_dept_config_is_year_aware():
+    """양산지사는 2023년 DH, 2025년 중대형CHP 다 — 둘 다 맞고 연도가 다를 뿐이다.
+
+    2023년에는 발전설비 건설 중이라 공식적으로 DH지사였고, 준공 후
+    중대형CHP지사가 되었다. 연도 축 없는 시드 하나로는 담을 수 없다.
+    """
+    g2023 = {i["이름"]: i["그룹"] for i in config_store.seed_dept_config("2023")}
+    g2025 = {i["이름"]: i["그룹"] for i in config_store.seed_dept_config("2025")}
+    assert g2023["양산지사"] == "DH"
+    assert g2025["양산지사"] == "중대형CHP"
+    # 대구·청주도 같은 시기에 올라갔다
+    assert g2023["대구지사"] == "소형CHP"
+    assert g2025["대구지사"] == "중대형CHP"
+
+
+def test_seed_dept_config_unknown_year_uses_nearest_past():
+    """시드에 없는 연도는 가장 가까운 과거 연도를 쓴다."""
+    g2026 = {i["이름"]: i["그룹"] for i in config_store.seed_dept_config("2026")}
+    assert g2026["양산지사"] == "중대형CHP"      # 2025 를 물려받는다
+    g2020 = {i["이름"]: i["그룹"] for i in config_store.seed_dept_config("2020")}
+    assert g2020["양산지사"] == "DH"             # 과거가 없으면 가장 이른 시드
+
+
+def test_seed_dept_config_shape():
+    items = config_store.seed_dept_config("2025")
+    assert len(items) == 24
     assert all(i["그룹"] in config_store.DEPT_GROUPS for i in items)
     names = [i["이름"] for i in items]
-    assert "플랜트기술처" in names
-    assert "화성지사" in names
-    assert "평택지사" in names
+    assert "플랜트기술처" in names and "화성지사" in names and "평택지사" in names
     assert all(i["포함"] is True for i in items)
 
 def test_dept_config_save_and_load_roundtrip(tmp_path):
     cfg_dir = str(tmp_path)
     items = config_store.load_dept_config(cfg_dir, "2026")
-    assert len(items) == len(config_store.seed_dept_config())  # 저장 전에는 시드
+    assert len(items) == len(config_store.seed_dept_config("2026"))  # 저장 전에는 시드
     items[0]["포함"] = False
     items[0]["그룹"] = "DH"
     config_store.save_dept_config(cfg_dir, "2026", items)
@@ -25,8 +47,8 @@ def test_dept_config_save_and_load_roundtrip(tmp_path):
     assert reloaded[0]["그룹"] == "DH"
 
 def test_seed_item_config_pl_and_capital():
-    pl = config_store.seed_item_config("손익")
-    cap = config_store.seed_item_config("자본")
+    pl = config_store.seed_item_config("2025", "손익")
+    cap = config_store.seed_item_config("2025", "자본")
     assert len(pl) == 8
     assert len(cap) == 11
     names = {x["과목"] for x in pl}
