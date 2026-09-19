@@ -327,7 +327,7 @@ document.addEventListener("change", async e => {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const r = await api(`/api/upload/master?kind=${kind}`, {method: "POST", body: fd});
+      const r = await api(`/api/upload/master?kind=${kind}&year=${state.year}`, {method: "POST", body: fd});
       toast(r.notice);
       await navigate("settings");
     } catch (err) { toast(err.message); }
