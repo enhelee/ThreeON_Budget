@@ -12,5 +12,3 @@ scikit-learn>=1.5
 joblib>=1.4
 # PostgreSQL(Supabase·사내 서버)로 갈 때만: DATABASE_URL 설정 시 필요
 # psycopg[binary]>=3.2
-# 레거시 Streamlit UI(app.py) 사용 시에만 필요
-streamlit>=1.30
