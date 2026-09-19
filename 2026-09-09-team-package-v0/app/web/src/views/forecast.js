@@ -35,10 +35,12 @@ function sel(opts, value, attrs, labels = {}) {
   return `<select class="control" ${attrs}>${opts.map(o => `<option value="${esc(o)}" ${String(o) === String(value) ? "selected" : ""}>${esc(labels[o] ?? o)}</option>`).join("")}</select>`
 }
 
-/** 양식은 «26년» 라벨이 박힌 2026년 기준 참고 양식이다 — 다른 기준연도에서는 시트명이 맞는 부분만 채워진다. */
+/** 내장 양식은 «26년» 라벨이 박힌 2026년 기준 참고 양식이다. 다른 기준연도로 내보내면 서버가 시트명·연도
+ *  헤더·수식 참조를 그 기준연도로 옮긴 뒤 채운다(forecast_export.rebase_workbook_years). */
 function exportNote() {
-  if (String(state.fc.baseYear) === "2026") return ""
-  return `<p class="mt-2 text-xs text-amber-700">ℹ️ 내장 양식은 2026년 기준(«26년» 시트)입니다. ${esc(state.fc.baseYear)}년 기준에서는 지사 탭·총괄표·일정처럼 연도가 박히지 않은 시트만 채워지고, «26년 본사 원가분배»·«26년 총원가 배분»은 비어 있습니다.</p>`
+  const by = String(state.fc.baseYear)
+  if (by === "2026") return ""
+  return `<p class="mt-2 text-xs text-slate-500">ℹ️ 내장 양식은 2026년 기준 참고 양식입니다. ${esc(by)}년 기준으로 내려받으면 «26년 본사 원가분배»→«${esc(by.slice(2))}년 본사 원가분배»처럼 시트명·연도 헤더·수식 참조를 ${esc(by)}년 기준으로 옮겨 채웁니다. 전년 실측치 같은 참고 블록은 양식 그대로입니다.</p>`
 }
 
 function panel(title, help, body, key) {

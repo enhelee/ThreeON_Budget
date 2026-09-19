@@ -87,14 +87,16 @@ def test_schedule_download_ignores_years_without_history(tmp_path):
     assert ws.cell(row=4, column=6).value == "MI"          # 이력 없는 해는 원본 그대로
 
 
-def test_schedule_download_skips_past_years_before_base_year(tmp_path):
-    """일정 양식은 미래(기준연도~)만 담는다 — 과거 등급 이력은 쓰지 않는다."""
+def test_schedule_download_for_other_base_year_rebases_columns_and_skips_past(tmp_path):
+    """2027년 기준이면 양식의 연도 열이 2027·2028 로 옮겨지고(재기준화), 2026 이력은 과거라 쓰지 않는다."""
     tpl = _write(tmp_path, "sched.xlsx", _schedule_template())
     grade_hist = pd.DataFrame({"사업장": ["화성지사", "화성지사"], "연도": [2026, 2027], "등급": ["간이", "TI"]})
-    ws = load_workbook(io.BytesIO(fe.build_schedule_download(grade_hist, SITES, base_year=2027, template_path=tpl)),
-                       data_only=True).active
-    assert ws.cell(row=4, column=3).value == "MI"          # 2026 은 2027 기준에선 과거 → 원본
-    assert ws.cell(row=4, column=6).value == "TI"
+    wb = load_workbook(io.BytesIO(fe.build_schedule_download(grade_hist, SITES, base_year=2027, template_path=tpl)),
+                       data_only=True)
+    ws = wb["정기점검보수공사 일정(2027~2042)"]
+    assert ws.cell(row=1, column=3).value == 2027 and ws.cell(row=1, column=6).value == 2028
+    assert ws.cell(row=4, column=3).value == "TI"          # 2027 → 첫 열
+    assert ws.cell(row=4, column=6).value == "MI"          # 2028 이력 없음 → 원본
 
 
 # ---------------------------------------------------------------- 고온부품 (천원 그대로)
@@ -264,3 +266,93 @@ def test_fill_total_cost_sheet_writes_only_site_block_with_own_share():
     assert ws.cell(row=7, column=5).value == 4_200.0                         # 5,000 − 본사배분 800
     assert ws.cell(row=8, column=5).value == 300.0
     assert ws.cell(row=11, column=5).value == "=ROUND((E4+E7)/1000,0)"      # 전체 블록 보존
+
+
+# ---------------------------------------------------------------- 기준연도 재기준화 (양식은 «26년» 라벨 고정)
+def _year_bound_template():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "총괄표"
+    ws.cell(row=3, column=1, value="총괄표")
+    ws.cell(row=3, column=3, value="26년")
+    ws.cell(row=3, column=4, value="27년")
+    ws.cell(row=4, column=1, value="수선유지비")
+    ws.cell(row=4, column=2, value="건물/구축물")
+    ws.cell(row=4, column=3, value="='26년'!$Y4")
+    ws.cell(row=32, column=1, value="손익예산(2025중장기)")       # 참고 블록 — 헤더 영역 밖, 건드리지 않음
+    wb.create_sheet("26년")
+    y27 = wb.create_sheet("27년")                                  # 연속 연도 시트 — 개명이 충돌하는 자리
+    y27.cell(row=4, column=3, value="='26년'!$Y4+'27년'!$Y4")
+    hq = wb.create_sheet("26년 본사 원가분배")
+    hq.cell(row=5, column=4, value="26년 예산")
+    hq.cell(row=5, column=5, value="화성")
+    tc = wb.create_sheet("26년 총원가 배분")
+    tc.cell(row=3, column=1, value="본사(단위 : 천원)")
+    tc.cell(row=3, column=4, value="26년 예산")
+    tc.cell(row=4, column=5, value="='26년 본사 원가분배'!E48")
+    hp = wb.create_sheet("고온부품(26)")
+    hp.cell(row=4, column=6, value="26년")
+    sc = wb.create_sheet("정기점검보수공사 일정(2026~2041)")
+    sc.cell(row=1, column=3, value=2026)
+    site = wb.create_sheet("화성")
+    for i, y in enumerate(range(26, 36)):
+        site.cell(row=4, column=3 + i, value=y)
+    site.cell(row=6, column=3, value="='26년 총원가 배분'!F48")
+    site.cell(row=6, column=4, value="=$C6*1.015^(D$4-$C$4)")
+    site.cell(row=7, column=3, value=26)                          # 헤더 행이 아닌 곳의 26 은 금액일 수 있다 — 그대로
+    return wb
+
+
+def test_rebase_workbook_years_shifts_sheet_names_headers_and_formula_refs():
+    wb = _year_bound_template()
+    renamed = fe.rebase_workbook_years(wb, 2027)
+    assert set(wb.sheetnames) == {"총괄표", "27년", "28년", "27년 본사 원가분배", "27년 총원가 배분", "고온부품(27)",
+                                  "정기점검보수공사 일정(2027~2042)", "화성"}
+    assert "27년1" not in wb.sheetnames                                          # 개명 충돌 없음
+    assert wb["28년"].cell(row=4, column=3).value == "='27년'!$Y4+'28년'!$Y4"    # 한 번에 치환(연쇄 없음)
+    assert renamed["26년 본사 원가분배"] == "27년 본사 원가분배"
+    ws = wb["총괄표"]
+    assert ws.cell(row=3, column=3).value == "27년" and ws.cell(row=3, column=4).value == "28년"
+    assert ws.cell(row=4, column=3).value == "='27년'!$Y4"                       # 수식의 시트 참조
+    assert ws.cell(row=32, column=1).value == "손익예산(2025중장기)"               # 헤더 영역 밖은 그대로
+    assert wb["27년 본사 원가분배"].cell(row=5, column=4).value == "27년 예산"
+    assert wb["27년 총원가 배분"].cell(row=4, column=5).value == "='27년 본사 원가분배'!E48"
+    assert wb["고온부품(27)"].cell(row=4, column=6).value == "27년"
+    assert wb["정기점검보수공사 일정(2027~2042)"].cell(row=1, column=3).value == 2027
+    site = wb["화성"]
+    assert [site.cell(row=4, column=3 + i).value for i in range(10)] == list(range(27, 37))
+    assert site.cell(row=6, column=3).value == "='27년 총원가 배분'!F48"
+    assert site.cell(row=6, column=4).value == "=$C6*1.015^(D$4-$C$4)"           # 상대 연도 차 수식은 그대로
+    assert site.cell(row=7, column=3).value == 26                                # 헤더 밖 숫자는 그대로
+
+
+def test_rebase_workbook_years_is_noop_for_template_base_year():
+    wb = _year_bound_template()
+    assert fe.rebase_workbook_years(wb, 2026) == {}
+    assert "26년 본사 원가분배" in wb.sheetnames
+
+
+@pytest.mark.skipif(not os.path.exists(fe.LT_TEMPLATE), reason="내장 중장기 양식 없음")
+def test_longterm_workbook_for_2027_base_year_fills_rebased_real_template():
+    """2027년 기준 전망을 2026 양식에 채우면 시트명·헤더가 27년으로 옮겨지고 그 자리에 값이 들어간다."""
+    years = list(range(2027, 2037))
+    table = pd.DataFrame([{"예산과목": "수선유지비-열원경상정비", **{y: 2_000.0 for y in years}}])
+    master = pd.DataFrame([{"대분류": "플랜트", "중분류": "경상정비", "세부내역": "중대형", "27년예산": 100, "화성지사": 100}])
+    wb = load_workbook(io.BytesIO(fe.fill_longterm_workbook({"화성지사": table}, pd.DataFrame(columns=["사업장", "연도", "등급"]),
+                                                            master, SITES, 2027)))
+    assert "27년 본사 원가분배" in wb.sheetnames and "27년 총원가 배분" in wb.sheetnames and "고온부품(27)" in wb.sheetnames
+    assert "26년 본사 원가분배" not in wb.sheetnames
+    ws = wb["화성"]
+    year_by_col = fe._find_bare_year_row(ws)
+    assert min(year_by_col.values()) == 2027
+    row = next(r for r in range(1, ws.max_row + 1) if str(ws.cell(row=r, column=2).value or "").strip() == "열원경상정비")
+    col = next(c for c, y in year_by_col.items() if y == 2027)
+    assert ws.cell(row=row, column=col).value == 2.0                             # 2,000천원 → 2.0백만원
+    assert wb["총괄표"].cell(row=3, column=3).value == "27년"
+    hq = wb["27년 본사 원가분배"]
+    hr, _ = fe._find_label_header(hq, "27년 예산")
+    assert hr is not None
+    # 수식 참조도 옮겨졌다 — 옛 시트명을 가리키는 수식이 남아 있으면 엑셀에서 #REF! 가 난다
+    stale = [(n, c.coordinate) for n in wb.sheetnames for row_ in wb[n].iter_rows() for c in row_
+             if isinstance(c.value, str) and c.value.startswith("=") and "'26년" in c.value]
+    assert stale == []
