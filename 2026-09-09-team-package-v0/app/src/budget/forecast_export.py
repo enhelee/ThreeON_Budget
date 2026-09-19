@@ -61,6 +61,93 @@ def _bytes(wb) -> bytes:
     return buf.getvalue()
 
 
+# ═══════════════════════════════════════════════════════════ 기준연도 재기준화
+# 내장 양식은 «26년» 라벨이 박힌 2026년 기준 양식이다. 참조용 양식이므로 기준연도가 바뀌면
+# 시트명(«26년 본사 원가분배»·«고온부품(26)»·«26년»~«35년»)·헤더 영역의 연도 값과 라벨·
+# 그 시트명을 가리키는 수식 참조를 기준연도만큼 옮긴 뒤 채운다(사용자 요청 2026-09-20).
+# 헤더 영역(1~6행) 밖의 숫자·문구는 건드리지 않는다 — 금액 26 이나 참고 블록 «(2025중장기)» 같은 것.
+
+TEMPLATE_BASE_YEAR = 2026
+_HEADER_ROWS = 6
+_YY = re.compile(r"(?<!\d)(\d{2})년")            # 26년 · 26년 예산 · 26년 본사 원가분배
+_PAREN_YY = re.compile(r"\((\d{2})\)")           # 고온부품(26)
+_YYYY = re.compile(r"(?<!\d)(20\d{2})(?!\d)")    # (2026~2041)
+
+
+def _shift_label(s: str, delta: int) -> str:
+    def yy(m):
+        v = int(m.group(1))
+        return f"{(v + delta) % 100:02d}년" if 20 <= v <= 45 else m.group(0)
+
+    def paren(m):
+        v = int(m.group(1))
+        return f"({(v + delta) % 100:02d})" if 20 <= v <= 45 else m.group(0)
+
+    def yyyy(m):
+        v = int(m.group(1))
+        return str(v + delta) if 2020 <= v <= 2050 else m.group(0)
+
+    return _YYYY.sub(yyyy, _PAREN_YY.sub(paren, _YY.sub(yy, s)))
+
+
+def rebase_workbook_years(wb, base_year: int, template_base: int = TEMPLATE_BASE_YEAR) -> dict:
+    """양식의 연도 라벨을 template_base → base_year 로 옮긴다. 반환 {옛 시트명: 새 시트명}."""
+    delta = int(base_year) - int(template_base)
+    if delta == 0:
+        return {}
+    renames = {}
+    for ws in wb.worksheets:
+        new = _shift_label(ws.title, delta)
+        if new != ws.title:
+            renames[ws.title] = new
+    # «26년»→«27년» 을 바로 하면 아직 남아 있는 «27년» 과 충돌해 openpyxl 이 «27년1» 을 만든다(실측).
+    # 임시 이름을 거쳐 두 단계로 바꾼다.
+    targets = [ws for ws in wb.worksheets if ws.title in renames]
+    finals = [renames[ws.title] for ws in targets]
+    for i, ws in enumerate(targets):
+        ws.title = f"__rebase_{i}__"
+    for ws, final in zip(targets, finals):
+        ws.title = final
+    # 수식의 시트 참조 — openpyxl 은 시트를 바꿔도 수식을 고쳐 주지 않는다. 그대로 두면 #REF!.
+    # 한 번에 치환한다: 순서대로 적용하면 '26년'→'27년'→'28년' 으로 연쇄된다.
+    if renames:
+        alt = "|".join(re.escape(old) for old in sorted(renames, key=len, reverse=True))
+        quoted = re.compile(r"'(" + alt + r")'!")
+        bare = re.compile(r"(?<![\w'])(" + alt + r")!")
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    v = cell.value
+                    if isinstance(v, str) and v.startswith("="):
+                        v = quoted.sub(lambda m: f"'{renames[m.group(1)]}'!", v)
+                        v = bare.sub(lambda m: f"{renames[m.group(1)]}!", v)
+                        if v != cell.value:
+                            cell.value = v
+    # 헤더 영역(모든 시트): 네 자리 연도 · «NN년» 라벨 · 두 자리 연도 행(5개 이상 나열된 행만)
+    for ws in wb.worksheets:
+        for r in range(1, min(_HEADER_ROWS, ws.max_row) + 1):
+            cells = [ws.cell(row=r, column=c) for c in range(1, ws.max_column + 1)]
+            bare_years = [c for c in cells if isinstance(c.value, (int, float)) and not isinstance(c.value, bool)
+                          and 20 <= c.value <= 45]
+            shift_bare = len(bare_years) >= 5
+            for c in cells:
+                if isinstance(c, MergedCell):
+                    continue
+                v = c.value
+                if isinstance(v, bool):
+                    continue
+                if isinstance(v, (int, float)):
+                    if 2020 <= v <= 2050:
+                        c.value = int(v) + delta
+                    elif shift_bare and 20 <= v <= 45:
+                        c.value = int(v) + delta
+                elif isinstance(v, str) and not v.startswith("="):
+                    new = _shift_label(v, delta)
+                    if new != v:
+                        c.value = new
+    return renames
+
+
 # ═══════════════════════════════════════════════════════════ 표준화 양식 (25시트)
 def _find_year_row(ws) -> dict:
     """연도 헤더 행 → {열: 연도}. 표준화 지사 시트는 2025, 2024, … 네 자리 정수."""
@@ -548,14 +635,17 @@ def _sheet_like(wb, pred):
 def build_schedule_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,
                             template_path: str = LT_TEMPLATE) -> bytes:
     wb = load_workbook(template_path)
+    rebase_workbook_years(wb, base_year)
     name = _sheet_like(wb, lambda n: "정기점검보수공사" in n)
     if name:
         fill_schedule_sheet(wb[name], grade_hist, site_names, base_year)
     return _bytes(wb)
 
 
-def build_hot_parts_download(hot_parts_df, site_names, template_path: str = LT_TEMPLATE) -> bytes:
+def build_hot_parts_download(hot_parts_df, site_names, base_year: int = forecast_calc.BASE_YEAR,
+                             template_path: str = LT_TEMPLATE) -> bytes:
     wb = load_workbook(template_path)
+    rebase_workbook_years(wb, base_year)
     name = _sheet_like(wb, lambda n: n.strip().startswith("고온부품"))
     if name:
         fill_hot_parts_sheet(wb[name], hot_parts_df, site_names)
@@ -565,6 +655,7 @@ def build_hot_parts_download(hot_parts_df, site_names, template_path: str = LT_T
 def build_hq_master_download(hq_master_df, site_names, base_year: int = forecast_calc.BASE_YEAR,
                              template_path: str = LT_TEMPLATE) -> bytes:
     wb = load_workbook(template_path)
+    rebase_workbook_years(wb, base_year)
     name = f"{_yy(base_year)}년 본사 원가분배"
     if name in wb.sheetnames:
         fill_hq_master_sheet(wb[name], hq_master_df, site_names, base_year)
@@ -576,6 +667,7 @@ def fill_longterm_workbook(site_tables, grade_hist, hq_master_df, site_names,
     """지사 탭 + NN년 본사 원가분배 + NN년 총원가 배분 + 총괄표. 27~35년 개별 시트·원본 일정/고온부품 시트는
     건드리지 않는다(v2 정책 그대로 — 기준연도만 상세, 이후는 지사 탭으로 충분)."""
     wb = load_workbook(template_path)
+    rebase_workbook_years(wb, base_year)
     short_to_full = site_sheet_map(site_names)
     for sheet_name in wb.sheetnames:
         site = short_to_full.get(sheet_name.strip())

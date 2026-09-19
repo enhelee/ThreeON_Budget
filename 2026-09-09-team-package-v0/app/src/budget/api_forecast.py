@@ -202,7 +202,7 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 name = f"정기점검보수공사_일정_{by}년기준_현재값.xlsx"
             elif kind == "hot-parts":
                 data = forecast_export.build_hot_parts_download(
-                    fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year))
+                    fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year), by)
                 name = f"고온부품_계획_{by}년기준_현재값.xlsx"
             elif kind == "hq-master":
                 data = forecast_export.build_hq_master_download(
