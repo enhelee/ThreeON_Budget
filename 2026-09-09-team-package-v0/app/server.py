@@ -390,6 +390,8 @@ def status(year: str):
             "datasets": ds[:10],
             "locked": dbm.is_locked(conn, year),
             "locks": dbm.locked_years(conn),
+            # 열린 연도는 보고 있는 연도와 무관하게 알려야 한다 — 전 화면 배너의 근거
+            "lock_state": dbm.open_years(conn),
             "master": dbm.master_stats(conn, year),
             "items": items_cfg,
             "runs": {b: {"created_at": r["created_at"], "summary": r["summary"]}
@@ -569,10 +571,18 @@ class LockReq(BaseModel):
     year: str
 
 
+class UnlockReq(BaseModel):
+    reason: str
+
+
 @app.post("/api/lock")
 def lock(req: LockReq):
     conn = _conn()
     try:
+        # 열려 있던 구간이면 그 사이 무엇이 바뀌었는지 먼저 센다 —
+        # lock_year 가 해제 기록을 닫아 버리므로 순서가 중요하다.
+        since = dbm.lock_state(conn, req.year).get("unlocked_at")
+        changes = dbm.changes_since(conn, req.year, since) if since else {}
         dbm.lock_year(conn, req.year)
         # 마감 스냅샷: 그 시점의 산출물 6종을 output/마감/{연도}/에 증빙 보관
         import shutil
@@ -587,20 +597,47 @@ def lock(req: LockReq):
                 if os.path.exists(src):
                     shutil.copy2(src, os.path.join(snap_dir, name))
                     copied += 1
-        return {"locked": req.year, "snapshot": copied,
+        summary = " · ".join(f"{k} {v}건" for k, v in changes.items())
+        return {"locked": req.year, "snapshot": copied, "changes": changes,
                 "notice": f"{req.year}년 마감 완료 — 업로드·분석·재배정·수정이 차단되고 "
                           f"산출물 {copied}종을 output/마감/{req.year}/에 보관했습니다. "
-                          "(조회·통계·Excel 내보내기는 계속 가능)"}
+                          "(조회·통계·Excel 내보내기는 계속 가능)"
+                          + (f" 열린 동안 바뀐 것: {summary}." if summary else "")}
     finally:
         conn.close()
 
 
 @app.delete("/api/lock/{year}")
-def unlock(year: str):
+def unlock(year: str, req: UnlockReq, request: Request):
+    """마감 해제 — 사유를 반드시 받는다.
+
+    마감된 연도의 숫자는 대외 보고에 쓰인 값이다. 버튼 한 번으로 열리면 열린 줄
+    모르고 며칠이 지나간다. 사유를 남겨야 나중에 «왜 2023년 숫자가 달라졌지»에
+    답할 수 있다.
+    """
+    reason = (req.reason or "").strip()
+    if not reason:
+        raise HTTPException(400, "해제 사유를 입력하세요. 변경 이력에 기록됩니다.")
     conn = _conn()
     try:
-        dbm.unlock_year(conn, year)
-        return {"unlocked": year}
+        dbm.unlock_year(conn, year, reason, getattr(request.state, "operator", None))
+        return {"unlocked": year, "reason": reason}
+    finally:
+        conn.close()
+
+
+@app.get("/api/lock-state")
+def get_lock_state(year: str = None):
+    """year 를 주면 그 해 상태, 안 주면 «열려 있는 연도 전부».
+
+    후자는 전 화면 배너용이다. 배너는 어느 화면에서나 떠야 하는데 /api/status 는
+    일부 화면에서만 불린다 — 연도마다 한 번씩 묻지 않도록 한 번에 돌려준다.
+    """
+    conn = _conn()
+    try:
+        if year is None:
+            return _clean_json({"open": dbm.open_years(conn)})
+        return _clean_json(dbm.lock_state(conn, year))
     finally:
         conn.close()
 

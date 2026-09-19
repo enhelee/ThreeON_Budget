@@ -46,6 +46,14 @@ export async function afterSave(msg) {
   toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
 }
 
+// 마감을 풀어 놓은 연도 — 어느 화면에 있든 배너로 알려야 한다.
+// 실패해도 화면을 막지 않는다(배너만 안 뜬다).
+
+export async function loadLockStates() {
+  try { state.lockStates = (await api("/api/lock-state")).open; }
+  catch { state.lockStates = null; }
+}
+
 // 설정 화면 「연도 기준정보」 — 그 해 한 벌을 한 번에 끌어온다.
 // 별칭만 연도가 없다(표기 흔들림 보정은 연도가 바뀌어도 유효하다).
 
