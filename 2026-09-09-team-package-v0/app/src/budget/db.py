@@ -204,6 +204,57 @@ def init_db(conn):
         unlocked_at TEXT NOT NULL,
         reason TEXT,
         operator TEXT)""")
+    # ── 전망 상태(3·4단계) — 전망 기준연도(base_year)마다 «완전한 한 벌» ────
+    # v2(전망 앱)는 이 아홉 가지를 CWD 의 CSV 로 두었고 BASE_YEAR=2026 이 상수였다.
+    # 즉 그 상태는 사실상 «26년 기준 전망의 가정 한 벌»이다. 27년 전망을 시작할 때
+    # 26년 가정이 덮여 사라지면 «작년 전망과 무엇이 달라졌나»를 볼 수 없으므로
+    # 전부 base_year 축을 갖는다(사용자 결정 2026-09-19). 연도별 기준정보와 같은 모델.
+    #
+    # ⚠ base_year(어느 해에 세운 전망인가)와 연도(정비·사업의 대상연도)는 다른 축이다.
+    #   2026년 기준 전망 안에 «2027년 TI 정비»가 있을 수 있다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_grade(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL,
+        연도 INTEGER NOT NULL, 등급 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 연도))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS benchmark_method(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 방식 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 예산과목))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS benchmark_override(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 등급 TEXT NOT NULL, 표준금액 REAL NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 예산과목, 등급))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS forecast_factor(
+        base_year TEXT NOT NULL, 팩터명 TEXT NOT NULL,
+        연간비율 REAL NOT NULL, 활성 INTEGER NOT NULL DEFAULT 1,
+        순서 INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(base_year, 팩터명))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS forecast_hot_parts(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL,
+        연도 INTEGER NOT NULL, 항목 TEXT NOT NULL, 금액 REAL NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 연도, 항목))""")
+    # 본사 원가분배 마스터는 v2 에서 «지사가 열인 넓은 표»다(대분류·중분류·세부내역·
+    # 26년예산·<지사…>). DB 에는 셀 단위 긴 표로 두고 읽을 때 넓은 표로 되돌린다 —
+    # 지사 목록이 해마다 달라도 표를 고치지 않기 위해서다. 행·열순서가 원래 모양을 보존한다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS hq_master(
+        base_year TEXT NOT NULL, 행 INTEGER NOT NULL,
+        열 TEXT NOT NULL, 열순서 INTEGER NOT NULL,
+        대분류 TEXT, 중분류 TEXT, 세부내역 TEXT, 금액 REAL,
+        PRIMARY KEY(base_year, 행, 열))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS hq_ratio(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 계약체결금액 REAL NOT NULL,
+        PRIMARY KEY(base_year, 사업장))""")
+    # 임시사업·돌발사업은 같은 (사업, 연도, 과목)이 여러 건일 수 있어 자연키가 없다 → id.
+    cur.execute("""CREATE TABLE IF NOT EXISTS hq_temp(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        base_year TEXT NOT NULL,
+        사업명 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
+        연도 INTEGER NOT NULL, 금액 REAL NOT NULL)""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS forecast_surprise(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        base_year TEXT NOT NULL,
+        사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 예산과목 TEXT NOT NULL,
+        금액 REAL NOT NULL, 사유 TEXT)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS manual_biz(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         year TEXT NOT NULL, budget TEXT NOT NULL,
