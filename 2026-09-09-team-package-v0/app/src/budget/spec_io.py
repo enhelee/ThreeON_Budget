@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-"""연동규격(연동규격_INTERFACE.md) CSV 계약 어댑터.
+"""팀 연계 파일 계약(docs/연계계약_CONTRACT.md §3.4) 어댑터 — 결과 JSON + CSV 3종.
 
-두 코드베이스(본인 앱 ↔ budget_app)를 **파일 계약**으로 잇기 위한 입출력 계층.
-budget_app의 검증된 매칭 엔진은 그대로 두고, 규격 CSV ↔ 내부 모델 변환만 담당한다.
+원래 두 코드베이스(동료 전망 앱 ↔ budget_app)를 **파일 계약**으로 잇기 위한 입출력 계층이었다.
+전망 앱은 Phase 6-8 에서 이 앱에 흡수·삭제되어 지금 이 파일들을 읽는 프로그램은 없다 —
+외부 도구·감사 추적용으로 계약을 유지한다(쓰는 곳이 없다고 확인되면 정리 대상).
+검증된 매칭 엔진은 그대로 두고, 규격 CSV ↔ 내부 모델 변환만 담당한다.
 
 규격 파일(모두 utf-8-sig, 금액 단위 **원**):
   - data_{연도}.csv       : 정제 실적 (거래처명·사업장·전기일·전표헤더텍스트·금액·계정과목)
@@ -12,10 +14,10 @@ budget_app의 검증된 매칭 엔진은 그대로 두고, 규격 CSV ↔ 내부
 
 내부 단위는 천원. 경계에서 ×1000 / ÷1000 변환.
 
-⚠️ 미확정 공백(연동_통합가이드.md §4):
-  - 투자유형_확정 : 분류 로직 미구현(보류). classifier 훅으로 주입, 기본 '미분류'.
-  - 사업코드      : 우리 계획·실적에 없음 → matched 출력 시 공란.
-  - 거래처명      : zrfm2엔 공급업체 '코드'만 → 이름 아님(코드로 채움).
+결말이 난 공백(연계계약_CONTRACT.md §7):
+  - 투자유형_확정 : 동료 앱 담당이었고 그 앱이 사라졌다. classifier 훅은 남김, 기본 '미분류'.
+  - 사업코드      : 우리 계획·실적에 없음 → matched 출력 시 공란(양쪽 합의, 정상).
+  - 거래처명      : zrfm2엔 공급업체 '코드'만 → 이름 아님(코드로 채움, 양쪽 합의).
   - 사업장→처지사 : 손익센터 코드. 코드→지사 매핑은 budget_csv로 구성(dept_map_from_budget).
 """
 import csv as _csv
@@ -128,7 +130,7 @@ def write_budget_csv_from_df(df, out_path, normalize_item_alias=None):
 def write_matched_csv(erp_annotated, out_path):
     """매칭 결과(matching.match_actuals의 erp_annotated) → 규격 matched_{연도}.csv.
 
-    사업코드는 우리 데이터에 없음 → 공란(연동_통합가이드 §4-3 확정 전까지).
+    사업코드는 우리 데이터에 없음 → 공란(양쪽 합의 — 연계계약_CONTRACT §7-③).
     """
     def col(name):
         return erp_annotated[name] if name in erp_annotated.columns else [None] * len(erp_annotated)
@@ -153,7 +155,7 @@ def write_classified_csv(erp_annotated, out_path, classifier=None,
     """매칭 결과 → 규격 classified_{연도}.csv (data 6칸 + 투자유형_확정).
 
     classifier: 전표헤더텍스트(str) → 투자유형(str) 함수. None이면 전부 '미분류'.
-    ⚠️ 투자유형 분류는 담당 확정 전까지 보류 → 기본 '미분류'(연동_통합가이드 §4-1).
+    ⚠️ 투자유형 분류는 담당 확정 전까지 → 기본 '미분류'(동료 앱 담당이었고 그 앱은 사라짐 — 연계계약_CONTRACT §7-①).
     """
     def col(name):
         return erp_annotated[name] if name in erp_annotated.columns else [None] * len(erp_annotated)
@@ -189,7 +191,7 @@ def read_data_csv(path):
     """규격 data_{연도}.csv → 내부 ERP DataFrame(erp_loader.ERP_COLUMNS 호환).
 
     금액(원)→금액천원 환산. 사업장(손익센터 코드)은 지사원문에 담되, 코드→지사
-    정규화는 dept_map_from_budget 등 별도 매핑 필요(연동_통합가이드 §4).
+    정규화는 dept_map_from_budget 등 별도 매핑 필요(연계계약_CONTRACT §3.4.5).
     """
     df = pd.read_csv(path, dtype=str, keep_default_na=True)
     recs = []

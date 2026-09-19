@@ -1340,9 +1340,10 @@ def export(year: str, budget: str, kind: str = "actual"):
     return FileResponse(path, filename=names[kind])
 
 
-# ── 팀 v2 앱(예산예측프로그램_팀공유_v2) 연계 산출물 ──────────────────────────
-#   json    : 「예산 실적 집계 → 사업 실적 연결」에 올리는 결과 JSON(schemaVersion 1, 천원)
-#   matched / budget / data : 연동규격_INTERFACE CSV 계약(연도 단일 파일, 원 단위)
+# ── 팀 연계 산출물 (docs/연계계약_CONTRACT.md §3.4) ─────────────────────────
+#   json    : 결과 JSON(schemaVersion 1, 천원). 원래 동료 전망 앱(v2)에 올리던 파일 — v2 는
+#             6-8 에서 이 앱에 흡수·삭제되어 지금 소비자는 없다. 외부 도구·감사용으로 유지.
+#   matched / budget / data : CSV 계약(연도 단일 파일, 원 단위)
 #   손익·자본 최신 분석을 한 번에 담으므로 어느 한쪽 분석이라도 최신 파일보다 새로우면 재생성한다.
 
 @app.get("/api/export-team")

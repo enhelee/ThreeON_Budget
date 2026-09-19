@@ -7,7 +7,7 @@
 > **71 passed**(2026-08-04, rev13). 실행법·구조·API·주의사항은 반드시
 > **[`../통합_인수인계_MASTER.md`](../통합_인수인계_MASTER.md)(진입점)** 를 먼저 볼 것.
 > 그 밖에 루트 [`../HANDOFF.md`](../HANDOFF.md) · [`../변경이력_CHANGELOG.md`](../변경이력_CHANGELOG.md) ·
-> [`../연계규격_INTEGRATION.md`](../연계규격_INTEGRATION.md) · [`../PRD_V1.html`](../PRD_V1.html) 참조.
+> [`연계계약_CONTRACT.md`](연계계약_CONTRACT.md)(계약 통합본, 2026-09-20) · [`../PRD_V1.html`](../PRD_V1.html) 참조.
 
 ---
 
