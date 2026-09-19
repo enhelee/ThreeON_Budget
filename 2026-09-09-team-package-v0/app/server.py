@@ -31,16 +31,13 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
+from budget import api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
 # 값을 주지 않으면 "dev" — 화면만 보고 배포본인지 로컬 개발본인지 구분된다.
 APP_REV = os.environ.get("APP_REV") or "dev"
-# 5번 탭(중장기 전망) iframe 이 가리킬 주소. 배포에서는 같은 호스트의 /forecast 라
-# 상대경로가 기본값이다. 로컬 개발은 .env 에 http://localhost:8501/forecast 처럼 절대경로를 준다.
-# Phase 6 에서 전망 기능을 흡수하면 이 변수와 iframe 은 함께 사라진다.
-FORECAST_URL = os.environ.get("FORECAST_URL") or "/forecast"
+# (FORECAST_URL 은 6-6 에서 iframe 과 함께 사라졌다 — 3·4단계는 /api/forecast/* 가 담당한다.)
 # 지금 떠 있는 것이 «어느 커밋인가». Render 가 컨테이너에 자동으로 넣어 주는 값이다.
 # 배포가 실제로 갈렸는지 확인할 때 이것 하나면 끝난다 — 2026-09-15 에 Caddyfile 만 바뀐
 # 배포를 정적 파일 타임스탬프로 판별하려다 헛다리를 짚은 적이 있다(도커 레이어 캐시 때문에
@@ -124,7 +121,6 @@ class LoginReq(BaseModel):
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "commit": APP_COMMIT,
-            "forecast_url": FORECAST_URL,
             "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
 
 
@@ -1472,6 +1468,10 @@ def training_export(name: str):
     return Response(csv.encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote('training_' + name + '.csv')}"})
 
+
+# ── 3·4단계(표준화·중장기 전망) API — src/budget/api_forecast.py ────────
+# server.py 를 더 키우지 않으려고 라우터 파일로 분리했다. 연결·JSON 정리는 이 파일 것을 넘긴다.
+app.include_router(api_forecast.make_router(_conn, _clean_json))
 
 # ── Vite 빌드 자산 (해시 파일명 → 장기 캐시 가능) ──────────────────────
 if os.path.isdir(os.path.join(STATIC_DIR, "assets")):
