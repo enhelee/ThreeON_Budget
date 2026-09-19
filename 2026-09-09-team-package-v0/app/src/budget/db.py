@@ -38,6 +38,56 @@ def connect(db_path=None):
     return conn
 
 
+def _rebuild_master_with_year(conn, table, cols):
+    """옛 마스터(코드 단독 PK)를 (year, 코드) PK 로 다시 만든다.
+
+    SQLite 도 PostgreSQL 도 ALTER 로 기본키를 바꿀 수 없다. 표를 새로 만들고
+    옮긴 뒤 이름을 바꾸는 것이 두 backend 모두에서 통하는 유일한 길이다.
+    기존 행의 연도는 알 수 없으므로 빈 문자열로 두고,
+    migrate_masters_to_years 가 실제 연도로 복제한다.
+    """
+    existing = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+    if not existing or "year" in existing:
+        return                       # 아직 없거나 이미 새 모양
+    names = ",".join(cols)
+    pk = cols[0]
+    decl = ",".join(f"{c} TEXT" for c in cols)
+    conn.execute(f"CREATE TABLE {table}__new("
+                 f"year TEXT NOT NULL DEFAULT '', {decl}, PRIMARY KEY(year, {pk}))")
+    conn.execute(f"INSERT INTO {table}__new(year,{names}) SELECT '',{names} FROM {table}")
+    conn.execute(f"DROP TABLE {table}")
+    conn.execute(f"ALTER TABLE {table}__new RENAME TO {table}")
+    conn.commit()
+
+
+def migrate_masters_to_years(conn):
+    """연도를 모르는 마스터 행(year='')을 데이터가 있는 모든 연도로 복제한다.
+
+    한 번만 의미가 있다 — year='' 인 행이 없으면 아무것도 하지 않는다.
+    어느 해 것인지 고를 근거가 없으므로 전 연도에 같은 내용을 둔다.
+    이관 직후 동작이 바뀌지 않는 쪽을 택한 것이다.
+    """
+    years = [r[0] for r in conn.execute(
+        "SELECT DISTINCT year FROM dataset ORDER BY year")]
+    if not years:
+        return
+    for table in ("item_master", "dept_master"):
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+        others = [c for c in cols if c != "year"]
+        legacy = conn.execute(
+            f"SELECT {','.join(others)} FROM {table} WHERE year=''").fetchall()
+        if not legacy:
+            continue
+        ph = ",".join("?" for _ in others) + ",?"
+        for y in years:
+            for row in legacy:
+                conn.execute(
+                    f"INSERT OR REPLACE INTO {table}({','.join(others)},year)"
+                    f" VALUES({ph})", tuple(row) + (y,))
+        conn.execute(f"DELETE FROM {table} WHERE year=''")
+    conn.commit()
+
+
 def init_db(conn):
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS dataset(
@@ -101,14 +151,48 @@ def init_db(conn):
         source_year TEXT,
         created_at TEXT,
         PRIMARY KEY (과목, 텍스트정규))""")
+    # ── 연도별 기준정보 ──────────────────────────────────────────────
+    # 연도마다 «완전한 한 벌»을 둔다. 2023년 분석을 다시 돌릴 때 그 해 기준이
+    # 그대로 남아 있어야 하기 때문이다(설계 2026-09-15 §3.2).
+    #
+    # 지사는 성격이 바뀐다 — 양산지사는 2023년 발전설비 건설 중이라 DH 였고
+    # 준공 후 중대형CHP 가 되었다. 연도 축 없는 구성 하나로는 담을 수 없다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS dept_config(
+        year TEXT NOT NULL, 이름 TEXT NOT NULL,
+        그룹 TEXT NOT NULL, 포함 INTEGER NOT NULL DEFAULT 1,
+        순서 INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(year, 이름))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS item_config(
+        year TEXT NOT NULL, budget TEXT NOT NULL, 과목 TEXT NOT NULL,
+        대분류 TEXT, 심의대상 INTEGER NOT NULL DEFAULT 0,
+        포함 INTEGER NOT NULL DEFAULT 1, 실적반영 INTEGER NOT NULL DEFAULT 1,
+        순서 INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(year, budget, 과목))""")
+    # 별칭은 연도 축을 갖지 않는다 — 오래된 표기가 몇 년 뒤 자료에 다시 나타난다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS alias(
+        종류 TEXT NOT NULL,              -- 'item' | 'dept'
+        원표기 TEXT NOT NULL, 정규표기 TEXT NOT NULL,
+        PRIMARY KEY(종류, 원표기))""")
+    # 마스터는 «그 해의 기준표»다. 조직개편이 있으면 부서코드-처지사 대응이 바뀌고
+    # 예산코드 체계도 손질된다. 연도가 PK 에 들어가야 과거가 덮이지 않는다.
     cur.execute("""CREATE TABLE IF NOT EXISTS item_master(
-        계정코드 TEXT PRIMARY KEY,
+        year TEXT NOT NULL DEFAULT '',
+        계정코드 TEXT NOT NULL,
         과목명 TEXT NOT NULL,
-        주관부서코드 TEXT, 주관부서명 TEXT, 속성 TEXT, 비고 TEXT)""")
+        주관부서코드 TEXT, 주관부서명 TEXT, 속성 TEXT, 비고 TEXT,
+        PRIMARY KEY(year, 계정코드))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS dept_master(
-        부서코드 TEXT PRIMARY KEY,
+        year TEXT NOT NULL DEFAULT '',
+        부서코드 TEXT NOT NULL,
         부서명 TEXT NOT NULL,
-        처지사 TEXT, 비고 TEXT)""")
+        처지사 TEXT, 비고 TEXT,
+        PRIMARY KEY(year, 부서코드))""")
+    # 이미 있던 DB 는 마스터가 옛 모양(코드 단독 PK)이다. ALTER 로는 PK 를 바꿀 수
+    # 없으므로 표를 다시 만들어 옮긴다. 새 DB 는 위 CREATE 가 이미 새 모양이라 건너뛴다.
+    _rebuild_master_with_year(conn, "item_master",
+                              ("계정코드", "과목명", "주관부서코드", "주관부서명", "속성", "비고"))
+    _rebuild_master_with_year(conn, "dept_master",
+                              ("부서코드", "부서명", "처지사", "비고"))
     cur.execute("""CREATE TABLE IF NOT EXISTS year_lock(
         year TEXT PRIMARY KEY,
         locked_at TEXT NOT NULL)""")
@@ -369,19 +453,27 @@ def latest_run(conn, year, budget):
 VALID_ATTRS = ("일반", "제조", "건가", "자산")
 
 
-def ingest_item_master(conn, path):
-    """예산과목.xlsx [예산코드] 시트 → item_master. (계정코드, 과목명, 속성 등)"""
+def ingest_item_master(conn, path, year):
+    """예산과목.xlsx [예산코드] 시트 → 그 해의 item_master.
+
+    ⚠ 컬럼을 이름으로 지정한다. 예전에는 VALUES(?,?,?,?,?,?) 로 위치에 기댔는데,
+      year 컬럼이 늘어나는 순간 조용히 깨지는 구조였다.
+    """
     import openpyxl
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[wb.sheetnames[0]]
     cur = conn.cursor()
+    cur.execute("DELETE FROM item_master WHERE year=?", (str(year),))
     n = 0
     for r in range(2, ws.max_row + 1):
         code, name = ws.cell(r, 1).value, ws.cell(r, 2).value
         if code is None or name is None:
             continue
-        cur.execute("INSERT OR REPLACE INTO item_master VALUES(?,?,?,?,?,?)",
-                    (str(code).strip(), str(name).strip(),
+        cur.execute(
+            "INSERT OR REPLACE INTO item_master"
+            "(year,계정코드,과목명,주관부서코드,주관부서명,속성,비고)"
+            " VALUES(?,?,?,?,?,?,?)",
+                    (str(year), str(code).strip(), str(name).strip(),
                      None if ws.cell(r, 3).value is None else str(ws.cell(r, 3).value).strip(),
                      ws.cell(r, 4).value, ws.cell(r, 5).value, ws.cell(r, 6).value))
         n += 1
@@ -390,19 +482,22 @@ def ingest_item_master(conn, path):
     return n
 
 
-def ingest_dept_master(conn, path):
-    """부서코드.xlsx [부서코드] 시트 → dept_master. (부서코드, 부서명, 처지사)"""
+def ingest_dept_master(conn, path, year):
+    """부서코드.xlsx [부서코드] 시트 → 그 해의 dept_master."""
     import openpyxl
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb[wb.sheetnames[0]]
     cur = conn.cursor()
+    cur.execute("DELETE FROM dept_master WHERE year=?", (str(year),))
     n = 0
     for r in range(2, ws.max_row + 1):
         code, name = ws.cell(r, 1).value, ws.cell(r, 2).value
         if code is None or name is None:
             continue
-        cur.execute("INSERT OR REPLACE INTO dept_master VALUES(?,?,?,?)",
-                    (str(code).strip(), str(name).strip(),
+        cur.execute(
+            "INSERT OR REPLACE INTO dept_master(year,부서코드,부서명,처지사,비고)"
+            " VALUES(?,?,?,?,?)",
+                    (str(year), str(code).strip(), str(name).strip(),
                      ws.cell(r, 3).value, ws.cell(r, 4).value))
         n += 1
     wb.close()
@@ -410,10 +505,28 @@ def ingest_dept_master(conn, path):
     return n
 
 
-def load_item_attr_map(conn):
+def master_year(conn, table, year):
+    """그 해의 마스터가 없으면 가장 가까운 과거 연도를 쓴다.
+
+    마스터는 연도별이지만 매년 새로 올리지는 않는다. 아직 올리지 않은 해에
+    매핑이 통째로 비면 속성·과목 정규화가 무너지므로, 가장 최근에 올린 해로
+    물러선다. (+연도로 새 해를 만들면 직전 해가 복사되므로 보통은 쓰이지 않는다.)
+    """
+    row = conn.execute(
+        f"SELECT year FROM {table} WHERE year<=? ORDER BY year DESC LIMIT 1",
+        (str(year),)).fetchone()
+    if row:
+        return row[0]
+    row = conn.execute(f"SELECT year FROM {table} ORDER BY year LIMIT 1").fetchone()
+    return row[0] if row else str(year)
+
+
+def load_item_attr_map(conn, year):
     """{과목명 -> 속성(단일)} — 복합 표기('일반/제조')는 첫 값 사용."""
+    y = master_year(conn, "item_master", year)
     out = {}
-    for name, attr in conn.execute("SELECT 과목명, 속성 FROM item_master"):
+    for name, attr in conn.execute(
+            "SELECT 과목명, 속성 FROM item_master WHERE year=?", (y,)):
         if not attr:
             continue
         first = str(attr).split("/")[0].strip()
@@ -422,21 +535,31 @@ def load_item_attr_map(conn):
     return out
 
 
-def load_code_to_item(conn):
+def load_code_to_item(conn, year):
     """{계정코드 -> 과목명} — ERP 계정코드 정규화용."""
+    y = master_year(conn, "item_master", year)
     return {str(c): str(n) for c, n in
-            conn.execute("SELECT 계정코드, 과목명 FROM item_master")}
+            conn.execute("SELECT 계정코드, 과목명 FROM item_master WHERE year=?", (y,))}
 
 
-def load_deptcode_map(conn):
+def load_deptcode_map(conn, year):
     """{부서코드 -> 처지사} — 계획행 처지사 보정용(부서코드 마스터)."""
+    y = master_year(conn, "dept_master", year)
     return {str(c): str(d) for c, d in
-            conn.execute("SELECT 부서코드, 처지사 FROM dept_master WHERE 처지사 IS NOT NULL")}
+            conn.execute("SELECT 부서코드, 처지사 FROM dept_master"
+                         " WHERE year=? AND 처지사 IS NOT NULL", (y,))}
 
 
-def master_stats(conn):
-    item = conn.execute("SELECT COUNT(*) FROM item_master").fetchone()[0]
-    dept = conn.execute("SELECT COUNT(*) FROM dept_master").fetchone()[0]
+def master_stats(conn, year=None):
+    """마스터 건수. 연도를 주면 그 해 것만 센다(설정 화면·상태 표시용)."""
+    if year is None:
+        item = conn.execute("SELECT COUNT(*) FROM item_master").fetchone()[0]
+        dept = conn.execute("SELECT COUNT(*) FROM dept_master").fetchone()[0]
+    else:
+        item = conn.execute("SELECT COUNT(*) FROM item_master WHERE year=?",
+                            (str(year),)).fetchone()[0]
+        dept = conn.execute("SELECT COUNT(*) FROM dept_master WHERE year=?",
+                            (str(year),)).fetchone()[0]
     return {"예산과목": item, "부서코드": dept}
 
 

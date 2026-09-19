@@ -288,8 +288,12 @@ async def upload_erp(year: str, file: UploadFile = File(...)):
 
 
 @app.post("/api/upload/master")
-async def upload_master(kind: str, file: UploadFile = File(...)):
-    """기준정보 마스터 갱신: kind=item(예산과목) | dept(부서코드)."""
+async def upload_master(kind: str, year: str, file: UploadFile = File(...)):
+    """기준정보 마스터 갱신: kind=item(예산과목) | dept(부서코드).
+
+    ⚠ 연도가 필수다. 마스터는 «그 해의 기준표»이고, 연도 없이 넣으면
+      아무도 읽지 않는 행이 쌓인다(조회는 전부 연도로 건다).
+    """
     if kind not in ("item", "dept"):
         raise HTTPException(400, "kind는 item(예산과목) 또는 dept(부서코드)여야 합니다.")
     fd, tmp = tempfile.mkstemp(suffix=".xlsx")
@@ -298,9 +302,10 @@ async def upload_master(kind: str, file: UploadFile = File(...)):
             f.write(await file.read())
         conn = _conn()
         try:
-            n = (dbm.ingest_item_master(conn, tmp) if kind == "item"
-                 else dbm.ingest_dept_master(conn, tmp))
-            return {"rows": n, "master": dbm.master_stats(conn),
+            _guard_unlocked(conn, year, "마스터 갱신")
+            n = (dbm.ingest_item_master(conn, tmp, year) if kind == "item"
+                 else dbm.ingest_dept_master(conn, tmp, year))
+            return {"rows": n, "master": dbm.master_stats(conn, year),
                     "notice": f"{'예산과목' if kind == 'item' else '부서코드'} 마스터 "
                               f"{n}건 갱신 — 다음 분석부터 적용됩니다."}
         finally:
@@ -386,7 +391,7 @@ def status(year: str):
             "datasets": ds[:10],
             "locked": dbm.is_locked(conn, year),
             "locks": dbm.locked_years(conn),
-            "master": dbm.master_stats(conn),
+            "master": dbm.master_stats(conn, year),
             "items": items_cfg,
             "runs": {b: {"created_at": r["created_at"], "summary": r["summary"]}
                      for b, r in runs.items()},
@@ -824,7 +829,7 @@ def branch_detail(year: str, branch: str):
             groups = {}
             for v in vs:
                 groups.setdefault((v["budget"], v["과목"]), []).append(v)
-            attr_map = dbm.load_item_attr_map(conn)
+            attr_map = dbm.load_item_attr_map(conn, year)
             biz_out = []
             for (budget, item), vv in sorted(groups.items()):
                 vouchers = [{k: v[k] for k in
