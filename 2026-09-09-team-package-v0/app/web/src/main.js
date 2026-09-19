@@ -84,6 +84,7 @@ document.addEventListener("click", async e => {
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
   if (act === "reload-audit") { await navigate("settings"); return; }
+  if (act === "reload-view") { await navigate(state.view); return; }
   if (act === "train") {
     const name = e.target.closest("[data-action]").dataset.name;
     if (!confirm(`${name} 모델을 지금 재학습할까요?\n활성 학습데이터로 새 버전을 만들고 그 버전을 활성화합니다(이전 버전은 보관·롤백 가능).`)) return;
