@@ -530,7 +530,9 @@ def _year_config_is_untouched(conn, year):
     «이미 있음»으로 보고 복사를 막으면, 화면을 한 번 열었다는 이유만으로 연도 복사가
     영영 막힌다 — 실측으로 걸린 길이다. 마스터가 올라와 있으면 손댄 것으로 본다.
     """
-    if any(dbm.master_stats(conn, year).values()):
+    # master_stats 는 «그 해 분석이 실제로 쓰는» 마스터를 세므로 과거 연도로 물러선다.
+    # 여기서 묻는 것은 «이 해에 사람이 올린 것이 있는가» 라 그 해 것만 봐야 한다.
+    if dbm.list_item_master(conn, year) or dbm.list_dept_master(conn, year):
         return False
     if config_store.load_dept_config(conn, year) != config_store.seed_dept_config(year):
         return False

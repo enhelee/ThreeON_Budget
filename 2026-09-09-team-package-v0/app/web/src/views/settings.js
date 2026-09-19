@@ -94,6 +94,7 @@ export function renderSettings() {
 
     <section class="panel p-6">
       <h3 class="section-title">📚 기준정보 마스터</h3>
+      ${state.status?.master?.기준연도 ? `<p class="mt-1 text-xs font-semibold text-amber-700">ℹ ${esc(state.year)}년 마스터가 없어 <b>${esc(state.status.master.기준연도)}년 것을 쓰고 있습니다</b> — 아래 건수는 그 해 기준입니다.</p>` : ""}
       <p class="section-help">예산과목(계정코드·속성)·부서코드(처지사) 마스터 — 속성(일반/제조/건가/자산) 교정, ERP 과목 정규화, 계획행 처지사 보정에 사용됩니다. 조직개편·계정 신설 시 새 파일을 올려 갱신하세요(같은 코드는 덮어씀).</p>
       <div class="mt-4 grid gap-3 sm:grid-cols-2">
         <div class="rounded-xl bg-slate-50 p-4"><div class="flex items-center justify-between"><p class="text-xs font-semibold text-slate-500">예산과목 마스터</p><button class="btn-secondary" data-action="pick-master-item">파일 갱신</button></div><p class="mt-2 text-2xl font-bold">${(state.status?.master?.예산과목 || 0).toLocaleString()}건</p><p class="mt-1 text-xs text-slate-400">양식: 계정코드·이름·주관부서코드·주관부서명·속성·비고</p></div>

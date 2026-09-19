@@ -238,6 +238,11 @@ def init_db(conn):
     conn.commit()
     ml_registry.init_tables(conn)        # 모델 레지스트리·학습데이터 표
 
+    # 연도를 모르는 옛 마스터를 실제 연도로 복제한다. 계획서에는 있었는데
+    # 호출이 빠져 있었다(Task 1) — 그래서 마스터가 year='' 에 갇혔고,
+    # 분석은 master_year 후퇴 덕에 멀쩡했지만 설정 화면이 «0건» 으로 보였다.
+    migrate_masters_to_years(conn)
+
 
 def add_audit(conn, operator, method, path, status, detail=None):
     conn.execute("INSERT INTO audit_log(at,operator,method,path,status,detail) VALUES(?,?,?,?,?,?)",
@@ -590,16 +595,25 @@ def copy_masters(conn, from_year, to_year):
 
 
 def master_stats(conn, year=None):
-    """마스터 건수. 연도를 주면 그 해 것만 센다(설정 화면·상태 표시용)."""
+    """마스터 건수. 연도를 주면 «그 해 분석이 실제로 쓰는» 마스터를 센다.
+
+    그 해 마스터가 없으면 분석은 master_year 로 가장 가까운 과거 연도를 쓴다.
+    화면이 그 사실을 모른 채 0건이라고 하면, 멀쩡히 쓰이고 있는 마스터를 두고
+    «안 올라갔나?» 하게 된다. 그래서 기준연도를 함께 돌려준다.
+    """
     if year is None:
         item = conn.execute("SELECT COUNT(*) FROM item_master").fetchone()[0]
         dept = conn.execute("SELECT COUNT(*) FROM dept_master").fetchone()[0]
-    else:
-        item = conn.execute("SELECT COUNT(*) FROM item_master WHERE year=?",
-                            (str(year),)).fetchone()[0]
-        dept = conn.execute("SELECT COUNT(*) FROM dept_master WHERE year=?",
-                            (str(year),)).fetchone()[0]
-    return {"예산과목": item, "부서코드": dept}
+        return {"예산과목": item, "부서코드": dept, "기준연도": None}
+    iy = master_year(conn, "item_master", year)
+    dy = master_year(conn, "dept_master", year)
+    item = conn.execute("SELECT COUNT(*) FROM item_master WHERE year=?",
+                        (iy,)).fetchone()[0]
+    dept = conn.execute("SELECT COUNT(*) FROM dept_master WHERE year=?",
+                        (dy,)).fetchone()[0]
+    base = iy if item else (dy if dept else None)
+    return {"예산과목": item, "부서코드": dept,
+            "기준연도": (base or None) if str(base) != str(year) else None}
 
 
 # ---------------------------------------------------------------------------

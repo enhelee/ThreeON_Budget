@@ -54,6 +54,43 @@ def test_legacy_master_rows_are_copied_to_each_year(conn):
     assert conn.execute("SELECT COUNT(*) FROM item_master").fetchone()[0] == 2
 
 
+def test_init_db_runs_the_master_year_migration(tmp_path):
+    """init_db 가 마이그레이션을 실제로 부르는지 — 함수만 있고 호출이 없었다.
+
+    Task 1 계획서에는 «init_db 끝에서 호출한다»가 있었는데 코드에 그 줄이 빠졌다.
+    그래서 옛 마스터가 year='' 에 갇혔고, 분석은 master_year 후퇴 덕에 멀쩡했지만
+    설정 화면과 /api/master/* 가 «0건» 으로 보였다(실측 2026-09-19, 배포본 포함).
+    함수의 존재가 아니라 «불린다»를 고정한다.
+    """
+    path = str(tmp_path / "legacy.db")
+    c = dbm.connect(path)
+    c.execute("INSERT INTO dataset(kind,year,label,uploaded_at) VALUES('plan','2025','x','t')")
+    c.execute("INSERT INTO item_master(year,계정코드,과목명) VALUES('','60909002','수선유지비-열원정기점검')")
+    c.execute("INSERT INTO dept_master(year,부서코드,부서명,처지사) VALUES('','D1','기술부','화성지사')")
+    c.commit()
+    c.close()
+
+    c = dbm.connect(path)                       # 재기동 = init_db 재실행
+    try:
+        assert {r[0] for r in c.execute("SELECT DISTINCT year FROM item_master")} == {"2025"}
+        assert dbm.master_stats(c, "2025")["예산과목"] == 1
+        assert dbm.master_stats(c, "2025")["부서코드"] == 1
+    finally:
+        c.close()
+
+
+def test_master_stats_says_which_year_it_fell_back_to(conn):
+    """그 해 마스터가 없으면 분석은 과거 연도를 쓴다 — 화면이 그걸 알아야 한다.
+
+    0건이라고만 하면 멀쩡히 쓰이는 마스터를 두고 «안 올라갔나?» 하게 된다.
+    """
+    conn.execute("INSERT INTO item_master(year,계정코드,과목명) VALUES('2025','60909002','수선유지비-열원정기점검')")
+    conn.commit()
+    same = dbm.master_stats(conn, "2025")
+    assert same["예산과목"] == 1 and same["기준연도"] is None      # 그 해 것이면 표시할 필요 없다
+    older = dbm.master_stats(conn, "2026")
+    assert older["예산과목"] == 1 and older["기준연도"] == "2025"
+
 # ── Task 3: config_store 가 DB 에서 읽고 쓴다 ────────────────────────────────
 
 def test_load_seeds_when_empty_then_persists(conn):
