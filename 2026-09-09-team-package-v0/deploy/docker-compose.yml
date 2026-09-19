@@ -1,13 +1,16 @@
-# 사내 서버(최종 목표) 구성 — 같은 이미지 + 영속 볼륨 + (선택) PostgreSQL
-#   docker compose up -d --build                 → SQLite(볼륨) 모드, http://서버IP:8080
-#   docker compose --profile pg up -d --build    → PostgreSQL 컨테이너 포함(.env의 DATABASE_URL을 아래 postgres 주소로)
-# 비밀값은 전부 .env(.env.example 복사)에서 읽는다. .env는 Git에 올리지 않는다.
+# 사내 서버(최종 목표) 구성 — 반입한 이미지 + 영속 볼륨 + (선택) PostgreSQL
+#   절차와 스크립트: docs/사내이관_가이드.md · deploy/onprem/
+#   사내 서버:      deploy/onprem/load_and_run.{sh,ps1} <tar.gz> [--pg]   ← docker load 후 up -d --no-build
+#   인터넷 PC 직접: docker compose -f deploy/docker-compose.yml up -d --build  (빌드 가능한 곳에서만)
+# 비밀값은 전부 .env(.env.example 복사, 이 파일의 부모 폴더)에서 읽는다. .env는 Git에 올리지 않는다.
 services:
   app:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
     image: threeon-budget:latest
+    # 오프라인 서버가 이미지를 못 찾으면 레지스트리를 뒤지며 시간을 끈다 — 바로 실패하게.
+    pull_policy: never
     container_name: threeon-budget
     env_file:
       - ../.env
