@@ -4,7 +4,7 @@ import os
 import openpyxl
 import pytest
 
-from budget import pipeline_plan, pipeline_actual
+from budget import config_store, db as dbm, pipeline_plan, pipeline_actual
 from budget.excel_actual_writer import (
     ACTUAL_HEADER, ACTUAL_SHEET, DATA_START, HEADER_ROW,
 )
@@ -21,10 +21,10 @@ pytestmark = pytest.mark.skipif(
 
 
 def _make_plan(tmp_path, budget):
-    cfg = str(tmp_path / "config")
+    conn = dbm.connect(str(tmp_path / "budget.db"))
     out = str(tmp_path / "output")
-    res = pipeline_plan.run_plan(REAL_PLAN, cfg, out, "2025", budget)
-    return res["output_path"], cfg, out
+    res = pipeline_plan.run_plan(REAL_PLAN, conn, out, "2025", budget)
+    return res["output_path"], conn, out
 
 
 # 행별 천원 반올림 누적 오차 허용치. 요약·양식1·종합표는 모두 '행별 반올림 후 합'
@@ -39,9 +39,9 @@ def test_actual_total_conserves_full_erp(tmp_path):
     전표뿐이며(플랜트기술처 강제 귀속 폐지), 그만큼 '미반영'에 잡혀 총액은 보존된다.
     """
     for budget, universe in [("손익", 98554801), ("자본", 49709178)]:
-        plan_path, cfg, out = _make_plan(tmp_path, budget)
+        plan_path, conn, out = _make_plan(tmp_path, budget)
         res = pipeline_actual.run_actual(
-            plan_path, ZRFM2, MASTER, cfg, out, "2025", budget, new_policy="group",
+            plan_path, ZRFM2, MASTER, conn, out, "2025", budget, new_policy="group",
         )
         assert os.path.exists(res["output_path"])
         assert os.path.exists(res["zrfm2_v1_path"])
@@ -60,9 +60,9 @@ def test_actual_total_conserves_full_erp(tmp_path):
 def test_actual_sheet_layout_matches_reference(tmp_path):
     """데이터시트가 사용자 분석본 [Sheet1] 포맷(2행 헤더·3행 데이터, A~J 동일)이고,
     실적금액은 I열(9)이며 zrfm2_V1에 반영구분(20열)이 있다."""
-    plan_path, cfg, out = _make_plan(tmp_path, "자본")
+    plan_path, conn, out = _make_plan(tmp_path, "자본")
     res = pipeline_actual.run_actual(
-        plan_path, ZRFM2, MASTER, cfg, out, "2025", "자본", new_policy="group",
+        plan_path, ZRFM2, MASTER, conn, out, "2025", "자본", new_policy="group",
     )
     wb = openpyxl.load_workbook(res["output_path"])
     ws = wb[ACTUAL_SHEET]
@@ -87,25 +87,22 @@ def test_actual_sheet_layout_matches_reference(tmp_path):
 def test_deselect_item_becomes_unreflected(tmp_path):
     """예산과목 하나(기계장치)를 포함 해제하면 그 실적이 종합표에서 빠지고
     동일 금액이 미반영으로 이동한다(총액=ERP 자본유니버스 보존)."""
-    plan_path, cfg, out = _make_plan(tmp_path, "자본")
+    plan_path, conn, out = _make_plan(tmp_path, "자본")
     base = pipeline_actual.run_actual(
-        plan_path, ZRFM2, MASTER, cfg, out, "2025", "자본", new_policy="group",
+        plan_path, ZRFM2, MASTER, conn, out, "2025", "자본", new_policy="group",
     )
     base_total = base["요약"]["총 실적(천원)"]
     base_unref = base["요약"]["미반영(천원)"]
 
     # 과목구성에서 '기계장치' 포함 해제
-    item_path = os.path.join(cfg, "과목구성_2025_자본.json")
-    with open(item_path, "r", encoding="utf-8") as f:
-        items = json.load(f)
+    items = config_store.load_item_config(conn, "2025", "자본")
     for it in items:
         if it["과목"] == "기계장치":
             it["포함"] = False
-    with open(item_path, "w", encoding="utf-8") as f:
-        json.dump(items, f, ensure_ascii=False, indent=2)
+    config_store.save_item_config(conn, "2025", "자본", items)
 
     res = pipeline_actual.run_actual(
-        plan_path, ZRFM2, MASTER, cfg, out, "2025", "자본", new_policy="group",
+        plan_path, ZRFM2, MASTER, conn, out, "2025", "자본", new_policy="group",
     )
     moved = base_total - res["요약"]["총 실적(천원)"]
     assert moved > 0                                   # 기계장치 실적이 종합표에서 빠짐
@@ -131,9 +128,9 @@ def test_deselect_item_becomes_unreflected(tmp_path):
 
 
 def test_strict_policy_more_new(tmp_path):
-    plan_path, cfg, out = _make_plan(tmp_path, "손익")
-    grp = pipeline_actual.run_actual(plan_path, ZRFM2, MASTER, cfg, out, "2025", "손익", new_policy="group")
-    strt = pipeline_actual.run_actual(plan_path, ZRFM2, MASTER, cfg, out, "2025", "손익", new_policy="strict_name")
+    plan_path, conn, out = _make_plan(tmp_path, "손익")
+    grp = pipeline_actual.run_actual(plan_path, ZRFM2, MASTER, conn, out, "2025", "손익", new_policy="group")
+    strt = pipeline_actual.run_actual(plan_path, ZRFM2, MASTER, conn, out, "2025", "손익", new_policy="strict_name")
     # 총액은 정책 무관 동일(행 구성이 달라 행별 반올림 오차만 차이)
     assert abs(grp["요약"]["총 실적(천원)"] - strt["요약"]["총 실적(천원)"]) <= ROUND_TOL
     # 엄격정책은 신규 실적이 더 큼

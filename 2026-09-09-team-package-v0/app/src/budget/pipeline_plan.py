@@ -7,19 +7,16 @@ from . import missing as missing_mod
 from . import normalize
 
 
-def run_plan(business_plan_path, config_dir, out_dir, year, budget):
-    dept_config = config_store.load_dept_config(config_dir, year)
-    config_store.save_dept_config(config_dir, year, dept_config)  # 최초 실행 시 시드 영속화
-
-    pl_config = config_store.load_item_config(config_dir, year, "손익")
-    cap_config = config_store.load_item_config(config_dir, year, "자본")
-    config_store.save_item_config(config_dir, year, "손익", pl_config)
-    config_store.save_item_config(config_dir, year, "자본", cap_config)
+def run_plan(business_plan_path, conn, out_dir, year, budget):
+    # load_* 가 비어 있으면 시드를 심어 돌려준다 — 별도 save 호출은 필요 없다.
+    dept_config = config_store.load_dept_config(conn, year)
+    pl_config = config_store.load_item_config(conn, year, "손익")
+    cap_config = config_store.load_item_config(conn, year, "자본")
 
     item_config = pl_config if budget == "손익" else cap_config
     # 예산과목 명칭 통일(계정코드 동일 개명 흡수) — 실적 분석과 동일 기준.
     # 구성(config)에도 같은 alias를 적용해야 구명으로 등록된 과목이 누락되지 않는다.
-    item_alias = config_store.load_item_alias(config_dir)
+    item_alias = config_store.load_item_alias(conn)
     pl_items = {normalize.normalize_item(x["과목"], item_alias)
                 for x in pl_config if x.get("포함")}
     cap_items = {normalize.normalize_item(x["과목"], item_alias)

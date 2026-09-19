@@ -141,9 +141,9 @@ def test_matched_csv_combined_merges_budgets(tmp_path):
 
 
 def test_export_team_bundle_writes_four_files(env):
-    conn, cfg, out = env
-    pipeline_db.run_actual_db(conn, cfg, out, "2023", "손익", make_files=False)
-    res = pipeline_db.export_team_bundle(conn, cfg, out, "2023")
+    conn, out = env
+    pipeline_db.run_actual_db(conn, out, "2023", "손익", make_files=False)
+    res = pipeline_db.export_team_bundle(conn, out, "2023")
     for k, p in res["paths"].items():
         assert os.path.exists(p), k
     data = json.load(open(res["paths"]["json"], encoding="utf-8"))

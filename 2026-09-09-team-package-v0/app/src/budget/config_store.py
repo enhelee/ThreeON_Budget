@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
-"""지사구성·예산과목구성 JSON 영속화. 연도별(및 과목은 손익/자본별)로 저장·자동 로드."""
-import json
-import os
+"""지사구성·예산과목구성·별칭 영속화 — DB 에 산다.
+
+연도별(및 과목은 손익/자본별)로 저장하고, 비어 있으면 시드를 심어 돌려준다.
+파일(JSON) 시절에는 개발자 PC 와 배포 환경의 구성이 달랐다 — 그 JSON 이
+.gitignore·.dockerignore 양쪽에 걸려 저장소에도 이미지에도 없었기 때문이다.
+"""
 
 DEPT_GROUPS = ["본사", "중대형CHP", "소형CHP", "DH"]
 SIMUI_THRESHOLD_THOUSAND = 50000
@@ -50,28 +53,36 @@ def seed_dept_config(year):
     return out
 
 
-def _dept_path(config_dir, year):
-    return os.path.join(config_dir, f"지사구성_{year}.json")
-
-
 def normalize_dept_config(items):
     """지사 구성의 '포함' 값을 불리언으로 표준화(누락·NaN → True)."""
     return [dict(x, 포함=to_bool(x.get("포함"), True)) for x in items]
 
 
-def load_dept_config(config_dir, year):
-    path = _dept_path(config_dir, year)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return normalize_dept_config(json.load(f))
-    return seed_dept_config(year)
+def load_dept_config(conn, year):
+    """그 해의 지사 구성. 없으면 시드를 심고 그것을 돌려준다.
+
+    읽기가 쓰기를 하는 것이 어색해 보이지만, 이렇게 해야 «그 연도를 처음 연 순간»의
+    시드가 DB 에 고정된다. 고정되지 않으면 나중에 시드를 고칠 때 과거 연도의
+    분석 결과가 조용히 바뀐다.
+    """
+    rows = conn.execute(
+        "SELECT 이름,그룹,포함 FROM dept_config WHERE year=? ORDER BY 순서,이름",
+        (str(year),)).fetchall()
+    if not rows:
+        return save_dept_config(conn, year, seed_dept_config(year))
+    return [{"이름": r[0], "그룹": r[1], "포함": bool(r[2])} for r in rows]
 
 
-def save_dept_config(config_dir, year, items):
-    os.makedirs(config_dir, exist_ok=True)
-    with open(_dept_path(config_dir, year), "w", encoding="utf-8") as f:
-        json.dump(normalize_dept_config(items), f, ensure_ascii=False, indent=2,
-                  allow_nan=False)
+def save_dept_config(conn, year, items):
+    """그 해 한 벌을 통째로 갈아 끼운다 — 다른 연도는 건드리지 않는다."""
+    items = normalize_dept_config(items)
+    conn.execute("DELETE FROM dept_config WHERE year=?", (str(year),))
+    for i, x in enumerate(items):
+        conn.execute(
+            "INSERT INTO dept_config(year,이름,그룹,포함,순서) VALUES(?,?,?,?,?)",
+            (str(year), x["이름"], x["그룹"], 1 if x["포함"] else 0, i))
+    conn.commit()
+    return items
 
 
 SEED_ITEMS = {
@@ -146,23 +157,30 @@ def normalize_item_config(items):
     return [normalize_item_row(x) for x in items]
 
 
-def _item_path(config_dir, year, budget):
-    return os.path.join(config_dir, f"과목구성_{year}_{budget}.json")
+def load_item_config(conn, year, budget):
+    rows = conn.execute(
+        "SELECT 과목,대분류,심의대상,포함,실적반영 FROM item_config"
+        " WHERE year=? AND budget=? ORDER BY 순서,과목",
+        (str(year), budget)).fetchall()
+    if not rows:
+        return save_item_config(conn, year, budget, seed_item_config(year, budget))
+    return [{"과목": r[0], "대분류": r[1], "심의대상": bool(r[2]),
+             "포함": bool(r[3]), "실적반영": bool(r[4])} for r in rows]
 
 
-def load_item_config(config_dir, year, budget):
-    path = _item_path(config_dir, year, budget)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return normalize_item_config(json.load(f))
-    return seed_item_config(year, budget)
-
-
-def save_item_config(config_dir, year, budget, items):
-    os.makedirs(config_dir, exist_ok=True)
-    with open(_item_path(config_dir, year, budget), "w", encoding="utf-8") as f:
-        json.dump(normalize_item_config(items), f, ensure_ascii=False, indent=2,
-                  allow_nan=False)
+def save_item_config(conn, year, budget, items):
+    items = normalize_item_config(items)
+    conn.execute("DELETE FROM item_config WHERE year=? AND budget=?",
+                 (str(year), budget))
+    for i, x in enumerate(items):
+        conn.execute(
+            "INSERT INTO item_config(year,budget,과목,대분류,심의대상,포함,실적반영,순서)"
+            " VALUES(?,?,?,?,?,?,?,?)",
+            (str(year), budget, x["과목"], x.get("대분류"),
+             1 if x["심의대상"] else 0, 1 if x["포함"] else 0,
+             1 if x["실적반영"] else 0, i))
+    conn.commit()
+    return items
 
 
 # ---------------------------------------------------------------------------
@@ -204,44 +222,40 @@ def seed_dept_alias():
     return dict(SEED_DEPT_ALIAS)
 
 
-def _item_alias_path(config_dir):
-    return os.path.join(config_dir, "예산과목_별칭.json")
-
-
-def _dept_alias_path(config_dir):
-    return os.path.join(config_dir, "처지사_별칭.json")
-
-
-def load_item_alias(config_dir):
-    """시드 기본값 + 파일(사용자 편집) 병합. 파일 항목이 우선."""
-    merged = seed_item_alias()
-    path = _item_alias_path(config_dir)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            merged.update(json.load(f))
+def _load_alias(conn, 종류, seed):
+    """시드 기본값 + DB(사용자 편집) 병합. DB 항목이 우선."""
+    merged = dict(seed)
+    for 원표기, 정규표기 in conn.execute(
+            "SELECT 원표기,정규표기 FROM alias WHERE 종류=?", (종류,)).fetchall():
+        merged[원표기] = 정규표기
     return merged
 
 
-def save_item_alias(config_dir, mapping):
-    os.makedirs(config_dir, exist_ok=True)
-    with open(_item_alias_path(config_dir), "w", encoding="utf-8") as f:
-        json.dump(mapping, f, ensure_ascii=False, indent=2)
+def load_item_alias(conn):
+    return _load_alias(conn, "item", seed_item_alias())
 
 
-def load_dept_alias(config_dir):
-    """시드 기본값 + 파일(사용자 편집) 병합. 파일 항목이 우선."""
-    merged = seed_dept_alias()
-    path = _dept_alias_path(config_dir)
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            merged.update(json.load(f))
-    return merged
+def load_dept_alias(conn):
+    return _load_alias(conn, "dept", seed_dept_alias())
 
 
-def save_dept_alias(config_dir, mapping):
-    os.makedirs(config_dir, exist_ok=True)
-    with open(_dept_alias_path(config_dir), "w", encoding="utf-8") as f:
-        json.dump(mapping, f, ensure_ascii=False, indent=2)
+def save_alias(conn, 종류, mapping):
+    """그 종류 전체를 갈아 끼운다. 별칭은 연도 축이 없다 —
+    오래된 표기가 몇 년 뒤 자료에 다시 나타나기 때문이다(설계 §3.2)."""
+    conn.execute("DELETE FROM alias WHERE 종류=?", (종류,))
+    for 원표기, 정규표기 in mapping.items():
+        conn.execute("INSERT INTO alias(종류,원표기,정규표기) VALUES(?,?,?)",
+                     (종류, 원표기, 정규표기))
+    conn.commit()
+    return mapping
+
+
+def save_item_alias(conn, mapping):
+    return save_alias(conn, "item", mapping)
+
+
+def save_dept_alias(conn, mapping):
+    return save_alias(conn, "dept", mapping)
 
 
 # 사업명 유사도 매칭 임계값(%). 요구사항: 80% 이상.

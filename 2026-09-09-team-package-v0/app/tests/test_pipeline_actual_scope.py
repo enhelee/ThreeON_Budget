@@ -10,7 +10,7 @@ import os
 import openpyxl
 import pytest
 
-from budget import pipeline_actual
+from budget import db as dbm, pipeline_actual
 from budget.excel_actual_writer import ACTUAL_SHEET, DATA_START
 
 PLAN_HEADER = ["주관부서명", "부서코드", "처지사", "부서부", "속성",
@@ -65,7 +65,8 @@ def inputs(tmp_path):
             ws.cell(r, c, v)
     wb.save(erp)
     wb.close()
-    return str(plan), str(erp), str(tmp_path / "config"), str(tmp_path / "out")
+    conn = dbm.connect(str(tmp_path / "budget.db"))
+    return str(plan), str(erp), conn, str(tmp_path / "out")
 
 
 def _reasons(rows):
@@ -73,8 +74,8 @@ def _reasons(rows):
 
 
 def test_other_budget_plan_rows_are_excluded(inputs):
-    plan, erp, cfg, out = inputs
-    res = pipeline_actual.run_actual(plan, erp, None, cfg, out, "2023", "손익")
+    plan, erp, conn, out = inputs
+    res = pipeline_actual.run_actual(plan, erp, None, conn, out, "2023", "손익")
 
     # 계획행 = 손익 과목 & 등록 지사 = 화성/청주 정기점검 2행
     assert res["요약"]["계획행수"] == 2
@@ -93,8 +94,8 @@ def test_other_budget_plan_rows_are_excluded(inputs):
 
 
 def test_total_row_and_other_year_are_dropped(inputs):
-    plan, erp, cfg, out = inputs
-    res = pipeline_actual.run_actual(plan, erp, None, cfg, out, "2023", "손익")
+    plan, erp, conn, out = inputs
+    res = pipeline_actual.run_actual(plan, erp, None, conn, out, "2023", "손익")
 
     # 2023년 손익 전표는 D1(8,000천원) 하나뿐. 총계행·2022년 전표는 빠진다.
     assert res["요약"]["총 실적(천원)"] == 8000
@@ -111,8 +112,8 @@ def test_total_row_and_other_year_are_dropped(inputs):
 
 
 def test_output_filenames_carry_year(inputs):
-    plan, erp, cfg, out = inputs
-    res = pipeline_actual.run_actual(plan, erp, None, cfg, out, "2023", "자본")
+    plan, erp, conn, out = inputs
+    res = pipeline_actual.run_actual(plan, erp, None, conn, out, "2023", "자본")
     assert os.path.basename(res["zrfm2_v1_path"]) == "zrfm2_2023_V1(자본).xlsx"
     assert os.path.basename(res["output_path"]) == "2023년 자본예산_실적.xlsx"
     assert os.path.basename(res["matched_csv_path"]) == "matched_2023_자본.csv"
