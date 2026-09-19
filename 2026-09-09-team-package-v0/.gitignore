@@ -78,3 +78,6 @@ node_modules/
 .idea/
 .DS_Store
 Thumbs.db
+
+# deploy/onprem/build_image 가 만드는 반입용 이미지 tar.gz — 커밋·빌드 컨텍스트 금지
+dist/

@@ -45,6 +45,12 @@ ENV PORT=8080 \
     OUT_DIR=/data/budget/output \
     COOKIE_SECURE=1
 
+# /healthz 의 "commit" — 배포 판별의 유일한 근거다. Render 는 RENDER_GIT_COMMIT 을 자동으로
+# 넣어 주지만(그쪽이 우선) 사내 이미지는 아무도 안 넣는다 → deploy/onprem/build_image 가
+# --build-arg 로 넘기고 여기서 ENV 로 굳힌다(ARG 만으로는 런타임에 사라진다).
+ARG APP_COMMIT=
+ENV APP_COMMIT=${APP_COMMIT}
+
 # supervisord 가 `directory=/srv/app` 으로 잡아 주던 작업 폴더를 그대로 유지한다.
 # 앱 코드는 경로를 전부 __file__ 과 환경변수(DATA_DIR·OUT_DIR)로 푸므로 지금은 CWD 에
 # 의존하지 않지만, 흡수한 v2 계산부는 CWD 상대경로로 파일을 읽던 이력이 있다
