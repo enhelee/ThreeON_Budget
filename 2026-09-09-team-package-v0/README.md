@@ -5,15 +5,15 @@
 
 ```
 ① 예산 계획 수립  →  ② 실적 집계·사업 매칭  →  ③ 예산 표준화  →  ④ 중장기 예산 전망
-   └──────────  app (FastAPI)  ──────────┘        └──  forecast (Streamlit) ──┘
-                                                     ※ Phase 6에서 app으로 흡수
+   └────────────────────────  app (FastAPI)  ───────────────────────┘
+                     ※ 3·4단계는 원래 별도 Streamlit 앱이었고 Phase 6 에서 흡수했다
 ```
 
 | | 값 |
 |---|---|
 | 단위 | 천원(집계) · 원(전표·계약 파일) |
 | 검증 연도 | 2023 · 2025 — ERP 전체 = 종합표, 미배정 0 |
-| 테스트 | `app` 87 passed · `forecast` 183 passed |
+| 테스트 | `app` 전체 1통 (`cd app && py -m pytest -q`) |
 | 배포 | Render + Supabase(검토·실증용) → 최종 사내 서버 |
 
 ---
@@ -30,10 +30,8 @@ threeon-budget/
 │  ├─ templates/ tests/ scripts/
 │  ├─ data/ config/ output/    로컬 상태 — 커밋하지 않음
 │  └─ .env                     비밀값 — 커밋하지 않음
-├─ forecast/     Streamlit — 3·4단계 (표준화·전망)
-│                ※ Phase 6 완료 시 폴더째 삭제
 ├─ site/         소개 사이트 — Phase 5에서 앱으로 흡수 후 삭제
-├─ deploy/       Dockerfile · Caddyfile · supervisord · docker-compose
+├─ deploy/       Dockerfile · entrypoint.sh · docker-compose · requirements
 ├─ docs/         문서 (설계·인수인계·계약·변경이력)
 ├─ render.yaml   Render Blueprint
 └─ .env.example  환경변수 예시 → app/.env 로 복사해 사용
@@ -66,14 +64,14 @@ Windows는 `app/분석프로그램_실행.bat` 더블클릭으로도 됩니다(�
 **테스트**
 
 ```bash
-cd app && python -m pytest -q      # 87 passed (약 6분)
+cd app && python -m pytest -q      # 약 6~7분
 ```
 
 ---
 
 ## 배포
 
-한 컨테이너에 세 프로세스(Caddy · uvicorn · Streamlit)를 담아 한 주소로 서비스합니다.
+한 컨테이너에 **프로세스 하나(uvicorn)**. Phase 6-8 에서 프록시·Streamlit·supervisord 를 걷어냈습니다.
 
 | 경로 | 내용 |
 |---|---|
@@ -81,7 +79,7 @@ cd app && python -m pytest -q      # 87 passed (약 6분)
 | `/app/` | `/` 로 301 (예전 북마크 보호) |
 | `/api/*` `/assets/*` `/healthz` | API · 프론트 자산 · 헬스체크 |
 | `/site/` | 소개·문서 사이트 — *Phase 5에서 앱으로 흡수 후 삭제* |
-| `/forecast` | forecast (Streamlit) — *Phase 6에서 앱으로 흡수 후 삭제* |
+| `/forecast` | 전망 앱 — *Phase 6에서 앱 5번 탭으로 흡수 후 삭제* |
 
 Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보드에서 `APP_PASSWORD`·`DATABASE_URL`을 입력하면 됩니다.
 자세한 절차는 [docs/배포가이드.md](docs/배포가이드.md).
