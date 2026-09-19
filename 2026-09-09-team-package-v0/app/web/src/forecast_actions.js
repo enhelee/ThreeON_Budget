@@ -170,6 +170,13 @@ export async function fcClick(e) {
     rowsOf(key).splice(Number(del.dataset.idx), 1)
     markDirty(key); renderPage(); return true
   }
+  // 양식 내보내기(6-7) — 파일은 그때그때 만들어 내려온다(저장 안 함). 세션 쿠키가 따라가므로 location 으로.
+  const ex = e.target.closest("[data-fcexport]")
+  if (ex) {
+    toast("양식을 채우는 중… 시트가 많아 몇 초 걸립니다.")
+    window.location.href = `/api/forecast/export?kind=${ex.dataset.fcexport}&base_year=${state.fc.baseYear}`
+    return true
+  }
   const imp = e.target.closest("[data-fcimport]")
   if (imp) {
     const input = $("#fcImportFile")

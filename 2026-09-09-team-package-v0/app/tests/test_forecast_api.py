@@ -172,3 +172,40 @@ def test_benchmark_and_table_read_locked_runs(client):
     assert line["2026"] == 1200.0                       # 당해년도 = 계획본
     assert line["2027"] == pytest.approx(1100.0 * 1.015)  # 팩터 시드 1.5%
     assert t["notes"]["budget_plan_missing"] is False
+
+
+# ---------------------------------------------------------------- 6-7 양식 내보내기
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@pytest.mark.parametrize("kind", ["standardization", "longterm", "schedule", "hot-parts", "hq-master"])
+def test_export_returns_xlsx_for_every_kind(client, kind):
+    """다섯 종류 모두 실제 내장 양식을 열어 채운 xlsx 를 돌려준다(빈 상태에서도 깨지지 않아야 한다)."""
+    r = client.get(f"/api/forecast/export?kind={kind}&base_year=2026")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith(XLSX)
+    assert "filename*=utf-8''" in r.headers["content-disposition"]
+    assert r.content[:2] == b"PK"          # zip(xlsx) 시그니처
+
+
+def test_export_unknown_kind_is_400(client):
+    assert client.get("/api/forecast/export?kind=nope&base_year=2026").status_code == 400
+
+
+def test_export_longterm_contains_forecast_numbers(client):
+    """마감 run + 계획본을 심고 내보낸 중장기 양식의 화성 탭에 기준연도 값(백만원)이 들어간다."""
+    from openpyxl import load_workbook
+    import io
+    conn = _conn()
+    try:
+        _seed_run(conn, "2025", "손익", [("화성지사", "수선유지비-열원경상정비", 1100.0, "계획집행")])
+        dbm.lock_year(conn, "2025")
+        _seed_plan(conn, "2026", [("화성지사", "수선유지비-열원경상정비", 1200.0)])
+    finally:
+        conn.close()
+    r = client.get("/api/forecast/export?kind=longterm&base_year=2026")
+    ws = load_workbook(io.BytesIO(r.content))["화성"]
+    row = next(r_ for r_ in range(1, ws.max_row + 1)
+               if str(ws.cell(row=r_, column=2).value or "").strip() == "열원경상정비")
+    col_2026 = next(c for c in range(1, ws.max_column + 1) if ws.cell(row=4, column=c).value == 26)
+    assert ws.cell(row=row, column=col_2026).value == pytest.approx(1200.0 / 1000)   # 천원 → 백만원

@@ -111,19 +111,39 @@ def run_benchmark(conn, base_year):
             "has_ltsa": benchmark.has_ltsa_detail(actuals), "rows": records(std)}
 
 
-def run_forecast(conn, base_year):
-    """4단계 — 지사별 기준연도~+9년 표와 전사 합계."""
+def benchmark_frames(conn, base_year):
+    """3단계 입력·결과를 DataFrame 으로 — 엑셀 양식(6-7)이 화면과 같은 계산을 쓴다.
+    반환 dict: std · actuals · years_used · grade · sites"""
+    fs.bind_site_resolvers(conn, base_year)
+    std, actuals, years_used, grade = _standard(conn, base_year)
+    return {"std": std, "actuals": actuals, "years_used": years_used, "grade": grade,
+            "sites": forecast_sites(conn, base_year)}
+
+
+def forecast_frames(conn, base_year):
+    """4단계 계산 결과(지사별 DataFrame, 연도 int 열)와 그 입력 — 화면(JSON)과 엑셀(양식) 둘이 같은 계산을 쓴다.
+    반환 dict: tables · years · years_used · sites · grade · hq_master · budget_df · actuals"""
     fs.bind_site_resolvers(conn, base_year)
     by = int(base_year)
     years = forecast_calc.forecast_years(by)
     std, actuals, years_used, grade = _standard(conn, base_year)
     sites = forecast_sites(conn, base_year)
     budget_df = budget_plan_for(conn, base_year)
+    hq_master = fs.load_hq_master(conn, base_year)
     tables = forecast_calc.compute_all_sites(
-        sites, grade, std, fs.load_hot_parts(conn, base_year), fs.load_hq_master(conn, base_year),
+        sites, grade, std, fs.load_hot_parts(conn, base_year), hq_master,
         fs.load_hq_temp_projects(conn, base_year), fs.load_hq_ratio(conn, base_year),
         fs.load_factors(conn, base_year), fs.load_surprise_projects(conn, base_year),
         forecast_calc.investment_by_site(budget_df), budget_df, base_year=by, years=years)
+    return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,
+            "hq_master": hq_master, "budget_df": budget_df, "actuals": actuals}
+
+
+def run_forecast(conn, base_year):
+    """4단계 — 지사별 기준연도~+9년 표와 전사 합계(JSON 용)."""
+    f = forecast_frames(conn, base_year)
+    years, tables, sites = f["years"], f["tables"], f["sites"]
+    years_used, grade, budget_df, actuals = f["years_used"], f["grade"], f["budget_df"], f["actuals"]
 
     def rows_of(df):
         return [{"예산과목": r["예산과목"], **{str(y): float(r[y]) for y in years}} for _, r in df.iterrows()]
