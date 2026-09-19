@@ -8,12 +8,16 @@ Phase 6-6. server.py 는 1,480줄이라 여기에 300줄을 더 얹지 않는다
 기준연도(base_year)는 마감 대상이 아니다 — 마감은 분석 연도(2023·2025)의 개념이고
 전망 상태는 «어느 해에 세운 가정인가»다. 그래서 마감 가드가 없다.
 """
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from urllib.parse import quote
+
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_import, forecast_store as fs, pipeline_forecast as pf
+from . import config_store, forecast_export, forecast_import, forecast_store as fs, pipeline_forecast as pf
 from . import db as dbm
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # 표 이름(URL) → forecast_store 저장 함수. 여기 없는 이름은 404.
 SAVERS = {
@@ -173,5 +177,42 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             return clean_json(pf.run_forecast(conn, base_year))
         finally:
             conn.close()
+
+    @router.get("/export")
+    def export(kind: str, base_year: str):
+        """재무팀 양식 내보내기(6-7). 결과 파일을 저장하지 않고 그때그때 만든다 — 화면과 같은 계산.
+
+        kind: standardization(표준화 양식 25시트) · longterm(중장기예산 양식) ·
+              schedule / hot-parts / hq-master(현재 저장된 가정이 채워진 원본 양식 — 고쳐서 다시 올리는 용도)
+        """
+        by = int(base_year)
+        conn = conn_factory()
+        try:
+            if kind == "standardization":
+                b = pf.benchmark_frames(conn, base_year)
+                data = forecast_export.fill_standardization_workbook(b["actuals"], b["grade"], b["std"], b["sites"])
+                name = f"예산표준화_{by}년기준_결과.xlsx"
+            elif kind == "longterm":
+                f = pf.forecast_frames(conn, base_year)
+                data = forecast_export.fill_longterm_workbook(f["tables"], f["grade"], f["hq_master"], f["sites"], by)
+                name = f"중장기예산_{by}-{by + 9}년_결과.xlsx"
+            elif kind == "schedule":
+                data = forecast_export.build_schedule_download(
+                    fs.load_grade_history(conn, base_year), pf.forecast_sites(conn, base_year), by)
+                name = f"정기점검보수공사_일정_{by}년기준_현재값.xlsx"
+            elif kind == "hot-parts":
+                data = forecast_export.build_hot_parts_download(
+                    fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year))
+                name = f"고온부품_계획_{by}년기준_현재값.xlsx"
+            elif kind == "hq-master":
+                data = forecast_export.build_hq_master_download(
+                    fs.load_hq_master(conn, base_year), pf.forecast_sites(conn, base_year), by)
+                name = f"본사_원가분배_{by}년기준_현재값.xlsx"
+            else:
+                raise HTTPException(400, "kind 는 standardization·longterm·schedule·hot-parts·hq-master 중 하나여야 합니다.")
+        finally:
+            conn.close()
+        return Response(data, media_type=XLSX,
+                        headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
 
     return router
