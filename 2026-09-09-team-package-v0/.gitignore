@@ -11,6 +11,7 @@
 # 앱 상태 (DB·설정·산출물) — 전부 로컬/볼륨에서 생성된다
 app/data/
 app/output/
+# 구성은 DB 로 옮겼다(2026-09). 개발자 PC 에 남은 잔재를 실수로 커밋하지 않도록 계속 무시한다
 app/config/*.json
 app/static/
 

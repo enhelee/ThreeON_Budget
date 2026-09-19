@@ -148,16 +148,20 @@ def test_intro_site_is_gone():
     assert "SITE_DIR" not in src and '"/site' not in src
 
 
-def test_entrypoint_seeds_config_json_into_config_dir():
-    """구성 JSON 이 CONFIG_DIR 에 없으면 앱이 시드 기본값으로 시작한다.
+def test_config_dir_is_gone():
+    """구성은 DB 에 산다 — 파일 경로가 남아 있으면 진실이 두 곳에 생긴다.
 
-    이미지의 구성은 /srv/app/config 에 있고 앱은 CONFIG_DIR 에서 읽는다.
-    Render 무료 플랜은 /data 가 배포마다 초기화되므로, 이 복사가 없으면
-    저장소에 정리해 둔 연도별 지사·과목 구성이 배포된 앱에 영영 반영되지 않는다.
+    Phase 5 에서 넣었던 «구성 JSON 복사»는 복사할 대상이 저장소에도 이미지에도
+    없어(.gitignore·.dockerignore 양쪽에 걸려 있었다) 아무 일도 하지 않는
+    코드였다. 연도별 기준정보를 DB 로 옮기며 함께 걷어낸다.
     """
+    assert "CONFIG_DIR" not in _read("Dockerfile")
     entrypoint = _read("entrypoint.sh")
-    assert "/srv/app/config/*.json" in entrypoint
-    assert "CONFIG_DIR" in entrypoint
+    assert "CONFIG_DIR" not in entrypoint
+    assert "/srv/app/config" not in entrypoint
+    server = os.path.join(os.path.dirname(DEPLOY), "app", "server.py")
+    with open(server, encoding="utf-8") as f:
+        assert "CONFIG_DIR" not in f.read()
 
 
 def test_dead_env_vars_are_removed():

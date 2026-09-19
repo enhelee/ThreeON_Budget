@@ -51,7 +51,6 @@ RUN chmod +x /srv/deploy/entrypoint.sh \
 # 실행 시 덮어쓸 수 있는 기본값 (.env / PaaS 환경변수)
 ENV PORT=8080 \
     DATA_DIR=/data/budget \
-    CONFIG_DIR=/data/budget/config \
     OUT_DIR=/data/budget/output \
     FORECAST_DATA_DIR=/data/forecast \
     COOKIE_SECURE=1
