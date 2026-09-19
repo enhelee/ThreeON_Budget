@@ -739,6 +739,12 @@ def pending(year: str):
             if n:
                 out["counts"][label] = n
                 out["total"] += n
+        # 구성·별칭·마스터 변경도 «결과에 반영되지 않은 변경»이다. 알림을 두 갈래로
+        # 나누면 어느 것을 눌러야 하는지 헷갈리므로 같은 배지에 합친다.
+        n = sum(dbm.config_changes_since(conn, year, base).values())
+        if n:
+            out["counts"]["기준정보"] = n
+            out["total"] += n
         out["learn_pending"] = dbm.count_learn_pending(conn, year)
         return _clean_json(out)
     finally:

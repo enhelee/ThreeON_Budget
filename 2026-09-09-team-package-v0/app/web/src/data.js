@@ -67,6 +67,7 @@ export async function loadYearConfig() {
     api(`/api/master/items?year=${year}`),
     api(`/api/master/depts?year=${year}`),
   ]);
+  state.ycDirty = new Set();
   state.yearConfig = {
     depts: depts.rows,
     items: {"손익": pl.rows, "자본": cap.rows},
