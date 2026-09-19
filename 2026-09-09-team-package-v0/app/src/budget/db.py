@@ -680,6 +680,36 @@ def open_years(conn):
 _CONFIG_PATHS = ("/api/config/depts", "/api/config/items", "/api/config/copy-year")
 
 
+def config_changes_since(conn, year, since=None):
+    """구성·별칭·마스터 변경 건수 {라벨: n}. since 가 None 이면 전 기간.
+
+    구성은 그 해 한 벌을 통째로 다시 쓰는 방식이라(DELETE+INSERT) «몇 건 바뀌었나»를
+    표에서 셀 수 없다. 그래서 감사 로그를 근거로 삼는다 — 이 앱에서 무엇이 언제
+    바뀌었는지의 장부다.
+
+    거부된 요청(4xx)은 «바뀐 것»이 아니므로 세지 않는다.
+    """
+    def count(where, params):
+        q = "SELECT COUNT(*) FROM audit_log WHERE status < 400 AND " + where
+        if since is not None:
+            q += " AND at >= ?"
+            params = params + (since,)
+        return conn.execute(q, params).fetchone()[0]
+
+    out = {}
+    ph = ",".join("?" for _ in _CONFIG_PATHS)
+    n = count(f"path IN ({ph}) AND detail LIKE ?", _CONFIG_PATHS + (f"%{year}%",))
+    if n:
+        out["구성"] = n
+    n = count("path = '/api/config/alias'", ())
+    if n:
+        out["별칭"] = n                     # 별칭은 연도 축이 없다 — 전 연도에 걸린다
+    n = count("path = '/api/upload/master' AND detail LIKE ?", (f"%{year}%",))
+    if n:
+        out["마스터"] = n
+    return out
+
+
 def changes_since(conn, year, since):
     """해제 시각 이후 그 연도에 일어난 변경을 센다 — 재마감 승인 화면의 근거.
 
@@ -698,24 +728,7 @@ def changes_since(conn, year, since):
             (str(year), since)).fetchone()[0]
         if n:
             out[label] = n
-    ph = ",".join("?" for _ in _CONFIG_PATHS)
-    n = conn.execute(
-        f"SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
-        f" AND path IN ({ph}) AND detail LIKE ?",
-        (since,) + _CONFIG_PATHS + (f"%{year}%",)).fetchone()[0]
-    if n:
-        out["구성"] = n
-    n = conn.execute(
-        "SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
-        " AND path = '/api/config/alias'", (since,)).fetchone()[0]
-    if n:
-        out["별칭"] = n                     # 별칭은 연도 축이 없다 — 전 연도에 걸린다
-    n = conn.execute(
-        "SELECT COUNT(*) FROM audit_log WHERE at >= ? AND status < 400"
-        " AND path = '/api/upload/master' AND detail LIKE ?",
-        (since, f"%{year}%")).fetchone()[0]
-    if n:
-        out["마스터"] = n
+    out.update(config_changes_since(conn, year, since))
     return out
 
 

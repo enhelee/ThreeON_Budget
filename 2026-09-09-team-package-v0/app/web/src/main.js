@@ -116,16 +116,23 @@ document.addEventListener("click", async e => {
     return;
   }
   if (act === "save-yearconfig") {
+    // 손댄 표만 보낸다. 전부 보내면 한 번 고치고 저장해도 «미반영»이 3건으로 잡힌다.
+    const dirty = [...state.ycDirty];
+    if (!dirty.length) { toast("바뀐 내용이 없습니다."); return; }
     busy(true, "기준정보 저장 중...");
     try {
-      await api("/api/config/depts", {method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({year: state.year, rows: state.yearConfig.depts})});
+      if (state.ycDirty.has("depts")) {
+        await api("/api/config/depts", {method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year, rows: state.yearConfig.depts})});
+      }
       for (const b of ["손익", "자본"]) {
+        if (!state.ycDirty.has(b)) continue;
         await api("/api/config/items", {method: "PUT",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({year: state.year, budget: b, rows: state.yearConfig.items[b]})});
       }
+      state.ycDirty = new Set();
     } catch (err) { toast(err.message); return; }
     finally { busy(false); }
     await afterSave(`${state.year}년 기준정보 저장`);
@@ -392,8 +399,13 @@ document.addEventListener("change", async e => {
   const yc = e.target.closest("[data-yc]");
   if (yc) {
     const f = yc.dataset.field, v = yc.type === "checkbox" ? yc.checked : yc.value;
-    if (yc.dataset.yc === "dept") state.yearConfig.depts[Number(yc.dataset.idx)][f] = v;
-    else if (yc.dataset.yc === "item") state.yearConfig.items[yc.dataset.budget][Number(yc.dataset.idx)][f] = v;
+    if (yc.dataset.yc === "dept") {
+      state.yearConfig.depts[Number(yc.dataset.idx)][f] = v;
+      state.ycDirty.add("depts");
+    } else if (yc.dataset.yc === "item") {
+      state.yearConfig.items[yc.dataset.budget][Number(yc.dataset.idx)][f] = v;
+      state.ycDirty.add(yc.dataset.budget);
+    }
     else if (yc.dataset.yc === "alias") {
       const kind = state.ycAliasKind || "dept";
       await saveAlias(kind, {...state.yearConfig.alias[kind], [yc.dataset.key]: yc.value.trim()},

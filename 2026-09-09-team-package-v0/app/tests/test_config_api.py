@@ -236,3 +236,54 @@ def test_config_change_blocked_on_locked_year(client):
                        json={"from_year": "2025", "to_year": "2023"}).status_code == 423
     # 읽기는 막지 않는다 — 마감본을 들여다보는 것까지 막을 이유가 없다
     assert client.get("/api/config/depts?year=2023").status_code == 200
+
+
+# ── 분석 반영 배지 ───────────────────────────────────────────────────────────
+
+def test_config_change_counts_as_pending(client):
+    """구성 변경도 «결과에 반영되지 않은 변경»이다 — 재배정과 같은 배지에 잡힌다.
+
+    알림을 두 갈래로 나누면 어느 것을 눌러야 하는지 헷갈린다.
+    """
+    client.get("/api/config/depts?year=2025")
+    before = client.get("/api/pending?year=2025").json()["total"]
+
+    rows = client.get("/api/config/depts?year=2025").json()["rows"]
+    rows[0]["그룹"] = "DH"
+    client.put("/api/config/depts", json={"year": "2025", "rows": rows})
+
+    after = client.get("/api/pending?year=2025").json()
+    assert after["total"] > before
+    assert after["counts"].get("기준정보")
+
+
+def test_pending_ignores_other_years_and_rejections(client):
+    """다른 해를 고친 것과 거부된 요청은 이 해의 «미반영»이 아니다."""
+    for y in ("2023", "2025"):
+        client.get(f"/api/config/depts?year={y}")
+    rows2023 = client.get("/api/config/depts?year=2023").json()["rows"]
+    rows2023[0]["그룹"] = "DH"
+    client.put("/api/config/depts", json={"year": "2023", "rows": rows2023})
+
+    client.post("/api/lock", json={"year": "2025"})
+    rows2025 = client.get("/api/config/depts?year=2025").json()["rows"]
+    assert client.put("/api/config/depts",
+                      json={"year": "2025", "rows": rows2025}).status_code == 423
+
+    assert not client.get("/api/pending?year=2025").json()["counts"].get("기준정보")
+    assert client.get("/api/pending?year=2023").json()["counts"]["기준정보"] >= 1
+
+
+def test_pending_counts_copy_year_and_master_upload(client, tmp_path):
+    """연도 복사와 마스터 업로드도 분석 결과를 바꾼다 — 같은 배지에 들어간다."""
+    client.get("/api/config/depts?year=2025")
+    client.post("/api/config/copy-year", json={"from_year": "2025", "to_year": "2026"})
+    assert client.get("/api/pending?year=2026").json()["counts"]["기준정보"] >= 1
+
+    f = _master_xlsx(tmp_path / "m.xlsx", ["부서코드", "부서명", "처지사"],
+                     [["D1", "기술부", "화성지사"]])
+    before = client.get("/api/pending?year=2023").json()["counts"].get("기준정보", 0)
+    with open(f, "rb") as fh:
+        client.post("/api/upload/master?kind=dept&year=2023",
+                    files={"file": ("m.xlsx", fh.read())})
+    assert client.get("/api/pending?year=2023").json()["counts"]["기준정보"] > before

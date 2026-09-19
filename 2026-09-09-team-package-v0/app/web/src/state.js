@@ -10,6 +10,9 @@ export const state = {
   pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}
   // 설정 화면 「연도 기준정보」 — 그 해 구성 한 벌 + 연도 축 없는 별칭 + 마스터 조회
   yearConfig: null, ycTab: "depts", ycAliasKind: "dept",
+  // 손댄 표만 저장한다 — 안 바뀐 표까지 보내면 «미반영» 건수가 부풀어
+  //   한 번 고치고 한 번 저장했는데 배지에 3건이 잡힌다.
+  ycDirty: new Set(),
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
