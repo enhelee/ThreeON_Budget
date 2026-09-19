@@ -8,6 +8,8 @@ export const state = {
   learned: null, overrides: null, bizEdits: null,
   ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}
   pending: null,    // 분석 미반영 변경 {total, counts, learn_pending, analyzed_at}
+  // 설정 화면 「연도 기준정보」 — 그 해 구성 한 벌 + 연도 축 없는 별칭 + 마스터 조회
+  yearConfig: null, ycTab: "depts", ycAliasKind: "dept",
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,

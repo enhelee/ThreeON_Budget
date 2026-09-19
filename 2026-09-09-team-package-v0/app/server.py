@@ -474,11 +474,18 @@ def put_item_config(req: ItemCfgReq):
 
 @app.get("/api/config/alias")
 def get_alias():
-    """별칭은 연도 축이 없다 — 오래된 표기가 몇 년 뒤 자료에 다시 나타난다."""
+    """별칭은 연도 축이 없다 — 오래된 표기가 몇 년 뒤 자료에 다시 나타난다.
+
+    seeded 는 코드 시드에서 온 열쇠들이다. 읽을 때마다 시드를 병합하므로 이들은
+    지워도 되살아난다 — 화면은 이 목록을 보고 해당 행을 잠근다(사용자 결정
+    2026-09-19). 지울 수 있는 것처럼 보여 놓고 되살아나는 쪽이 더 나쁘다.
+    """
     conn = _conn()
     try:
         return _clean_json({"item": config_store.load_item_alias(conn),
-                            "dept": config_store.load_dept_alias(conn)})
+                            "dept": config_store.load_dept_alias(conn),
+                            "seeded": {"item": sorted(config_store.seed_item_alias()),
+                                       "dept": sorted(config_store.seed_dept_alias())}})
     finally:
         conn.close()
 

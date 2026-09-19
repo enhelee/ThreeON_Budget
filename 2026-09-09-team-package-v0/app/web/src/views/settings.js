@@ -1,6 +1,7 @@
 import { api } from "../api.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
+import { renderYearConfig } from "./yearconfig.js"
 
 export function renderSettingsExtra() {
   const audit = state.audit || [];
@@ -88,6 +89,8 @@ export function renderSettings() {
       </div>
       <p class="mt-4 text-xs text-slate-400">'학습 대기'는 재배정한 전표 중 아직 학습표에 없는 건수입니다(텍스트 없는 전표는 학습 대상이 아닙니다).</p>
     </section>
+
+    ${renderYearConfig()}
 
     <section class="panel p-6">
       <h3 class="section-title">📚 기준정보 마스터</h3>

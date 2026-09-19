@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadOverview, loadPending, loadStatus } from "./data.js"
+import { loadBranches, loadDetail, loadExportStatus, loadHealth, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -122,6 +122,7 @@ export async function navigate(view, opts = {}) {
       state.bizEdits = await api(`/api/biz-edits?year=${state.year}`);
       state.manualBiz = await api(`/api/manual-biz?year=${state.year}`);
       state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`);
+      await loadYearConfig();
     }
   } catch (e) { toast(e.message); }
   renderPage();

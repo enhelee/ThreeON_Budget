@@ -46,6 +46,28 @@ export async function afterSave(msg) {
   toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
 }
 
+// 설정 화면 「연도 기준정보」 — 그 해 한 벌을 한 번에 끌어온다.
+// 별칭만 연도가 없다(표기 흔들림 보정은 연도가 바뀌어도 유효하다).
+
+export async function loadYearConfig() {
+  const year = state.year;
+  const q = b => `/api/config/items?year=${year}&budget=${encodeURIComponent(b)}`;
+  const [depts, pl, cap, alias, mi, md] = await Promise.all([
+    api(`/api/config/depts?year=${year}`),
+    api(q("손익")), api(q("자본")),
+    api("/api/config/alias"),
+    api(`/api/master/items?year=${year}`),
+    api(`/api/master/depts?year=${year}`),
+  ]);
+  state.yearConfig = {
+    depts: depts.rows,
+    items: {"손익": pl.rows, "자본": cap.rows},
+    alias: {item: alias.item, dept: alias.dept},
+    aliasSeeded: alias.seeded,
+    masters: {items: mi.rows, depts: md.rows},
+  };
+}
+
 export async function loadBranches() {
   state.branches = (await api(`/api/branches?year=${state.year}`)).rows;
 }
