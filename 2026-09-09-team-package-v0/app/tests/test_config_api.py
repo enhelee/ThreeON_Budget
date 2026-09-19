@@ -99,6 +99,25 @@ def test_alias_roundtrip_and_no_year_axis(client):
     assert client.get("/api/config/alias").json()["dept"]["없는지사"] == "화성지사"
 
 
+def test_alias_reports_which_keys_are_seeded(client):
+    """시드에서 온 열쇠를 알려 줘야 화면이 그 행을 잠글 수 있다.
+
+    읽을 때마다 시드를 병합하므로 시드 별칭은 지워도 되살아난다. 지울 수 있는
+    것처럼 보여 놓고 되살아나는 쪽이 더 나쁘다(사용자 결정 2026-09-19).
+    """
+    r = client.get("/api/config/alias").json()
+    assert "판교사업소" in r["seeded"]["dept"]
+    assert "수선유지비-열원보완개선및기타" in r["seeded"]["item"]
+
+    # 사용자가 넣은 것은 시드가 아니다
+    client.put("/api/config/alias", json={"종류": "dept", "rows": {"없는지사": "화성지사"}})
+    r = client.get("/api/config/alias").json()
+    assert r["dept"]["없는지사"] == "화성지사"
+    assert "없는지사" not in r["seeded"]["dept"]
+    # 시드를 DB 에 안 넣어도 읽을 때 병합돼 살아 있다
+    assert r["dept"]["판교사업소"] == "판교지사"
+
+
 # ── 마스터 조회 ──────────────────────────────────────────────────────────────
 
 def test_master_upload_and_read_are_year_scoped(client, tmp_path):

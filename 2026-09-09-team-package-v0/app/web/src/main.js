@@ -4,7 +4,7 @@ import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { renderSidebar } from "./components/sidebar.js"
-import { afterSave, loadDetail, loadOvBiz } from "./data.js"
+import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -12,6 +12,23 @@ import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, unassignedName } from "./views/detail.js"
 
 // ───────────────────────── 상태 ─────────────────────────
+
+// 별칭은 즉시 저장한다 — 연도 축이 없어 «그 해 한 벌»이라는 개념이 없고,
+// 구성 표처럼 모아 두었다가 함께 보내면 어느 연도에 속하는지 오해를 부른다.
+// 시드 항목은 보내지 않는다: 읽을 때 늘 병합되므로 DB 에 둘 이유가 없다.
+async function saveAlias(kind, mapping, msg) {
+  const seeded = new Set(state.yearConfig.aliasSeeded?.[kind] || []);
+  const rows = Object.fromEntries(Object.entries(mapping).filter(([k, v]) => !seeded.has(k) && v));
+  busy(true, "별칭 저장 중...");
+  try {
+    await api("/api/config/alias", {method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({종류: kind, rows})});
+    await loadYearConfig();
+  } catch (err) { toast(err.message); return; }
+  finally { busy(false); }
+  await afterSave(msg);
+}
 
 document.addEventListener("click", async e => {
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
@@ -49,6 +66,20 @@ document.addEventListener("click", async e => {
     renderPage();
     return;
   }
+  // 「연도 기준정보」 탭 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
+  const yct = e.target.closest("[data-yctab]");
+  if (yct) { state.ycTab = yct.dataset.yctab; renderPage(); return; }
+  const yca = e.target.closest("[data-ycalias]");
+  if (yca) { state.ycAliasKind = yca.dataset.ycalias; renderPage(); return; }
+  const delAlias = e.target.closest("[data-del-alias]");
+  if (delAlias) {
+    const kind = state.ycAliasKind || "dept";
+    const next = {...state.yearConfig.alias[kind]};
+    delete next[delAlias.dataset.delAlias];
+    await saveAlias(kind, next, "별칭을 지웠습니다.");
+    return;
+  }
+
   const act = e.target.closest("[data-action]")?.dataset.action;
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
@@ -74,6 +105,32 @@ document.addEventListener("click", async e => {
   if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
+  if (act === "add-alias") {
+    const kind = state.ycAliasKind || "dept";
+    const src = $("#ycAliasSrc").value.trim(), dst = $("#ycAliasDst").value.trim();
+    if (!src || !dst) { toast("원표기와 정규표기를 모두 입력하세요."); return; }
+    if ((state.yearConfig.aliasSeeded?.[kind] || []).includes(src)) {
+      toast("프로그램에 내장된 기본 별칭이라 바꿀 수 없습니다."); return;
+    }
+    await saveAlias(kind, {...state.yearConfig.alias[kind], [src]: dst}, "별칭을 추가했습니다.");
+    return;
+  }
+  if (act === "save-yearconfig") {
+    busy(true, "기준정보 저장 중...");
+    try {
+      await api("/api/config/depts", {method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({year: state.year, rows: state.yearConfig.depts})});
+      for (const b of ["손익", "자본"]) {
+        await api("/api/config/items", {method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({year: state.year, budget: b, rows: state.yearConfig.items[b]})});
+      }
+    } catch (err) { toast(err.message); return; }
+    finally { busy(false); }
+    await afterSave(`${state.year}년 기준정보 저장`);
+    return;
+  }
   if (act === "pick-master-item") $("#masterItemFile").click();
   if (act === "pick-master-dept") $("#masterDeptFile").click();
   if (act === "clear-sel") {
@@ -317,6 +374,19 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
+  // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
+  const yc = e.target.closest("[data-yc]");
+  if (yc) {
+    const f = yc.dataset.field, v = yc.type === "checkbox" ? yc.checked : yc.value;
+    if (yc.dataset.yc === "dept") state.yearConfig.depts[Number(yc.dataset.idx)][f] = v;
+    else if (yc.dataset.yc === "item") state.yearConfig.items[yc.dataset.budget][Number(yc.dataset.idx)][f] = v;
+    else if (yc.dataset.yc === "alias") {
+      const kind = state.ycAliasKind || "dept";
+      await saveAlias(kind, {...state.yearConfig.alias[kind], [yc.dataset.key]: yc.value.trim()},
+                      "별칭을 고쳤습니다.");
+    }
+    return;
+  }
   if (e.target.id === "planFile" && e.target.files[0]) { uploadFile("plan", e.target.files[0]); e.target.value = ""; return; }
   if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
   if ((e.target.id === "masterItemFile" || e.target.id === "masterDeptFile") && e.target.files[0]) {
