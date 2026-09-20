@@ -26,7 +26,7 @@
 | `#ED1C2B` | ❌ | 시안 `DESIGN-NOTES.md` 의 값 — 공식 로고 이미지에서 **추출**한 근사값. 기록만 하고 쓰지 않는다(테스트가 막는다) |
 | 빨강 위 흰 글자 | ❌ | 대비 **4.02:1** — AA 4.5 미달. 그래서 주요 버튼은 시안 규칙대로 **검정 바탕 + 흰 글자 + 빨간 1px 테두리**. 빨강은 포커스 링·활성 마커·호버 글자색·스피너에만 |
 | 시그니처 `kdhc-signature-ko.svg` | ✅ | `한난 CI/signi/…한글가로A타입.ai` 를 시안이 SVG 로 변환한 자산을 그대로 복사(`app/web/public/assets/`). viewBox 165.7×38.3 → 184px 폭에 42.5px |
-| 한난체 `HananCha` | ✅ (제목만) | `한난 CI/font/HANAN.TTF`(866KB, 4,766 글리프) → `scripts/make_hanan_font.py` 로 완성형 2,350자+ASCII+기호 서브셋 **130KB woff2**(2,575 글리프). **라이선스 문구가 파일에 없다** — 사내 도구에서의 웹폰트 사용 범위 확인은 사용자 몫(§5) |
+| 한난체 `HananCha` | ✅ (제목만) | `한난 CI/font/HANAN.TTF`(866KB, 4,766 글리프) → `scripts/make_hanan_font.py` 로 완성형 2,350자+ASCII+기호 서브셋 **130KB woff2**(2,575 글리프). TTF 에 라이선스 문구는 없지만 **사내 도구 웹폰트 사용은 2026-09-21 사용자가 확인·승인**(§5) |
 | 중성·상태색 | ✅ (2개 조정) | 시안 `globals.css` + `openai-light.md`. **`tri` `#8F8F8F`→`#767676`**, **`warn` `#9A6700`→`#8F6000`** 으로 조정 — §4 대비표 참조 |
 
 ### 폰트 서브셋에서 잡은 것 (재발 시 참고)
@@ -95,7 +95,7 @@ rounded-card 16  rounded-visual 24  rounded-control 12  버튼 캡슐(999)   sha
 
 ## 5. 남은 항목 (사용자 확인)
 
-1. **한난체 웹폰트 사용 범위** — TTF 에 라이선스 문구가 없다. 사내 도구(비공개, 팀 내부)에서 자체 호스팅해도 되는지 CI 담당 부서 확인. 안 되면 `@font-face` 한 블록과 `font-hanan` 만 빼면 Pretendard 로 자동 폴백된다.
+1. ~~한난체 웹폰트 사용 범위~~ — **2026-09-21 확인 완료: 사내 도구(팀 내부)에서 자체 호스팅 사용 가능**(사용자 확인). 그대로 유지한다. 만약 나중에 방침이 바뀌면 `@font-face` 한 블록과 `font-hanan` 만 빼면 Pretendard 로 자동 폴백된다.
 2. **팀 피드백** — 색·글꼴·형태만 바뀌었고 동선은 같지만, «낯설다»는 반응이 오면 `docs/팀공유_최종안내.html` 캡처(갱신됨)로 안내.
 3. **배포 확인** (병합 후 Manual Deploy) — `/healthz` commit · 번들 해시 · `/assets/kdhc-signature-ko.svg` 200 · `/assets/fonts/HananCha-v1.woff2` 200 + `cache-control: immutable`.
 4. 시안 대비 **조정한 토큰 2개**(`tri`·`warn`)는 대비 때문이다. 시안값으로 되돌리려면 §3 의 두 곳을 같이 바꾸고 §4-3 을 다시 계산한다.
