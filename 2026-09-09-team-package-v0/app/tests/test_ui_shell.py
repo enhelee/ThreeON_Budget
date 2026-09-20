@@ -88,6 +88,7 @@ def test_sidebar_and_gate_use_official_signature():
         body = _read(f)
         assert "/assets/kdhc-signature-ko.svg" in body, f"{os.path.basename(f)}: 공식 시그니처 SVG"
         assert 'alt="한국지역난방공사"' in body, f"{os.path.basename(f)}: 로고 대체 텍스트"
+        assert "ThreeON" in body, f"{os.path.basename(f)}: 팀 이름 ThreeON 표기(로고 아래)"
 
 
 def test_drawer_handles_escape_and_returns_focus():
