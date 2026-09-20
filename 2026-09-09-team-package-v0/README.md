@@ -30,9 +30,8 @@ threeon-budget/
 │  ├─ templates/ tests/ scripts/
 │  ├─ data/ config/ output/    로컬 상태 — 커밋하지 않음
 │  └─ .env                     비밀값 — 커밋하지 않음
-├─ site/         소개 사이트 — Phase 5에서 앱으로 흡수 후 삭제
 ├─ deploy/       Dockerfile · entrypoint.sh · docker-compose · requirements
-├─ docs/         문서 (설계·인수인계·계약·변경이력)
+├─ docs/         문서 — HANDOFF(진입점)·MASTER·계약·변경이력·디자인 · img/(캡처) · superpowers/(설계·계획) · archive/(역사)
 ├─ render.yaml   Render Blueprint
 └─ .env.example  환경변수 예시 → app/.env 로 복사해 사용
 ```
@@ -93,10 +92,11 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 
 | 순서 | 문서 | 내용 |
 |---|---|---|
-| 1 | [docs/superpowers/specs/2026-09-12-통합웹앱-design.md](docs/superpowers/specs/2026-09-12-통합웹앱-design.md) | **현재 진행 중인 설계** — Phase 0~6 전 구간 |
+| 0 | [docs/HANDOFF.md](docs/HANDOFF.md) | **개발자 진입점** — 현재 상태·결정 기록·코드 지도·운영 지식·남은 것 |
+| 1 | [docs/superpowers/specs/2026-09-12-통합웹앱-design.md](docs/superpowers/specs/2026-09-12-통합웹앱-design.md) | 통합 웹앱 설계 — Phase 0~6 전 구간(완료) |
 | 2 | [docs/통합_인수인계_MASTER.md](docs/통합_인수인계_MASTER.md) | 구조·아키텍처·분석 로직 R1~R15·API 명세 |
 | 3 | [docs/DB_스냅샷.md](docs/DB_스냅샷.md) | DB 스키마·현재 데이터·검증 기준치 |
-| 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev15 의사결정 이력 |
+| 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev20 의사결정 이력 |
 | 5 | [docs/연계계약_CONTRACT.md](docs/연계계약_CONTRACT.md) | 앱이 받고 내는 파일·인터페이스 계약(옛 계약 4개 통합본) |
 | 6 | [docs/설계_3-4단계_소요전망_파이프라인.md](docs/설계_3-4단계_소요전망_파이프라인.md) | 표준화·중장기 전망 설계 (Phase 6 근거) |
 | 7 | [docs/팀공유_최종안내.html](docs/팀공유_최종안내.html) | **팀원용 — 무엇을 하는 앱이고 어떻게 쓰나** (Phase 8, 브라우저로 열기) |
@@ -109,5 +109,6 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 
 - **이 저장소는 public 입니다.** 따라서 사내 실데이터·비밀값은 어떤 경우에도 커밋하지 않습니다.
   실적 데이터는 전부 DB(Supabase/사내 PostgreSQL)에 있고, 앱은 로그인 뒤에서만 보여 줍니다.
+  (저장소 루트에 남아 있던 초기 버전의 실데이터 CSV 는 2026-09-21 에 삭제했으나 이력에는 남아 있습니다 — private 전환 예정.)
 - 실데이터(`*.csv` 마스터·연도별 자료)·DB·`.env`는 `.gitignore`로 차단됩니다. 커밋 전 `git status`로 확인하세요.
 - 외부 반출·외부 서비스 업로드는 사내 정보보호 규정을 따릅니다. [docs/보안설계.md](docs/보안설계.md)

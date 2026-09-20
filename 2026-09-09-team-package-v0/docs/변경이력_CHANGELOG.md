@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-09-21 · 문서 부채·레거시 정리 (rev20)
+
+**대상:** 저장소 루트 · 패키지 `docs/` · `README.md` · `render.yaml`. 코드 변경 없음(테스트 279 passed).
+
+- **저장소 루트 정리**: 2026-09-08 이전의 초기 버전(루트 `app.py`·`classify.py` 등 Streamlit 앱, `2026-09-08_예산예측프로그램/`, `2026-09-08_팀공유_v2/`, `checkpoints/`, 옛 `docs/`)과 **실데이터 CSV·모델 파일**(`data_2016.csv`·`classified_2016.csv`·`training_data.csv`·`year_status.json`·`type_classifier.joblib`) 265개 파일 삭제. 루트에는 `render.yaml`·`README.md`(새로 작성)·`.gitignore` 만. 이력에는 남는다 → private 전환은 사용자 몫.
+- **패키지 정리**: `matching_tool_src/`(codex 매칭 도구 원형, 앱에 흡수됨)·`site/`(Phase 5 에서 SPA 가 흡수) 삭제.
+- **문서**: [HANDOFF.md](HANDOFF.md) 를 **현행 개발자 인수인계**로 다시 썼다(로컬에만 있던 09-19·20·21 인수인계 3벌을 합침 — 결정 기록·코드 지도·운영 지식·남은 것). 역사 문서 5개(옛 1단계 HANDOFF·팀 통합 README·비교분석 보고서·PRD 2개)는 [archive/](archive/) 로. 배포가이드(GitHub Pages 절 삭제 → 자산 캐시 절, Session pooler, 279)·보안설계(§6-5 실데이터 삭제·private 전환)·체크리스트·MASTER·README 현행화.
+- `render.yaml`: `APP_REV` rev17 → rev20, `autoDeploy` 가 실제로 안 걸린다는 주석.
+- 로컬 PC(`Desktop/중장기 예산 소요 전망`)의 옛 사본(구 budget_app 저장소·v2 원본·패키지 사본·옛 문서 20여 종)은 휴지통으로 — 복구 가능. 구 budget_app 의 git 이력은 `보관_2026-09-21/budget_app.bundle` 로 남김.
+
+---
+
 ## 2026-09-21 · Phase 8 — 한난 디자인 시스템 적용 · ThreeON 표기 (rev19)
 
 **대상:** `app/web/`(토큰·컴포넌트·셸·뷰 10개) · `app/scripts/`(폰트 서브셋·치환) · `docs/`. PR #35 + 후속 PR. 테스트 **279 passed**(269 + `test_ui_shell.py` 10).

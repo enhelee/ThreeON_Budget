@@ -12,7 +12,7 @@ services:
     dockerfilePath: ./2026-09-09-team-package-v0/deploy/Dockerfile
     dockerContext: ./2026-09-09-team-package-v0
     healthCheckPath: /healthz
-    autoDeploy: true
+    autoDeploy: true            # ⚠ 실제로는 걸리지 않는다(2026-09 반복 실측) — 병합 뒤 대시보드에서 Manual Deploy
     envVars:
       - key: APP_PASSWORD
         sync: false                 # 대시보드에서 입력 — 팀 공용 비밀번호
@@ -23,7 +23,7 @@ services:
       - key: COOKIE_SECURE
         value: "1"
       - key: APP_REV
-        value: rev17                # 메인 헤더에 찍히는 리비전 라벨(사람이 읽는 값)
+        value: rev20                # 메인 헤더에 찍히는 리비전 라벨(사람이 읽는 값) — CHANGELOG 의 rev 와 맞춘다
       - key: SESSION_HOURS
         value: "12"
       - key: PORT
