@@ -96,3 +96,34 @@ def test_drawer_handles_escape_and_returns_focus():
     assert "aria-expanded" in js
     assert "menuReturnEl" in js and ".focus()" in js, "닫힌 뒤 메뉴 버튼으로 포커스가 돌아와야 합니다"
     assert '"Tab"' in js, "열려 있는 동안 Tab 은 드로어 안에서 순환"
+
+
+# ── Task 4: 옛 팔레트 잔존 0 ─────────────────────────────────────────
+
+LEGACY = re.compile(r"\b(?:hover:|focus:|sm:|lg:|md:)?(?:bg|text|border|ring|accent|divide|from|to)-(?:blue|slate|emerald|amber|red|rose|indigo|gray|green|yellow)-\d+(?:/\d+)?\b")
+
+
+def test_no_legacy_palette_anywhere_in_frontend_source():
+    """새 화면에 blue-600 한 줄이 들어와도 아무 테스트도 안 깨진다 — 여기서 깨진다."""
+    hits = {}
+    for root, _, files in os.walk(os.path.join(WEB, "src")):
+        for f in files:
+            if f.endswith(".js"):
+                found = sorted(set(LEGACY.findall(_read(root, f))))
+                if found:
+                    hits[f] = found
+    found = sorted(set(LEGACY.findall(_read(WEB, "index.html"))))
+    if found:
+        hits["index.html"] = found
+    assert not hits, "옛 팔레트 유틸리티가 남아 있습니다: " + repr(hits)
+
+
+def test_no_card_shadows_left():
+    """시안: 일반 카드는 그림자 없음. 떠 있는 것(토스트·바쁨)만 shadow-float."""
+    src = ""
+    for root, _, files in os.walk(os.path.join(WEB, "src")):
+        for f in files:
+            if f.endswith(".js"):
+                src += _read(root, f)
+    src += _read(WEB, "index.html")
+    assert not re.search(r"\bshadow-(sm|md|lg|xl)\b|\bshadow\b(?!-float)", src), "shadow-* 유틸리티가 남아 있습니다"

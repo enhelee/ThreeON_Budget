@@ -12,15 +12,16 @@ export default {
       colors: {
         ink: "#0D0D0D",          // text-primary
         sub: "#5D5D5D",          // text-secondary (흰 배경 대비 6.58:1)
-        tri: "#8F8F8F",          // text-tertiary (캡션·비활성 라벨)
-        dis: "#A6A6A6",          // text-disabled
+        tri: "#767676",          // text-tertiary (캡션·빈 상태 문구). 시안값 #8F8F8F 는 흰 배경 3.23:1 — 12px 캡션 본문에
+                                 //   실제로 쓰이므로(«귀속 전표 없음» 등) AA 4.5 를 넘는 값으로 올렸다(4.54:1)
+        dis: "#A6A6A6",          // text-disabled (비활성 전용 — 대비 기준 면제)
         line: { DEFAULT: "#E5E5E5", strong: "#C9C9C9", subtle: "#F2F2F2" },
         base: "#FFFFFF",
         subtle: "#F7F7F8",
         overlay: "rgba(13,13,13,0.56)",
         brand: { DEFAULT: "#FE0009", ink: "#000000" },
         ok: { DEFAULT: "#16794A", bg: "#EAF5EF" },
-        warn: { DEFAULT: "#9A6700", bg: "#FFF4D6" },
+        warn: { DEFAULT: "#8F6000", bg: "#FFF4D6" },   // 시안값 #9A6700 은 warn-bg 위 4.44:1 — 4.5 미달이라 한 단계 어둡게(4.99:1)
         err: { DEFAULT: "#B42318", bg: "#FDECEC" },
         info: { DEFAULT: "#315EAC", bg: "#EAF2FF" },
       },

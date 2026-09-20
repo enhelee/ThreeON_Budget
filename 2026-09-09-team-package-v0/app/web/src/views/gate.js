@@ -46,18 +46,18 @@ export function renderGate() {
       </div>
 
       <form id="gateForm" class="mt-6" autocomplete="off">
-        <label for="gateName" class="block text-xs font-semibold text-slate-700">작업자 이름</label>
+        <label for="gateName" class="block text-xs font-semibold text-ink">작업자 이름</label>
         <input id="gateName" class="control mt-1.5 w-full" maxlength="40" placeholder="예: 홍길동" required>
 
-        <label for="gatePw" class="mt-4 block text-xs font-semibold text-slate-700">팀 공용 비밀번호</label>
+        <label for="gatePw" class="mt-4 block text-xs font-semibold text-ink">팀 공용 비밀번호</label>
         <input id="gatePw" class="control mt-1.5 w-full" type="password" autocomplete="current-password" required>
 
-        <p id="gateMsg" class="mt-3 min-h-[1.1rem] text-xs font-medium text-red-600"></p>
+        <p id="gateMsg" class="mt-3 min-h-[1.1rem] text-xs font-medium text-err"></p>
 
         <button type="submit" class="btn-primary w-full">입장</button>
 
-        <p class="mt-4 text-xs leading-5 text-slate-500">
-          작업자 이름은 재배정·수정·삭제 등 <b class="text-slate-700">모든 변경 이력에 기록</b>됩니다. 실명을 입력하세요.
+        <p class="mt-4 text-xs leading-5 text-sub">
+          작업자 이름은 재배정·수정·삭제 등 <b class="text-ink">모든 변경 이력에 기록</b>됩니다. 실명을 입력하세요.
         </p>
       </form>
 

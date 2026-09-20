@@ -40,14 +40,14 @@ function sel(opts, value, attrs, labels = {}) {
 function exportNote() {
   const by = String(state.fc.baseYear)
   if (by === "2026") return ""
-  return `<p class="mt-2 text-xs text-slate-500">ℹ️ 내장 양식은 2026년 기준 참고 양식입니다. ${esc(by)}년 기준으로 내려받으면 «26년 본사 원가분배»→«${esc(by.slice(2))}년 본사 원가분배»처럼 시트명·연도 헤더·수식 참조를 ${esc(by)}년 기준으로 옮겨 채웁니다. 전년 실측치 같은 참고 블록은 양식 그대로입니다.</p>`
+  return `<p class="mt-2 text-xs text-sub">ℹ️ 내장 양식은 2026년 기준 참고 양식입니다. ${esc(by)}년 기준으로 내려받으면 «26년 본사 원가분배»→«${esc(by.slice(2))}년 본사 원가분배»처럼 시트명·연도 헤더·수식 참조를 ${esc(by)}년 기준으로 옮겨 채웁니다. 전년 실측치 같은 참고 블록은 양식 그대로입니다.</p>`
 }
 
 function panel(title, help, body, key) {
   const dirty = key && state.fc.dirty.has(key)
   return `<article class="panel overflow-hidden">
-    <div class="border-b border-slate-200 p-5 sm:p-6">
-      <h3 class="section-title">${esc(title)} ${dirty ? '<span class="badge bg-amber-50 text-amber-700">저장 안 됨</span>' : ""}</h3>
+    <div class="border-b border-line p-5 sm:p-6">
+      <h3 class="section-title">${esc(title)} ${dirty ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h3>
       <p class="section-help leading-6">${help}</p>
     </div>${body}</article>`
 }
@@ -61,17 +61,17 @@ function header() {
   return `
   <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
     <div>
-      <p class="text-sm font-semibold text-blue-700">STAGE 03 · 04</p>
-      <h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">예산 표준화 · 중장기 전망</h2>
-      <p class="section-help max-w-30 leading-6">마감된 연도(<b class="text-slate-700">${esc(locked)}</b>)의 분석 결과가 표준금액의 입력입니다. 가정(정비등급·고온부품·본사배분·팩터·임시·돌발사업)은 기준연도마다 한 벌 — 내년 전망을 시작해도 올해 가정이 남습니다.</p>
+      <p class="text-sm font-semibold text-ink">STAGE 03 · 04</p>
+      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 표준화 · 중장기 전망</h2>
+      <p class="section-help max-w-30 leading-6">마감된 연도(<b class="text-ink">${esc(locked)}</b>)의 분석 결과가 표준금액의 입력입니다. 가정(정비등급·고온부품·본사배분·팩터·임시·돌발사업)은 기준연도마다 한 벌 — 내년 전망을 시작해도 올해 가정이 남습니다.</p>
     </div>
     <div class="flex flex-wrap items-end gap-2">
-      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">전망 기준연도</span>
+      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">전망 기준연도</span>
         <select class="control" data-fcbase>${years.map(y => `<option value="${esc(y)}" ${y === fc.baseYear ? "selected" : ""}>${esc(y)}년 기준${fc.baseYears.includes(y) ? "" : " (아직 저장된 가정 없음)"}</option>`).join("")}</select></label>
       <button class="btn-secondary" data-action="fc-add-base" title="직전 기준연도의 가정을 복사해 새 기준연도를 만듭니다">＋기준연도</button>
     </div>
   </section>
-  <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ? "btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
+  <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
 }
 
 // ── 기준정보(가정) 탭 ────────────────────────────────────────
@@ -87,11 +87,11 @@ function cellInput(key, i, c, v) {
 
 /** 긴 표 편집기 — 행 추가·삭제·셀 편집. cols: [{f, label, type, options}] */
 function longTable(key, cols, rows, empty) {
-  const head = cols.map(c => `<th class="px-3 py-2 ${c.type === "num" ? "text-right" : ""}">${esc(c.label)}</th>`).join("") + '<th class="w-16"></th>'
+  const head = cols.map(c => `<th class="px-3 py-2 ${c.type ==="num" ? "text-right" : ""}">${esc(c.label)}</th>`).join("") + '<th class="w-16"></th>'
   const body = rows.map((r, i) => `<tr>${cols.map(c => `<td class="px-2 py-1">${cellInput(key, i, c, r[c.f])}</td>`).join("")}
       <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="${key}" data-idx="${i}">삭제</button></td></tr>`).join("")
   return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${head}</tr></thead>
-    <tbody class="divide-y divide-slate-100">${body || `<tr><td class="table-cell text-slate-400" colspan="${cols.length + 1}">${esc(empty || "없음")}</td></tr>`}</tbody></table>
+    <tbody class="divide-y divide-line-subtle">${body || `<tr><td class="table-cell text-tri" colspan="${cols.length + 1}">${esc(empty || "없음")}</td></tr>`}</tbody></table>
     <button class="btn-secondary mt-3" data-fcadd="${key}">＋ 행 추가</button></div>`
 }
 
@@ -108,7 +108,7 @@ function gradesPanel(d) {
       <button class="btn-secondary" data-fcexport="schedule" title="지금 저장된 미래 등급이 채워진 원본 양식 — 고쳐서 다시 올릴 수 있습니다">현재값이 채워진 일정 양식 내려받기</button>
     </div>
     <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th>${years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-slate-100">${sites.map(s => `<tr><td class="table-cell font-semibold text-slate-900">${esc(s)}</td>${years.map(y =>
+      <tbody class="divide-y divide-line-subtle">${sites.map(s => `<tr><td class="table-cell font-semibold text-ink">${esc(s)}</td>${years.map(y =>
         `<td class="px-1 py-1 text-center"><input class="control fc-grade" data-fc="grade-cell" data-site="${esc(s)}" data-year="${y}" value="${esc(cell[`${s}|${y}`] || "")}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`, "grades")
 }
 
@@ -123,9 +123,9 @@ function hqMasterPanel(d) {
       <button class="btn-secondary" data-fcexport="hq-master">현재값이 채워진 양식 내려받기</button>
     </div>
     <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${cols.map(c => `<th class="px-3 py-2">${esc(c)}</th>`).join("")}<th class="w-16"></th></tr></thead>
-      <tbody class="divide-y divide-slate-100">${body || `<tr><td class="table-cell text-slate-400" colspan="${cols.length + 1}">마스터가 없습니다 — 엑셀에서 가져오세요.</td></tr>`}</tbody></table>
+      <tbody class="divide-y divide-line-subtle">${body || `<tr><td class="table-cell text-tri" colspan="${cols.length + 1}">마스터가 없습니다 — 엑셀에서 가져오세요.</td></tr>`}</tbody></table>
       <button class="btn-secondary mt-3" data-fcadd="hq_master">＋ 행 추가</button></div>
-    <div class="border-t border-slate-200 px-5 pt-4"><h4 class="text-sm font-bold text-slate-700">배분비율 — 계약체결금액 ${state.fc.dirty.has("hq_ratio") ? '<span class="badge bg-amber-50 text-amber-700">저장 안 됨</span>' : ""}</h4></div>
+    <div class="border-t border-line px-5 pt-4"><h4 class="text-sm font-bold text-ink">배분비율 — 계약체결금액 ${state.fc.dirty.has("hq_ratio") ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h4></div>
     ${longTable("hq_ratio", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "계약체결금액", label: "계약체결금액(천원)", type: "num"}], d.hq_ratio, "배분비율이 없습니다 — 본사 임시사업이 지사에 배분되지 않습니다.")}`, "hq_master")
 }
 
@@ -150,9 +150,9 @@ function manageBody() {
       longTable("hq_temp", [{f: "사업명", label: "사업명"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "연도", label: "연도", type: "int"}, {f: "금액", label: "금액(천원)", type: "num"}], d.hq_temp, "없음"), "hq_temp")}
     ${panel("지사별 돌발 사업", "표준금액에 없던 지사 사업을 그 해 그 과목에 더합니다.",
       longTable("surprise", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "금액", label: "금액(천원)", type: "num"}, {f: "사유", label: "사유"}], d.surprise, "없음"), "surprise")}
-    <div class="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+    <div class="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-card border border-line bg-white/95 p-4 shadow-float backdrop-blur">
       <button class="btn-primary" id="fcSaveBtn" data-action="fc-save" ${n ? "" : "disabled"}>저장${n ? ` (${n}표)` : ""}</button>
-      <span class="text-xs text-slate-500">손댄 표만 ${esc(state.fc.baseYear)}년 기준으로 저장합니다. 표준화·전망 표는 저장 즉시 다시 계산됩니다.</span>
+      <span class="text-xs text-sub">손댄 표만 ${esc(state.fc.baseYear)}년 기준으로 저장합니다. 표준화·전망 표는 저장 즉시 다시 계산됩니다.</span>
     </div>
   </div>`
 }
@@ -169,20 +169,20 @@ function previewPanel() {
   const cols = p.columns || (rows[0] ? Object.keys(rows[0]) : [])
   const mergeable = p.kind !== "hq-master"
   return `
-  <article class="panel overflow-hidden border-blue-300" id="fcPreview">
-    <div class="border-b border-slate-200 bg-blue-50 p-5 sm:p-6">
+  <article class="panel overflow-hidden border-line-strong" id="fcPreview">
+    <div class="border-b border-line bg-subtle p-5 sm:p-6">
       <h3 class="section-title">가져오기 미리보기 — ${esc(IMPORT_LABEL[p.kind] || p.kind)}</h3>
       <p class="section-help">${rows.length.toLocaleString()}건을 찾았습니다${p.ratio_rows ? ` · 배분비율 ${p.ratio_rows.length}개 지사` : ""}. 아직 저장되지 않았습니다 — 아래에서 적용 방식을 고르세요.</p>
       <div class="mt-3 flex flex-wrap gap-2">
         ${mergeable ? '<button class="btn-primary" data-action="fc-apply-merge">기존에 없는 것만 추가</button>' : ""}
-        <button class="${mergeable ? "btn-secondary" : "btn-primary"}" data-action="fc-apply-replace">전체 교체</button>
+        <button class="${mergeable ?"btn-secondary" : "btn-primary"}" data-action="fc-apply-replace">전체 교체</button>
         <button class="btn-secondary" data-action="fc-cancel-preview">취소</button>
       </div>
     </div>
     ${rows.length ? `<div class="max-h-80 overflow-auto p-5"><table class="w-full"><thead class="table-head"><tr>${cols.map(c => `<th class="px-3 py-2">${esc(c)}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-slate-100">${rows.slice(0, 100).map(r => `<tr>${cols.map(c => `<td class="table-cell">${esc(typeof r[c] === "number" ? fmt(r[c]) : r[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
-      ${rows.length > 100 ? '<p class="mt-2 text-xs text-slate-400">앞 100건만 표시합니다.</p>' : ""}</div>`
-      : '<p class="p-5 text-sm text-amber-700">이 파일에서 해당 자료를 찾지 못했습니다 — 양식·시트명을 확인하세요. 지사 시트명은 지사 이름에서 «지사»·«사업소»를 뗀 것(예: 화성)이어야 합니다.</p>'}
+      <tbody class="divide-y divide-line-subtle">${rows.slice(0, 100).map(r => `<tr>${cols.map(c => `<td class="table-cell">${esc(typeof r[c] === "number" ? fmt(r[c]) : r[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+      ${rows.length > 100 ? '<p class="mt-2 text-xs text-tri">앞 100건만 표시합니다.</p>' : ""}</div>`
+      : '<p class="p-5 text-sm text-warn">이 파일에서 해당 자료를 찾지 못했습니다 — 양식·시트명을 확인하세요. 지사 시트명은 지사 이름에서 «지사»·«사업소»를 뗀 것(예: 화성)이어야 합니다.</p>'}
   </article>`
 }
 
@@ -198,15 +198,15 @@ function benchBody() {
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
     ? `마감 연도 <b>${esc(b.years_used.join("·"))}</b> · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)}천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
-    : '<span class="text-amber-700">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
+    : '<span class="text-warn">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
   return `
   <article class="panel overflow-hidden">
-    <div class="border-b border-slate-200 p-5 sm:p-6">
+    <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급)</h3>
       <p class="section-help leading-6">${info}</p>
       <p class="section-help">«자동추천»은 실적 패턴(연도별 변동·등급별 편차)으로 방식을 골랐고 근거가 «추천사유»에 있습니다. <b>산출방식</b>을 바꾸면 그 (지사,과목)은 «사용자지정»으로, <b>표준금액</b>을 고치면 그 (지사,과목,등급)은 «수동수정»으로 고정됩니다.${b.has_ltsa ? "" : " ℹ️ «투자유형세부»가 없어 기계장치에서 LTSA/CRI 를 분리하지 못하고 총액을 씁니다."}</p>
       <div class="mt-3 flex flex-wrap items-end gap-3">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사그룹</span>
+        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사그룹</span>
           ${sel(["all", ...GROUPS], g, "data-fcgroup", {all: "전체"})}</label>
         <button class="btn-primary" data-action="fc-save-bench" ${nEdits ? "" : "disabled"}>변경 저장${nEdits ? ` (${nEdits}건)` : ""}</button>
         <button class="btn-secondary" data-fcexport="standardization" title="재무팀 표준화 참고 양식(25시트)에 실적·정비등급·표준금액을 채워 내려받습니다">표준화 양식으로 내보내기 (xlsx)</button>
@@ -217,17 +217,17 @@ function benchBody() {
       <th class="px-3 py-2">지사</th><th class="px-3 py-2">구분</th><th class="px-3 py-2">예산과목</th><th class="px-3 py-2">등급</th>
       <th class="px-3 py-2">산출방식</th><th class="px-3 py-2">방식출처</th><th class="px-3 py-2">추천사유</th>
       <th class="px-3 py-2 text-right">표준금액(천원)</th><th class="px-3 py-2">비고</th></tr></thead>
-      <tbody class="divide-y divide-slate-100">${rows.length ? rows.map(r => {
+      <tbody class="divide-y divide-line-subtle">${rows.length ? rows.map(r => {
         const mk = `${r.사업장}|${r.예산과목}`, ak = `${mk}|${r.등급}`
         const mch = mk in ed.methods, ach = ak in ed.overrides
         return `<tr>
-          <td class="table-cell font-semibold text-slate-900">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
+          <td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
           <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
-          <td class="px-2 py-1 ${mch ? "bg-amber-50" : ""}">${sel(METHODS, ed.methods[mk] ?? r.산출방식, `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
-          <td class="table-cell text-slate-500">${esc(r.방식출처)}</td><td class="table-cell text-xs text-slate-500">${esc(r.추천사유 || "")}</td>
-          <td class="px-2 py-1 text-right ${ach ? "bg-amber-50" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
-          <td class="table-cell text-xs text-slate-500">${esc(r.비고 || "")}</td></tr>`
-      }).join("") : '<tr><td class="table-cell text-slate-400" colspan="9">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
+          <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${sel(METHODS, ed.methods[mk] ?? r.산출방식, `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
+          <td class="table-cell text-sub">${esc(r.방식출처)}</td><td class="table-cell text-xs text-sub">${esc(r.추천사유 || "")}</td>
+          <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
+          <td class="table-cell text-xs text-sub">${esc(r.비고 || "")}</td></tr>`
+      }).join("") : '<tr><td class="table-cell text-tri" colspan="9">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
   </article>`
 }
 
@@ -245,20 +245,20 @@ function tableBody() {
   const sums = Object.fromEntries(t.years.map(y => [y, rows.reduce((s, r) => s + (r[String(y)] || 0), 0)]))
   return `
   <article class="panel overflow-hidden">
-    <div class="border-b border-slate-200 p-5 sm:p-6">
-      <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-blue-700">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
+    <div class="border-b border-line p-5 sm:p-6">
+      <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-ink">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
       <p class="section-help">기준연도는 계획본(있으면) + 본사배분, 이후는 표준금액 × 팩터 복리. 고온부품은 계획값 그대로, 임시·돌발사업은 그 해에 더합니다. 단위 천원.</p>
-      ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-xl ${tone === "warn" ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"} px-3 py-2 text-xs">${msg}</p>`).join("")}
+      ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-control ${tone ==="warn" ? "bg-warn-bg text-warn" : "bg-subtle text-sub"} px-3 py-2 text-xs">${msg}</p>`).join("")}
       <div class="mt-3 flex flex-wrap items-end gap-3">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-slate-500">지사</span>
+        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사</span>
           <select class="control" data-fcsite><option value="${TOTAL}" ${site === TOTAL ? "selected" : ""}>전사 합계 (${t.sites.length}개 지사)</option>${t.sites.map(s => `<option value="${esc(s)}" ${s === site ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
         <button class="btn-secondary" data-fcexport="longterm" title="재무팀 중장기예산 참고 양식(지사 탭·본사 원가분배·총원가 배분·총괄표)에 결과를 채워 내려받습니다">중장기 예산 양식으로 내보내기 (xlsx)</button>
       </div>
       ${exportNote()}
     </div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-slate-100">${rows.map(r => `<tr><td class="table-cell font-semibold text-slate-900">${esc(r.예산과목)}</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(r[String(y)])}</td>`).join("")}</tr>`).join("")}
-      <tr class="bg-slate-50 font-bold"><td class="table-cell text-slate-900">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
+      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(r[String(y)])}</td>`).join("")}</tr>`).join("")}
+      <tr class="bg-subtle font-bold"><td class="table-cell text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
   </article>`
 }
 

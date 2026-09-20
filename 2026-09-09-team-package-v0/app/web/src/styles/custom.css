@@ -56,7 +56,7 @@
 /* 미반영 상태는 의미색(주의 --warn)을 유지한다 — 브랜드 빨강이 아니다 */
 .btn-pending{background:var(--warn) !important;border-color:var(--warn) !important;animation:pendPulse 1.8s ease-in-out infinite}
 .btn-pending .pending-count{color:var(--warn)}
-@keyframes pendPulse{0%,100%{box-shadow:0 0 0 0 rgba(154,103,0,.45)}50%{box-shadow:0 0 0 .35rem rgba(154,103,0,0)}}
+@keyframes pendPulse{0%,100%{box-shadow:0 0 0 0 rgba(143,96,0,.45)}50%{box-shadow:0 0 0 .35rem rgba(143,96,0,0)}}
 .pending-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:.7rem .9rem}
 .pending-bar b{color:var(--warn)}
 @keyframes spin{to{transform:rotate(1turn)}}
