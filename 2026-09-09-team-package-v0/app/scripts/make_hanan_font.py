@@ -25,6 +25,26 @@ def unicodes():
     return sorted(u)
 
 
+def repair_empty_contours(font):
+    """원본 HANAN.TTF 의 글리프 14개(래·챕·챗·쳅·햅·햇·헵·헷·혭 등)는 점이 0개인 빈 윤곽을 하나
+    더 갖고 있다(endPtsOfContours 에 같은 값이 연달아 — 예: 래 = [27, 27]). 데스크톱 렌더러는
+    눈감아 주지만 Chrome 의 OTS 는 «glyf: Decreasing contour index» 로 폰트 전체를 버린다
+    (2026-09-21 실측: 제목이 전부 폴백 글꼴로). 빈 윤곽만 지우면 점·플래그는 그대로다."""
+    glyf = font["glyf"]
+    fixed = []
+    for name in font.getGlyphOrder():
+        g = glyf[name]
+        if g.numberOfContours <= 0:                # 빈 글리프·합성 글리프는 해당 없음
+            continue
+        ends = list(g.endPtsOfContours)
+        clean = [e for i, e in enumerate(ends) if i == 0 or e > ends[i - 1]]
+        if clean != ends:
+            g.endPtsOfContours = clean
+            g.numberOfContours = len(clean)
+            fixed.append(name)
+    return fixed
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__); return 2
@@ -38,9 +58,10 @@ def main():
     sub = subset.Subsetter(opts)
     sub.populate(unicodes=unicodes())
     sub.subset(font)
+    fixed = repair_empty_contours(font)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     subset.save_font(font, out, opts)
-    print(f"{out}  {os.path.getsize(out)/1024:.0f} KB  glyphs={len(font.getGlyphOrder())}")
+    print(f"{out}  {os.path.getsize(out)/1024:.0f} KB  glyphs={len(font.getGlyphOrder())}  repaired={len(fixed)} {fixed}")
     return 0
 
 

@@ -50,6 +50,9 @@
 .max-w-30{max-width:30rem}
 /* 미반영 변경 건수 배지 — 분석 버튼에 붙는다 */
 .pending-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;margin-left:.15rem;border-radius:9999px;background:#fff;color:var(--ink);font-size:.72rem;font-weight:800;line-height:1}
+/* 이 파일이 Tailwind 유틸리티 뒤에 오므로 .hidden(display:none)을 위 규칙이 이겼다 — 미반영 0건인데
+   흰 점이 버튼에 남던 이유(Phase 7 캡처에도 보임). 같은 파일에서 한 번 더 끊는다. */
+.pending-count.hidden{display:none}
 /* 미반영 상태는 의미색(주의 --warn)을 유지한다 — 브랜드 빨강이 아니다 */
 .btn-pending{background:var(--warn) !important;border-color:var(--warn) !important;animation:pendPulse 1.8s ease-in-out infinite}
 .btn-pending .pending-count{color:var(--warn)}
@@ -93,3 +96,7 @@
 .fc-grade{width:3.6rem;padding:.25rem .3rem;text-align:center}
 .fc-num{width:8.5rem;text-align:right}
 .fc-int{width:5.5rem;text-align:right}
+
+/* 건너뛰기 링크 — 포커스될 때만 보인다(시안 .skip-link) */
+.skip-link{position:fixed;top:-90px;left:20px;z-index:200;padding:12px 20px;background:var(--ink);color:#fff;border-radius:0 0 8px 8px;font-size:14px}
+.skip-link:focus{top:0}

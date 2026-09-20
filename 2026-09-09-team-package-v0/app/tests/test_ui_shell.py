@@ -70,3 +70,29 @@ def test_primary_button_follows_sample_rule():
     shared = css.split(".btn-primary,", 1)[1].split("}", 1)[0]           # 공유 블록(형태)
     assert "rounded-full" in shared and "min-h-[44px]" in shared
     assert "bg-brand" not in block, "브랜드 빨강을 버튼 바탕으로 쓰면 흰 글자 대비가 4.5 미만입니다"
+
+
+# ── Task 3: 셸 ────────────────────────────────────────────────────────
+
+def test_shell_has_skip_link_header_height_and_drawer_aria():
+    html = _read(WEB, "index.html")
+    assert 'lang="ko"' in html
+    assert 'class="skip-link"' in html and 'href="#page"' in html and "본문 바로가기" in html
+    assert "min-h-[72px]" in html, "헤더는 72px(시안)"
+    assert 'aria-expanded="false"' in html and 'aria-controls="sidebar"' in html
+    assert "backdrop-blur" not in html, "시안 헤더는 불투명 흰색"
+
+
+def test_sidebar_and_gate_use_official_signature():
+    for f in (os.path.join(WEB, "src", "components", "sidebar.js"), os.path.join(WEB, "src", "views", "gate.js")):
+        body = _read(f)
+        assert "/assets/kdhc-signature-ko.svg" in body, f"{os.path.basename(f)}: 공식 시그니처 SVG"
+        assert 'alt="한국지역난방공사"' in body, f"{os.path.basename(f)}: 로고 대체 텍스트"
+
+
+def test_drawer_handles_escape_and_returns_focus():
+    js = _read(WEB, "src", "main.js")
+    assert '"Escape"' in js, "드로어는 Escape 로 닫혀야 합니다"
+    assert "aria-expanded" in js
+    assert "menuReturnEl" in js and ".focus()" in js, "닫힌 뒤 메뉴 버튼으로 포커스가 돌아와야 합니다"
+    assert '"Tab"' in js, "열려 있는 동안 Tab 은 드로어 안에서 순환"
