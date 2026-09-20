@@ -527,9 +527,47 @@ document.addEventListener("input", e => {
   }
 });
 
-export function openMenu() { $("#sidebar").classList.remove("-translate-x-full"); $("#backdrop").classList.remove("hidden"); }
+// ── 모바일 드로어 — Escape 닫기 · 닫은 뒤 메뉴 버튼으로 포커스 복귀 · 열린 동안 Tab 순환 ──
+// (시안의 Radix Sheet 가 하던 일을 손으로 한다. 데스크톱(lg 이상)에서는 사이드바가 고정이라 해당 없음.)
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let menuReturnEl = null;   // 열 때 포커스가 있던 요소 — 보통 #menuButton
 
-export function closeMenu() { if (window.innerWidth >= 1024) return; $("#sidebar").classList.add("-translate-x-full"); $("#backdrop").classList.add("hidden"); }
+function drawerIsOpen() {
+  return window.innerWidth < 1024 && !$("#sidebar").classList.contains("-translate-x-full");
+}
+
+export function openMenu() {
+  const sb = $("#sidebar");
+  menuReturnEl = document.activeElement;
+  sb.classList.remove("-translate-x-full"); $("#backdrop").classList.remove("hidden");
+  $("#menuButton").setAttribute("aria-expanded", "true");
+  sb.setAttribute("role", "dialog"); sb.setAttribute("aria-modal", "true");
+  const first = sb.querySelector(FOCUSABLE);
+  if (first) first.focus();
+}
+
+export function closeMenu() {
+  if (window.innerWidth >= 1024) return;
+  const sb = $("#sidebar");
+  if (sb.classList.contains("-translate-x-full")) return;
+  sb.classList.add("-translate-x-full"); $("#backdrop").classList.add("hidden");
+  $("#menuButton").setAttribute("aria-expanded", "false");
+  sb.removeAttribute("role"); sb.removeAttribute("aria-modal");
+  const back = (menuReturnEl && document.contains(menuReturnEl)) ? menuReturnEl : $("#menuButton");
+  back.focus();
+}
+
+document.addEventListener("keydown", e => {
+  if (!drawerIsOpen()) return;
+  if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }
+  if (e.key === "Tab") {
+    const items = [...$("#sidebar").querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
 
 $("#menuButton").addEventListener("click", openMenu);
 

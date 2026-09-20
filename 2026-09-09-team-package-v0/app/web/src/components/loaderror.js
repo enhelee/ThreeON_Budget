@@ -9,13 +9,13 @@ export function loadErrorBannerHtml() {
   const errs = state.loadErrors || []
   if (!errs.length) return ""
   return `
-    <div class="border-t border-rose-300 bg-rose-50 px-4 py-2 text-sm sm:px-6 lg:px-8">
+    <div class="border-t border-err bg-err-bg px-4 py-2 text-sm sm:px-6 lg:px-8">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span class="font-bold text-rose-900">⚠ ${errs.length}개 구역을 불러오지 못했습니다</span>
-        <span class="text-xs text-rose-800">아래 화면의 해당 구역은 <b>비어 있는 것이 아니라 조회에 실패한 것</b>입니다. 자료는 서버에 그대로 있습니다.</span>
+        <span class="font-bold text-err">⚠ ${errs.length}개 구역을 불러오지 못했습니다</span>
+        <span class="text-xs text-err">아래 화면의 해당 구역은 <b>비어 있는 것이 아니라 조회에 실패한 것</b>입니다. 자료는 서버에 그대로 있습니다.</span>
         <button class="btn-secondary ml-auto" data-action="reload-view">다시 불러오기</button>
       </div>
-      <ul class="mt-1 list-disc pl-5 text-xs text-rose-700">
+      <ul class="mt-1 list-disc pl-5 text-xs text-err">
         ${errs.map(e => `<li>${esc(e)}</li>`).join("")}
       </ul>
     </div>`

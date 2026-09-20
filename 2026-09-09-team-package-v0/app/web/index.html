@@ -8,32 +8,34 @@
 </head>
 <body>
 
-  <div id="appShell" class="min-h-screen lg:flex">
-    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/30 lg:hidden" aria-hidden="true"></div>
+  <a class="skip-link" href="#page">본문 바로가기</a>
 
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-slate-200 bg-white px-4 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+  <div id="appShell" class="min-h-screen lg:flex">
+    <div id="backdrop" class="fixed inset-0 z-30 hidden bg-overlay lg:hidden" aria-hidden="true"></div>
+
+    <aside id="sidebar" aria-label="주요 메뉴" class="fixed inset-y-0 left-0 z-40 flex w-72 -translate-x-full flex-col border-r border-line bg-base px-4 py-5 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
       <!-- 내용은 components/sidebar.js 가 채운다 (main.js 부팅 시 1회) -->
     </aside>
 
     <div class="min-w-0 flex-1">
-      <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div class="flex min-h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <header class="sticky top-0 z-20 border-b border-line bg-base">
+        <div class="flex min-h-[72px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div class="flex min-w-0 items-center gap-3">
-            <button id="menuButton" class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-600 lg:hidden" aria-label="메뉴 열기">
-              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            <button id="menuButton" class="grid h-11 w-11 place-items-center rounded-full border border-line-strong text-ink lg:hidden" aria-label="전체 메뉴 열기" aria-expanded="false" aria-controls="sidebar">
+              <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
             </button>
             <div class="min-w-0">
-              <h1 id="pageTitle" class="truncate text-lg font-bold text-slate-950">홈</h1>
-              <p id="pageSubtitle" class="hidden truncate text-xs text-slate-500 sm:block"></p>
+              <h1 id="pageTitle" class="truncate font-hanan text-[22px] font-semibold tracking-tight text-ink">홈</h1>
+              <p id="pageSubtitle" class="hidden truncate text-xs text-sub sm:block"></p>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <label class="hidden items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">대상연도
+          <div class="flex shrink-0 items-center gap-2">
+            <label class="hidden items-center gap-2 text-xs font-semibold text-sub sm:flex">대상연도
               <select id="yearSelect" class="control"></select>
             </label>
             <button id="addYearBtn" class="btn-secondary hidden sm:inline-flex" title="새 연도 추가">＋연도</button>
             <button class="btn-primary" data-action="analyze" id="analyzeBtn">
-              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+              <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
               <span id="analyzeLabel">분석 실행</span><span id="pendingCount" class="pending-count hidden"></span>
             </button>
             <span id="operatorBadge" class="operator-badge hidden" title="로그인 때 입력한 작업자 이름 — 모든 변경이 이 이름으로 기록됩니다"></span>
@@ -43,7 +45,7 @@
         <div id="lockBanner"></div>
       </header>
 
-      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite"></main>
+      <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite" tabindex="-1"></main>
     </div>
   </div>
 
@@ -53,11 +55,11 @@
 
   <input type="file" id="trainingFile" accept=".csv" class="hidden">
 
-  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-2xl bg-slate-950 px-4 py-3 text-sm font-medium text-white shadow-xl" role="status"></div>
-  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-slate-950/30">
-    <div class="rounded-2xl bg-white px-8 py-6 text-center shadow-xl">
+  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-visual bg-ink px-4 py-3 text-sm font-medium text-white shadow-float" role="status"></div>
+  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-overlay">
+    <div class="rounded-visual bg-base px-8 py-6 text-center shadow-float">
       <div class="spinner mx-auto"></div>
-      <p id="busyText" class="mt-3 text-sm font-semibold text-slate-700">처리 중...</p>
+      <p id="busyText" class="mt-3 text-sm font-semibold text-ink">처리 중...</p>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

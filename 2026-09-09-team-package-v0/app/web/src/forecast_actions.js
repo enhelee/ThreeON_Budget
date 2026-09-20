@@ -217,7 +217,7 @@ export async function fcChange(e) {
     const btn = document.querySelector('[data-action="fc-save-bench"]')
     const n = Object.keys(state.fc.benchEdits.methods).length + Object.keys(state.fc.benchEdits.overrides).length
     if (btn) { btn.disabled = false; btn.textContent = `변경 저장 (${n}건)` }
-    t.closest("td")?.classList.add("bg-amber-50")
+    t.closest("td")?.classList.add("bg-warn-bg")
     return true
   }
   const fc = t.dataset.fc

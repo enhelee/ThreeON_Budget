@@ -36,34 +36,30 @@ export const STAGES = [
 ]
 
 function navButton(m) {
-  return `<button class="nav-button" data-view="${m.view}"><span class="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-xs text-slate-600">${esc(m.tag)}</span>${esc(m.label)}</button>`
+  return `<button class="nav-button" data-view="${m.view}"><span class="grid h-7 w-7 place-items-center rounded-lg bg-subtle text-xs text-sub">${esc(m.tag)}</span>${esc(m.label)}</button>`
 }
 
 function groupLabel(text) {
-  return `<p class="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-slate-400">${esc(text)}</p>`
+  return `<p class="px-3 pb-1 pt-5 text-xs font-semibold tracking-wider text-tri">${esc(text)}</p>`
 }
 
-/** <aside id="sidebar"> 의 내용. 바깥 껍데기(위치·모바일 토글)는 index.html 이 갖는다. */
+/** <aside id="sidebar"> 의 내용. 바깥 껍데기(위치·모바일 토글)는 index.html 이 갖는다.
+ *  로고는 CI 매뉴얼의 한글 가로 A타입 시그니처(SVG, 비율 4.33:1 → 184px 폭에 43px). */
 export function renderSidebar() {
   return `
-    <div class="flex items-center gap-3 px-2">
-      <div class="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 text-white shadow-sm" aria-hidden="true">
-        <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-7h6v7M8 10h.01M12 10h.01M16 10h.01"/></svg>
-      </div>
-      <div>
-        <p class="font-bold text-slate-950">예산·실적 분석</p>
-        <p class="text-xs text-slate-500">발전플랜트 유지보수</p>
-      </div>
+    <div class="px-2">
+      <img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-[184px]">
+      <p class="mt-3 text-[13px] leading-5 text-sub">예산·실적 분석 · 발전플랜트 유지보수</p>
     </div>
 
     <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
       ${MENU.map(m => m.group ? groupLabel(m.group) : navButton(m)).join("\n      ")}
     </nav>
 
-    <div class="rounded-2xl bg-blue-50 p-4">
-      <div class="flex items-center gap-2 text-sm font-semibold text-blue-900">
-        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>사내망 · 백엔드 DB 저장
+    <div class="rounded-card border border-line bg-subtle p-4">
+      <div class="flex items-center gap-2 text-sm font-semibold text-ink">
+        <span class="h-2 w-2 rounded-full bg-ok" aria-hidden="true"></span>사내망 · 백엔드 DB 저장
       </div>
-      <p class="mt-2 text-xs leading-5 text-blue-700">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
+      <p class="mt-2 text-xs leading-5 text-sub">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
     </div>`
 }
