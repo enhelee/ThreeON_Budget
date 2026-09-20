@@ -12,6 +12,7 @@
 - **프로세스 하나(6-8, #28·#29)**: Caddy·supervisord·Streamlit·`forecast/` 삭제. uvicorn 이 `$PORT` 를 직접 연다. Caddy 가 내던 보안 헤더 3종·gzip·`/assets` immutable 은 `server.py` 미들웨어로 인계(`test_http_hardening.py`). 실측 함정: GZip 은 BaseHTTPMiddleware **안쪽**이어야 `minimum_size` 가 산다. budget_app 의 레거시 Streamlit UI(`app.py`)도 삭제.
 - **사내 이관 패키지(6-9, #31)**: `deploy/onprem/{build_image,load_and_run,check}.{sh,ps1}` + [사내이관_가이드.md](사내이관_가이드.md). 오프라인 서버에서는 절대 빌드하지 않는다(`--no-build`·`pull_policy: never`). Dockerfile `ARG APP_COMMIT` 으로 사내에서도 `/healthz` commit. 실제 Docker 실행은 사용자 PC 에서 첫 검증 예정.
 - **문서 통합(6-10)**: 계약 문서 4개 → [연계계약_CONTRACT.md](연계계약_CONTRACT.md). 배포가이드·보안설계·체크리스트를 6-8 이후 상태로. 이 CHANGELOG 와 `팀프로젝트_통합_README_2026-09-08` 은 역사 문서로 두고 안내만 붙였다.
+- **Phase 7 (2026-09-21)**: v2 잔재 삭제(`/api/export-team`·`export-status`·`spec_io`·`v2_model_sync`·화면 패널) · `HEAD /` 허용 · 5번 탭 하위 탭 딥링크(`#/forecast/bench|table`) · `#/detail/<지사>` 첫 진입 딥링크 버그 수정 · 팀 문서 최신화(MASTER·HANDOFF·실행가이드·README·체크리스트) · **[팀공유_최종안내.html](팀공유_최종안내.html)**(캡처 10장). 테스트 269.
 - 운영 교훈: Render Auto-Deploy 가 안 걸려 매번 Manual Deploy · 첫 Manual Deploy 가 옛 커밋을 띄운 적 있음 → **배포 판별은 `/healthz` 의 `commit`** 으로.
 
 ---

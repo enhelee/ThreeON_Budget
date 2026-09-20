@@ -28,11 +28,16 @@ import { renderStats } from "./views/stats.js"
 const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "branches",
                    detail: "detail", stats: "stats", forecast: "forecast", settings: "settings"};
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
+// 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
+// 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
+const FC_TABS = ["manage", "bench", "table"];
 
 /** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
 export function viewHash(view, branch) {
   const h = VIEW_HASH[view] || "home";
-  return h === "detail" && branch ? `#/detail/${encodeURIComponent(branch)}` : `#/${h}`;
+  if (h === "detail" && branch) return `#/detail/${encodeURIComponent(branch)}`;
+  if (h === "forecast" && state.fc.tab && state.fc.tab !== "manage") return `#/forecast/${state.fc.tab}`;
+  return `#/${h}`;
 }
 
 /** 주소 조각 → {view, branch}. 모르는 주소면 null. */
@@ -45,7 +50,8 @@ export function parseHash(hash = location.hash) {
   if (view === "detail" && m[2]) {
     try { branch = decodeURIComponent(m[2]); } catch { branch = m[2]; }
   }
-  return {view, branch};
+  const tab = view === "forecast" && FC_TABS.includes(m[2]) ? m[2] : "";
+  return {view, branch, tab};
 }
 
 /** 현재 state 에 맞춰 주소를 갱신한다(화면 전환을 navigate 밖에서 한 경우용). */
@@ -61,15 +67,16 @@ export function onHashChange() {
   const t = parseHash();
   if (!t) { syncHash({replace: true}); return; }   // 모르는 주소는 지금 화면으로 되돌린다
   const same = t.view === state.view &&
-               (t.view !== "detail" || t.branch === state.det.branch);
+               (t.view !== "detail" || t.branch === state.det.branch) &&
+               (t.view !== "forecast" || (t.tab || "manage") === (state.fc.tab || "manage"));
   if (same) return;                               // navigate() 가 방금 맞춘 주소 — 할 일 없음
-  navigate(t.view, {branch: t.branch});
+  navigate(t.view, {branch: t.branch, tab: t.tab});
 }
 
 /** 첫 진입: 주소에 화면이 적혀 있으면 그 화면으로, 없으면 홈으로. */
 export function bootRoute() {
   const t = parseHash();
-  return t ? navigate(t.view, {branch: t.branch}) : navigate("home");
+  return t ? navigate(t.view, {branch: t.branch, tab: t.tab}) : navigate("home");
 }
 
 export function renderPage() {
@@ -106,6 +113,12 @@ export async function navigate(view, opts = {}) {
   // 3+ 상세는 주소가 지사까지 담는다. 주소에서 온 호출("branch" 키가 있는 경우)은
   // 그 값이 곧 진실이다 - 지사가 적혀 있으면 불러오고, 비어 있으면 선택을 푼다.
   // 키가 없는 내부 호출(changeYear 등)은 보던 지사를 그대로 둔다.
+  // ⚠ 주소로 바로 들어온 첫 진입(#/detail/동탄지사)은 아직 연도가 없다 — 연도 없이 상세를 부르면
+  //   /api/branch-detail?year= 로 실패해 «지사를 선택하세요» 화면이 뜬다(딥링크 실측 2026-09-21).
+  //   상세를 부르기 전에 연도 목록부터 확보한다.
+  if (view === "detail" && opts.branch && !state.year) {
+    try { await loadOverview(); } catch (e) { toast(e.message); }
+  }
   if (view === "detail" && "branch" in opts && opts.branch !== state.det.branch) {
     if (opts.branch) {
       try { await loadDetail(opts.branch); }
@@ -114,6 +127,9 @@ export async function navigate(view, opts = {}) {
       state.det = {...state.det, branch: "", data: null, open: new Set(), sel: new Set(),
                    selBudget: null, editKey: null, delKey: null};
     }
+  }
+  if (view === "forecast" && opts.tab && FC_TABS.includes(opts.tab) && opts.tab !== state.fc.tab) {
+    state.fc.tab = opts.tab; state.fc.preview = null;   // 주소에서 온 하위 탭 — 미리보기는 탭마다 다르니 비운다
   }
   state.view = view;
   syncHash();

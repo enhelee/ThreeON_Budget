@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>예산·실적 분석 시스템 — 팀 공유 안내</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --brand:#1d4ed8; --brand-soft:#dbeafe; --warn:#b45309; --warn-soft:#fef3c7; --ok:#047857; --ok-soft:#d1fae5; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.65 -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", Roboto, sans-serif; }
+  header { background:linear-gradient(120deg,#0f172a,#1e3a8a); color:#fff; padding:40px 24px 32px; }
+  header .in { max-width:1080px; margin:0 auto; }
+  header h1 { margin:0 0 8px; font-size:28px; letter-spacing:-.01em; }
+  header p { margin:0; opacity:.85; }
+  header .meta { display:flex; flex-wrap:wrap; gap:16px 28px; margin-top:20px; font-size:13px; opacity:.9; }
+  header .meta b { display:block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; opacity:.7; }
+  main { max-width:1080px; margin:0 auto; padding:24px 16px 80px; }
+  nav.toc { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:0 0 28px; display:flex; flex-wrap:wrap; gap:6px 18px; font-size:14px; }
+  nav.toc a { color:var(--brand); text-decoration:none; }
+  section { margin:0 0 40px; }
+  h2 { font-size:21px; margin:0 0 12px; padding-top:8px; letter-spacing:-.01em; }
+  h2 small { font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.08em; display:block; margin-bottom:2px; }
+  h3 { font-size:16px; margin:22px 0 8px; }
+  p { margin:0 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
+  .grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .kpi b { display:block; font-size:22px; letter-spacing:-.01em; }
+  .kpi span { color:var(--muted); font-size:13px; }
+  figure { margin:14px 0 6px; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  figure img { display:block; width:100%; height:auto; }
+  figcaption { padding:10px 14px; font-size:13px; color:var(--muted); border-top:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; font-size:14px; }
+  th, td { padding:9px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { background:#f1f5f9; font-weight:700; font-size:13px; }
+  tr:last-child td { border-bottom:0; }
+  code { background:#eef2ff; padding:1px 6px; border-radius:6px; font-size:.92em; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:700; }
+  .ok { background:var(--ok-soft); color:var(--ok); } .warn { background:var(--warn-soft); color:var(--warn); } .brand { background:var(--brand-soft); color:var(--brand); }
+  .flow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-weight:600; }
+  .flow span { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .flow i { color:var(--muted); font-style:normal; }
+  .callout { border-left:4px solid var(--brand); background:var(--brand-soft); padding:12px 16px; border-radius:0 10px 10px 0; margin:12px 0; }
+  .callout.warn { border-color:var(--warn); background:var(--warn-soft); }
+  ol, ul { padding-left:22px; margin:0 0 10px; }
+  li { margin:3px 0; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding:20px; }
+  @media (max-width:640px){ header{padding:28px 16px 22px} header h1{font-size:22px} th,td{padding:7px 8px} }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <h1>발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지, 앱 하나</h1>
+  <p>지사 19곳의 예산계획과 SAP 실적 전표를 자동으로 맞춰 보고, 마감된 연도의 실적으로 정비등급별 표준금액과 2026~2035년 소요를 전망하는 팀 시스템입니다. 이 문서는 «무엇을 하고 · 어떻게 쓰고 · 어디까지 검증됐고 · 무엇이 남았나»를 30분 안에 파악하기 위한 안내입니다.</p>
+  <div class="meta">
+    <div><b>주소</b>https://threeon-budget.onrender.com</div>
+    <div><b>기준일</b>2026-09-21 (Phase 7)</div>
+    <div><b>상태</b>1~5단계 완성 · 테스트 269 passed · 배포 운영 중</div>
+    <div><b>단위</b>화면 천원</div>
+  </div>
+</div></header>
+
+<main>
+<nav class="toc">
+  <a href="#what">① 무엇인가</a><a href="#login">② 접속</a><a href="#screens">③ 화면별 사용법</a><a href="#year">④ 한 해 운영 흐름</a><a href="#verify">⑤ 검증 현황</a><a href="#limits">⑥ 알려진 한계</a><a href="#next">⑦ 남은 일</a><a href="#docs">⑧ 문서 지도</a>
+</nav>
+
+<section id="what">
+  <h2><small>SECTION 01</small>무엇을 하는 시스템인가</h2>
+  <div class="card">
+    <div class="flow"><span>① 예산 계획</span><i>→</i><span>② 실적 집계·사업 매칭</span><i>→</i><span>③ 검토·확정·마감</span><i>→</i><span>④ 예산 표준화</span><i>→</i><span>⑤ 중장기 전망 26~35</span></div>
+    <p style="margin-top:14px">계획본(양식1)과 ERP 전표(zrfm2)를 올리면 전표 하나하나를 계획 사업에 자동으로 귀속시키고(총액 유실 0), 사람이 검토·확정한 결과를 학습해 다음 해에 더 잘 맞춥니다. 확정된 연도를 <b>마감</b>하면 그 실적이 그대로 3·4단계(표준화·중장기 전망)의 입력이 됩니다 — 파일을 옮기거나 다른 프로그램을 열 필요가 없습니다.</p>
+    <p>2026-09-20 까지의 변화: 동료가 만든 별도 전망 앱(v2)을 이 앱의 5번 탭으로 흡수했고, 서버는 프로세스 하나(uvicorn)로 정리됐으며, 인터넷이 없는 사내 서버에 올리는 절차까지 준비됐습니다.</p>
+  </div>
+</section>
+
+<section id="login">
+  <h2><small>SECTION 02</small>접속과 로그인</h2>
+  <div class="card">
+    <ol>
+      <li><b>https://threeon-budget.onrender.com</b> 을 엽니다. 무료 호스팅이라 15분간 아무도 안 쓰면 잠듭니다 — <b>첫 접속은 30~60초</b> 걸릴 수 있습니다. 회의 전에 한 번 열어 깨워 두세요.</li>
+      <li>로그인 화면에 <b>작업자 이름</b>(실명 또는 팀 내 고정 별명)과 <b>팀 공용 비밀번호</b>(관리자에게 비밀 메모로 받음)를 넣습니다. 이름은 모든 변경 이력에 기록됩니다.</li>
+      <li>왼쪽 메뉴가 곧 업무 순서입니다. 화면마다 주소가 있어(<code>/#/branches</code>, <code>/#/detail/동탄지사</code>, <code>/#/forecast/table</code> …) 링크로 공유하면 상대도 같은 화면을 봅니다.</li>
+    </ol>
+    <div class="callout warn">비밀번호·주소를 메신저 일반 채팅이나 이메일 본문에 적지 마세요. 저장소는 공개 상태이므로 저장소 링크가 아니라 <b>이 문서와 배포 주소</b>만 공유합니다.</div>
+  </div>
+</section>
+
+<section id="screens">
+  <h2><small>SECTION 03</small>화면별 사용법</h2>
+
+  <h3>메인 — 오늘 기준 현황과 다음 할 일</h3>
+  <figure><img src="img/share/home.png" alt="메인 화면"><figcaption>연도별 손익·자본 집행률, 미배정 전표, 마감 상태, 시스템 상태(DB 종류·리비전). 숫자는 전부 DB 실측치이며 카드를 누르면 해당 단계로 이동합니다.</figcaption></figure>
+
+  <h3>1 예산 계획 — 계획본 등록</h3>
+  <figure><img src="img/share/plan.png" alt="예산 계획 화면"><figcaption>연도를 고르고 사업별예산(양식1(월별)) xlsx 를 올리면 행 단위로 DB 에 흡수됩니다. 원본 파일은 서버에 남지 않습니다. 마감된 연도는 업로드가 차단됩니다.</figcaption></figure>
+
+  <h3>2 실적 집계 — zrfm2 업로드와 자동 매칭</h3>
+  <figure><img src="img/share/collect.png" alt="실적 집계 화면"><figcaption>SAP 에서 추출한 zrfm2 원본 그대로 올리고 <b>분석 실행</b>(손익·자본 한 번에, 16~19초). 합계행·타연도 전표는 자동으로 걸러지고, 이전에 학습한 확정 매칭이 자동 적용됩니다.</figcaption></figure>
+
+  <h3>3 실적 분석 — 전체 지사 현황</h3>
+  <figure><img src="img/share/branches.png" alt="실적 분석 화면"><figcaption>지사별 계획·실적·집행률·검토대상 건수. 지사를 누르면 상세로 갑니다.</figcaption></figure>
+
+  <h3>3+ 실적분석(상세) — 사람이 검토·확정하는 곳</h3>
+  <figure><img src="img/share/detail.png" alt="실적분석 상세 화면"><figcaption>지사의 사업별 실적과 귀속 전표. 재배정·✎수정·삭제·추가 뒤 상단 <b>분석 반영 (N)</b>. 저확신 매칭은 노란 배지로 표시됩니다. 확정한 것은 설정의 AI 학습으로 다음 해에 반영됩니다.</figcaption></figure>
+
+  <h3>4 통계·내보내기 — 재무팀 산출물</h3>
+  <figure><img src="img/share/stats.png" alt="통계 내보내기 화면"><figcaption>과목별 계획 대비 실적, 지사그룹별 집행. <b>실적 Excel</b>(재무팀 «계획 대비 실적» 양식) · <b>zrfm2_V1</b>(원본 + 매칭사업명·확신도·반영구분 열) · <b>matched CSV</b>(전표 단위, 감사 추적용).</figcaption></figure>
+
+  <h3>5 중장기 예측 — 기준정보(가정) · 표준화(3단계) · 중장기 전망(4단계)</h3>
+  <figure><img src="img/share/forecast.png" alt="기준정보 탭"><figcaption><b>기준정보(가정)</b> — 정비등급 이력·정기점검 일정·고온부품·본사배분·팩터·돌발사업. 전망 기준연도(예: 2026)마다 한 벌씩 저장되므로 내년 전망을 시작해도 올해 가정이 남습니다. 양식을 내려받아 채워 다시 올리는 왕복이 기본 사용법입니다.</figcaption></figure>
+  <figure><img src="img/share/forecast_bench.png" alt="표준화 탭"><figcaption><b>표준화(3단계)</b> — 마감 연도(2023·2025)의 실적 2,467행 → (지사×예산과목×정비등급) 표준금액 203행. 산출방식은 실적 패턴으로 자동 추천되고 «추천사유»에 근거가 적힙니다. 방식·금액을 고치면 «사용자지정/수동수정»으로 고정됩니다.</figcaption></figure>
+  <figure><img src="img/share/forecast_table.png" alt="중장기 전망 탭"><figcaption><b>중장기 전망(4단계)</b> — 2026~2035년, 전사 합계 또는 지사별. 기준연도는 계획본(있으면)+본사배분, 이후는 표준금액×팩터 복리 + 고온부품·임시·돌발사업. 재무팀 양식(표준화·중장기예산·일정·고온부품·본사배분 5종)으로 내보내며 «26년» 라벨은 기준연도에 맞춰 자동 재기준화됩니다.</figcaption></figure>
+
+  <h3>설정 — 변경 이력 · AI 학습 · 연도 마감 · 연도별 기준정보 · 모델</h3>
+  <figure><img src="img/share/settings.png" alt="설정 화면"><figcaption>공용 비밀번호 체계에서 «누가·언제·무엇을» 바꿨는지의 근거(감사 로그). 연도별 지사·과목·별칭 구성(전년 복사 가능), 분류 모델 레지스트리(버전·롤백)도 여기 있습니다.</figcaption></figure>
+</section>
+
+<section id="year">
+  <h2><small>SECTION 04</small>한 해를 돌리는 순서</h2>
+  <div class="card">
+    <ol>
+      <li><b>설정 → 연도별 기준정보</b>: 새 연도의 지사·과목 구성 확인(전년 복사).</li>
+      <li><b>1 예산 계획</b>: 사업별예산 업로드 → 계획본 내려받기.</li>
+      <li><b>2 실적 집계</b>: 계획본 + zrfm2 업로드 → 분석 실행.</li>
+      <li><b>3+ 상세</b>: 재배정·수정·삭제·추가 → 분석 반영. 메인의 «다음 할 일»이 미배정·미반영을 알려 줍니다.</li>
+      <li><b>설정</b>: AI 학습 → 검토가 끝나면 <b>연도 마감</b>(수정 잠금 + 산출물 증빙 보관). 마감된 연도만 5번 탭의 입력이 됩니다.</li>
+      <li><b>4 통계·내보내기</b>: 재무팀 실적본·재검토본.</li>
+      <li><b>5 중장기 예측</b>: 기준연도 선택 → 기준정보 입력 → 표준화 확인 → 전망 → 양식 5종 내보내기.</li>
+    </ol>
+    <div class="callout">분석 후 <b>첫 다운로드는 20~30초</b>(산출물은 그때 생성). 두 번째부터는 즉시. 5번 탭 입력값은 전부 DB 에 있어 배포·재시작에도 남습니다.</div>
+  </div>
+</section>
+
+<section id="verify">
+  <h2><small>SECTION 05</small>어디까지 검증됐나</h2>
+  <div class="grid">
+    <div class="kpi"><b>269 passed</b><span>자동 테스트 (계산·API·배포 구성·문서)</span></div>
+    <div class="kpi"><b>2023 · 2025</b><span>실데이터 전 과정 검증 — 미매핑 0, 종합표 = ERP 전체</span></div>
+    <div class="kpi"><b>−0.06%</b><span>2023 손익, 수기 분석본 대비</span></div>
+    <div class="kpi"><b>10,888건</b><span>확정 매칭 학습 데이터</span></div>
+  </div>
+  <table style="margin-top:14px">
+    <tr><th style="width:26%">항목</th><th>근거</th></tr>
+    <tr><td>총액 보존 불변식</td><td>실적본 종합표 총액 + 미반영 + 타예산 = zrfm2 이번 예산 전체(유실 0). 회귀 테스트의 기준.</td></tr>
+    <tr><td>3·4단계 계산 동일성</td><td>동료 v2 앱의 테스트 33개를 그대로 옮겨 같은 결과임을 증명. 2023 역산 기준선 고정.</td></tr>
+    <tr><td>DB 이전</td><td>SQLite ↔ PostgreSQL 금액열 8종 차이 0(원 단위). 운영은 Supabase PostgreSQL.</td></tr>
+    <tr><td>배포</td><td>Render 컨테이너 1개(uvicorn). 보안 헤더·자산 캐시·gzip 을 앱이 직접 냄 — 배포 응답에서 실측.</td></tr>
+    <tr><td>사내 반입 스크립트</td><td>Docker 대역 시뮬레이션으로 bash·PowerShell 전 구간 + 부정 경로 5건 통과. 실제 Docker 실행은 사내 PC 에서 1회 남음.</td></tr>
+  </table>
+</section>
+
+<section id="limits">
+  <h2><small>SECTION 06</small>알려진 한계 — 숫자를 읽을 때 꼭 알아야 할 것</h2>
+  <table>
+    <tr><th style="width:26%">한계</th><th>의미</th><th style="width:22%">계획</th></tr>
+    <tr><td><span class="pill warn">표본 2개년</span></td><td>표준금액이 마감 연도 2개(2023·2025)로만 산출됩니다. «변동계수»는 두 값의 비율에 가깝고, 표본이 얇은 칸을 지사그룹·전사 값으로 대체하는 <b>계층적 후퇴</b>는 아직 없습니다.</td><td>동료 합의 후 별도 단계(대외 수치가 바뀜)</td></tr>
+    <tr><td><span class="pill warn">정비등급 이력 비어 있음</span></td><td>등급 이력을 넣기 전까지 모든 지사가 «표준» 등급 하나로 계산됩니다. 등급별 표준금액은 이력을 가져오면 살아납니다.</td><td>5번 탭 기준정보에서 양식 업로드</td></tr>
+    <tr><td><span class="pill warn">팩터 없는 순진 예측의 오차</span></td><td>한 해로 다른 해를 예측하면 2023→2025 실제 증가(+15.9%)를 못 따라갑니다 — 물가·물량 팩터가 4단계에서 채워야 할 몫입니다.</td><td>팩터 입력·재추정(실적 3~4개년 축적 후)</td></tr>
+    <tr><td><span class="pill brand">건설공사 3과목</span></td><td>zrfm2 에 실적 계정이 없어 실적 산출물에서 제외(계획에는 유지). 전망에서 0 으로 나오는 이유입니다.</td><td>별도 실적 소스 확보 시</td></tr>
+    <tr><td><span class="pill brand">무료 호스팅</span></td><td>15분 유휴 후 잠듦(첫 접속 30~60초). 데이터는 외부 DB(Supabase)에 있어 사라지지 않습니다.</td><td>사내 서버 이관으로 소멸</td></tr>
+    <tr><td><span class="pill brand">공용 비밀번호</span></td><td>개인 계정이 아니라 팀 비밀번호 1개 + 작업자 이름. 이름은 자기 신고라 감사 로그의 근거는 «신뢰»입니다.</td><td>사내 이관 시 인증 정책과 함께</td></tr>
+  </table>
+</section>
+
+<section id="next">
+  <h2><small>SECTION 07</small>남은 일과 담당</h2>
+  <table>
+    <tr><th style="width:44%">항목</th><th style="width:16%">담당</th><th>비고</th></tr>
+    <tr><td>Supabase 계정 2단계 인증</td><td>관리자</td><td>DB 자체 접근 권한 — 가장 중요</td></tr>
+    <tr><td>저장소 공개 상태 정리(실데이터 파일·private 전환)</td><td>관리자</td><td>보류 중. 그때까지 저장소 링크는 공유하지 않음</td></tr>
+    <tr><td>Docker 있는 PC 에서 사내 반입 스크립트 1회 실행</td><td>관리자</td><td>결과를 사내이관_가이드 §9 에 기록</td></tr>
+    <tr><td>표준금액 계층적 후퇴(표본 2개년 한계)</td><td>동료 합의 → 개발</td><td>대외 수치가 바뀌므로 합의 먼저</td></tr>
+    <tr><td>정비등급 이력·정기점검 일정 입력</td><td>담당 팀원</td><td>5번 탭 기준정보 양식</td></tr>
+    <tr><td>사내 서버 이관(데이터 이전 · 개인 계정)</td><td>일정 확정 후</td><td>절차·스크립트 준비 완료</td></tr>
+  </table>
+</section>
+
+<section id="docs">
+  <h2><small>SECTION 08</small>문서 지도 (저장소 <code>docs/</code>)</h2>
+  <table>
+    <tr><th style="width:34%">문서</th><th>언제 보나</th></tr>
+    <tr><td>팀원_실행가이드.md</td><td>손에 쥐고 쓰는 순서 · 자주 묻는 것 · 각자 PC 실행</td></tr>
+    <tr><td>통합_인수인계_MASTER.md</td><td>개발자 진입점 — 분석 로직·DB·API·주의사항 (상단 현행화 블록부터)</td></tr>
+    <tr><td>연계계약_CONTRACT.md</td><td>앱이 받고 내는 파일의 스키마·단위·명명 규칙</td></tr>
+    <tr><td>배포가이드.md · 사내이관_가이드.md · 보안설계.md</td><td>운영·이관·보안</td></tr>
+    <tr><td>학습데이터_모델_관리.md · DB_스냅샷.md</td><td>분류 모델·학습데이터 · DB 스키마와 현재 데이터</td></tr>
+    <tr><td>변경이력_CHANGELOG.md · superpowers/(설계·계획)</td><td>왜 이렇게 만들었나 — 의사결정 이력</td></tr>
+  </table>
+</section>
+</main>
+<footer>ThreeON 예산 팀 · 2026-09-21 · 이 문서는 저장소 docs/팀공유_최종안내.html 에서 관리합니다.</footer>
+</body>
+</html>

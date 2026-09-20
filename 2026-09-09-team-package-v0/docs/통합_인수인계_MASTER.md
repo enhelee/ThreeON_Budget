@@ -1,21 +1,18 @@
 # 예산·실적 분석 시스템 — 통합 인수인계 MASTER
 
 > **이 문서가 진입점입니다.** 다른 컴퓨터에서 Claude Code로 이 프로젝트를 분석·통합할 때 이 파일부터 읽으세요.
-> 작성: 2026-08-04 (rev13) · 상태: **1·2단계(계획·실적분석) + 웹 시스템 완성, 테스트 71 passed**
+> 작성: 2026-08-04 (rev13) · **현행화 2026-09-21 (Phase 7)** · 상태: **1~5단계(계획·실적·분석·통계·전망) 웹 앱 하나, 테스트 269 passed, Render 배포 운영 중**
 >
-> **[rev14 · 2026-09-08 팀 병합]** 팀 전체(두 앱) 진입점은 **`팀프로젝트_통합_README_2026-09-08.md`**. 이 문서는 budget_app 전용.
-> - **[2026-09-20]** 3·4단계는 Phase 6 로 이 앱의 5번 탭이 됐다(`/api/forecast/*`, 마감 연도 `biz_line` 을 DB 에서 직접). 아래 두 줄은 2026-09-08 당시 기록 — 동료 앱은 6-8 에서 삭제됐고 결과 JSON 은 소비자 없이 계약만 남았다([연계계약_CONTRACT.md](연계계약_CONTRACT.md) §3.4).
-> - (당시) 3·4단계(표준화·중장기 26~35년)는 동료 앱 `../예산예측프로그램_팀공유_v2/`(테스트 183)가 담당.
->   budget_app은 「4 통계·내보내기 → 팀 연계 → 결과 JSON」(`GET /api/export-team?year=&kind=json|matched|budget|data`)으로
->   손익·자본 매칭 결과를 v2 「사업 실적 연결」에 넘긴다(계약: `연계계약_CONTRACT.md §3.4`, 구현: `spec_io.build_team_result_json`,
->   `pipeline_db.export_team_bundle`). 2023·2025 실데이터 검증 통과(미배정 0), 테스트 **77 passed**.
-> - §10 로드맵의 3·4단계 항목은 **v2 구현으로 대체**(우리 `설계_3-4단계_…md`는 개선 제안으로 격하). 아래 본문 수치·구조는 rev13 그대로 유효.
+> **[2026-09-21 · Phase 6·7 이후 읽는 법]** 아래 본문은 rev13(2026-08-04) 기준으로 쓴 것이라 **분석 로직(§4)·DB(§5)·총액 보존 불변식·주의사항(§9)은 그대로 유효**하지만, 다음은 달라졌다:
+> - **앱은 하나다.** 3·4단계(표준화·중장기 전망)는 Phase 6(2026-09-19~20)에서 동료 전망 앱(v2)을 흡수해 **5번 탭**이 됐다(`/api/forecast/*`, 입력은 마감 연도의 `biz_line` 을 DB 에서 직접). v2 앱·Caddy·Streamlit·supervisord 는 삭제됐고 컨테이너는 uvicorn 하나다.
+> - **v2 로 넘기던 것은 전부 사라졌다.** 결과 JSON·CSV(`/api/export-team`)·`spec_io`·`v2_model_sync` 는 Phase 7 에서 삭제. 계약은 [연계계약_CONTRACT.md](연계계약_CONTRACT.md) 하나.
+> - **프론트는 Vite SPA**(`app/web/src/`, 빌드 산출 `app/static/`) — §7 의 `webapp/index.html`·CSS 함정은 Phase 1 이전 이야기다. 지금은 Tailwind 를 정상 빌드한다.
+> - **구성(지사·과목·별칭)은 파일이 아니라 DB**(연도별 기준정보, `config_store`). §2 의 `config/*.json` 은 없다.
+> - **DB 는 SQLite 또는 PostgreSQL**(`DATABASE_URL`, `dbcore`). 운영은 Supabase PG, 사내 이관은 [사내이관_가이드.md](사내이관_가이드.md).
+> - 인증·감사(`auth.py`, `audit_log`)·모델 레지스트리(`ml_registry.py`)·마감(`year_lock`)은 rev15~ 에 추가됐고 유효.
+> - 팀원용 요약은 [팀공유_최종안내.html](팀공유_최종안내.html)(Phase 7), 실행법은 [팀원_실행가이드.md](팀원_실행가이드.md).
 >
-> **[rev15 · 2026-09-09 배포 준비]** 테스트 **87 passed**. 새 모듈 `src/budget/auth.py`(공용 비밀번호+작업자 이름 세션, `audit_log`),
-> `dbcore.py`(`DATABASE_URL` PostgreSQL 전환 — sqlite SQL 번역, PG 실서버 미검증 → `scripts/db_check.py`), `ml_registry.py`(모델 버전·BLOB·학습데이터·스냅샷,
-> `scripts/v2_model_sync.py`). `server.py`에 `AuthAuditMiddleware`·`/api/login|audit|models|train|training*`·`/healthz`·`/site`. 환경변수 `APP_PASSWORD SECRET_KEY
-> SESSION_HOURS COOKIE_SECURE DATABASE_URL DATA_DIR CONFIG_DIR OUT_DIR SITE_DIR`(`.env`, gitignore). 배포 구성 `../deploy/`(단일 이미지·Compose·Render), 소개 사이트 `../site/`.
-> 문서: `배포가이드.md` `보안설계.md` `학습데이터_모델_관리.md` `팀원_실행가이드.md`. 프론트 §7 CSS 함정은 그대로 — 로그인/감사/레지스트리 UI는 직접 CSS(`.login-*`, `.operator-badge`, `.audit-*`, `.mono`)로 추가.
+> **[rev14 · 2026-09-08 팀 병합 / rev15 · 2026-09-09 배포 준비]** 당시 기록은 [변경이력_CHANGELOG.md](변경이력_CHANGELOG.md) 참조.
 
 ---
 
@@ -57,7 +54,7 @@ py -m pytest -q                             # 71 passed 확인
 **목적**: 발전플랜트 유지보수 예산의 4단계 자동화
 ① 예산 계획 수립 → ② 실적 집계·사업 매칭 → ③ 예산 표준화(벤치마크) → ④ 중장기(10개년) 예측
 
-**현재 구현**: ①·② 완성 + 검토·수정·학습 웹 시스템. ③·④는 미구현(다년도 확정 DB가 쌓이면 착수).
+**현재 구현**: ①~④ 전부 — 검토·수정·학습 웹 시스템 + 5번 탭 표준화·중장기 전망(Phase 6). 표본은 마감 연도 2개(2023·2025)라 얇다 — 알려진 한계.
 
 **검증 상태**: 23년(수기 분석본 대비 손익 −0.06%)·25년 실데이터로 전 과정 검증.
 23·25년 모두 **미매핑 0 · 종합표 = ERP 전체**로 마무리, 확정 결과 학습 완료(10,888건).
@@ -67,43 +64,29 @@ py -m pytest -q                             # 71 passed 확인
 
 ---
 
-## 2. 디렉토리 구조
+## 2. 디렉토리 구조 (2026-09-21 현재 — 저장소 `2026-09-09-team-package-v0/`)
 
 ```
-중장기 예산 소요 전망/
-├─ 통합_인수인계_MASTER.md      ★ 이 문서 (진입점)
-├─ 변경이력_CHANGELOG.md        ★ rev1~rev12 전체 개발 이력 (상세)
-├─ 알고리즘_명세.html            ★ 규칙 R1~R12 시각 문서 (오프라인 열람)
-├─ PRD.html / PRD_V1.html        4단계 비전 PRD (V1이 개정본)
-├─ 연계계약_CONTRACT.md          ★ 앱이 받고 내는 파일·인터페이스 계약 — 옛 연계규격·연동규격·통합가이드·필드매핑 4개 통합(2026-09-20)
-├─ 팀프로젝트_통합_README_2026-09-08.md   ★ 팀 전체(두 앱) 진입점 (rev14)
-├─ 비교분석_및_병합_보고서_2026-09-08.md   GitHub 팀 저장소 ↔ 로컬 비교·병합 근거 (rev14)
-├─ 예산예측프로그램_팀공유_v2/   동료 앱(3·4단계 담당, GitHub 2026-09-08_팀공유_v2 그대로) + checkpoint_data/(우리 JSON 연결 결과)
-├─ 예산예측프로그램_v2_실행(로컬).bat   v2를 현재 PC Python으로 실행
-├─ 팀자료_2026-09-08/            매칭도구 소스(codex)·저장소 실행방법·[3조] 진행문서
-├─ 업로드용_ThreeON_Budget_2026-09-08_팀통합/   GitHub 재업로드 패키지(실데이터 제외)
-└─ budget_app/                   ★ 애플리케이션 본체
-   ├─ server.py                  FastAPI 백엔드 (API 전체) — 기본 실행 대상
-   ├─ app.py                     [레거시] Streamlit UI — 참고용, 유지보수 안 함
-   ├─ 분석프로그램_실행.bat       uvicorn 기동 + 브라우저 오픈
-   ├─ requirements.txt / pytest.ini
-   ├─ data/budget.db             ★★ 모든 데이터 (SQLite, 스키마는 §5)
-   ├─ config/                    지사·과목 구성 + 별칭 (연도별 JSON)
-   ├─ webapp/
-   │  ├─ index.html              ★ 프론트 SPA — **서버가 서빙하는 실제 파일(수정은 여기)**
-   │  └─ body.template.html      index.html의 <body> 사본(동기화 필요, §7)
-   ├─ budget-analysis-prototype.html  디자인 원본(CSS 출처)
-   ├─ src/budget/                분석 엔진 (§4)
-   ├─ tests/                     pytest 68건
-   ├─ scripts/
-   │  ├─ make_db_snapshot.py     DB 문서화 → docs/DB_스냅샷.md
-   │  └─ db_정리.py              과거 실행 이력 정리(용량 축소)
-   ├─ docs/DB_스냅샷.md          ★ 현재 DB 내용 전체 문서 (스키마·데이터·기준치)
-   ├─ output/                    분석 산출물 Excel/CSV (+ 마감/{연도}/ 스냅샷)
-   └─ templates/                 계획 업로드용 빈 템플릿
+2026-09-09-team-package-v0/
+├─ README.md                    저장소 진입점 · 로컬 실행 · 배포
+├─ .env.example                 환경변수 예시 (로컬은 app/.env, Docker 는 루트 .env)
+├─ app/                         ★ 애플리케이션 본체 (FastAPI + Vite SPA)
+│  ├─ server.py                 API 전체 + 정적 서빙 + 보안 헤더·gzip 미들웨어
+│  ├─ src/budget/               도메인 로직 — normalize·matching·pipeline_* · db/dbcore · auth · config_store ·
+│  │                            ml_registry · benchmark·forecast_calc·forecast_store·pipeline_forecast·
+│  │                            forecast_import·forecast_export·api_forecast (5번 탭)
+│  ├─ web/src/                  프론트 원본 (views/ 10화면 · router · data · state)
+│  ├─ static/                   빌드 산출물 — 커밋하지 않음 (npm run build)
+│  ├─ templates/                내장 양식 3종 (사업별예산 · 표준화 · 중장기예산)
+│  ├─ tests/                    pytest 269
+│  ├─ scripts/                  db_check(PG 접속·이전) · db_정리 · make_db_snapshot · make_business_template
+│  └─ data/ output/ .env        로컬 상태·비밀 — 커밋하지 않음
+├─ deploy/                      Dockerfile · entrypoint.sh · docker-compose.yml · requirements.txt · onprem/(사내 반입 스크립트)
+└─ docs/                        이 문서 · 연계계약_CONTRACT · 배포가이드 · 사내이관_가이드 · 보안설계 · 팀원_실행가이드 ·
+                                학습데이터_모델_관리 · DB_스냅샷 · 변경이력_CHANGELOG · 팀공유_최종안내.html · superpowers/(설계·계획)
 ```
 
----
+옛 트리(바탕화면 `중장기 예산 소요 전망/` 의 `budget_app/`·`webapp/`·`config/`·v2 폴더)는 rev13 시절 것으로, 저장소로 옮기며 위 구조가 됐다.
 
 ## 3. 아키텍처
 
@@ -314,20 +297,23 @@ sed -n '/<body/,$p' webapp/index.html | sed '/^<\/html>$/d' \
 12. 23년 zrfm2에는 계정 60602015(외주비-열원정기점검)가 없음 — A급정비 실적은 ERP 재추출 필요.
 13. 건설공사 3과목(외주비-열원공사비 등)은 zrfm2 범위 밖 → `실적반영:false` 유지.
 
-## 10. 다음 단계 로드맵 (미구현)
+## 10. 다음 단계 (2026-09-21 기준)
 
-- **3단계 예산 표준화**: 확정 다년도 biz_line/matched CSV → (지사×정비등급×투자유형×과목) 벤치마크
-- **4단계 중장기 예측**: 표준금액 × 물가·노후화 팩터 → 10개년 전망 (웹 '5 중장기 예측' 자리 마련됨)
-- 투자유형 분류(8종)는 동료 앱 담당이었고 그 앱이 사라짐 — 결말은 `연계계약_CONTRACT.md` §7
+3·4단계는 **구현 완료**(Phase 6). 남은 것은 운영·정밀화다:
+
+- **표본 2개년의 한계** — 표준금액이 마감 연도 2개(2023·2025)로만 산출된다. 설계서 §2.4 의 계층적 후퇴(지사그룹·전사 대체)는 아직 없다 → 동료 합의 후 별도 Phase(대외 수치가 바뀜).
+- **정비등급 이력** — 5번 탭 가져오기로 넣기 전까지 등급 «표준» 하나로 후퇴한다.
+- **사내 이관** — 절차·스크립트 준비됨([사내이관_가이드.md](사내이관_가이드.md)), 실제 Docker 실행과 Supabase→사내 PG 이전은 일정 확정 후.
+- 개인 계정 전환 · 로그인 실패 지연 · public 저장소 실데이터 정리([보안설계.md](보안설계.md) §6).
 
 ## 11. 문서 지도 (최신성)
 
 | 문서 | 상태 |
 |---|---|
-| 이 문서 + 루트 `HANDOFF.md` + `변경이력_CHANGELOG.md` + `budget_app/README_실행방법.md` | ★ **최신 (rev12, 2026-08-04)** |
+| 이 문서(상단 현행화 블록) + `변경이력_CHANGELOG.md` + [팀공유_최종안내.html](팀공유_최종안내.html) + [팀원_실행가이드.md](팀원_실행가이드.md) | ★ **최신 (Phase 7, 2026-09-21)** |
+| `배포가이드.md` · `사내이관_가이드.md` · `보안설계.md` · `연계계약_CONTRACT.md` | 최신 (Phase 6-8~7) |
 | `budget_app/docs/DB_스냅샷.md` | 최신 — `py scripts/make_db_snapshot.py`로 언제든 재생성 |
 | `알고리즘_명세.html` | R1~R12까지 시각화 — **R13~R15(이동·삭제·개명동기화)는 미반영**, 이 문서 §4 표 참조 |
 | `PRD_V1.html`, [`연계계약_CONTRACT.md`](연계계약_CONTRACT.md) | 유효(계약) — 옛 4개 통합본(2026-09-20). CSV 스키마는 2026-07-22 이후 불변 |
-| `budget_app/HANDOFF.md` | **1단계(계획본) 전용 상세 문서** — Streamlit 시절 기술이라 실행법은 이 문서를 따를 것 |
-| `run.bat` / `run.sh` / `app.py` | 레거시 Streamlit — 유지보수 안 함. 웹 실행은 `분석프로그램_실행.bat` |
-| 개발 설계 문서 | `budget_app/docs/superpowers/specs/` (최신: `2026-08-04-사업-지사이동-design.md`) |
+| `HANDOFF.md` · `HANDOFF_budget_app.md` | **역사 문서**(1단계 계획본·rev13 이전) — 상단 안내 참조 |
+| 개발 설계·계획 문서 | `docs/superpowers/specs/`(최신: `2026-09-12-통합웹앱-design.md`, Phase 6 계약·설계) · `docs/superpowers/plans/`(Phase 6·7 계획서) |
