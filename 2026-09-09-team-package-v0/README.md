@@ -55,7 +55,8 @@ cd app/web && npm install && npm run build && cd ../..
 cd app && python -m uvicorn server:app --port 8010
 ```
 
-**3번을 건너뛰면 `/` 가 500 을 냅니다.** 프론트 원본은 `app/web/src/` 이고,
+**3번을 건너뛰면 `/` 가 500 을 냅니다.** 화면 색·글꼴은 한난 디자인 토큰(`app/web/tailwind.config.js` + `app.css :root`)이며 규칙은 [docs/UI_제작메모_한난.md](docs/UI_제작메모_한난.md).
+ 프론트 원본은 `app/web/src/` 이고,
 빌드 산출물 `app/web/../static/` 은 커밋하지 않습니다(`.gitignore`).
 프론트만 고칠 때는 `cd app/web && npm run dev` 가 편합니다.
 
@@ -98,7 +99,8 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 | 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev15 의사결정 이력 |
 | 5 | [docs/연계계약_CONTRACT.md](docs/연계계약_CONTRACT.md) | 앱이 받고 내는 파일·인터페이스 계약(옛 계약 4개 통합본) |
 | 6 | [docs/설계_3-4단계_소요전망_파이프라인.md](docs/설계_3-4단계_소요전망_파이프라인.md) | 표준화·중장기 전망 설계 (Phase 6 근거) |
-| 7 | [docs/팀공유_최종안내.html](docs/팀공유_최종안내.html) | **팀원용 — 무엇을 하는 앱이고 어떻게 쓰나** (Phase 7, 브라우저로 열기) |
+| 7 | [docs/팀공유_최종안내.html](docs/팀공유_최종안내.html) | **팀원용 — 무엇을 하는 앱이고 어떻게 쓰나** (Phase 8, 브라우저로 열기) |
+| 9 | [docs/UI_제작메모_한난.md](docs/UI_제작메모_한난.md) | 화면 디자인(Phase 8) — 한난 CI 토큰·한난체·대비표·값 바꿀 때 보는 두 곳 |
 | 8 | [docs/사내이관_가이드.md](docs/사내이관_가이드.md) | 인터넷 없는 사내 서버에 올리는 절차·스크립트 |
 
 ---
