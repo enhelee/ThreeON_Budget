@@ -1,7 +1,9 @@
 # 예산·실적 분석 시스템 — 통합 인수인계 MASTER
 
 > **이 문서가 진입점입니다.** 다른 컴퓨터에서 Claude Code로 이 프로젝트를 분석·통합할 때 이 파일부터 읽으세요.
-> 작성: 2026-08-04 (rev13) · **현행화 2026-09-21 (Phase 8)** · 상태: **1~5단계(계획·실적·분석·통계·전망) 웹 앱 하나, 테스트 279 passed, Render 배포 운영 중, 한난 CI 디자인 적용**
+> 작성: 2026-08-04 (rev13) · **현행화 2026-09-21 (rev20)** · 상태: **1~5단계(계획·실적·분석·통계·전망) 웹 앱 하나, 테스트 279 passed, Render 배포 운영 중, 한난 CI 디자인 적용**
+>
+> **개발자 진입점은 이제 [HANDOFF.md](HANDOFF.md) 다**(rev20, 2026-09-21). 이 문서는 구조·분석 로직 R1~R15·API·CSS 함정의 **참조서**로 남는다. 아래 rev14~rev19 블록과 본문의 «budget_app/» 경로는 지금의 `2026-09-09-team-package-v0/app/` 이다.
 >
 > **[rev19 · 2026-09-21 Phase 8 디자인]** 화면 색·글꼴·형태를 한난 공식 CI 로(#35). 토큰은 `app/web/tailwind.config.js` + `app.css :root` **두 곳 동일값**, 규칙·대비표·폰트 함정은 [UI_제작메모_한난.md](UI_제작메모_한난.md). 옛 팔레트(`blue-*`·`slate-*`) 를 새 화면에 쓰면 `test_ui_shell.py` 가 깨진다. 사이드바·게이트에 팀 이름 **ThreeON** 표기. §7 CSS 함정 문단의 «`.login-*`·`.operator-badge` 직접 CSS» 중 `.operator-badge` 는 `app.css` 컴포넌트로 옮겨졌다.
 >
@@ -174,7 +176,7 @@ Excel 산출물 생성**(zrfm2_V1 8.2초)이었다. 그래서 세 가지를 분�
 - `pipeline_db.py` DB 입출력 래퍼(오버라이드·학습·마스터 로드→실행→run 기록)
 - `db.py` **SQLite 계층 전부**(스키마·ingest·학습·마감·수동데이터)
 - `excel_actual_writer.py` 산출물 3종(실적.xlsx=Sheet1+종합표SUMIFS+검토리포트 / zrfm2_V1 / matched CSV)
-- `pipeline_plan.py`+`excel_plan_writer.py` 1단계 계획본 생성(레거시 Streamlit 탭에서 사용)
+- `pipeline_plan.py`+`excel_plan_writer.py` 1단계 계획본 생성(웹 「1 예산 계획」 탭 · `/api/plan/*`)
 - `spec_io.py` 팀 연계 파일 어댑터(연계계약_CONTRACT §3.4 구현 — 소비자였던 동료 앱은 사라짐, 외부 도구·감사용 유지)
 
 ---
