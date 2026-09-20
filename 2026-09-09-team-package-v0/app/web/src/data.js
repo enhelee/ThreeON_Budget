@@ -22,11 +22,6 @@ export async function loadHealth() {
   catch { state.health = null; }
 }
 
-export async function loadExportStatus() {
-  try { state.exportStatus = await api(`/api/export-status?year=${state.year}`); }
-  catch { state.exportStatus = null; }
-}
-
 export async function loadStatus() {
   state.status = await api(`/api/status?year=${state.year}`);
 }

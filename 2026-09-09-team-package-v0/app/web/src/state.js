@@ -3,7 +3,6 @@ export const state = {
   type: "all", search: "", sort: "rateDesc",
   status: null, branches: null, stats: null, overview: null,
   health: null,        // GET /healthz — DB 종류·인증 여부·리비전 (메인 헤더/카드)
-  exportStatus: null,  // GET /api/export-status — 팀 연계 산출물을 마지막으로 넘긴 연도·시각
   returnHash: null,  // 401 로 게이트에 튕기기 직전 보던 주소 — 로그인 후 여기로 돌아간다
   learned: null, overrides: null, bizEdits: null,
   ovBiz: {},        // 재배정 대상 지사의 사업 목록 캐시 {"연도|지사": [{budget,사업명}]}

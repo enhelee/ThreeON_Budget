@@ -42,23 +42,10 @@ export function renderStats() {
       <tfoot class="border-t-2 border-slate-200 bg-slate-50"><tr><td class="table-cell font-bold">합계</td><td class="table-cell text-right font-bold">${fmt(t.o)}</td><td class="table-cell text-right font-bold">${fmt(t.c)}</td><td class="table-cell text-right font-bold ${t.c - t.o < 0 ? "text-red-600" : ""}">${t.c - t.o >= 0 ? "+" : ""}${fmt(t.c - t.o)}</td><td class="table-cell text-right font-bold">${t.o ? ((t.c - t.o) / t.o * 100).toFixed(1) + "%" : "-"}</td></tr></tfoot></table></div>
     </section>`;
   }).join("");
-  const teamSection = `
-    <section class="panel p-5 sm:p-6">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 class="section-title">팀 연계 — 예산예측프로그램(팀공유 v2)으로 넘기기</h3>
-        <p class="section-help">손익·자본 최신 분석을 한 파일에 담습니다. <b>결과 JSON</b>은 v2 앱의 「예산 실적 집계 → 사업 실적 연결」에 올려 표준화·중장기 예산(3·4단계) 입력으로 쓰고, CSV 3종은 연동규격(연도 단일 파일, 원 단위)입니다. 첫 다운로드는 파일 생성으로 30초쯤 걸립니다.</p></div>
-        <div class="flex flex-wrap gap-2">
-          <button class="btn-primary" data-team-export="json" title="팀연계_${esc(state.year)}_사업실적연결.json">결과 JSON (사업 실적 연결)</button>
-          <button class="btn-secondary" data-team-export="matched" title="matched_${esc(state.year)}.csv">matched 통합 CSV</button>
-          <button class="btn-secondary" data-team-export="budget" title="budget_${esc(state.year)}.csv">budget CSV</button>
-          <button class="btn-secondary" data-team-export="data" title="data_${esc(state.year)}.csv">data CSV</button>
-        </div>
-      </div>
-    </section>`;
   return `<div class="space-y-6">
     <section><p class="text-sm font-semibold text-blue-700">STAGE 4</p><h2 class="mt-1 text-2xl font-bold tracking-tight text-slate-950">통계 · 내보내기 — ${esc(state.year)}년</h2>
     <p class="mt-2 text-sm text-slate-500">검토(재배정·수정)가 반영된 최신 분석 기준입니다.</p></section>
-    ${teamSection}${sections}${cmpSection}</div>`;
+    ${sections}${cmpSection}</div>`;
 }
 
 // ───────────────────────── 5 중장기 예측 / 설정 ─────────────────────────

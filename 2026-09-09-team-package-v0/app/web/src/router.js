@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadExportStatus, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -122,7 +122,7 @@ export async function navigate(view, opts = {}) {
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  if (view === "home") jobs.push(["서버 정보", loadHealth], ["내보내기 이력", loadExportStatus]);
+  if (view === "home") jobs.push(["서버 정보", loadHealth]);
   if (view === "forecast") {
     // 기준연도 → 가정 → (탭에 따라) 표준화 결과 | 전망 표. settle 이 순서대로 돌리므로
     // 메타가 정한 기준연도를 뒤의 둘이 그대로 쓴다.

@@ -14,7 +14,7 @@
   투자유형세부_사업명   v2 project_type_classifier: '사업명 예산과목' → 투자유형세부 (project_type_model_minor.joblib)
 학습 파이프라인은 v2와 동일(TF-IDF char_wb 2~4그램 + 로지스틱회귀)이라 v2 코드가 그대로 읽는다.
 v2 앱은 파일에서 모델을 읽으므로 `export_to_v2_files`로 활성 버전을 파일로 내려주고,
-`import_v2_files`로 팀원 PC의 기존 파일·CSV를 레지스트리에 흡수한다(scripts/v2_model_sync.py).
+`import_v2_files`로 팀원 PC의 기존 파일·CSV를 레지스트리에 흡수한다(옛 v2 앱 모델 반입용 — 동기화 스크립트는 Phase 7 에서 삭제, 함수는 1회성 반입용으로 남김).
 """
 import hashlib
 import io

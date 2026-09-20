@@ -186,29 +186,7 @@ function stageCards() {
   </section>`
 }
 
-// ── ④ 이음새 · 다음 할 일 ────────────────────────────────────
-
-function bridgeBox() {
-  const last = state.exportStatus?.last
-  const thisYear = state.exportStatus?.files?.json || null
-  return `
-  <article class="panel p-5 sm:p-6">
-    <h3 class="section-title">이음새 — 3·4단계는 이 앱 안에서</h3>
-    <p class="section-help leading-6"><b class="text-slate-700">마감된 연도</b>의 분석 결과가 곧 5번 탭 표준화·중장기 전망의 입력입니다 — 파일을 옮길 필요가 없습니다. 아래 <b class="text-slate-700">팀연계_{연도}_사업실적연결.json</b> 은 외부 공유용으로 남아 있습니다(화면 금액 천원, 연계 파일 원 단위).</p>
-    <button class="btn-secondary mt-3" data-view="forecast">중장기 예측 화면 열기 →</button>
-    <dl class="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
-      <div class="flex flex-wrap items-baseline gap-x-2">
-        <dt class="font-semibold text-slate-500">마지막 내보내기</dt>
-        <dd class="font-bold text-slate-800">${last ? `${esc(last.year)}년 · ${esc(last.at)}` : '<span class="text-amber-700">아직 내보낸 적 없습니다</span>'}</dd>
-      </div>
-      <div class="flex flex-wrap items-baseline gap-x-2">
-        <dt class="font-semibold text-slate-500">${esc(state.year)}년 연계 JSON</dt>
-        <dd class="font-bold text-slate-800">${thisYear ? esc(thisYear) : dash}</dd>
-      </div>
-    </dl>
-    <button class="btn-secondary mt-4" data-view="stats">통계·내보내기 화면 열기</button>
-  </article>`
-}
+// ── ④ 다음 할 일 ────────────────────────────────────────────
 
 /** 지금 해야 할 것. 조건에 맞는 것만, 급한 것부터. */
 function nextActions() {
@@ -301,7 +279,6 @@ export function renderHome() {
       ${statusCards()}
       ${stageCards()}
       <section class="grid gap-6 xl:grid-cols-2">
-        ${bridgeBox()}
         ${nextActions()}
       </section>
       ${multiYearPanels()}
