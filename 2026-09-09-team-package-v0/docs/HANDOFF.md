@@ -109,7 +109,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 
 ## 6. 남은 것 (우선순위)
 
-1. **[사용자]** 한난체 웹폰트 사내 사용 범위 확인 — TTF 에 라이선스 문구 없음. 불가 시 `app.css` `@font-face` + `font-hanan` 제거 → Pretendard 폴백(테스트 2개도 삭제).
+1. ~~한난체 웹폰트 사내 사용 범위 확인~~ — **2026-09-21 사용자 확인: 사용 가능.** 유지. (방침이 바뀌면 `app.css` `@font-face` + `font-hanan` 제거 → Pretendard 폴백, 테스트 2개도 삭제.)
 2. **[사용자]** 저장소 private 전환 — 루트 실데이터 파일은 2026-09-21 삭제했지만 **이력(`4be2452` 등)에는 남아 있다**. private 전환 + 백업 저장소(`wnghcjswo12-cpu`) 점검. 이력 재작성은 협업자와 상의.
 3. **[사용자]** Supabase 계정 2단계 인증 · Docker 있는 PC 에서 `deploy/onprem` 첫 실행 → [사내이관_가이드.md](사내이관_가이드.md) §9 에 기록.
 4. **[동료 합의 → Claude]** 표준금액 계층적 후퇴(표본 2개년 한계, `specs/2026-09-19-표준화-기준선.md` §5) — 대외 수치가 바뀌므로 합의 후 별도 Phase.
