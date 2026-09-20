@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
-"""메인 대시보드(Phase 3)가 서버에서 끌어오는 두 값.
+"""메인 대시보드가 서버에서 끌어오는 값과 루트 경로 규칙.
 
-1) GET /api/export-status — '이음새' 박스의 마지막 내보내기 연도·시각
-2) GET /healthz 의 rev — 헤더 스트립에 찍히는 리비전 문자열
+1) GET /healthz 의 rev — 헤더 스트립에 찍히는 리비전 문자열
+2) index.html 은 매번 재검증(no-cache) · /app/ 은 301
 
-/api/export-team 은 GET 이라 audit_log 에 남지 않으므로, 내보낸 시각의 근거는
-OUT_DIR 에 실제로 떨어진 파일의 수정시각이다. 이 테스트는 그 규칙을 고정한다.
+(예전에 여기 있던 /api/export-status — 팀 연계 파일을 마지막으로 넘긴 시각 — 는 v2 앱과 함께
+ Phase 7 에서 사라졌다. 부재는 test_v2_residue_gone.py 가 고정한다.)
 """
-import io
 import os
 import sys
-import time
 
 import pytest
 
@@ -18,7 +16,7 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
-from budget import db as dbm, pipeline_db   # noqa: E402
+from budget import db as dbm   # noqa: E402
 
 
 @pytest.fixture()
@@ -35,46 +33,6 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "OUT_DIR", str(out))
     from fastapi.testclient import TestClient
     return TestClient(server.app), out
-
-
-def _bundle(out_dir, year, kind="json"):
-    name = pipeline_db.TEAM_BUNDLE_FILES[kind].format(y=year)
-    path = os.path.join(str(out_dir), name)
-    io.open(path, "w", encoding="utf-8").write("{}")
-    return path
-
-
-def test_no_export_yet(client):
-    c, _ = client
-    r = c.get("/api/export-status").json()
-    assert r["last"] is None and r["exports"] == []
-
-
-def test_last_export_is_the_newest_year_bundle(client):
-    c, out = client
-    _bundle(out, "2023")
-    time.sleep(1.1)                      # 수정시각이 초 단위 문자열이라 1초 이상 벌린다
-    _bundle(out, "2025")
-    r = c.get("/api/export-status").json()
-    assert r["last"]["year"] == "2025"
-    assert len(r["last"]["at"]) == 19    # "YYYY-MM-DD HH:MM:SS"
-    assert [h["year"] for h in r["exports"]] == ["2023", "2025"]
-
-
-def test_year_param_reports_each_bundle_file(client):
-    c, out = client
-    _bundle(out, "2025", "json")
-    r = c.get("/api/export-status?year=2025").json()
-    assert r["year"] == "2025"
-    assert r["files"]["json"] is not None
-    assert r["files"]["matched"] is None      # 아직 만들지 않은 산출물은 None
-
-
-def test_unrelated_files_are_ignored(client):
-    c, out = client
-    io.open(os.path.join(str(out), "팀연계_삭제본_사업실적연결.json"), "w", encoding="utf-8").write("{}")
-    r = c.get("/api/export-status").json()
-    assert r["last"] is None               # 연도 4자리가 아니면 집계하지 않는다
 
 
 def test_healthz_reports_revision(client, monkeypatch):

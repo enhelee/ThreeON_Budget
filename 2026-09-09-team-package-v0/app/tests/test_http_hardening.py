@@ -99,6 +99,20 @@ def test_index_html_is_still_no_cache(client):
     assert "immutable" not in r.headers.get("cache-control", "")
 
 
+# ── HEAD ─────────────────────────────────────────────────────────────────
+
+def test_head_is_allowed_on_root_and_healthz(client):
+    """업타임 모니터·프록시 헬스체크는 HEAD 를 쓴다 — 405 면 «죽은 것»으로 오판한다.
+
+    6-8 배포 실측에서 `curl -I /` 가 405(allow: GET)를 냈다. 헤더는 GET 과 같아야 한다.
+    """
+    r = client.head("/healthz")
+    assert r.status_code == 200 and r.content == b""
+    r = client.head("/")
+    assert r.status_code == 200
+    assert "no-cache" in r.headers.get("cache-control", "")
+
+
 # ── gzip ─────────────────────────────────────────────────────────────────
 
 def test_large_responses_are_gzipped(client, asset_url):

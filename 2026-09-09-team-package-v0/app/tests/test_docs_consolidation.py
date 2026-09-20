@@ -36,9 +36,8 @@ def test_old_contract_docs_are_gone_and_new_one_exists():
 def test_new_contract_doc_keeps_the_live_boundaries():
     """통합하며 잃어버리면 안 되는 것 — 살아 있는 경계와 총액 보존 규칙."""
     body = _read(DOCS, NEW_CONTRACT_DOC)
-    for needle in ("/api/export?kind=", "/api/export-team", "/api/forecast/import", "/api/forecast/export",
-                   "import_v2_csv_dir", "schemaVersion", "sourceTotals", "미배정", "총액 보존",
-                   "_erp_row", "예산귀속\\n부서명(처.지사)", "utf-8-sig"):
+    for needle in ("/api/export?kind=", "/api/forecast/import", "/api/forecast/export",
+                   "import_v2_csv_dir", "총액 보존", "_erp_row", "utf-8-sig"):
         assert needle in body, f"연계계약_CONTRACT.md 에 «{needle}» 가 없습니다"
 
 

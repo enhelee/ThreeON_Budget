@@ -357,12 +357,6 @@ document.addEventListener("click", async e => {
     toast("내보내기 준비 중… 분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다. 잠시 기다려 주세요.");
     window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
   }
-  const texp = e.target.closest("[data-team-export]");
-  if (texp) {
-    // 손익·자본 두 분석을 한 번에 담는 팀 연계 파일 — 어느 한쪽이 최신 파일보다 새로우면 서버가 재생성.
-    toast("팀 연계 파일 준비 중… 손익·자본 분석을 다시 읽어 만듭니다(첫 다운로드 30초쯤). 잠시 기다려 주세요.");
-    window.location.href = `/api/export-team?year=${state.year}&kind=${texp.dataset.teamExport}`;
-  }
   const delOv = e.target.closest("[data-del-override]");
   if (delOv) {
     try {

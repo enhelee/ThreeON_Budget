@@ -98,6 +98,8 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 | 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev15 의사결정 이력 |
 | 5 | [docs/연계계약_CONTRACT.md](docs/연계계약_CONTRACT.md) | 앱이 받고 내는 파일·인터페이스 계약(옛 계약 4개 통합본) |
 | 6 | [docs/설계_3-4단계_소요전망_파이프라인.md](docs/설계_3-4단계_소요전망_파이프라인.md) | 표준화·중장기 전망 설계 (Phase 6 근거) |
+| 7 | [docs/팀공유_최종안내.html](docs/팀공유_최종안내.html) | **팀원용 — 무엇을 하는 앱이고 어떻게 쓰나** (Phase 7, 브라우저로 열기) |
+| 8 | [docs/사내이관_가이드.md](docs/사내이관_가이드.md) | 인터넷 없는 사내 서버에 올리는 절차·스크립트 |
 
 ---
 

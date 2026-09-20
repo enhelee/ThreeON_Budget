@@ -152,7 +152,7 @@ class LoginReq(BaseModel):
     name: str
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 def healthz():
     return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "commit": APP_COMMIT,
             "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
@@ -251,7 +251,8 @@ def _clean_json(obj):
 
 # ── 정적 프론트 ──────────────────────────────────────────────────────────
 
-@app.get("/")
+# HEAD 도 받는다 — 업타임 모니터·프록시 헬스체크가 HEAD 를 쓰면 405 로 «죽은 것»으로 오판한다(6-8 배포 실측).
+@app.api_route("/", methods=["GET", "HEAD"])
 def index():
     page = os.path.join(WEB_DIR, "index.html")
     if not os.path.isfile(page):
@@ -698,33 +699,6 @@ def overview():
         return _clean_json({"years": rows})
     finally:
         conn.close()
-
-
-@app.get("/api/export-status")
-def export_status(year: str = None):
-    """메인 대시보드 '이음새' 박스용 - 팀 연계 산출물을 마지막으로 넘긴 연도와 시각.
-
-    /api/export-team 은 GET 이라 audit_log 에 남지 않는다(감사 기록은 변경 요청만 남긴다).
-    그래서 '언제 넘겼는가'는 OUT_DIR 에 떨어진 파일의 수정시각으로 읽는다 -
-    파일 자체가 산출물이므로 이것이 사실에 가장 가깝다.
-
-    반환: {"last": {"year","at"} | None, "exports": [...], (year 지정 시) "files": {kind: at|None}}
-    """
-    tmpl = pipeline_db.TEAM_BUNDLE_FILES["json"]
-    pre, post = tmpl.split("{y}")
-    pat = re.compile(re.escape(pre) + r"(\d{4})" + re.escape(post) + "$")
-    hits = []
-    for path in glob.glob(os.path.join(OUT_DIR, tmpl.format(y="*"))):
-        m = pat.match(os.path.basename(path))
-        if m:
-            hits.append({"year": m.group(1), "at": _mtime_str(path)})
-    hits.sort(key=lambda h: h["at"])
-    out = {"last": hits[-1] if hits else None, "exports": hits}
-    if year:
-        out["year"] = str(year)
-        out["files"] = {k: (_mtime_str(f) if os.path.exists(f) else None)
-                        for k, f in pipeline_db.team_bundle_paths(OUT_DIR, str(year)).items()}
-    return out
 
 
 # ── 학습 (완료 자료 → 텍스트-사업 매핑 축적) ────────────────────────────
@@ -1338,34 +1312,6 @@ def export(year: str, budget: str, kind: str = "actual"):
     if not os.path.exists(path):
         raise HTTPException(500, "산출물 생성에 실패했습니다.")
     return FileResponse(path, filename=names[kind])
-
-
-# ── 팀 연계 산출물 (docs/연계계약_CONTRACT.md §3.4) ─────────────────────────
-#   json    : 결과 JSON(schemaVersion 1, 천원). 원래 동료 전망 앱(v2)에 올리던 파일 — v2 는
-#             6-8 에서 이 앱에 흡수·삭제되어 지금 소비자는 없다. 외부 도구·감사용으로 유지.
-#   matched / budget / data : CSV 계약(연도 단일 파일, 원 단위)
-#   손익·자본 최신 분석을 한 번에 담으므로 어느 한쪽 분석이라도 최신 파일보다 새로우면 재생성한다.
-
-@app.get("/api/export-team")
-def export_team(year: str, kind: str = "json"):
-    if kind not in pipeline_db.TEAM_BUNDLE_FILES:
-        raise HTTPException(400, "kind는 json|matched|budget|data 중 하나여야 합니다.")
-    path = pipeline_db.team_bundle_paths(OUT_DIR, year)[kind]
-    conn = _conn()
-    try:
-        runs = [dbm.latest_run(conn, year, b) for b in ("손익", "자본")]
-        runs = [r for r in runs if r]
-        if not runs:
-            raise HTTPException(404, "분석 이력이 없습니다. 먼저 손익·자본 분석을 실행하세요.")
-        newest = max(str(r["created_at"]) for r in runs)
-        stale = (not os.path.exists(path) or _mtime_str(path) < newest)
-        if stale:
-            pipeline_db.export_team_bundle(conn, OUT_DIR, year)
-    finally:
-        conn.close()
-    if not os.path.exists(path):
-        raise HTTPException(500, "연계 산출물 생성에 실패했습니다.")
-    return FileResponse(path, filename=os.path.basename(path))
 
 
 # ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────
