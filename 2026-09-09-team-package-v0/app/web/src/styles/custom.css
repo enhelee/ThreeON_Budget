@@ -5,38 +5,41 @@
    (통합_인수인계_MASTER.md 「프론트 CSS 함정·표 열폭 기준」 참조)
    ───────────────────────────────────────────────────────────── */
 
+/* 색은 app.css :root 의 한난 토큰 변수만 쓴다(Phase 8). 구조·열폭은 그대로. */
+
 /* ── 상세 화면 추가 스타일 ── */
-    .login-overlay{position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:1rem}
+    .login-overlay{position:fixed;inset:0;z-index:60;background:var(--overlay);display:flex;align-items:center;justify-content:center;padding:1rem}
     .login-overlay.hidden{display:none}
-    .login-card{background:#fff;border-radius:1rem;max-width:26rem;width:100%;padding:1.6rem 1.5rem;box-shadow:0 24px 60px rgba(15,23,42,.35)}
-    .login-card h2{font-size:1.15rem;font-weight:800;color:#0f172a;margin:0 0 .25rem}
-    .login-card p{font-size:.8rem;color:#64748b;margin:0 0 1rem}
-    .login-card label{display:block;font-size:.75rem;font-weight:700;color:#475569;margin:.75rem 0 .25rem}
+    .login-card{background:#fff;border-radius:16px;max-width:26rem;width:100%;padding:1.6rem 1.5rem;box-shadow:var(--shadow-float)}
+    .login-card h2{font-size:1.15rem;font-weight:800;color:var(--ink);margin:0 0 .25rem}
+    .login-card p{font-size:.8rem;color:var(--sub);margin:0 0 1rem}
+    .login-card label{display:block;font-size:.75rem;font-weight:700;color:var(--sub);margin:.75rem 0 .25rem}
     .login-card .control{width:100%}
-    .login-msg{min-height:1.2rem;font-size:.78rem;color:#b91c1c;margin-top:.5rem}
-    .operator-badge{display:inline-flex;align-items:center;gap:.35rem;border-radius:9999px;background:#eef2ff;color:#3730a3;font-size:.72rem;font-weight:700;padding:.25rem .6rem;white-space:nowrap}
+    .login-msg{min-height:1.2rem;font-size:.78rem;color:var(--err);margin-top:.5rem}
+    /* .operator-badge 는 app.css @layer components 로 옮겼다 */
     .audit-table td,.audit-table th{font-size:.72rem;padding:.35rem .5rem;vertical-align:top}
-    .audit-detail{max-width:28rem;overflow-wrap:anywhere;color:#64748b}
+    .audit-detail{max-width:28rem;overflow-wrap:anywhere;color:var(--sub)}
     .mono{font-family:ui-monospace,Consolas,monospace;font-size:.72rem}
 
 .clickable{cursor:pointer}
-.voucher-row td{background:#f8fafc;border-bottom:1px dashed #e2e8f0;padding-top:.4rem;padding-bottom:.4rem}
-.voucher-head td{background:#eef2f7;border-bottom:1px solid #e2e8f0;padding-top:.35rem;padding-bottom:.35rem}
-.row-new td{background:#fffbeb}
-.row-missing td{background:#fef2f2}
-.row-unmapped td{background:#f1f5f9}
-.edit-row td{background:#f8fafc}
-.spinner{width:2rem;height:2rem;border-radius:9999px;border:3px solid #dbeafe;border-top-color:#2563eb;animation:spin .8s linear infinite}
+.voucher-row td{background:var(--subtle);border-bottom:1px dashed var(--line);padding-top:.4rem;padding-bottom:.4rem}
+.voucher-head td{background:var(--line-subtle);border-bottom:1px solid var(--line);padding-top:.35rem;padding-bottom:.35rem}
+.row-new td{background:var(--warn-bg)}
+.row-missing td{background:var(--err-bg)}
+.row-unmapped td{background:var(--subtle)}
+.edit-row td{background:var(--subtle)}
+.spinner{width:2rem;height:2rem;border-radius:9999px;border:3px solid var(--line);border-top-color:var(--brand);animation:spin .8s linear infinite}
 /* 위험 동작(삭제) — 이 페이지 CSS는 프로토타입에서 컴파일된 유틸리티만 담고 있어
-   red 계열 배경·테두리 클래스가 없다. 그래서 직접 정의한다(bg-red-* 쓰면 투명해짐). */
-.btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:700;background:#dc2626;color:#fff;border:1px solid #dc2626;cursor:pointer;box-shadow:0 1px 2px 0 rgba(0,0,0,.06);transition:background-color .15s,border-color .15s}
-.btn-danger:hover{background:#b91c1c;border-color:#b91c1c}
-.btn-danger-outline{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;line-height:1.25rem;font-weight:700;background:#fff;color:#dc2626;border:1px solid #fca5a5;cursor:pointer;transition:background-color .15s}
-.btn-danger-outline:hover{background:#fef2f2}
-.danger-box{border:1px solid #fca5a5;background:#fef2f2;border-radius:.75rem;padding:1rem;margin-top:.75rem}
-.danger-title{color:#991b1b;font-weight:700;font-size:.875rem}
-.danger-text{color:#b91c1c;font-size:.75rem;line-height:1.45;margin-top:.35rem}
-.danger-label{color:#b91c1c;font-size:.75rem;font-weight:600;display:block;margin-bottom:.35rem}
+   red 계열 배경·테두리 클래스가 없다. 그래서 직접 정의한다(bg-red-* 쓰면 투명해짐).
+   오류색 --err(#B42318 적갈)는 브랜드 빨강 --brand(#FE0009 선홍)와 다른 값 — 의미를 섞지 않는다. */
+.btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:999px;min-height:44px;padding:.625rem 1.25rem;font-size:.875rem;line-height:1.25rem;font-weight:500;background:var(--err);color:#fff;border:1px solid var(--err);cursor:pointer;box-shadow:none;transition:filter .15s}
+.btn-danger:hover{filter:brightness(.9)}
+.btn-danger-outline{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border-radius:999px;min-height:44px;padding:.625rem 1.25rem;font-size:.875rem;line-height:1.25rem;font-weight:500;background:#fff;color:var(--err);border:1px solid var(--err);cursor:pointer;transition:background-color .15s}
+.btn-danger-outline:hover{background:var(--err-bg)}
+.danger-box{border:1px solid var(--err);background:var(--err-bg);border-radius:12px;padding:1rem;margin-top:.75rem}
+.danger-title{color:var(--err);font-weight:700;font-size:.875rem}
+.danger-text{color:var(--err);font-size:.75rem;line-height:1.45;margin-top:.35rem}
+.danger-label{color:var(--err);font-size:.75rem;font-weight:600;display:block;margin-bottom:.35rem}
 /* 컴파일된 CSS에 없는 유틸(lg:grid-cols-5 / ml-auto / max-w-xl) 대체 */
 .edit-grid{display:grid;gap:.75rem;grid-template-columns:1fr}
 @media (min-width:640px){.edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -46,12 +49,13 @@
 .push-right{margin-left:auto}
 .max-w-30{max-width:30rem}
 /* 미반영 변경 건수 배지 — 분석 버튼에 붙는다 */
-.pending-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;margin-left:.15rem;border-radius:9999px;background:#fff;color:#1d4ed8;font-size:.72rem;font-weight:800;line-height:1}
-.btn-pending{background:#b45309 !important;border-color:#b45309 !important;animation:pendPulse 1.8s ease-in-out infinite}
-.btn-pending .pending-count{color:#b45309}
-@keyframes pendPulse{0%,100%{box-shadow:0 0 0 0 rgba(180,83,9,.45)}50%{box-shadow:0 0 0 .35rem rgba(180,83,9,0)}}
-.pending-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;border:1px solid #fcd34d;background:#fffbeb;border-radius:.75rem;padding:.7rem .9rem}
-.pending-bar b{color:#92400e}
+.pending-count{display:inline-flex;align-items:center;justify-content:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;margin-left:.15rem;border-radius:9999px;background:#fff;color:var(--ink);font-size:.72rem;font-weight:800;line-height:1}
+/* 미반영 상태는 의미색(주의 --warn)을 유지한다 — 브랜드 빨강이 아니다 */
+.btn-pending{background:var(--warn) !important;border-color:var(--warn) !important;animation:pendPulse 1.8s ease-in-out infinite}
+.btn-pending .pending-count{color:var(--warn)}
+@keyframes pendPulse{0%,100%{box-shadow:0 0 0 0 rgba(154,103,0,.45)}50%{box-shadow:0 0 0 .35rem rgba(154,103,0,0)}}
+.pending-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:.7rem .9rem}
+.pending-bar b{color:var(--warn)}
 @keyframes spin{to{transform:rotate(1turn)}}
 /* 컴팩트 상세 테이블: 고정 레이아웃으로 한 화면에 맞춤 */
 /* 100% 배율에서 가로 스크롤·생략 없이 전부 보이게: 고정폭은 최소한으로 잡고
@@ -77,7 +81,7 @@
 .det-table td.text-right{white-space:nowrap}    /* 금액·날짜는 숫자 중간에서 끊기지 않게 */
 .det-table .badge{padding:.12rem .4rem;font-size:.68rem}
 .det-table .voucher-row td,.det-table .voucher-head td{white-space:normal}
-.swatch{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;border:1px solid #e2e8f0;flex:none}
+.swatch{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;border:1px solid var(--line);flex:none}
 
 /* ── 로그인 게이트 (Phase 2) ──────────────────────────────────────
    Tailwind 의 .hidden{display:none} 은 #appShell 의 lg:flex 를 이기지 못한다.

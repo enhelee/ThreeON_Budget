@@ -46,3 +46,27 @@ def test_font_subset_and_logo_are_shipped():
         assert f.read(4) == b"wOF2"
     svg = _read(WEB, "public", "assets", "kdhc-signature-ko.svg")
     assert "<svg" in svg and "viewBox" in svg
+
+
+# ── Task 2: 공통 컴포넌트 ────────────────────────────────────────────
+
+def test_shared_css_uses_tokens_not_legacy_palette():
+    """app.css·custom.css 에 옛 팔레트가 남으면 컴포넌트 절반이 파랑으로 돌아간다."""
+    legacy = re.compile(r"\b(bg|text|border|ring|divide)-(blue|slate|emerald|amber|red|rose|indigo|gray)-\d+")
+    for name in ("app.css", "custom.css"):
+        body = _read(WEB, "src", "styles", name)
+        hits = sorted(set(legacy.findall(body)))
+        assert not hits, f"{name} 에 옛 팔레트 유틸리티: {hits}"
+    custom = _read(WEB, "src", "styles", "custom.css")
+    for hexv in ("#2563eb", "#1d4ed8", "#3730a3", "#eef2ff", "#dbeafe"):
+        assert hexv not in custom.lower(), f"custom.css 에 옛 파랑 {hexv} 가 남아 있습니다"
+
+
+def test_primary_button_follows_sample_rule():
+    """검정 바탕 + 흰 글자 + 브랜드 빨강 테두리 + 캡슐 + 44px. 빨강 바탕은 금지."""
+    css = _read(WEB, "src", "styles", "app.css")
+    block = css.split(".btn-primary {", 1)[1].split("}", 1)[0]          # 단독 블록(색·테두리)
+    assert "bg-ink" in block and "text-white" in block and "border-brand" in block
+    shared = css.split(".btn-primary,", 1)[1].split("}", 1)[0]           # 공유 블록(형태)
+    assert "rounded-full" in shared and "min-h-[44px]" in shared
+    assert "bg-brand" not in block, "브랜드 빨강을 버튼 바탕으로 쓰면 흰 글자 대비가 4.5 미만입니다"
