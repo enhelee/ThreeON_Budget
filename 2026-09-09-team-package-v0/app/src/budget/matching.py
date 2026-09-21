@@ -287,6 +287,20 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     erp_score[i] = 0.0
                 unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
+            # ── 크리티칼 포인트 용역: 이름 표기가 흔들려 유사도가 낮아도, 그룹에
+            #   '크리티칼' 계획사업이 있으면 그 사업으로 확정(담당자 규칙: 비슷하면 통과).
+            if rep_name and "크리티" in str(rep_name):
+                crit = [p for p in candidates if "크리티" in str(p.get("사업명") or "")]
+                if crit:
+                    cbest = max(crit, key=lambda p: (_clean_na(p.get("연예산")) or 0.0))
+                    for i in vg["rows"]:
+                        erp_score[i] = 100.0
+                        cbest["실적금액"] += _amt(i)
+                        cbest["매칭전표수"] += 1
+                        cbest["_점수합"] += 100.0
+                        attributed[i] = cbest
+                        erp_match_name[i] = cbest.get("사업명")
+                    continue
             # 대표 사업명 유사도 최고 계획행에 묶음 전체를 귀속. 동점(전표
             # 텍스트가 비어 점수가 모두 0인 경우 포함)이면 연예산이 큰 계획행 —
             # 입력 순서에 좌우되지 않고, 실무상 큰 사업에 귀속될 확률이 높다.
