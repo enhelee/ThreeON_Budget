@@ -812,9 +812,10 @@ def locked_years(conn):
 # ---------------------------------------------------------------------------
 
 def norm_text(s):
-    """학습 키용 텍스트 정규화(normalize.text_key와 동일 기준)."""
+    """학습 키용 텍스트 정규화(normalize.learn_key: 회차·월·연도 마커까지 제거).
+    matching.py 조회 키와 동일 기준이어야 반복 전표가 매년 자동확정된다."""
     from . import normalize
-    return normalize.text_key(s)
+    return normalize.learn_key(s)
 
 
 def learn_from_year(conn, year):

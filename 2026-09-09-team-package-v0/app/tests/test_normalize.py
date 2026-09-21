@@ -47,3 +47,18 @@ def test_dept_from_text_j_column():
     assert normalize.dept_from_text("(CHP)광교지사 고객지원부", PLAN_DEPTS) == "광교지사"
     assert normalize.dept_from_text("(지사공통)강남지사 고객지원부", PLAN_DEPTS) == "강남지사"
     assert normalize.dept_from_text("본사 총무부", PLAN_DEPTS) is None
+
+
+def test_learn_key_collapses_installment_and_period_markers():
+    """회차·월·분기·연도 마커만 다른 반복 전표는 같은 학습키로 모인다.
+    → 한 번 사람이 확정하면 다음 해 같은 계약 전표가 자동확정(재검토 방지)."""
+    lk = normalize.learn_key
+    # 회차만 다른 LTSA 기성 → 동일 키
+    assert lk("가스터빈 LTSA 29회 기성(원화-고정비)") == lk("가스터빈 LTSA 33회 기성(원화-고정비)")
+    # 월만 다른 소방 용역 → 동일 키
+    assert lk("24년 소방 용역 12월") == lk("25년 소방 용역 3월")
+    # 연도·월만 다른 비용인식 → 동일 키
+    assert lk("GT LTSA '25년 2월 비용인식") == lk("GT LTSA '24년 11월 비용역인식")
+    # 서로 다른 사업은 여전히 구분된다
+    assert lk("가스터빈 LTSA 1회 기성") != lk("스팀터빈 정비 1회 기성")
+    assert lk(None) is None

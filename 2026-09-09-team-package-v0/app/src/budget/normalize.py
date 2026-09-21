@@ -35,6 +35,27 @@ def text_key(s):
     return out or None
 
 
+# 반복 전표 마커: 회차·분기·월·연도·비용인식을 지워 "N회/N월/YY년"만 다른 전표를 한 키로 모은다.
+#   예) "가스터빈 LTSA 29회 기성" 과 "…33회 기성" → 같은 학습키 → 한 번 확정하면 매년 자동확정.
+_INSTALLMENT = re.compile(
+    r"\d+\s*회차?"           # 29회, 3회차
+    r"|\d+\s*분기"           # 2분기
+    r"|'?\s*\d{2,4}\s*년"    # '25년, 2025년
+    r"|\d{1,2}\s*월\s*분?"   # 12월, 1월분
+    r"|비용\s*역?\s*인식"    # 비용인식, 비용역인식
+)
+
+
+def learn_key(s):
+    """학습키 정규화: text_key + 회차/분기/월/연도/비용인식 마커 제거.
+    반복 기성·월별 전표(회차·연도만 다름)를 한 키로 묶어, 한 번 사람이 확정하면
+    다음 해 같은 계약 전표가 자동확정되게 한다(재검토 방지)."""
+    if s is None:
+        return None
+    out = _INSTALLMENT.sub("", str(s))
+    return text_key(out)
+
+
 def normalize_item(name, alias_map):
     """예산과목명을 계획본 표준 표기로 환원. 매핑 없으면 원문 그대로."""
     if name is None:

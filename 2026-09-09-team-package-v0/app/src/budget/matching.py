@@ -14,11 +14,22 @@
 (부호 상쇄(±) 전표도 같은 클러스터에 묶여 순액으로 집계).
 """
 from collections import defaultdict
+import re
 
 import pandas as pd
 from rapidfuzz import fuzz
 
 from . import normalize
+
+
+# 자재류(예비품·재생고온부품·저장품·공구): 전표 텍스트가 비거나 애매해 사업별 분할이
+# 원리적으로 불가하고, 예산을 안 잡고 사는(미편성) 경우가 많다. 담당자 규칙 =
+# "지사×과목 총액만 맞으면 됨" → 배정되면 총액기준 통과(사업명 유사도로 검토 플래그하지 않음).
+_MATERIAL_RE = re.compile(r"자산화예비품|재생고온부품|저장품|공구와기구")
+
+
+def _is_material(item):
+    return bool(item and _MATERIAL_RE.search(str(item)))
 
 
 def _clean_na(v):
@@ -245,7 +256,8 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
             # ── 학습 맵: 과년도 확정 결과와 텍스트가 일치하면 유사도보다 우선.
-            lname = learned.get((key[0], normalize.text_key(rep_name)))
+            #    learn_key = 회차·월·연도 마커 제거 → 반복 기성·월별이 한 번 확정되면 매년 자동확정.
+            lname = learned.get((key[0], normalize.learn_key(rep_name)))
             if lname:
                 prec = next((p for p in candidates if p.get("사업명") == lname), None)
                 if prec is not None:
@@ -275,6 +287,20 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     erp_score[i] = 0.0
                 unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
+            # ── 크리티칼 포인트 용역: 이름 표기가 흔들려 유사도가 낮아도, 그룹에
+            #   '크리티칼' 계획사업이 있으면 그 사업으로 확정(담당자 규칙: 비슷하면 통과).
+            if rep_name and "크리티" in str(rep_name):
+                crit = [p for p in candidates if "크리티" in str(p.get("사업명") or "")]
+                if crit:
+                    cbest = max(crit, key=lambda p: (_clean_na(p.get("연예산")) or 0.0))
+                    for i in vg["rows"]:
+                        erp_score[i] = 100.0
+                        cbest["실적금액"] += _amt(i)
+                        cbest["매칭전표수"] += 1
+                        cbest["_점수합"] += 100.0
+                        attributed[i] = cbest
+                        erp_match_name[i] = cbest.get("사업명")
+                    continue
             # 대표 사업명 유사도 최고 계획행에 묶음 전체를 귀속. 동점(전표
             # 텍스트가 비어 점수가 모두 0인 경우 포함)이면 연예산이 큰 계획행 —
             # 입력 순서에 좌우되지 않고, 실무상 큰 사업에 귀속될 확률이 높다.
@@ -291,12 +317,16 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     erp_match_name[i] = None
                 unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
+            # 자재류(예비품 등): 사업명 유사도가 낮아도 총액기준 통과 — 확신도 1.0,
+            #   저유사/임의귀속 카운트 제외(건별 검토 대상에서 뺀다). 담당자 규칙.
+            mat = _is_material(key[0])
             for i in vg["rows"]:
-                erp_score[i] = float(best_score)
+                score = 100.0 if mat else float(best_score)
+                erp_score[i] = score
                 best["실적금액"] += _amt(i)
                 best["매칭전표수"] += 1
-                best["_점수합"] += float(best_score)
-                if best_score < threshold:
+                best["_점수합"] += score
+                if not mat and best_score < threshold:
                     best["저유사전표수"] += 1
                     if len(candidates) > 1:
                         # 그룹에 계획행이 여럿인데 사업명이 못 맞은 건 = 임의 귀속.
