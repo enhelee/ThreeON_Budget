@@ -116,6 +116,9 @@ export async function navigate(view, opts = {}) {
   // ⚠ 주소로 바로 들어온 첫 진입(#/detail/동탄지사)은 아직 연도가 없다 — 연도 없이 상세를 부르면
   //   /api/branch-detail?year= 로 실패해 «지사를 선택하세요» 화면이 뜬다(딥링크 실측 2026-09-21).
   //   상세를 부르기 전에 연도 목록부터 확보한다.
+  // 화면 전환 시 데이터를 불러오는 동안 로딩 오버레이 — 느린 서버에서 옛 화면이
+  // 멈춘 듯 보이는 것을 막는다(선생님 피드백①). settle 이 예외를 삼키므로 별도 try 불필요.
+  busy(true, "화면을 불러오는 중…");
   if (view === "detail" && opts.branch && !state.year) {
     try { await loadOverview(); } catch (e) { toast(e.message); }
   }
@@ -164,6 +167,7 @@ export async function navigate(view, opts = {}) {
       ["연도 기준정보", loadYearConfig]);
   }
   state.loadErrors = await settle(jobs);
+  busy(false);
   if (state.loadErrors.length) {
     toast(`${state.loadErrors.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
   }

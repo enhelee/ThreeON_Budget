@@ -50,6 +50,9 @@ APP_COMMIT = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("APP_COMMIT"
 # 예전 webapp/index.html(단일 149KB)은 web/ 로 쪼개져 삭제되었다. 폴백을 두지 않는 이유는,
 # 빌드가 실패했을 때 조용히 옛 화면을 서비스하는 것이 눈에 띄게 실패하는 것보다 나쁘기 때문이다.
 STATIC_DIR = os.path.join(APP_DIR, "static")
+# 설정 화면 이력 목록의 표시용 상한(최근 N건). 분석·매칭은 dbm 함수를 직접 호출하므로
+# 이 상한과 무관하게 전체를 쓴다 — 여기서 자르는 건 화면 조회량뿐(선생님 피드백②, 안전 슬라이스).
+_RECENT_DISPLAY = 300
 WEB_DIR = STATIC_DIR
 _PARENT = os.path.dirname(APP_DIR)
 AUTH = authm.AuthConfig()
@@ -871,7 +874,7 @@ def biz_delete(req: BizDeleteReq):
 def biz_deletes(year: str):
     conn = _conn()
     try:
-        return _clean_json(dbm.list_biz_deletes(conn, year))
+        return _clean_json(dbm.list_biz_deletes(conn, year)[-_RECENT_DISPLAY:])  # 표시용 최근 N
     finally:
         conn.close()
 
@@ -890,7 +893,7 @@ def restore_biz_delete(del_id: int):
 def biz_edits(year: str):
     conn = _conn()
     try:
-        return _clean_json(dbm.list_biz_edits(conn, year))
+        return _clean_json(dbm.list_biz_edits(conn, year)[-_RECENT_DISPLAY:])  # 표시용 최근 N
     finally:
         conn.close()
 
@@ -941,7 +944,7 @@ def add_manual_biz(req: ManualBizReq):
 def manual_biz_list(year: str):
     conn = _conn()
     try:
-        return _clean_json(dbm.list_manual_biz(conn, year))
+        return _clean_json(dbm.list_manual_biz(conn, year)[-_RECENT_DISPLAY:])  # 표시용 최근 N
     finally:
         conn.close()
 
@@ -1171,8 +1174,8 @@ def add_override(req: OverrideReq):
 def overrides(year: str):
     conn = _conn()
     try:
-        return _clean_json({b: dbm.list_overrides(conn, year, b)
-                            for b in ("손익", "자본")})
+        return _clean_json({b: dbm.list_overrides(conn, year, b)[-_RECENT_DISPLAY:]
+                            for b in ("손익", "자본")})  # 표시용 최근 N (분석은 dbm 직접호출)
     finally:
         conn.close()
 
