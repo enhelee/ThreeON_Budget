@@ -14,11 +14,22 @@
 (부호 상쇄(±) 전표도 같은 클러스터에 묶여 순액으로 집계).
 """
 from collections import defaultdict
+import re
 
 import pandas as pd
 from rapidfuzz import fuzz
 
 from . import normalize
+
+
+# 자재류(예비품·재생고온부품·저장품·공구): 전표 텍스트가 비거나 애매해 사업별 분할이
+# 원리적으로 불가하고, 예산을 안 잡고 사는(미편성) 경우가 많다. 담당자 규칙 =
+# "지사×과목 총액만 맞으면 됨" → 배정되면 총액기준 통과(사업명 유사도로 검토 플래그하지 않음).
+_MATERIAL_RE = re.compile(r"자산화예비품|재생고온부품|저장품|공구와기구")
+
+
+def _is_material(item):
+    return bool(item and _MATERIAL_RE.search(str(item)))
 
 
 def _clean_na(v):
@@ -292,12 +303,16 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     erp_match_name[i] = None
                 unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
+            # 자재류(예비품 등): 사업명 유사도가 낮아도 총액기준 통과 — 확신도 1.0,
+            #   저유사/임의귀속 카운트 제외(건별 검토 대상에서 뺀다). 담당자 규칙.
+            mat = _is_material(key[0])
             for i in vg["rows"]:
-                erp_score[i] = float(best_score)
+                score = 100.0 if mat else float(best_score)
+                erp_score[i] = score
                 best["실적금액"] += _amt(i)
                 best["매칭전표수"] += 1
-                best["_점수합"] += float(best_score)
-                if best_score < threshold:
+                best["_점수합"] += score
+                if not mat and best_score < threshold:
                     best["저유사전표수"] += 1
                     if len(candidates) > 1:
                         # 그룹에 계획행이 여럿인데 사업명이 못 맞은 건 = 임의 귀속.

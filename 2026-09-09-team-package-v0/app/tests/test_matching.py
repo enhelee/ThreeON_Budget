@@ -175,3 +175,36 @@ def test_match_strict_name_policy():
     assert hs["매칭전표수"] == 2
     assert len(res["new_rows"]) == 1  # T3
     assert res["new_rows"][0]["실적금액"] == 3000.0
+
+
+def test_material_item_passes_on_total_basis_without_review_flag():
+    """자재류(예비품 등): 사업명 유사도가 낮아도 총액기준 통과.
+    확신도 1.0 · 저유사전표수 0 → 건별 검토(<0.80) 대상에서 빠진다(담당자 규칙)."""
+    erp = pd.DataFrame([
+        {"계정코드": "20790006", "예산과목원문": "건설중인자산-자산화예비품", "연도": "2025",
+         "전표번호": "S1", "금액원": 40_000_000, "금액천원": 40000.0,
+         "사업명": "2차 예비품 불출", "지사원문": "동탄지사"},
+        {"계정코드": "20790006", "예산과목원문": "건설중인자산-자산화예비품", "연도": "2025",
+         "전표번호": "S2", "금액원": 10_000_000, "금액천원": 10000.0,
+         "사업명": "CPFM 교체 자재", "지사원문": "동탄지사"},
+    ])
+    plan = pd.DataFrame([
+        {"_row": 9, "예산과목": "건설중인자산-자산화예비품", "처지사": "동탄지사",
+         "사업명": "동탄지사 자산화예비품 구매", "연예산": 60000.0},
+    ])
+    cap = {"건설중인자산-자산화예비품"}
+    res = matching.match_actuals(plan, _erp_norm(erp), cap, set(), cap, threshold=80)
+    row = [r for r in res["plan_rows"] if r["처지사"] == "동탄지사"][0]
+    assert row["구분"] == "계획집행"
+    assert row["실적금액"] == 50000.0
+    assert row["저유사전표수"] == 0      # 자재는 저유사로 세지 않음(검토 제외)
+    assert row["매칭확신도"] == 1.0      # 총액기준 통과
+
+
+def test_nonmaterial_low_similarity_still_flagged():
+    """대조군: 자재가 아닌 과목은 종전대로 저유사(<0.80)로 검토 플래그된다."""
+    res = matching.match_actuals(_plan(), _erp_norm(_erp()),
+                                 {"수선유지비-열원정기점검"}, {"수선유지비-열원정기점검"},
+                                 {"건물"}, threshold=80)
+    hs = [r for r in res["plan_rows"] if r["처지사"] == "화성지사"][0]
+    assert hs["저유사전표수"] == 1       # 비자재는 여전히 검토 대상
