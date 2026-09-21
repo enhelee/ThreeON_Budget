@@ -245,7 +245,8 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
             # ── 학습 맵: 과년도 확정 결과와 텍스트가 일치하면 유사도보다 우선.
-            lname = learned.get((key[0], normalize.text_key(rep_name)))
+            #    learn_key = 회차·월·연도 마커 제거 → 반복 기성·월별이 한 번 확정되면 매년 자동확정.
+            lname = learned.get((key[0], normalize.learn_key(rep_name)))
             if lname:
                 prec = next((p for p in candidates if p.get("사업명") == lname), None)
                 if prec is not None:
