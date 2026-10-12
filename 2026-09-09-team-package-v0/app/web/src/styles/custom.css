@@ -100,3 +100,43 @@
 /* 건너뛰기 링크 — 포커스될 때만 보인다(시안 .skip-link) */
 .skip-link{position:fixed;top:-90px;left:20px;z-index:200;padding:12px 20px;background:var(--ink);color:#fff;border-radius:0 0 8px 8px;font-size:14px}
 .skip-link:focus{top:0}
+
+/* ── ThreeON 캐릭터 (components/characters.js) ──
+   캐릭터 고유색(청록=매칭·산호=검토·보라=전망)은 역할 구분용이라 한난 토큰과 따로 둔다.
+   바탕만 옅게 깔고 글자는 토큰(ink·sub)을 쓴다. 이름 글자색은 각 바탕 위 4.5:1 이상. */
+.char-say{display:grid;grid-template-columns:3.5rem minmax(0,1fr) auto;gap:.75rem 1rem;align-items:center;border:1px solid var(--line);border-radius:16px;background:var(--subtle);padding:.75rem 1rem}
+.char-say__img{width:3.5rem;height:4rem;display:block}
+.char-say__title{font-size:.9375rem;font-weight:700;color:var(--ink);line-height:1.45}
+.char-say__body{margin-top:.15rem;font-size:.8125rem;line-height:1.55;color:var(--sub)}
+.char-say--mt{background:#E6F5F2;border-color:#B6E1D9}
+.char-say--mt .char-say__name{color:#0E7468}
+.char-say--gt{background:#FDEEEB;border-color:#F4BDB3}
+.char-say--gt .char-say__name{color:#B23725}
+.char-say--yc{background:#F2EEFC;border-color:#D8CEF5}
+.char-say--yc .char-say__name{color:#5B3FBF}
+.char-say--hj .char-say__name{color:var(--ink)}
+.char-say--warn{background:var(--warn-bg);border-color:var(--warn)}
+.char-say--warn .char-say__name,.char-say--warn .char-say__title{color:var(--warn)}
+@media (max-width:640px){
+  .char-say{grid-template-columns:3rem minmax(0,1fr)}
+  .char-say__img{width:3rem;height:3.5rem}
+  .char-say > button{grid-column:1/-1;justify-self:start}
+}
+
+.sidebar-mascot{width:1.75rem;height:1.6rem;margin-left:.15rem;display:inline-block}
+.empty-state__img{width:3.25rem;height:4rem;margin:0 auto;display:block}
+
+/* 도움말 — 오른쪽 아래 고정. 토스트(bottom-24)보다 아래, 드로어(z-40)보다 위 */
+.help-fab{position:fixed;right:1rem;bottom:1rem;z-index:45;display:flex;flex-direction:column;align-items:flex-end;gap:.5rem;pointer-events:none}
+.help-fab > *{pointer-events:auto}
+.help-fab__btn{display:flex;align-items:center;gap:.35rem;background:none;border:0;padding:0;cursor:pointer}
+.help-fab__btn:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:14px}
+.help-fab__pill{background:var(--base);border:1px solid var(--line);border-radius:999px;padding:.35rem .8rem;font-size:.8125rem;font-weight:700;color:var(--ink);box-shadow:var(--shadow-float)}
+.help-fab__img{width:3.5rem;height:4rem;display:block}
+.help-bubble{position:relative;width:min(18rem,calc(100vw - 2rem));background:var(--base);border:1px solid var(--line);border-radius:16px;padding:.9rem 1rem;box-shadow:var(--shadow-float)}
+.help-bubble__title{font-size:.875rem;font-weight:700;color:var(--ink);margin-bottom:.35rem;padding-right:1.75rem}
+.help-bubble ol{margin:0;padding-left:1.1rem;list-style:decimal;display:grid;gap:.2rem;font-size:.8125rem;line-height:1.5;color:var(--sub)}
+.help-bubble__close{position:absolute;top:.4rem;right:.45rem;width:1.75rem;height:1.75rem;border:0;border-radius:999px;background:none;color:var(--sub);font-size:1.1rem;line-height:1;cursor:pointer}
+.help-bubble__close:hover{background:var(--subtle);color:var(--ink)}
+.help-bubble__close:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+@media print{.help-fab{display:none}}
