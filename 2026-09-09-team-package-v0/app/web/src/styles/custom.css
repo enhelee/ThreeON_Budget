@@ -127,6 +127,8 @@
 .empty-state__img{width:3.25rem;height:4rem;margin:0 auto;display:block}
 
 /* 도움말 — 오른쪽 아래 고정. 토스트(bottom-24)보다 아래, 드로어(z-40)보다 위 */
+/* 본문 끝에 도움말 높이만큼 여백 — 끝까지 내리면 마지막 카드가 도움말 위로 올라온다 */
+#page{padding-bottom:7rem}
 .help-fab{position:fixed;right:1rem;bottom:1rem;z-index:45;display:flex;flex-direction:column;align-items:flex-end;gap:.5rem;pointer-events:none}
 .help-fab > *{pointer-events:auto}
 .help-fab__btn{display:flex;align-items:center;gap:.35rem;background:none;border:0;padding:0;cursor:pointer}
