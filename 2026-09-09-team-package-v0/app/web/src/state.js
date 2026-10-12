@@ -21,8 +21,10 @@ export const state = {
         benchEdits: {methods: {}, overrides: {}} },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
+  helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
+         lowConf: false,   // 검토미 배너 «같이 보기» — 확신도 0.80 미만 계획집행 사업만
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
          // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
          //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.

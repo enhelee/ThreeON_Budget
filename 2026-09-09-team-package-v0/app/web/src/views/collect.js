@@ -1,6 +1,24 @@
+import { charSay } from "../components/characters.js"
 import { yearPicker } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
+
+/** 매칭이 한마디 — 업로드 전 / 분석 전 / 분석 끝 세 단계. 숫자는 runs 요약(손익+자본) 그대로. */
+function matchingSay(ds, runs) {
+  const done = ["손익", "자본"].map(b => runs[b]?.summary).filter(Boolean);
+  if (done.length) {
+    const sum = k => done.reduce((a, s) => a + (Number(s[k]) || 0), 0);
+    return charSay({who: "mt", title: "분석 끝! 전표마다 맞는 사업을 찾아 붙였어요.",
+      body: `계획집행 ${fmt(sum("계획집행 행수"))}행 · 신규 ${fmt(sum("신규 행수"))}행 · 학습확정 ${fmt(sum("학습확정 전표수"))}건. 확신도가 낮은 건 실적분석(상세)에서 검토미와 같이 봐요.`,
+      action: `<button class="btn-secondary" data-view="detail">확인하러 가기 →</button>`});
+  }
+  if (ds.length) {
+    return charSay({who: "mt", title: "zrfm2가 올라왔어요.",
+      body: "«분석 실행»을 누르면 전표 글자·금액·지사·과목을 보고 맞는 사업을 찾아요."});
+  }
+  return charSay({who: "mt", title: "전표를 기다리고 있어요.",
+    body: `${esc(state.year)}년 zrfm2 를 올리고 «분석 실행»을 누르면 제가 전표마다 맞는 사업을 찾아요.`});
+}
 
 export function renderCollect() {
   const ds = (state.status?.datasets || []).filter(d => d.kind === "erp" && String(d.year) === String(state.year));
@@ -16,7 +34,9 @@ export function renderCollect() {
     <div class="space-y-6">
       <section><p class="text-sm font-semibold text-ink">STAGE 2</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적 집계와 사업 매칭</h2>
       <p class="mt-2 text-sm text-sub">ERP(SAP) zrfm2 실적을 업로드하고 자동 매칭을 실행합니다. 저확신 항목은 실적분석(상세)에서 사람이 확인합니다.</p></section>
-      ${state.status?.locked ? `<section class="rounded-card border border-warn bg-warn-bg p-4 text-sm font-semibold text-warn">🔒 ${esc(state.year)}년은 마감(잠금) 상태 — 업로드·분석이 차단됩니다.</section>` : ""}
+      ${state.status?.locked
+        ? charSay({who: "gt", tone: "warn", title: `${esc(state.year)}년은 마감(잠금) 상태예요.`, body: "업로드·분석이 차단됩니다. 고치려면 설정 탭에서 마감을 해제하세요."})
+        : matchingSay(ds, runs)}
       <section class="panel p-5">${yearPicker("cp")}</section>
       <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
         <article class="panel p-6"><h3 class="section-title">ERP(zrfm2) 업로드 — <span class="text-ink">${esc(state.year)}년</span>으로 등록</h3>

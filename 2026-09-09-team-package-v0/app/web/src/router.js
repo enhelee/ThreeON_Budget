@@ -4,6 +4,7 @@ import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadFore
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
+import { helpFabHtml } from "./components/characters.js"
 import { loadErrorBannerHtml } from "./components/loaderror.js"
 import { lockBannerHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
@@ -86,6 +87,8 @@ export function renderPage() {
   $("#page").innerHTML = renderers[state.view]();
   const lb = $("#lockBanner");
   if (lb) lb.innerHTML = loadErrorBannerHtml() + lockBannerHtml();
+  const hf = $("#helpFab");
+  if (hf) hf.innerHTML = helpFabHtml();
   const [title, subtitle] = viewMeta[state.view];
   $("#pageTitle").textContent = title;
   $("#pageSubtitle").textContent = subtitle;
@@ -135,6 +138,7 @@ export async function navigate(view, opts = {}) {
     state.fc.tab = opts.tab; state.fc.preview = null;   // 주소에서 온 하위 탭 — 미리보기는 탭마다 다르니 비운다
   }
   state.view = view;
+  state.helpOpen = false;   // 도움말은 화면마다 내용이 달라 — 옮기면 닫는다
   syncHash();
   const jobs = [["연도 목록", loadOverview], ["미반영 건수", loadPending],
                 ["마감 상태", loadLockStates]];

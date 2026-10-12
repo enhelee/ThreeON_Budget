@@ -47,6 +47,9 @@
 
       <main id="page" class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8" aria-live="polite" tabindex="-1"></main>
     </div>
+    <!-- 오른쪽 아래 도움말(매칭이) — appShell 안에 둬서 로그인 게이트에서는 같이 숨는다.
+         내용은 components/characters.js helpFabHtml() 을 router.renderPage() 가 채운다. -->
+    <div id="helpFab"></div>
   </div>
 
   <!-- 로그인 게이트 — 비로그인 시 appShell 을 대신해 화면 전체를 차지한다.
@@ -55,7 +58,7 @@
 
   <input type="file" id="trainingFile" accept=".csv" class="hidden">
 
-  <div id="toast" class="pointer-events-none fixed bottom-5 right-5 z-50 hidden max-w-sm rounded-visual bg-ink px-4 py-3 text-sm font-medium text-white shadow-float" role="status"></div>
+  <div id="toast" class="pointer-events-none fixed bottom-24 right-5 z-50 hidden max-w-sm rounded-visual bg-ink px-4 py-3 text-sm font-medium text-white shadow-float" role="status"></div>
   <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-overlay">
     <div class="rounded-visual bg-base px-8 py-6 text-center shadow-float">
       <div class="spinner mx-auto"></div>

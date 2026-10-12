@@ -1,4 +1,5 @@
 import { confBadge, gubunBadge } from "../components/badges.js"
+import { charSay } from "../components/characters.js"
 import { emptyState, pendingBarHtml } from "../components/widgets.js"
 import { realBranches } from "../data.js"
 import { state } from "../state.js"
@@ -24,6 +25,24 @@ export function legend() {
   </div>`;
 }
 
+// 확신도 0.80 미만 계획집행 — confBadge 의 «검토 필요» 기준과 같은 선이다.
+//   예비품·재생고온부품·저장품·공구는 매칭에서 총액 기준으로 통과(1.00)하므로 여기 들지 않는다.
+export const isLowConf = b => b.구분 === "계획집행" && b.확신도 !== null && b.확신도 !== undefined && Number(b.확신도) < 0.8;
+
+/** 검토미 배너 — 사람이 볼 것만 골라 준다. 결정은 사람이 한다(검토미는 고르기만 한다). */
+export function reviewBannerHtml() {
+  const d = state.det;
+  const n = (d.data?.biz || []).filter(isLowConf).length;
+  if (!n && !d.lowConf) {
+    return charSay({who: "gt", title: "확신도 낮은 사업이 없어요.",
+      body: "신규(노랑)·미시행(분홍) 행만 훑어보면 돼요."});
+  }
+  return charSay({who: "gt",
+    title: d.lowConf ? `확신도 0.80 미만 사업 ${n}건만 보고 있어요.` : `애매한 사업 ${n}건을 골랐어요.`,
+    body: "확신도 0.80 미만만 모았어요. 이건 제가 정하면 안 돼요 — 전표를 펼쳐 보고 맞는 사업으로 재배정해 주세요.",
+    action: `<button class="btn-secondary" data-action="toggle-lowconf">${d.lowConf ? "전체 보기" : "같이 보기"}</button>`});
+}
+
 export function renderDetail() {
   const d = state.det;
   const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
@@ -33,7 +52,7 @@ export function renderDetail() {
       <p class="mt-2 text-sm text-sub">지사를 선택하면 손익·자본 구분 없이 전체 사업 목록이 표시됩니다.</p></section>
       <section class="panel p-5"><label class="block max-w-sm"><span class="mb-1.5 block text-xs font-semibold text-sub">지사 선택</span>
       <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
-      ${!(state.branches || []).length ? `<p class="mt-4 text-sm text-warn">분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.</p>` : ""}</section>
+      ${!(state.branches || []).length ? `<div class="mt-4">${charSay({who: "hj", title: "아직 자리를 찾은 전표가 없어요.", body: "분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.", action: `<button class="btn-secondary" data-view="collect">실적 집계로 가기</button>`})}</div>` : ""}</section>
     </div>`;
   }
   const locked = !!state.status?.locked;
@@ -46,6 +65,7 @@ export function renderDetail() {
         <button class="btn-secondary" data-view="branches">← 전체 지사</button>
       </section>
       ${pendingBarHtml()}
+      ${locked ? "" : reviewBannerHtml()}
       <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
         <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
         <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
@@ -56,7 +76,8 @@ export function renderDetail() {
         ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
       </div></section>
       ${!locked && d.addOpen ? addBizFormHtml() : ""}
-      ${locked ? `<section class="rounded-card border border-warn bg-warn-bg p-4 text-sm font-semibold text-warn">🔒 ${esc(state.year)}년은 마감(잠금) 상태입니다 — 조회만 가능하며 재배정·수정이 차단됩니다. (설정 탭에서 해제 가능)</section>` : ""}
+      ${locked ? charSay({who: "gt", tone: "warn", title: `${esc(state.year)}년은 마감(잠금) 상태예요.`,
+        body: "확인이 끝나 잠가 뒀어요. 조회만 가능하고 재배정·수정은 차단됩니다. (설정 탭에서 해제 가능)"}) : ""}
       <div id="detResults">${detResultsHtml()}</div>
     </div>`;
 }
@@ -141,6 +162,7 @@ export function detResultsHtml() {
   if (d.item) biz = biz.filter(b => b.예산과목 === d.item);
   if (d.attr) biz = biz.filter(b => String(b.속성 ?? "") === d.attr);
   if (d.hideMissing) biz = biz.filter(b => b.구분 !== "미시행");
+  if (d.lowConf) biz = biz.filter(isLowConf);
   if (d.q.trim()) { const q = d.q.trim().toLocaleLowerCase("ko"); biz = biz.filter(b => String(b.사업명 ?? "").toLocaleLowerCase("ko").includes(q)); }
   if (d.sortKey) {
     const k = d.sortKey, dir = d.sortDir;

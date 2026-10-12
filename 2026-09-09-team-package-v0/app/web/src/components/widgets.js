@@ -1,5 +1,6 @@
 import { state } from "../state.js"
 import { esc } from "../util.js"
+import { charSvg } from "./characters.js"
 
 export function pendingBarHtml() {
   const p = state.pending;
@@ -13,7 +14,8 @@ export function pendingBarHtml() {
 }
 
 export function emptyState(msg) {
-  return `<div class="rounded-card border border-dashed border-line-strong bg-subtle px-6 py-10 text-center"><p class="font-semibold text-ink">${esc(msg)}</p></div>`;
+  // 빈 화면에는 한장이가 선다 — «전표가 아직 자리를 못 찾았다»는 뜻이 그림으로도 읽힌다.
+  return `<div class="rounded-card border border-dashed border-line-strong bg-subtle px-6 py-8 text-center">${charSvg("hj", "empty-state__img")}<p class="mt-2 font-semibold text-ink">${esc(msg)}</p></div>`;
 }
 
 export function yearPicker(prefix) {

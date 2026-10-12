@@ -1,4 +1,5 @@
 import { esc } from "../util.js"
+import { charSvg } from "./characters.js"
 
 // ─────────────────────────────────────────────────────────────
 // 사이드바 — 모든 화면에서 항상 고정. 어느 화면에 있든 클릭 한 번으로 이동한다.
@@ -49,7 +50,7 @@ export function renderSidebar() {
   return `
     <div class="px-2">
       <img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-[184px]">
-      <p class="mt-2.5 flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-ink"><span class="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true"></span>ThreeON</p>
+      <p class="mt-2.5 flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-ink"><span class="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true"></span>ThreeON${charSvg("mt", "sidebar-mascot", {head: true})}</p>
       <p class="mt-0.5 text-[13px] leading-5 text-sub">예산·실적 분석 · 발전플랜트 유지보수</p>
     </div>
 

@@ -1,3 +1,4 @@
+import { charSay } from "../components/characters.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
@@ -71,6 +72,11 @@ function header() {
       <button class="btn-secondary" data-action="fc-add-base" title="직전 기준연도의 가정을 복사해 새 기준연도를 만듭니다">＋기준연도</button>
     </div>
   </section>
+  ${fc.lockedYears?.length
+    ? charSay({who: "yc", title: "마감된 숫자로만 다음 10년을 그려요.",
+        body: `마감된 ${esc(locked)}년 실적으로 표준금액을 만들고, ${esc(fc.baseYear)}년 기준으로 10개년을 전망해요.`})
+    : charSay({who: "yc", tone: "warn", title: "아직 마감된 연도가 없어요.",
+        body: "2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면, 그 숫자로 전망을 시작해요."})}
   <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
 }
 
