@@ -223,3 +223,49 @@ def test_postgres_schema_check_runs_once_per_process(tmp_path, monkeypatch):
     dbm.connect(str(tmp_path / "a.db")).close()
     dbm.connect(str(tmp_path / "a.db")).close()
     assert len(calls) == 3
+
+
+# ── 6. 마감·분석·업로드는 같은 연도에서 한 번에 하나만 ─────────────────────
+
+def test_lock_is_refused_while_same_year_analysis_runs(srv, monkeypatch):
+    """2024년 마감(1분)과 다른 창의 재분석이 겹쳐, 고정된 숫자와 보관 파일이 다른 실행에서
+    나올 수 있었다(2026-10-13 라이브). 겹치면 뒤에 온 요청을 409 로 돌려보낸다."""
+    import threading
+    from fastapi import HTTPException
+    server, client, _ = srv
+    _analyzed(client)
+    started, release = threading.Event(), threading.Event()
+    real = pipeline_db.run_actual_db
+
+    def slow(*a, **k):
+        started.set()
+        release.wait(10)
+        return real(*a, **k)
+    monkeypatch.setattr(server.pipeline_db, "run_actual_db", slow)
+    t = threading.Thread(target=server.analyze, args=(server.AnalyzeReq(year="2023"),))
+    t.start()
+    assert started.wait(10)
+    try:
+        with pytest.raises(HTTPException) as e:
+            server.lock(server.LockReq(year="2023"))
+        assert e.value.status_code == 409 and "분석 실행 중" in e.value.detail
+        # 다른 연도는 막지 않는다
+        assert client.get("/api/lock-state?year=2024").status_code == 200
+    finally:
+        release.set()
+        t.join(20)
+    monkeypatch.setattr(server.pipeline_db, "run_actual_db", real)
+    assert client.post("/api/lock", json={"year": "2023"}).status_code == 200
+
+
+def test_relock_summary_counts_reuploads(srv):
+    server, client, _ = srv
+    _analyzed(client)
+    client.post("/api/lock", json={"year": "2023"})
+    client.request("DELETE", "/api/lock/2023", json={"reason": "계획 교체"})
+    plan = _xlsx_bytes(HDR_2324, [_row2324("화성지사", "수선유지비-열원정기점검", "화성 정기점검 보수공사", 10000)])
+    assert client.post("/api/upload/plan?year=2023",
+                       files=[("file", ("새계획.xlsx", plan, XLSX))]).status_code == 200
+    r = client.post("/api/lock", json={"year": "2023"})
+    # 해제와 같은 초의 행도 센다(changes_since 의 >=) — 테스트는 1초 안에 다 돌아 앞선 업로드까지 잡힌다
+    assert r.json()["changes"].get("자료업로드", 0) >= 1
