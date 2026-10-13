@@ -328,12 +328,15 @@ document.addEventListener("click", async e => {
       ? `${year}년을 다시 마감할까요? 열린 동안의 변경이 이 값으로 굳습니다.`
       : `${year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`;
     if (!confirm(ask)) return;
+    // 마감은 산출물 6종을 새로 만들어 보관한 뒤 잠근다 — 처음 마감하는 연도는 1분쯤 걸린다
+    busy(true, `${year}년 마감 중 — 실적본·재검토본·전표 CSV를 만들어 보관하고 있습니다 (약 1분)`);
     try {
       const r = await api("/api/lock", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({year})});
       toast(r.notice);
       await navigate(state.view);
     } catch (err) { toast(err.message); }
+    finally { busy(false); }
     return;
   }
   // 해제는 사유를 받는다 — 마감된 숫자는 대외 보고에 쓰인 값이라,
@@ -417,7 +420,7 @@ document.addEventListener("change", async e => {
     }
     return;
   }
-  if (e.target.id === "planFile" && e.target.files[0]) { uploadFile("plan", e.target.files[0]); e.target.value = ""; return; }
+  if (e.target.id === "planFile" && e.target.files.length) { uploadFile("plan", [...e.target.files]); e.target.value = ""; return; }
   if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
   if ((e.target.id === "masterItemFile" || e.target.id === "masterDeptFile") && e.target.files[0]) {
     const kind = e.target.id === "masterItemFile" ? "item" : "dept";

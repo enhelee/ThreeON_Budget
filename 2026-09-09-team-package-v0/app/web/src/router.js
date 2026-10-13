@@ -256,11 +256,13 @@ export function syncAnalyzeButton() {
   cnt.classList.toggle("hidden", !n);
 }
 
-export async function uploadFile(kind, file) {
-  busy(true, `${kind === "plan" ? "계획" : "zrfm2"} 자료를 ${state.year}년으로 DB에 흡수 중...`);
+// files: File 하나 또는 목록. 계획은 손익·자본·건설공사를 한 번에 올려 한 데이터셋으로 합친다.
+export async function uploadFile(kind, files) {
+  const list = Array.from(files instanceof File ? [files] : files);
+  busy(true, `${kind === "plan" ? "계획" : "zrfm2"} 자료${list.length > 1 ? ` ${list.length}개` : ""}를 ${state.year}년으로 DB에 흡수 중...`);
   try {
     const fd = new FormData();
-    fd.append("file", file);
+    for (const f of list) fd.append("file", f);
     const info = await api(`/api/upload/${kind}?year=${state.year}`, {method: "POST", body: fd});
     toast(`흡수 완료 — ${info.rows.toLocaleString()}행 (dataset #${info.dataset_id})`);
     await navigate(state.view);

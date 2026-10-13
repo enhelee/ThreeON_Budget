@@ -17,7 +17,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src
 
 import glob
 import json
+import mimetypes
 import re
+import threading
 from urllib.parse import quote
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -282,30 +284,36 @@ def app_redirect(path: str = ""):
 
 # ── 자료 업로드 (DB 흡수, 원본 미보관) ──────────────────────────────────
 
-async def _ingest(file: UploadFile, year: str, kind: str):
-    fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+async def _ingest(files: list, year: str, kind: str):
+    """files 는 UploadFile 목록. 계획은 여러 개(손익·자본·건설공사)를 한 데이터셋으로 합친다."""
+    tmps = []
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(await file.read())
+        for file in files:
+            fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+            tmps.append(tmp)
+            with os.fdopen(fd, "wb") as f:
+                f.write(await file.read())
+        label = " + ".join(f.filename for f in files)
         conn = _conn()
         try:
             _guard_unlocked(conn, year, "자료 업로드")
             if kind == "plan":
-                info = dbm.ingest_plan(conn, tmp, year, label=file.filename)
+                info = dbm.ingest_plan(conn, tmps, year, label=label)
             else:
-                info = dbm.ingest_erp(conn, tmp, year, label=file.filename)
+                info = dbm.ingest_erp(conn, tmps[0], year, label=label)
         finally:
             conn.close()
         return info
     finally:
-        try:
-            os.remove(tmp)          # 보안: 원본 파일 미보관
-        except OSError:
-            pass
+        for tmp in tmps:
+            try:
+                os.remove(tmp)          # 보안: 원본 파일 미보관
+            except OSError:
+                pass
 
 
 @app.post("/api/upload/plan")
-async def upload_plan(year: str, file: UploadFile = File(...)):
+async def upload_plan(year: str, file: list[UploadFile] = File(...)):
     try:
         return _clean_json(await _ingest(file, year, "plan"))
     except Exception as e:
@@ -315,7 +323,7 @@ async def upload_plan(year: str, file: UploadFile = File(...)):
 @app.post("/api/upload/erp")
 async def upload_erp(year: str, file: UploadFile = File(...)):
     try:
-        return _clean_json(await _ingest(file, year, "erp"))
+        return _clean_json(await _ingest([file], year, "erp"))
     except Exception as e:
         raise HTTPException(400, f"zrfm2 파일 흡수 실패: {e}")
 
@@ -619,20 +627,22 @@ def lock(req: LockReq):
         # lock_year 가 해제 기록을 닫아 버리므로 순서가 중요하다.
         since = dbm.lock_state(conn, req.year).get("unlocked_at")
         changes = dbm.changes_since(conn, req.year, since) if since else {}
-        dbm.lock_year(conn, req.year)
-        # 마감 스냅샷: 그 시점의 산출물 6종을 output/마감/{연도}/에 증빙 보관
+        # 마감 스냅샷: 그 시점의 산출물 6종을 output/마감/{연도}/에 증빙 보관.
+        # 산출물은 다운로드 때 만들어지므로 한 번도 내려받지 않은 연도는 0종이 보관됐다
+        # (2026-10-13 최종 테스트) — 잠그기 전에 최신 분석 기준으로 먼저 만든다.
         import shutil
         snap_dir = os.path.join(OUT_DIR, "마감", str(req.year))
         os.makedirs(snap_dir, exist_ok=True)
         copied = 0
         for budget in ("손익", "자본"):
-            for name in (f"{req.year}년 {budget}예산_실적.xlsx",
-                         f"zrfm2_{req.year}_V1({budget}).xlsx",
-                         f"matched_{req.year}_{budget}.csv"):
-                src = os.path.join(OUT_DIR, name)
-                if os.path.exists(src):
-                    shutil.copy2(src, os.path.join(snap_dir, name))
-                    copied += 1
+            with _output_lock(req.year, budget):
+                _ensure_actual_outputs(conn, req.year, budget)
+                for name in _actual_output_names(req.year, budget).values():
+                    src = os.path.join(OUT_DIR, name)
+                    if os.path.exists(src):
+                        shutil.copy2(src, os.path.join(snap_dir, name))
+                        copied += 1
+        dbm.lock_year(conn, req.year)
         summary = " · ".join(f"{k} {v}건" for k, v in changes.items())
         return {"locked": req.year, "snapshot": copied, "changes": changes,
                 "notice": f"{req.year}년 마감 완료 — 업로드·분석·재배정·수정이 차단되고 "
@@ -1288,33 +1298,64 @@ def stats_compare(year: str):
 
 # ── Excel 내보내기 (분석 실행 시 생성된 산출물 서빙) ─────────────────────
 
-@app.get("/api/export")
-def export(year: str, budget: str, kind: str = "actual"):
-    names = {
+def _actual_output_names(year, budget):
+    return {
         "actual": f"{year}년 {budget}예산_실적.xlsx",
         "v1": f"zrfm2_{year}_V1({budget}).xlsx",
         "matched": f"matched_{year}_{budget}.csv",
     }
+
+
+# (연도, 예산)마다 하나 — 산출물 3종은 한 번의 생성으로 같이 다시 써진다. 버튼 셋을 연달아
+# 누르면 세 요청이 동시에 같은 파일을 다시 쓰고, 먼저 끝난 요청이 쓰는 중인 파일을 내려보내
+# 2KB 짜리 깨진 xlsx 가 나갔다(2026-10-13 최종 테스트). 서버는 uvicorn 한 프로세스라
+# 프로세스 안 잠금이면 충분하다.
+_OUTPUT_LOCKS = {}
+_OUTPUT_LOCKS_GUARD = threading.Lock()
+
+
+def _output_lock(year, budget):
+    with _OUTPUT_LOCKS_GUARD:
+        return _OUTPUT_LOCKS.setdefault((str(year), budget), threading.Lock())
+
+
+def _ensure_actual_outputs(conn, year, budget):
+    """산출물 3종이 최신 분석보다 오래됐으면 다시 만든다. 분석 이력이 없으면 False.
+    호출측이 _output_lock 을 잡고 부른다."""
+    run = dbm.latest_run(conn, year, budget)
+    if not run:
+        return False
+    paths = [os.path.join(OUT_DIR, n) for n in _actual_output_names(year, budget).values()]
+    # 분석은 속도를 위해 파일을 만들지 않는다 → 없거나 최신 분석보다 오래됐으면 지금 생성.
+    if any(not os.path.exists(p) or _mtime_str(p) < str(run["created_at"]) for p in paths):
+        # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
+        pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
+                                  make_files=True, record_run=False)
+    return True
+
+
+@app.get("/api/export")
+def export(year: str, budget: str, kind: str = "actual"):
+    names = _actual_output_names(year, budget)
     if kind not in names:
         raise HTTPException(400, "kind는 actual|v1|matched 중 하나여야 합니다.")
     path = os.path.join(OUT_DIR, names[kind])
-    conn = _conn()
-    try:
-        run = dbm.latest_run(conn, year, budget)
-        if not run:
-            raise HTTPException(404, "분석 이력이 없습니다. 먼저 분석을 실행하세요.")
-        # 분석은 속도를 위해 파일을 만들지 않는다 → 없거나 최신 분석보다 오래됐으면 지금 생성.
-        stale = (not os.path.exists(path)
-                 or _mtime_str(path) < str(run["created_at"]))
-        if stale:
-            # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
-            pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
-                                      make_files=True, record_run=False)
-    finally:
-        conn.close()
-    if not os.path.exists(path):
-        raise HTTPException(500, "산출물 생성에 실패했습니다.")
-    return FileResponse(path, filename=names[kind])
+    with _output_lock(year, budget):
+        conn = _conn()
+        try:
+            if not _ensure_actual_outputs(conn, year, budget):
+                raise HTTPException(404, "분석 이력이 없습니다. 먼저 분석을 실행하세요.")
+        finally:
+            conn.close()
+        if not os.path.exists(path):
+            raise HTTPException(500, "산출물 생성에 실패했습니다.")
+        # 잠금 안에서 다 읽어 둔다 — FileResponse 는 잠금이 풀린 뒤에 파일을 흘려보내므로
+        # 그 사이 다른 요청이 다시 쓰면 반쪽 파일이 나간다.
+        with open(path, "rb") as f:
+            body = f.read()
+    media = mimetypes.guess_type(names[kind])[0] or "application/octet-stream"
+    return Response(body, media_type=media, headers={
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(names[kind])}"})
 
 
 # ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────
