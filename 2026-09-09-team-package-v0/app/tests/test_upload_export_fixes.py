@@ -201,3 +201,25 @@ def test_lock_archives_outputs_even_without_prior_download(srv):
     assert "2023년 손익예산_실적.xlsx" in os.listdir(snap)
     assert r.json()["snapshot"] >= 3
     assert client.get("/api/lock-state?year=2023").json()["locked"] is True
+
+
+# ── 5. 라이브 속도: PostgreSQL 은 표 확인(init_db)을 프로세스당 한 번만 ─────────
+
+def test_postgres_schema_check_runs_once_per_process(tmp_path, monkeypatch):
+    """init_db 는 표가 있어도 문장 44개를 보낸다 — Supabase 에선 그게 요청마다 4~7초였다."""
+    import sqlite3
+    url = "postgresql://example/budget"
+    monkeypatch.setattr(dbm.dbcore, "database_url", lambda: url)
+    monkeypatch.setattr(dbm.dbcore, "is_postgres_url", lambda u: u == url)
+    monkeypatch.setattr(dbm.dbcore, "connect", lambda *a, **k: sqlite3.connect(str(tmp_path / "pg.db")))
+    monkeypatch.setattr(dbm, "_PG_READY", set())
+    calls = []
+    real = dbm.init_db
+    monkeypatch.setattr(dbm, "init_db", lambda c: (calls.append(1), real(c))[1])
+    for _ in range(3):
+        dbm.connect().close()
+    assert len(calls) == 1
+    # SQLite 경로는 지금처럼 매번 확인한다(테스트가 파일을 지우고 다시 연다)
+    dbm.connect(str(tmp_path / "a.db")).close()
+    dbm.connect(str(tmp_path / "a.db")).close()
+    assert len(calls) == 3

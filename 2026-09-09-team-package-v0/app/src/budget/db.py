@@ -25,11 +25,25 @@ PLAN_COLS = loaders.PLAN_COLUMNS            # 10열
 ERP_COLS = [c for c in erp_loader.ERP_COLUMNS if c != "_erp_row"]
 
 
+# 이 프로세스에서 표 생성·마이그레이션 확인을 끝낸 PostgreSQL 주소.
+# init_db 는 표가 이미 있어도 문장 44개(CREATE … IF NOT EXISTS·열 확인)를 보낸다. SQLite 에선
+# 공짜지만 Supabase 에선 한 문장마다 네트워크 왕복이라, 연결마다 돌리면 요청 하나가 4~7초였다
+# (2026-10-13 라이브 실측 — 쿼리 한두 개짜리 /api/lock-state 도 4.5초). 스키마는 배포(=프로세스
+# 재시작) 때만 바뀌므로 프로세스당 한 번이면 충분하다. SQLite 는 테스트가 파일을 지우고 같은
+# 경로로 다시 열기도 해서 지금처럼 매번 확인한다.
+_PG_READY = set()
+
+
 def connect(db_path=None):
     """DB 연결. db_path 지정 → SQLite 파일(테스트·스크립트).
     미지정 → DATABASE_URL이 PostgreSQL이면 그 서버, 아니면 DATA_DIR/budget.db(SQLite)."""
-    if db_path is None and dbcore.is_postgres_url(dbcore.database_url()):
+    url = dbcore.database_url()
+    if db_path is None and dbcore.is_postgres_url(url):
         conn = dbcore.connect()
+        if url not in _PG_READY:
+            init_db(conn)
+            _PG_READY.add(url)
+        return conn
     else:
         path = db_path or DEFAULT_DB
         os.makedirs(os.path.dirname(path), exist_ok=True)
