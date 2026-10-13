@@ -15,6 +15,7 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
+import contextlib
 import glob
 import json
 import mimetypes
@@ -236,6 +237,32 @@ def _guard_unlocked(conn, year, action="변경"):
                  "설정 탭에서 잠금을 해제한 뒤 진행하세요.")
 
 
+# 연도 단위 «무거운 쓰기»(분석·마감·해제·자료 업로드)는 한 번에 하나만. 2026-10-13 라이브에서
+# 2024년 마감(산출물 생성 1분)이 도는 사이 다른 창에서 같은 해 분석을 다시 돌려, DB 에 고정된
+# 숫자와 마감 보관 파일이 서로 다른 실행에서 나올 수 있었다. 기다리게 하지 않고 바로 409 로
+# 돌려보낸다 — 마감은 1분, 분석은 수십 초라 그동안 화면이 멈춘 것처럼 보이는 편이 더 나쁘다.
+# 서버는 uvicorn 한 프로세스라 프로세스 안 잠금이면 충분하다.
+_YEAR_OPS = {}
+_YEAR_OPS_NOW = {}
+_YEAR_OPS_GUARD = threading.Lock()
+
+
+@contextlib.contextmanager
+def _year_op(year, action):
+    year = str(year)
+    with _YEAR_OPS_GUARD:
+        lk = _YEAR_OPS.setdefault(year, threading.Lock())
+    if not lk.acquire(blocking=False):
+        busy = _YEAR_OPS_NOW.get(year, "다른 작업")
+        raise HTTPException(409, f"{year}년은 지금 {busy} 중입니다 — 끝난 뒤 다시 {action}하세요.")
+    _YEAR_OPS_NOW[year] = action
+    try:
+        yield
+    finally:
+        _YEAR_OPS_NOW.pop(year, None)
+        lk.release()
+
+
 def _mtime_str(path):
     """파일 수정시각을 DB의 created_at과 같은 'YYYY-MM-DD HH:MM:SS' 문자열로."""
     import datetime
@@ -294,15 +321,16 @@ async def _ingest(files: list, year: str, kind: str):
             with os.fdopen(fd, "wb") as f:
                 f.write(await file.read())
         label = " + ".join(f.filename for f in files)
-        conn = _conn()
-        try:
-            _guard_unlocked(conn, year, "자료 업로드")
-            if kind == "plan":
-                info = dbm.ingest_plan(conn, tmps, year, label=label)
-            else:
-                info = dbm.ingest_erp(conn, tmps[0], year, label=label)
-        finally:
-            conn.close()
+        with _year_op(year, "자료 업로드"):
+            conn = _conn()
+            try:
+                _guard_unlocked(conn, year, "자료 업로드")
+                if kind == "plan":
+                    info = dbm.ingest_plan(conn, tmps, year, label=label)
+                else:
+                    info = dbm.ingest_erp(conn, tmps[0], year, label=label)
+            finally:
+                conn.close()
         return info
     finally:
         for tmp in tmps:
@@ -385,21 +413,22 @@ def analyze(req: AnalyzeReq):
     Excel/CSV 산출물은 만들지 않는다 — 그게 시간의 63%였다(zrfm2_V1 8.2초).
     파일은 `/api/export`에서 필요할 때 생성한다.
     """
-    conn = _conn()
-    try:
-        _guard_unlocked(conn, req.year, "분석 실행")
-        out = {}
-        for budget in ("손익", "자본"):
-            res = pipeline_db.run_actual_db(
-                conn, OUT_DIR, req.year, budget, new_policy=req.policy,
-                make_files=False)
-            out[budget] = {"run_id": res["run_id"], "요약": res["요약"],
-                           "경고": res.get("경고", [])}
-        return _clean_json(out)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    finally:
-        conn.close()
+    with _year_op(req.year, "분석 실행"):
+        conn = _conn()
+        try:
+            _guard_unlocked(conn, req.year, "분석 실행")
+            out = {}
+            for budget in ("손익", "자본"):
+                res = pipeline_db.run_actual_db(
+                    conn, OUT_DIR, req.year, budget, new_policy=req.policy,
+                    make_files=False)
+                out[budget] = {"run_id": res["run_id"], "요약": res["요약"],
+                               "경고": res.get("경고", [])}
+            return _clean_json(out)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        finally:
+            conn.close()
 
 
 def _latest_runs(conn, year):
@@ -621,6 +650,11 @@ class UnlockReq(BaseModel):
 
 @app.post("/api/lock")
 def lock(req: LockReq):
+    with _year_op(req.year, "마감"):
+        return _lock(req)
+
+
+def _lock(req: LockReq):
     conn = _conn()
     try:
         # 열려 있던 구간이면 그 사이 무엇이 바뀌었는지 먼저 센다 —
@@ -655,6 +689,11 @@ def lock(req: LockReq):
 
 @app.delete("/api/lock/{year}")
 def unlock(year: str, req: UnlockReq, request: Request):
+    with _year_op(year, "잠금 해제"):
+        return _unlock(year, req, request)
+
+
+def _unlock(year: str, req: UnlockReq, request: Request):
     """마감 해제 — 사유를 반드시 받는다.
 
     마감된 연도의 숫자는 대외 보고에 쓰인 값이다. 버튼 한 번으로 열리면 열린 줄

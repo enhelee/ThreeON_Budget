@@ -810,6 +810,12 @@ def changes_since(conn, year, since):
             (str(year), since)).fetchone()[0]
         if n:
             out[label] = n
+    # 계획·zrfm2 를 바꿔 올린 것도 «열린 동안 바뀐 것»이다 — 2026-10-13 라이브에서 23년 계획을
+    # 원본으로 교체하고 재마감했더니 요약에 «분석실행 2건»만 떠 교체 사실이 안 보였다.
+    n = conn.execute("SELECT COUNT(*) FROM dataset WHERE year=? AND uploaded_at >= ?",
+                     (str(year), since)).fetchone()[0]
+    if n:
+        out["자료업로드"] = n
     out.update(config_changes_since(conn, year, since))
     return out
 
