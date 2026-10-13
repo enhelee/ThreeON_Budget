@@ -322,12 +322,15 @@ def _now():
 # ---------------------------------------------------------------------------
 
 def ingest_plan(conn, path, year, label=None):
-    df = loaders.load_business_plan(path)
+    """path 는 파일 하나 또는 목록. 목록이면 한 데이터셋으로 합친다(손익·자본·건설공사)."""
+    paths = [path] if isinstance(path, (str, os.PathLike)) else list(path)
+    df = loaders.load_business_plans(paths)
     cur = conn.cursor()
     total = float(pd.to_numeric(df["연예산"], errors="coerce").fillna(0).sum())
     cur.execute("INSERT INTO dataset(kind,year,label,uploaded_at,row_count,total_amount)"
                 " VALUES('plan',?,?,?,?,?)",
-                (str(year), label or os.path.basename(path), _now(), len(df), total))
+                (str(year), label or " + ".join(os.path.basename(p) for p in paths),
+                 _now(), len(df), total))
     ds_id = cur.lastrowid
     rows = []
     for _, r in df.iterrows():

@@ -57,11 +57,20 @@ def learn_key(s):
 
 
 def normalize_item(name, alias_map):
-    """예산과목명을 계획본 표준 표기로 환원. 매핑 없으면 원문 그대로."""
+    """예산과목명을 계획본 표준 표기로 환원. 매핑 없으면 원문(공백 제거) 그대로.
+
+    과목명 안의 공백(전각 포함)은 지운다 — 표준 과목명엔 공백이 없는데 23년 계획본에
+    «건 물»이 섞여 «건물»과 다른 과목이 되어 1.3억이 빠졌다(2026-10-13 최종 테스트).
+    alias 원표기도 같은 방식으로 맞춰 본다."""
     if name is None:
         return None
-    key = str(name).strip()
-    return alias_map.get(key, key)
+    key = _SPACE.sub("", str(name))
+    if key in alias_map:
+        return alias_map[key]
+    for src, dst in alias_map.items():
+        if _SPACE.sub("", str(src)) == key:
+            return dst
+    return key
 
 
 def dept_from_text(text, plan_depts):
