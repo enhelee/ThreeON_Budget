@@ -15,6 +15,8 @@
 | **들어옴** | 사업별예산 업로드 xlsx | 1 계획 | `POST /api/upload`(plan) | `loaders.load_business_plan` | 천원 |
 | 들어옴 | `zrfm2.XLSX` (SAP export) | 2 실적 | `POST /api/upload`(erp) | `erp_loader.load_erp` | **원**→로더가 천원 |
 | 들어옴 | 정비등급·정비일정·고온부품·본사배분 xlsx (4종) | 5 전망 | `POST /api/forecast/import?kind=grades\|schedule\|hot-parts\|hq-master` | `forecast_import` | 천원 |
+| 들어옴 | «(YY년) 손익·자본예산 실적 분석» xlsx (사업마다 투자유형 K열·세부 M열) | 5 전망 › 투자유형별 | `POST /api/forecast/invest-type/import-labels` | `invest_type.labels_from_workbook` → 학습데이터(사람 확정) → 재학습 | — |
+| 나감 | `투자유형별_실적·전망_{기준연도}년기준.xlsx` (분류표·과거 실적·전망·사업별 분류) | 5 전망 › 투자유형별 | `GET /api/forecast/invest-type/export` | `invest_type.export_workbook` | 천원 |
 | 들어옴 | v2 상태 CSV 9종 (동료 PC, 1회성) | — (파이썬 함수) | 없음 | `forecast_store.import_v2_csv_dir` | 원→천원 |
 | **나감** | `{연도}년 {손익\|자본}예산_계획.xlsx` | 1 계획 | `GET /api/plan/export` | `excel_plan_writer` | 천원 |
 | 나감 | `{연도}년 {손익\|자본}예산_실적.xlsx` · `zrfm2_{연도}_V1({예산}).xlsx` · `matched_{연도}_{예산}.csv` | 2 실적 | `GET /api/export?kind=actual\|v1\|matched` | `pipeline_actual`·`excel_writer` | 천원(matched 는 원·천원 둘 다) |

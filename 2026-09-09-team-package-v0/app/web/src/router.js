@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadForecastType, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -31,7 +31,7 @@ const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
 // 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
-const FC_TABS = ["manage", "bench", "table"];
+const FC_TABS = ["manage", "bench", "table", "type"];
 
 /** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
 export function viewHash(view, branch) {
@@ -152,6 +152,7 @@ export async function navigate(view, opts = {}) {
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
     if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
+    if (state.fc.tab === "type") jobs.push(["투자유형별", loadForecastType]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "stats") {

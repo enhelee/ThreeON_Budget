@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_export, forecast_import, forecast_store as fs, pipeline_forecast as pf
+from . import config_store, forecast_export, forecast_import, forecast_store as fs, invest_type, ml_registry, pipeline_forecast as pf
 from . import db as dbm
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -212,6 +212,75 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 raise HTTPException(400, "kind 는 standardization·longterm·schedule·hot-parts·hq-master 중 하나여야 합니다.")
         finally:
             conn.close()
+        return Response(data, media_type=XLSX,
+                        headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
+
+    # ── 투자유형별(«무엇 때문에 쓰는 돈인가») — src/budget/invest_type.py ──
+    @router.get("/invest-type")
+    def invest_type_report(base_year: str):
+        conn = conn_factory()
+        try:
+            return clean_json(invest_type.report(conn, base_year))
+        finally:
+            conn.close()
+
+    @router.get("/invest-type/rows")
+    def invest_type_rows(year: str, type: str):
+        conn = conn_factory()
+        try:
+            return clean_json({"year": year, "type": type, "rows": invest_type.type_rows(conn, year, type)})
+        finally:
+            conn.close()
+
+    @router.post("/invest-type/import-labels")
+    async def invest_type_import(file: list[UploadFile] = File(...)):
+        """«실적 분석» 엑셀(사업마다 투자유형이 붙은 것) 여러 개 → 학습데이터(사람 확정) → 두 모델 재학습."""
+        import os
+        import tempfile
+        tmps = []
+        try:
+            for f in file:
+                fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+                with os.fdopen(fd, "wb") as out:
+                    out.write(await f.read())
+                # 파일 이름의 «(25년) 손익» 으로 연도·예산을 읽으므로 원래 이름을 붙여 둔다
+                named = os.path.join(os.path.dirname(tmp), f"{os.path.basename(tmp)}_{os.path.basename(f.filename)}")
+                os.replace(tmp, named)
+                tmps.append(named)
+            labels = invest_type.labels_from_files(tmps)
+        except Exception as e:
+            raise HTTPException(400, f"실적 분석 엑셀을 읽지 못했습니다: {e}")
+        finally:
+            for t in tmps:
+                try:
+                    os.remove(t)
+                except OSError:
+                    pass
+        if labels.empty:
+            raise HTTPException(400, "투자유형이 붙은 행을 찾지 못했습니다 — K열(투자유형)이 채워진 «실적 분석» 엑셀인지 확인하세요.")
+        conn = conn_factory()
+        try:
+            added = invest_type.store_labels(conn, labels)
+            trained = {}
+            for name in (invest_type.TYPE_MODEL, invest_type.DETAIL_MODEL):
+                try:
+                    info = ml_registry.train(conn, name, note="실적 분석 라벨 가져오기")
+                    trained[name] = {"version": info["version"], "n_samples": info["n_samples"],
+                                     "cv_accuracy": info["metrics"].get("cv_accuracy")}
+                except ValueError as e:
+                    trained[name] = {"error": str(e)}
+            return clean_json({"rows": int(len(labels)), "added": added, "trained": trained})
+        finally:
+            conn.close()
+
+    @router.get("/invest-type/export")
+    def invest_type_export(base_year: str):
+        conn = conn_factory()
+        try:
+            data = invest_type.export_workbook(conn, base_year)
+        finally:
+            conn.close()
+        name = f"투자유형별_실적·전망_{base_year}년기준.xlsx"
         return Response(data, media_type=XLSX,
                         headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
 

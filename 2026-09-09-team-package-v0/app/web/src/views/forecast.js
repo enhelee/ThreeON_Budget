@@ -19,7 +19,7 @@ import { esc, fmt } from "../util.js"
 //   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"], ["type", "투자유형별"]]
 const HOT_ITEMS = ["고온부품재생", "신품구매"]
 export const METHODS = ["등급별 평균", "최근실적", "3개년 평균", "5개년 평균"]
 const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
@@ -268,9 +268,119 @@ function tableBody() {
   </article>`
 }
 
+// ── 투자유형별 탭 — «무엇 때문에 쓰는 돈인가» (src/budget/invest_type.py) ──────────
+// 과목(회계) 대신 정기점검·노후설비 교체·설비개선(AX/DX…) 같은 투자유형으로 실적과 전망을 본다.
+// 단위는 억 원(다른 탭은 천원) — 유형 13종 × 10년을 한눈에 보려고 줄였다. 엑셀은 천원 그대로.
+
+const eok = v => (v === null || v === undefined || isNaN(v)) ? "-" : (v / 1e5).toLocaleString("ko-KR", {maximumFractionDigits: 1, minimumFractionDigits: 1})
+const pct = v => (v === null || v === undefined || isNaN(v)) ? "-" : Math.round(v * 100) + "%"
+const GROUP_BADGE = {정기: "bg-info-bg text-info", 비정기: "bg-warn-bg text-warn", 미분류: "bg-subtle text-sub"}
+const GROUP_BAR = {정기: "bg-info", 비정기: "bg-warn", 미분류: "bg-line-strong"}
+const SRC_BADGE = {과목규칙: "bg-subtle text-ink", 사람: "bg-ok-bg text-ok", 낱말규칙: "bg-subtle text-ink", 모델: "bg-info-bg text-info", 미분류: "bg-err-bg text-err"}
+const groupBadge = g => `<span class="badge ${GROUP_BADGE[g] || GROUP_BADGE.미분류}">${esc(g)}</span>`
+
+function typeKpis(r) {
+  const src = r.actual.sources || {}
+  const m = r.model?.투자유형
+  const yrs = r.forecast.years || []
+  const total = r.forecast.rows.reduce((s, x) => s + yrs.reduce((a, y) => a + (x[y] || 0), 0), 0)
+  const reg = r.forecast.rows.filter(x => x.대분류 === "정기").reduce((s, x) => s + yrs.reduce((a, y) => a + (x[y] || 0), 0), 0)
+  const card = (label, big, small) => `<div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-sub">${label}</p><p class="mt-1 text-xl font-bold text-ink">${big}</p><p class="mt-1 text-xs text-tri">${small}</p></div>`
+  const order = ["과목규칙", "사람", "모델", "낱말규칙", "미분류"].filter(k => src[k])
+  return `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    ${card("분류된 금액의 출처", order.length ? `${esc(order[0])} ${pct(src[order[0]])}` : "-", order.slice(1).map(k => `${esc(k)} ${pct(src[k])}`).join(" · ") || "마감 연도 실적이 없습니다")}
+    ${card("분류 모델 정확도 (교차검증)", m?.cv_accuracy != null ? pct(m.cv_accuracy) : "학습 전", m ? `v${m.version} · 학습 ${fmt(m.n_samples)}건 · ${esc(m.trained_at || "")}` : "실적 분석 엑셀로 라벨을 가져오면 학습합니다")}
+    ${card("학습 데이터 (사람 확정)", `${fmt(r.model?.examples?.confirmed || 0)}건`, `투자유형 ${Object.keys(r.model?.examples?.per_class || {}).length}종`)}
+    ${card(`${yrs[0] || ""}~${yrs[yrs.length - 1] || ""} 전망 합계`, `${eok(total)}억`, total ? `정기 ${pct(reg / total)} · 비정기 ${pct(1 - reg / total)}` : "전망이 없습니다")}
+  </div>`
+}
+
+function typeActualTable(r) {
+  const a = r.actual, open = state.fc.typeOpen
+  if (!a.rows.length) return emptyState("마감된 연도의 분석 결과가 없습니다 — 설정에서 연도를 마감하면 투자유형별로 나눠 보여줍니다.")
+  const max = Math.max(1, ...a.rows.flatMap(x => a.years.map(y => x[String(y)] || 0)))
+  const sums = Object.fromEntries(a.years.map(y => [y, a.rows.reduce((s, x) => s + (x[String(y)] || 0), 0)]))
+  const last = a.years[a.years.length - 1]
+  return `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">투자유형</th>${a.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}<th class="px-3 py-2">${last}년 크기</th></tr></thead>
+    <tbody class="divide-y divide-line-subtle">${a.rows.map(x => `<tr>
+      <td class="table-cell font-semibold text-ink">${groupBadge(x.대분류)} ${esc(x.투자유형)}</td>
+      ${a.years.map(y => { const on = open && open.type === x.투자유형 && String(open.year) === String(y)
+        return `<td class="table-cell text-right"><button class="rounded px-1 ${on ? "bg-ink text-white" : "hover:bg-subtle"}" data-ittype="${esc(x.투자유형)}" data-ityear="${y}" title="${y}년 ${esc(x.투자유형)} 사업 목록">${eok(x[String(y)])}</button></td>` }).join("")}
+      <td class="table-cell"><span class="inline-block h-2 rounded ${GROUP_BAR[x.대분류] || GROUP_BAR.미분류}" style="width:${Math.max(2, Math.round((x[String(last)] || 0) / max * 120))}px"></span></td></tr>`).join("")}
+    <tr class="bg-subtle font-bold"><td class="table-cell text-ink">합계</td>${a.years.map(y => `<td class="table-cell text-right">${eok(sums[y])}</td>`).join("")}<td></td></tr></tbody></table></div>`
+}
+
+function typeDetail() {
+  const open = state.fc.typeOpen
+  if (!open) return ""
+  if (!open.rows) return `<p class="p-5 text-sm text-sub">불러오는 중…</p>`
+  return `<div class="border-t border-line p-5 sm:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2"><h4 class="font-bold text-ink">${esc(String(open.year))}년 · ${esc(open.type)} — 금액 큰 순 ${fmt(open.rows.length)}개 사업</h4>
+      <button class="btn-secondary" data-action="it-close">닫기</button></div>
+    <p class="section-help">분류출처: 과목규칙(예산과목으로 정해짐) · 사람(실적 분석 라벨) · 낱말규칙(LTSA·고온부품·노후·돌발) · 모델(학습 예측, 신뢰도 표시). 단위 천원.</p>
+    <div class="mt-3 max-h-[28rem] overflow-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th><th class="px-3 py-2">예산과목</th><th class="px-3 py-2">사업명</th><th class="px-3 py-2 text-right">실적</th><th class="px-3 py-2">분류출처</th><th class="px-3 py-2 text-right">신뢰도</th></tr></thead>
+    <tbody class="divide-y divide-line-subtle">${open.rows.map(x => `<tr><td class="table-cell">${esc(x.지사)}</td><td class="table-cell text-xs text-sub">${esc(x.예산과목)}</td><td class="table-cell">${esc(x.사업명)}</td><td class="table-cell text-right">${fmt(x.금액)}</td>
+      <td class="table-cell"><span class="badge ${SRC_BADGE[x.분류출처] || SRC_BADGE.미분류}">${esc(x.분류출처)}</span></td><td class="table-cell text-right text-xs ${x.분류출처 === "모델" && x.분류신뢰도 < 0.6 ? "text-warn" : "text-sub"}">${x.분류신뢰도 == null ? "-" : x.분류신뢰도.toFixed(2)}</td></tr>`).join("") || '<tr><td class="table-cell text-tri" colspan="6">사업이 없습니다.</td></tr>'}</tbody></table></div></div>`
+}
+
+function typeForecast(r) {
+  const f = r.forecast
+  if (!f.rows.length) return emptyState("전망 표가 비어 있습니다 — 마감된 연도가 있어야 합니다.")
+  const yrs = f.years
+  const by = g => yrs.map(y => f.rows.filter(x => x.대분류 === g).reduce((s, x) => s + (x[y] || 0), 0))
+  const reg = by("정기"), non = by("비정기"), oth = by("미분류")
+  const top = Math.max(1, ...yrs.map((_, i) => reg[i] + non[i] + oth[i]))
+  const col = i => { const h = v => Math.round(v / top * 150)
+    return `<div class="flex flex-1 flex-col items-center gap-1"><div class="flex h-[150px] w-6 flex-col justify-end overflow-hidden rounded-t">
+      ${oth[i] ? `<div class="bg-line-strong" style="height:${h(oth[i])}px"></div>` : ""}<div class="bg-warn" style="height:${h(non[i])}px" title="비정기 ${eok(non[i])}억"></div><div class="bg-info" style="height:${h(reg[i])}px" title="정기 ${eok(reg[i])}억"></div></div>
+      <span class="text-[11px] text-tri">${String(yrs[i]).slice(2)}</span></div>` }
+  const rows = [...f.rows].sort((a, b) => yrs.reduce((s, y) => s + (b[y] || 0), 0) - yrs.reduce((s, y) => s + (a[y] || 0), 0))
+  return `<div class="flex flex-wrap items-center gap-4 text-xs text-sub"><span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-info"></span>정기</span><span class="flex items-center gap-1"><span class="inline-block h-2.5 w-2.5 rounded-sm bg-warn"></span>비정기</span></div>
+    <div class="mt-2 flex items-end gap-2" role="img" aria-label="${yrs[0]}~${yrs[yrs.length - 1]}년 정기·비정기 누적 전망">${yrs.map((_, i) => col(i)).join("")}</div>
+    <div class="mt-4 overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">투자유형</th>${yrs.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}<th class="px-3 py-2 text-right">10년 합계</th></tr></thead>
+    <tbody class="divide-y divide-line-subtle">${rows.map(x => `<tr><td class="table-cell font-semibold text-ink">${groupBadge(x.대분류)} ${esc(x.투자유형)}</td>${yrs.map(y => `<td class="table-cell text-right">${eok(x[y])}</td>`).join("")}<td class="table-cell text-right font-bold">${eok(yrs.reduce((s, y) => s + (x[y] || 0), 0))}</td></tr>`).join("")}</tbody></table></div>`
+}
+
+function typeTaxonomy(r) {
+  return `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">대분류</th><th class="px-3 py-2">투자유형</th><th class="px-3 py-2">세부 (예)</th><th class="px-3 py-2">예측 방법</th><th class="px-3 py-2">필요한 자료</th></tr></thead>
+    <tbody class="divide-y divide-line-subtle">${r.taxonomy.map(t => `<tr><td class="table-cell">${groupBadge(t.대분류)}</td><td class="table-cell font-semibold text-ink">${esc(t.투자유형)}</td><td class="table-cell text-xs text-sub">${esc(t.세부.join(" · "))}</td><td class="table-cell text-sm">${esc(t.예측방법)}</td><td class="table-cell text-xs text-sub">${esc(t.필요자료)}</td></tr>`).join("")}</tbody></table></div>
+    ${r.notes.length ? `<div class="mt-3 rounded-control bg-warn-bg p-3 text-xs text-warn"><p class="font-bold">팀 확정 때 짚을 것</p><ul class="mt-1 list-disc pl-4">${r.notes.map(n => `<li><b>${esc(n.라벨)}</b> — ${esc(n.내용)}</li>`).join("")}</ul></div>` : ""}`
+}
+
+function typeBody() {
+  const r = state.fc.type
+  if (!r) return emptyState("투자유형별 결과를 불러오지 못했습니다.")
+  return `
+  ${typeKpis(r)}
+  <article class="panel overflow-hidden">
+    <div class="border-b border-line p-5 sm:p-6">
+      <h3 class="section-title">과거 실적 — 투자유형별 (마감 연도)</h3>
+      <p class="section-help">단위 억 원 · 숫자를 누르면 그 해 그 유형으로 분류된 사업과 분류 출처가 열립니다.</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button class="btn-secondary" data-action="it-import" title="사업마다 투자유형(K열)이 붙은 «(YY년) 손익|자본예산 실적 분석» 엑셀 — 여러 개를 한 번에 고를 수 있습니다">실적 분석 엑셀로 라벨 가져오기</button>
+        <button class="btn-secondary" data-itexport title="분류표·과거 실적·전망·사업별 분류 4개 시트">투자유형별 엑셀 내보내기</button>
+      </div>
+    </div>
+    ${typeActualTable(r)}
+    ${typeDetail()}
+  </article>
+  <article class="panel p-5 sm:p-6">
+    <h3 class="section-title">${esc(r.base_year)}~ 10년 전망 — 투자유형별</h3>
+    <p class="section-help">«중장기 전망» 탭의 과목별 전망을 유형으로 나눴습니다. 과목만 보면 정해지는 과목은 통째로, 나머지(기계장치·보완개선·정기유지보수 등)는 마감 연도 실적의 유형 비율대로. 단위 억 원.</p>
+    <p class="mt-2 rounded-control bg-warn-bg px-3 py-2 text-xs text-warn">설비개선·노후설비 교체는 지금 «과거 비율»로만 나눠서 작게 잡힐 수 있습니다. 투자계획(AX/DX 등 정책 목표)·설비대장(설치연도·내용연수)을 받으면 유형별로 따로 계산하도록 바꿀 예정입니다.</p>
+    <div class="mt-4">${typeForecast(r)}</div>
+  </article>
+  <article class="panel p-5 sm:p-6">
+    <h3 class="section-title">투자유형 분류표 (팀 확정 전 초안)</h3>
+    <p class="section-help">대분류 2 → 투자유형 ${r.taxonomy.length}종 → 세부. 사람이 «실적 분석»에 붙여 온 라벨(자본 10종·손익 40종·설비개선 세부 11종)을 이 표로 묶었습니다.</p>
+    <div class="mt-3">${typeTaxonomy(r)}</div>
+  </article>
+  <input id="itImportFile" class="hidden" type="file" accept=".xlsx" multiple>`
+}
+
 export function renderForecast() {
   const tab = state.fc.tab || "manage"
-  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : manageBody()
+  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : tab === "type" ? typeBody() : manageBody()
   return `
   <div class="space-y-6">
     ${header()}
