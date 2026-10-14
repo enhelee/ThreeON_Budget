@@ -18,7 +18,8 @@ export const state = {
   fc: { baseYear: "", baseYears: [], lockedYears: [], tab: "manage",
         data: null, bench: null, table: null, site: "__total__",
         dirty: new Set(), preview: null, benchGroup: "all",
-        benchEdits: {methods: {}, overrides: {}} },
+        benchEdits: {methods: {}, overrides: {}},
+        type: null, typeOpen: null },   // 투자유형별 탭 — report · 펼친 (연도,유형) 사업 목록
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다

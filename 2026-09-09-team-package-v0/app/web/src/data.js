@@ -126,3 +126,8 @@ export async function loadForecastBench() {
 export async function loadForecastTable() {
   state.fc.table = await api(`/api/forecast/table?base_year=${state.fc.baseYear}`);
 }
+
+export async function loadForecastType() {
+  state.fc.type = await api(`/api/forecast/invest-type?base_year=${state.fc.baseYear}`);
+  state.fc.typeOpen = null;
+}
