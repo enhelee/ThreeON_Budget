@@ -460,6 +460,72 @@ def test_override_does_not_learn_on_save(env):
     assert dbm.count_learn_pending(conn, "2023") == 0
 
 
+def _count_learn_pending_v1(conn, year):
+    """묶음 조회로 바꾸기 전 구현(재배정 1건마다 질의 2회) — 결과 동등성의 기준."""
+    n = 0
+    for budget in ("손익", "자본"):
+        run = dbm.latest_run(conn, year, budget)
+        rows = conn.execute(
+            "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
+            " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
+            " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
+        for rid, target, item_raw, text in rows:
+            item = None
+            if run:
+                r = conn.execute(
+                    "SELECT 과목정규 FROM match_line WHERE run_id=? AND erp_row_id=?",
+                    (run["id"], int(rid))).fetchone()
+                item = r[0] if r else None
+            item = item or item_raw
+            key = dbm.norm_text(text)
+            if not item or not key:
+                continue
+            hit = conn.execute(
+                "SELECT 사업명 FROM learned_match WHERE 과목=? AND 텍스트정규=?",
+                (item, key)).fetchone()
+            if not hit or hit[0] != target:
+                n += 1
+    return n
+
+
+def test_count_learn_pending_batched_same_result_and_bounded_queries(env):
+    """학습 대기 건수는 모든 화면 전환마다 계산된다 — 재배정 건수만큼 질의가 늘면
+    운영 PG 에서 화면 하나가 30초 걸린다(2026-10-15 실측). 옛 구현과 같은 값을 내면서
+    질의 수는 재배정 건수와 무관해야 한다."""
+    conn, out = env
+    base = pipeline_db.run_actual_db(conn, out, "2023", "손익", make_files=False)
+    detail = dbm.load_match_detail(conn, base["run_id"])
+    ids = {r["전표번호"]: int(r["erp_row_id"]) for _, r in detail.iterrows()}
+
+    def queries(fn):
+        seen = []
+        conn.set_trace_callback(seen.append)
+        try:
+            return fn(), len(seen)
+        finally:
+            conn.set_trace_callback(None)
+
+    assert dbm.count_learn_pending(conn, "2023") == 0          # 재배정 없음
+
+    # 재배정 3건 → 학습 → 대기 0 → 하나는 다른 사업으로 다시 재배정(학습과 불일치 = 대기)
+    dbm.add_override(conn, "2023", "손익", ids["D1"], "화성 정기점검 보수공사")
+    dbm.add_override(conn, "2023", "손익", ids["D2"], "긴급 배관보수(수동)")
+    dbm.add_override(conn, "2023", "손익", ids["D3"], "화성 옥외배관 도색공사")
+    assert dbm.count_learn_pending(conn, "2023") == _count_learn_pending_v1(conn, "2023") >= 1
+    pipeline_db.run_actual_db(conn, out, "2023", "손익", make_files=False)
+    dbm.learn_from_year(conn, "2023")
+    assert dbm.count_learn_pending(conn, "2023") == _count_learn_pending_v1(conn, "2023") == 0
+    dbm.add_override(conn, "2023", "손익", ids["D3"], "화성 정기점검 보수공사")
+    assert dbm.count_learn_pending(conn, "2023") == _count_learn_pending_v1(conn, "2023")
+
+    n_few, q_few = queries(lambda: dbm.count_learn_pending(conn, "2023"))
+    for _ in range(30):                                         # 재배정이 많아져도
+        dbm.add_override(conn, "2023", "손익", ids["D2"], "또 다른 이름")
+    n_many, q_many = queries(lambda: dbm.count_learn_pending(conn, "2023"))
+    assert n_many == _count_learn_pending_v1(conn, "2023")
+    assert q_many == q_few <= 8                                 # 질의 수는 그대로
+
+
 def test_override_forced_new_name(env):
     """신규 전표(D2)에 사용자가 직접 사업명 부여 → 그 이름의 신규 사업으로 강제."""
     conn, out = env

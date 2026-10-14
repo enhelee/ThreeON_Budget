@@ -934,30 +934,41 @@ def count_learn_pending(conn, year):
 
     재배정 저장 시 자동 학습을 떼어냈으므로(설정 탭 [AI 학습] 버튼으로 분리),
     학습 대기 = override 중 (과목, 텍스트정규)가 learned_match에 없는 것.
+
+    ⚠ 이 값은 /api/pending 을 거쳐 «모든 화면 전환»마다 계산된다. 재배정 1건마다
+      match_line·learned_match 를 따로 묻던 옛 구현은 운영 PG(질의당 ~75ms 왕복)에서
+      재배정 193건에 30초가 걸렸다(2026-10-15 실측). 그래서 예산별로 묶어서 읽는다.
     """
     n = 0
     for budget in ("손익", "자본"):
-        run = latest_run(conn, year, budget)
         rows = conn.execute(
             "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
             " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
             " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
+        if not rows:
+            continue
+        run = latest_run(conn, year, budget)
+        item_of = {}
+        if run:
+            for rid, item in conn.execute(
+                    "SELECT erp_row_id, 과목정규 FROM match_line WHERE run_id=? AND erp_row_id IN"
+                    " (SELECT erp_row_id FROM override WHERE year=? AND budget=?)",
+                    (run["id"], str(year), budget)):
+                item_of.setdefault(int(rid), item)
+        cands = []
         for rid, target, item_raw, text in rows:
-            item = None
-            if run:
-                r = conn.execute(
-                    "SELECT 과목정규 FROM match_line WHERE run_id=? AND erp_row_id=?",
-                    (run["id"], int(rid))).fetchone()
-                item = r[0] if r else None
-            item = item or item_raw
+            item = item_of.get(int(rid)) or item_raw
             key = norm_text(text)
-            if not item or not key:
-                continue          # 텍스트 없는 전표는 학습 대상 아님
-            hit = conn.execute(
-                "SELECT 사업명 FROM learned_match WHERE 과목=? AND 텍스트정규=?",
-                (item, key)).fetchone()
-            if not hit or hit[0] != target:
-                n += 1
+            if item and key:          # 텍스트 없는 전표는 학습 대상 아님
+                cands.append((item, key, target))
+        if not cands:
+            continue
+        items = sorted({c[0] for c in cands})
+        ph = ",".join("?" for _ in items)
+        learned = {(a, b): c for a, b, c in conn.execute(
+            f"SELECT 과목, 텍스트정규, 사업명 FROM learned_match WHERE 과목 IN ({ph})",
+            tuple(items))}
+        n += sum(1 for item, key, target in cands if learned.get((item, key)) != target)
     return n
 
 
