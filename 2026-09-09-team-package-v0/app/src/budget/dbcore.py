@@ -23,9 +23,43 @@ lastrowid)으로 쓰여 있다. PostgreSQL(Supabase·사내 서버)로 갈 때 d
 ⚠️ PostgreSQL 경로는 로컬에 PG 서버가 없어 단위 테스트(번역 규칙)만 검증됐다.
    Supabase 최초 접속 시 `py scripts/db_check.py`로 스키마 생성·조회를 확인할 것.
 """
+import contextvars
 import os
 import re
 import sqlite3
+import time
+
+# ── 요청별 DB 사용량(Server-Timing 헤더의 근거) ─────────────────────────────
+# 운영 DB(서울)와 앱(싱가포르)이 떨어져 있어 «느린 이유»의 대부분이 연결·질의 왕복이다
+# (2026-10-15 실측: 연결 ~0.5s, 질의당 ~75ms). 미들웨어가 요청마다 begin_request_stats() 로
+# 빈 집계를 열면, 그 요청 안의 연결·질의가 여기에 더해진다. 집계가 없으면(스크립트·테스트) 무동작.
+_REQUEST_STATS = contextvars.ContextVar("db_request_stats", default=None)
+
+
+def begin_request_stats():
+    stats = {"conn": 0, "conn_ms": 0.0, "q": 0, "q_ms": 0.0}
+    _REQUEST_STATS.set(stats)
+    return stats
+
+
+def _note(kind, started):
+    stats = _REQUEST_STATS.get()
+    if stats is not None:
+        stats[kind] += 1
+        stats[kind + "_ms"] += (time.perf_counter() - started) * 1000
+
+
+def track_sqlite(conn):
+    """SQLite 연결의 질의 수를 요청 집계에 더한다(시간은 못 잰다 — 로컬이라 의미도 작다)."""
+    stats = _REQUEST_STATS.get()
+    if stats is None or not hasattr(conn, "set_trace_callback"):
+        return
+    stats["conn"] += 1
+
+    def count(_sql):
+        stats["q"] += 1
+    conn.set_trace_callback(count)
+
 
 # INSERT OR REPLACE 대상 테이블: (PK 컬럼들, 전체 컬럼 순서) — db.py의 VALUES(?,…) 순서와 동일
 REPLACE_TABLES = {
@@ -127,7 +161,9 @@ class PgCursor:
 
     def execute(self, sql, params=None):
         sql2, wants_id = translate(sql, single=True)
+        t = time.perf_counter()
         self._c.execute(sql2, _params(params) if params else None)
+        _note("q", t)
         if wants_id:
             row = self._c.fetchone()
             self.lastrowid = row[0] if row else None
@@ -135,7 +171,9 @@ class PgCursor:
 
     def executemany(self, sql, seq):
         sql2, _ = translate(sql, single=False)
+        t = time.perf_counter()
         self._c.executemany(sql2, [_params(p) for p in seq])
+        _note("q", t)
         return self
 
     def fetchone(self):
@@ -203,7 +241,10 @@ def connect(db_path=None, url=None):
         # prepare_threshold=None: 서버측 prepared statement 사용 안 함.
         # Supavisor transaction 모드(6543)는 prepared statement를 지원하지 않아
         # psycopg 기본값(5회 후 자동 prepare)이면 오류가 난다. session 모드(5432)에서도 무해.
-        return PgConnection(psycopg.connect(url, prepare_threshold=None))
+        t = time.perf_counter()
+        raw = psycopg.connect(url, prepare_threshold=None)
+        _note("conn", t)
+        return PgConnection(raw)
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn

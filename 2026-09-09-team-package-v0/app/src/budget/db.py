@@ -49,6 +49,7 @@ def connect(db_path=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         conn = dbcore.connect(db_path=path)
     init_db(conn)
+    dbcore.track_sqlite(conn)        # 요청 집계가 열려 있을 때만(Server-Timing) — init_db 는 빼고 센다
     return conn
 
 
@@ -1099,13 +1100,25 @@ def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     return n
 
 
-def load_match_detail(conn, run_id):
-    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인."""
+def load_match_detail(conn, run_id, branch=None, unmapped=False):
+    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인.
+
+    branch: 그 처지사의 행만 · unmapped: 미반영이면서 처지사가 비어 있는 행만.
+    화면 하나가 쓰는 행은 실행 하나의 수 %다(2025: 강남 840 / 14,290행). 전부 받아
+    pandas 로 거르면 서울 DB → 싱가포르 서버로 실행 전체를 매번 옮기게 되므로 SQL 에서 거른다.
+    """
+    where, params = ["m.run_id=?"], [run_id]
+    if branch is not None:
+        where.append("m.처지사정규=?")
+        params.append(branch)
+    if unmapped:
+        where.append("m.구분='미반영' AND m.처지사정규 IS NULL")
     return pd.read_sql_query(
         """SELECT m.erp_row_id, m.과목정규, m.처지사정규, m.매칭사업명, m.매칭확신도, m.구분,
                   m.매칭행,
                   e.전표번호, e.사업명 AS 전표텍스트, e.금액천원, e.금액원, e.전기일,
                   e.지사원문, e.부서부원문
            FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id
-           WHERE m.run_id=? ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
-        conn, params=(run_id,))
+           WHERE """ + " AND ".join(where) + """
+           ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
+        conn, params=tuple(params))

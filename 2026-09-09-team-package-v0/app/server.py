@@ -21,6 +21,7 @@ import json
 import mimetypes
 import re
 import threading
+import time
 from urllib.parse import quote
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -149,6 +150,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 # 바깥부터: SecurityHeaders → AuthAudit → GZip. 보안 헤더는 감사 미들웨어가 만든
 # 응답에도 붙어야 하므로 가장 바깥이다.
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+class ServerTimingMiddleware(BaseHTTPMiddleware):
+    """응답마다 Server-Timing 헤더 — 서버 처리 시간과 그중 DB 연결·질의 몫.
+
+    느린 화면을 만났을 때 «네트워크인가 · 서버 계산인가 · DB 왕복인가»를 브라우저
+    개발자 도구(Network → Timing)에서 바로 가를 수 있게 한다. 2026-10-15 속도 진단에서
+    이것이 없어 질의 수를 코드와 로컬 재현으로 역산해야 했다. 테스트도 이 헤더로
+    API 별 질의 수 상한을 고정한다(tests/test_perf_budget.py).
+    """
+
+    async def dispatch(self, request, call_next):
+        stats = dbcore.begin_request_stats()
+        t = time.perf_counter()
+        response = await call_next(request)
+        total = (time.perf_counter() - t) * 1000
+        response.headers["Server-Timing"] = (
+            f'app;dur={total:.1f}, '
+            f'db;dur={stats["q_ms"]:.1f};desc="queries={stats["q"]}", '
+            f'conn;dur={stats["conn_ms"]:.1f};desc="connections={stats["conn"]}"')
+        return response
+
+
+# 가장 바깥 — 감사 기록(AuthAudit 의 DB 쓰기)까지 요청 시간에 넣는다.
+app.add_middleware(ServerTimingMiddleware)
 
 
 # ── 인증 (공용 비밀번호 + 작업자 이름) ─────────────────────────────────────
@@ -732,23 +758,56 @@ def overview():
     """홈 화면용: DB에 있는 모든 연도의 최신 실행 요약(다년도 계획·실적)."""
     conn = _conn()
     try:
-        ds = dbm.list_datasets(conn)
-        years = sorted({d["year"] for d in ds})
-        rows = []
-        for y in years:
-            entry = {"year": y}
-            for budget in ("손익", "자본"):
-                r = dbm.latest_run(conn, y, budget)
-                if r:
-                    s = r["summary"]
-                    entry[budget] = {
-                        "계획": s.get("계획 연예산(천원)", 0),
-                        "실적": s.get("총 실적(천원)", 0),
-                        "집행률": s.get("집행률(%)"),
-                        "실행일시": r["created_at"],
-                    }
-            rows.append(entry)
-        return _clean_json({"years": rows})
+        return _clean_json({"years": _overview_rows(conn)})
+    finally:
+        conn.close()
+
+
+def _overview_rows(conn):
+    ds = dbm.list_datasets(conn)
+    years = sorted({d["year"] for d in ds})
+    rows = []
+    for y in years:
+        entry = {"year": y}
+        for budget in ("손익", "자본"):
+            r = dbm.latest_run(conn, y, budget)
+            if r:
+                s = r["summary"]
+                entry[budget] = {
+                    "계획": s.get("계획 연예산(천원)", 0),
+                    "실적": s.get("총 실적(천원)", 0),
+                    "집행률": s.get("집행률(%)"),
+                    "실행일시": r["created_at"],
+                }
+        rows.append(entry)
+    return rows
+
+
+@app.get("/api/nav-state")
+def nav_state(year: str = None):
+    """화면 전환마다 필요한 공통 3종(연도 목록·미반영 건수·열린 연도)을 연결 하나로.
+
+    따로 부르면 DB 연결 3번 — 운영(Render 싱가포르 ↔ Supabase 서울)에서 연결 한 번이
+    ~0.5초다(2026-10-15 실측). 개별 API(/api/overview·/api/pending·/api/lock-state)는
+    저장 뒤 갱신 등에서 그대로 쓰므로 남겨 둔다.
+
+    year 가 없으면(첫 진입) 화면이 고를 연도 — 자료가 있는 최신 연도 — 로 미반영을 센다.
+    미반영·열린 연도는 예전처럼 실패해도 화면을 막지 않는다(null).
+    """
+    conn = _conn()
+    try:
+        rows = _overview_rows(conn)
+        y = year or (rows[-1]["year"] if rows else None)
+        try:
+            pend = _pending_data(conn, y) if y else None
+        except Exception:
+            conn.rollback()              # PG: 실패한 트랜잭션 위에서는 다음 질의가 못 돈다
+            pend = None
+        try:
+            open_ = dbm.open_years(conn)
+        except Exception:
+            open_ = None
+        return _clean_json({"years": rows, "year": y, "pending": pend, "open": open_})
     finally:
         conn.close()
 
@@ -779,34 +838,38 @@ def pending(year: str):
     """
     conn = _conn()
     try:
-        runs = _latest_runs(conn, year)
-        # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
-        stamps = [str(r["created_at"]) for r in runs.values()]
-        base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
-        out = {"analyzed_at": base, "counts": {}, "total": 0}
-        tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
-                  ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
-        for tbl, label in tables:
-            if base is None:
-                n = conn.execute(
-                    f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
-            else:
-                n = conn.execute(
-                    f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
-                    (str(year), base)).fetchone()[0]
-            if n:
-                out["counts"][label] = n
-                out["total"] += n
-        # 구성·별칭·마스터 변경도 «결과에 반영되지 않은 변경»이다. 알림을 두 갈래로
-        # 나누면 어느 것을 눌러야 하는지 헷갈리므로 같은 배지에 합친다.
-        n = sum(dbm.config_changes_since(conn, year, base).values())
-        if n:
-            out["counts"]["기준정보"] = n
-            out["total"] += n
-        out["learn_pending"] = dbm.count_learn_pending(conn, year)
-        return _clean_json(out)
+        return _clean_json(_pending_data(conn, year))
     finally:
         conn.close()
+
+
+def _pending_data(conn, year):
+    runs = _latest_runs(conn, year)
+    # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
+    stamps = [str(r["created_at"]) for r in runs.values()]
+    base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
+    out = {"analyzed_at": base, "counts": {}, "total": 0}
+    tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
+              ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
+    for tbl, label in tables:
+        if base is None:
+            n = conn.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
+        else:
+            n = conn.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
+                (str(year), base)).fetchone()[0]
+        if n:
+            out["counts"][label] = n
+            out["total"] += n
+    # 구성·별칭·마스터 변경도 «결과에 반영되지 않은 변경»이다. 알림을 두 갈래로
+    # 나누면 어느 것을 눌러야 하는지 헷갈리므로 같은 배지에 합친다.
+    n = sum(dbm.config_changes_since(conn, year, base).values())
+    if n:
+        out["counts"]["기준정보"] = n
+        out["total"] += n
+    out["learn_pending"] = dbm.count_learn_pending(conn, year)
+    return out
 
 
 @app.get("/api/learned")
@@ -1017,8 +1080,7 @@ def _unmapped_detail(conn, runs):
     """미반영(미매핑 처지사) 전표를 원문 지사별로 수집: {raw: [voucher...]}."""
     out = {}
     for budget, r in runs.items():
-        detail = dbm.load_match_detail(conn, r["id"])
-        um = detail[(detail["구분"] == "미반영") & (detail["처지사정규"].isna())]
+        um = dbm.load_match_detail(conn, r["id"], unmapped=True)
         for _, v in um.iterrows():
             raw = str(v["지사원문"] or "(지사명 없음)").strip()
             out.setdefault(raw, []).append({
@@ -1121,8 +1183,7 @@ def branch_detail(year: str, branch: str):
         for budget, r in runs.items():
             biz = dbm.load_biz_lines(conn, r["id"])
             biz = biz[biz["처지사"] == branch]
-            detail = dbm.load_match_detail(conn, r["id"])
-            detail = detail[detail["처지사정규"] == branch]
+            detail = dbm.load_match_detail(conn, r["id"], branch=branch)
             # 사업별 전표 묶기: 계획행 = 매칭행(행번호) 우선 — 동명 사업 충돌 방지.
             #   신규(계획행 없음)는 '[신규] 사업명' 라벨로 연결.
             by_row, by_label = {}, {}
