@@ -118,6 +118,12 @@ export function amounts(row) {
 // 기준연도(base_year)는 헤더 대상연도와 다른 축이다 — 서버가 기본값을 정한다
 // (상태가 있는 최신 기준연도, 없으면 마감 최신연도+1). 사용자가 고른 값은 유지한다.
 
+// 기준연도를 아직 모르면(첫 진입) base_year 를 비워 보낸다 — 서버가 /base-years 의 default 와
+// 같은 함수로 정하고 응답에 base_year 를 싣는다. 그래서 메타·가정·표를 동시에 부를 수 있다
+// (순차로 기다리면 운영에서 탭 하나가 10초였다 — 2026-10-15 실측).
+const fcQuery = () => state.fc.baseYear ? `?base_year=${encodeURIComponent(state.fc.baseYear)}` : "";
+const adoptBase = d => { if (!state.fc.baseYear && d?.base_year) state.fc.baseYear = String(d.base_year); };
+
 export async function loadForecastMeta() {
   const m = await api("/api/forecast/base-years");
   state.fc.baseYears = m.base_years;
@@ -126,15 +132,18 @@ export async function loadForecastMeta() {
 }
 
 export async function loadForecastState() {
-  state.fc.data = await api(`/api/forecast/state?base_year=${state.fc.baseYear}`);
+  state.fc.data = await api(`/api/forecast/state${fcQuery()}`);
+  adoptBase(state.fc.data);
   state.fc.dirty = new Set();
 }
 
 export async function loadForecastBench() {
-  state.fc.bench = await api(`/api/forecast/benchmark?base_year=${state.fc.baseYear}`);
+  state.fc.bench = await api(`/api/forecast/benchmark${fcQuery()}`);
+  adoptBase(state.fc.bench);
   state.fc.benchEdits = {methods: {}, overrides: {}};
 }
 
 export async function loadForecastTable() {
-  state.fc.table = await api(`/api/forecast/table?base_year=${state.fc.baseYear}`);
+  state.fc.table = await api(`/api/forecast/table${fcQuery()}`);
+  adoptBase(state.fc.table);
 }

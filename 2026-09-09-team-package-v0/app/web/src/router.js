@@ -109,26 +109,20 @@ export function renderPage() {
 // 된다(운영 실측 2026-10-15: 설정 화면 API 13개 순차 → 40초). 다만 서버는 요청마다 DB
 // 연결을 새로 맺고 Supabase Session pooler 는 동시 연결 수에 한도가 있으므로, 한꺼번에
 // 쏟지 않고 SETTLE_LIMIT 개씩만 동시에 돌린다.
-// 순서가 필요한 구역(앞 결과를 뒤가 쓰는 경우)은 [[라벨, fn], …] 배열 하나로 묶어 넘긴다 —
-// 그 묶음 안에서는 차례로 돌고, 실패도 단계마다 따로 남는다.
 const SETTLE_LIMIT = 4;
 
 async function settle(jobs, limit = SETTLE_LIMIT) {
-  const errs = jobs.map(() => []);          // 구역 순서대로 모아 배너 순서를 예전과 같게
-  const runOne = async ([label, fn], out) => {
-    try { await fn(); } catch (e) { out.push(`${label}: ${e.message}`); }
-  };
+  const errs = jobs.map(() => null);        // 구역 순서대로 모아 배너 순서를 예전과 같게
   let next = 0;
   const worker = async () => {
     while (next < jobs.length) {
       const i = next++;
-      const job = jobs[i];
-      if (Array.isArray(job[0])) { for (const step of job) await runOne(step, errs[i]); }
-      else await runOne(job, errs[i]);
+      const [label, fn] = jobs[i];
+      try { await fn(); } catch (e) { errs[i] = `${label}: ${e.message}`; }
     }
   };
   await Promise.all(Array.from({length: Math.min(limit, jobs.length)}, worker));
-  return errs.flat();
+  return errs.filter(Boolean);
 }
 
 export async function navigate(view, opts = {}) {
@@ -170,12 +164,11 @@ export async function navigate(view, opts = {}) {
   }
   if (view === "home") jobs.push(["서버 정보", loadHealth]);
   if (view === "forecast") {
-    // 기준연도 → 가정 → (탭에 따라) 표준화 결과 | 전망 표. 한 묶음(배열)으로 넘겨 차례로
-    // 돌게 하므로 메타가 정한 기준연도를 뒤의 단계들이 그대로 쓴다.
-    const fcChain = [["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]];
-    if (state.fc.tab === "bench") fcChain.push(["표준화 결과", loadForecastBench]);
-    if (state.fc.tab === "table") fcChain.push(["중장기 전망", loadForecastTable]);
-    jobs.push(fcChain);
+    // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
+    // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
+    jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
+    if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench]);
+    if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "stats") {
