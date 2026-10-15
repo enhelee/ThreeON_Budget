@@ -27,6 +27,12 @@ export function legend() {
 
 // 확신도 0.80 미만 계획집행 — confBadge 의 «검토 필요» 기준과 같은 선이다.
 //   예비품·재생고온부품·저장품·공구는 매칭에서 총액 기준으로 통과(1.00)하므로 여기 들지 않는다.
+// 구조적 과목 비례 배분 행: 실적이 전표 합이 아니라 지사×과목 실적을 연예산 비율로 나눈 추정치.
+const DIST_TIP = "지사×과목 실적을 계획 연예산 비율로 나눈 추정치예요(정기점검·예비품처럼 전표로 사업을 못 나누는 과목)"
+const distBadge = b => b.배분
+  ? `<span class="badge bg-info-bg text-info" title="${DIST_TIP}">배분</span>${b.확신도 !== null && b.확신도 !== undefined ? " " + confBadge(b.확신도) : ""}`
+  : confBadge(b.확신도)
+
 export const isLowConf = b => b.구분 === "계획집행" && b.확신도 !== null && b.확신도 !== undefined && Number(b.확신도) < 0.8;
 
 /** 검토미 배너 — 사람이 볼 것만 골라 준다. 결정은 사람이 한다(검토미는 고르기만 한다). */
@@ -239,7 +245,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right">${fmt(b.연예산원)}</td>
         <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
-        <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
+        <td class="table-cell text-right">${b.구분 === "계획집행" ? distBadge(b) : ""}</td>
         <td class="table-cell text-right">${locked ? "" : `<button class="grid h-6 w-6 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button>`}</td>
       </tr>${editRow}${vrows}`;
   }).join("");
