@@ -14,6 +14,7 @@
 (부호 상쇄(±) 전표도 같은 클러스터에 묶여 순액으로 집계).
 """
 from collections import defaultdict
+import math
 import re
 
 import pandas as pd
@@ -83,6 +84,68 @@ def normalize_erp_df(erp_df, code_to_item, item_alias, dept_alias, plan_depts):
     return df
 
 
+# ── 9월 HTML 엔진에서 옮긴 규칙 (2025 수기 집계표 대비 사업 단위 금액 일치 56.6% → 64.2%) ──
+# 구조적 과목: 전표에 사업 구분 단서가 없어(이름 없는 반복 보수공사·예비품 입고) 사업별로 못 나눈다.
+#   (과목×지사) 실적 총액을 계획 연예산 비율로 사업에 나눠 «추정 배분»한다.
+#   외주비-열원정기점검(A급정비)은 호기별 사업명이 전표에 드러나 배분하면 오히려 나빠져 뺀다(측정).
+_STRUCT_RE = re.compile(r"^수선유지비-열원정기점검$|자산화예비품|재생고온부품|저장품|공구와기구")
+
+_INSTALL_NOISE = [re.compile(p) for p in (r"\d+\s*회", r"\d+\s*분기", r"'?\d+\s*년?\s*\d+\s*월",
+                                          r"\d+\s*월\s*분?", r"비용\s*역?\s*인식")]
+_SYNONYMS = [(re.compile(r"\bGT\b", re.I), "가스터빈"), (re.compile(r"\bHRSG\b", re.I), "배열회수보일러")]
+
+
+def _is_struct(item):
+    return bool(item and _STRUCT_RE.search(str(item)))
+
+
+def _use_idf(item):
+    """사업 선택에 IDF 유사도를 쓸 과목. 외주비(A급정비)는 WRatio 가 더 맞았다(측정)."""
+    return not str(item or "").startswith("외주비")
+
+
+def sim_norm(t):
+    """유사도용 정규화(9월 엔진 simNorm): 동의어 → 회차·분기·월 마커 제거 → 연도·구분자·공백 제거.
+    «3회 기성»·«'25년 4월분»처럼 매번 바뀌는 표기가 사업 판별을 흐리지 않게 한다."""
+    s = str(t or "")
+    for rx, rep in _SYNONYMS:
+        s = rx.sub(rep, s)
+    for rx in _INSTALL_NOISE:
+        s = rx.sub(" ", s)
+    s = re.sub(r"\d{4}\s*년도?", " ", s)
+    s = re.sub(r"['\"’”()\[\]（）·:,\-_/]", " ", s)
+    return re.sub(r"\s+", "", s)
+
+
+def _bigrams(s):
+    if len(s) == 1:
+        return {s}
+    return {s[i:i + 2] for i in range(len(s) - 1)}
+
+
+class GroupScorer:
+    """같은 (과목×지사) 계획 사업명으로 글자쌍 IDF 를 만들어 포함도(0~100)를 매긴다.
+    여러 사업에 흔한 낱말(점검·용역)은 약하게, 한 사업에만 있는 낱말(지명·설비명)은 강하게 본다."""
+
+    def __init__(self, names):
+        self.grams = [_bigrams(sim_norm(n)) for n in names]
+        df = defaultdict(int)
+        for g in self.grams:
+            for x in g:
+                df[x] += 1
+        n = len(names) or 1
+        self.idf = {x: math.log((n + 1) / d) + 1 for x, d in df.items()}
+        self.default_w = math.log(n + 1) + 1      # 계획 사업명에 없던 글자쌍 = 희귀 취급
+
+    def score(self, text, j):
+        a, b = (_bigrams(sim_norm(text)) if text else set()), self.grams[j]
+        if not a or not b:
+            return 0.0
+        w = lambda x: self.idf.get(x, self.default_w)
+        inter = sum(w(x) for x in a if x in b)
+        return 100.0 * inter / min(sum(w(x) for x in a), sum(w(x) for x in b))
+
+
 def _sim(a, b):
     if not a or not b:
         return 0.0
@@ -92,7 +155,7 @@ def _sim(a, b):
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                   threshold=80, new_policy="group", small_threshold=2000,
                   selected_depts=None, budget_all=None, other_budget_all=None,
-                  overrides=None, learned=None):
+                  overrides=None, learned=None, struct_distribute=True):
     """계획행별 실적금액 산출 + 신규사업 집계 + 미반영 분류.
 
     plan_df: 계획본 양식1(월별) 로드 결과(loaders.PLAN_COLUMNS + _row).
@@ -115,6 +178,8 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     learned: {(과목정규, 텍스트정규) -> 사업명} — 과년도 확정 결과 학습 맵.
         대표 텍스트가 학습 키와 일치하면 유사도보다 우선 적용(확신도 0.99).
         같은 그룹에 그 이름의 계획행이 있으면 그 행으로, 신규 클러스터엔 이름 부여.
+    struct_distribute: 구조적 과목(_STRUCT_RE)의 (과목×지사) 실적을 계획 연예산 비례로 배분.
+        사람이 수동지정·학습으로 확정한 전표가 있는 그룹은 배분하지 않는다.
 
     반환 dict: plan_rows, new_rows, erp_annotated, unmatched_dept,
                unclassified_item, unreflected_amt, unreflected_by_key.
@@ -211,8 +276,11 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     manual_cnt = 0    # 수동지정(오버라이드) 전표수
     learned_cnt = 0   # 학습 맵으로 확정된 전표수
 
+    human_keys = set()   # 수동지정·학습 확정 전표가 있는 (과목, 처지사) — 비례 배분 제외
     for key, idxs in groups.items():
         candidates = plan_by_key.get(key, [])
+        scorer = GroupScorer([p.get("사업명") for p in candidates]) \
+            if candidates and _use_idf(key[0]) else None
         # ── 참조전표번호 묶음: 같은 전표번호 = 하나의 내역.
         #    대표 텍스트 = 묶음 내 |금액| 최대 전표의 사업명(본 대금 전표).
         vmap = defaultdict(list)
@@ -238,6 +306,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                 target = vg["수동지정"]
                 prec = next((p for p in candidates if p.get("사업명") == target), None)
                 manual_cnt += len(vg["rows"])
+                human_keys.add(key)
                 if prec is not None:
                     for i in vg["rows"]:
                         erp_score[i] = 100.0
@@ -262,6 +331,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                 prec = next((p for p in candidates if p.get("사업명") == lname), None)
                 if prec is not None:
                     learned_cnt += len(vg["rows"])
+                    human_keys.add(key)
                     for i in vg["rows"]:
                         erp_score[i] = 99.0
                         prec["실적금액"] += _amt(i)
@@ -304,12 +374,14 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             # 대표 사업명 유사도 최고 계획행에 묶음 전체를 귀속. 동점(전표
             # 텍스트가 비어 점수가 모두 0인 경우 포함)이면 연예산이 큰 계획행 —
             # 입력 순서에 좌우되지 않고, 실무상 큰 사업에 귀속될 확률이 높다.
-            best, best_score, best_budget = None, -1.0, None
-            for prec in candidates:
-                s = _sim(rep_name, prec.get("사업명"))
+            # 고르는 점수는 IDF 포함도(scorer), 확신도·저유사 판정은 종전 WRatio 그대로.
+            best, best_pick, best_budget = None, -1.0, None
+            for j, prec in enumerate(candidates):
+                pick = scorer.score(rep_name, j) if scorer else _sim(rep_name, prec.get("사업명"))
                 pb = _clean_na(prec.get("연예산")) or 0.0
-                if s > best_score or (s == best_score and pb > (best_budget or 0.0)):
-                    best, best_score, best_budget = prec, s, pb
+                if pick > best_pick or (pick == best_pick and pb > (best_budget or 0.0)):
+                    best, best_pick, best_budget = prec, pick, pb
+            best_score = _sim(rep_name, best.get("사업명")) if scorer else best_pick
             if new_policy == "strict_name" and best_score < threshold:
                 for i in vg["rows"]:
                     erp_score[i] = float(best_score)
@@ -335,9 +407,28 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                 attributed[i] = best
                 erp_match_name[i] = best.get("사업명")
 
+    # 구조적 과목 비례 배분: 귀속된 (과목×지사) 실적 총액을 계획 연예산 비율로 나눈다.
+    #   총액은 그대로(지사×과목 합 불변), 사업별 금액만 추정치로 바뀐다 → «배분» 표시.
+    if struct_distribute:
+        for key, cands in plan_by_key.items():
+            if not _is_struct(key[0]) or key in human_keys:
+                continue
+            budgeted = [p for p in cands if (_clean_na(p.get("연예산")) or 0.0) > 0]
+            tot_budget = sum(_clean_na(p.get("연예산")) for p in budgeted)
+            got = sum(p["실적금액"] for p in cands)
+            if len(budgeted) < 2 or tot_budget <= 0 or not got:
+                continue
+            for p in cands:
+                share = (_clean_na(p.get("연예산")) or 0.0) / tot_budget if p in budgeted else 0.0
+                p["실적금액"] = got * share
+                p["배분"] = True
+
     # 계획행 구분 + 매칭확신도(0~1, 귀속전표 평균 유사도) 확정
     for rec in plan_rows:
-        if rec["매칭전표수"] > 0:
+        if rec["매칭전표수"] == 0 and rec.get("배분") and rec["실적금액"]:
+            rec["구분"] = "계획집행"            # 전표는 없지만 배분으로 실적이 생긴 사업
+            rec["매칭확신도"] = None
+        elif rec["매칭전표수"] > 0:
             rec["구분"] = "계획집행"
             rec["매칭확신도"] = round(rec["_점수합"] / rec["매칭전표수"] / 100.0, 3)
         else:

@@ -1153,9 +1153,13 @@ def branch_detail(year: str, branch: str):
                 if attr is None or (isinstance(attr, float) and attr != attr):
                     attr = None
                 vouchers = sorted(vouchers, key=lambda v: -abs(v["금액원"]))
-                # 실적 원단위: 귀속 전표의 원단위 정밀 합(전표 있으면), 없으면 천원×1000
-                actual_won = sum(v["금액원"] for v in vouchers) if vouchers \
-                    else round((b["실적금액"] or 0) * 1000)
+                # 실적 원단위: 귀속 전표의 원단위 정밀 합(전표 있으면), 없으면 천원×1000.
+                #   구조적 과목 비례 배분 행은 실적이 전표 합과 다르다 → 배분값(천원×1000)을 쓴다.
+                voucher_won = sum(v["금액원"] for v in vouchers)
+                actual_won = round((b["실적금액"] or 0) * 1000)
+                distributed = abs(voucher_won - actual_won) >= 1000
+                if vouchers and not distributed:
+                    actual_won = voucher_won
                 biz_out.append({
                     "budget": budget,
                     "예산과목": b["예산과목"], "속성": attr,
@@ -1166,6 +1170,7 @@ def branch_detail(year: str, branch: str):
                     "실적": round(b["실적금액"] or 0),
                     "실적원": actual_won,
                     "구분": b["구분"], "확신도": b["매칭확신도"],
+                    "배분": bool(distributed),
                     "전표": vouchers,
                 })
         # 과목 → 계획 사업 먼저(신규는 뒤) → 실적 큰 순

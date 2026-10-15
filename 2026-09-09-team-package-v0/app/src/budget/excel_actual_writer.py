@@ -90,6 +90,8 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
             amb = row.get("임의귀속전표수", 0)
             if amb:
                 note += f" ※임의귀속 {amb}건 — 사업 단위 배분 검증 필요"
+            if row.get("배분"):
+                note += " · 연예산 비례 배분(추정) — 지사×과목 실적을 계획 연예산 비율로 나눔"
         elif row.get("구분") == "미시행":
             note = "계획O·실적X (실적 없음)"
         else:
