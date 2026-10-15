@@ -49,6 +49,7 @@ def connect(db_path=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         conn = dbcore.connect(db_path=path)
     init_db(conn)
+    dbcore.track_sqlite(conn)        # 요청 집계가 열려 있을 때만(Server-Timing) — init_db 는 빼고 센다
     return conn
 
 
@@ -934,30 +935,41 @@ def count_learn_pending(conn, year):
 
     재배정 저장 시 자동 학습을 떼어냈으므로(설정 탭 [AI 학습] 버튼으로 분리),
     학습 대기 = override 중 (과목, 텍스트정규)가 learned_match에 없는 것.
+
+    ⚠ 이 값은 /api/pending 을 거쳐 «모든 화면 전환»마다 계산된다. 재배정 1건마다
+      match_line·learned_match 를 따로 묻던 옛 구현은 운영 PG(질의당 ~75ms 왕복)에서
+      재배정 193건에 30초가 걸렸다(2026-10-15 실측). 그래서 예산별로 묶어서 읽는다.
     """
     n = 0
     for budget in ("손익", "자본"):
-        run = latest_run(conn, year, budget)
         rows = conn.execute(
             "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
             " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
             " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
+        if not rows:
+            continue
+        run = latest_run(conn, year, budget)
+        item_of = {}
+        if run:
+            for rid, item in conn.execute(
+                    "SELECT erp_row_id, 과목정규 FROM match_line WHERE run_id=? AND erp_row_id IN"
+                    " (SELECT erp_row_id FROM override WHERE year=? AND budget=?)",
+                    (run["id"], str(year), budget)):
+                item_of.setdefault(int(rid), item)
+        cands = []
         for rid, target, item_raw, text in rows:
-            item = None
-            if run:
-                r = conn.execute(
-                    "SELECT 과목정규 FROM match_line WHERE run_id=? AND erp_row_id=?",
-                    (run["id"], int(rid))).fetchone()
-                item = r[0] if r else None
-            item = item or item_raw
+            item = item_of.get(int(rid)) or item_raw
             key = norm_text(text)
-            if not item or not key:
-                continue          # 텍스트 없는 전표는 학습 대상 아님
-            hit = conn.execute(
-                "SELECT 사업명 FROM learned_match WHERE 과목=? AND 텍스트정규=?",
-                (item, key)).fetchone()
-            if not hit or hit[0] != target:
-                n += 1
+            if item and key:          # 텍스트 없는 전표는 학습 대상 아님
+                cands.append((item, key, target))
+        if not cands:
+            continue
+        items = sorted({c[0] for c in cands})
+        ph = ",".join("?" for _ in items)
+        learned = {(a, b): c for a, b, c in conn.execute(
+            f"SELECT 과목, 텍스트정규, 사업명 FROM learned_match WHERE 과목 IN ({ph})",
+            tuple(items))}
+        n += sum(1 for item, key, target in cands if learned.get((item, key)) != target)
     return n
 
 
@@ -1088,13 +1100,25 @@ def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     return n
 
 
-def load_match_detail(conn, run_id):
-    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인."""
+def load_match_detail(conn, run_id, branch=None, unmapped=False):
+    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인.
+
+    branch: 그 처지사의 행만 · unmapped: 미반영이면서 처지사가 비어 있는 행만.
+    화면 하나가 쓰는 행은 실행 하나의 수 %다(2025: 강남 840 / 14,290행). 전부 받아
+    pandas 로 거르면 서울 DB → 싱가포르 서버로 실행 전체를 매번 옮기게 되므로 SQL 에서 거른다.
+    """
+    where, params = ["m.run_id=?"], [run_id]
+    if branch is not None:
+        where.append("m.처지사정규=?")
+        params.append(branch)
+    if unmapped:
+        where.append("m.구분='미반영' AND m.처지사정규 IS NULL")
     return pd.read_sql_query(
         """SELECT m.erp_row_id, m.과목정규, m.처지사정규, m.매칭사업명, m.매칭확신도, m.구분,
                   m.매칭행,
                   e.전표번호, e.사업명 AS 전표텍스트, e.금액천원, e.금액원, e.전기일,
                   e.지사원문, e.부서부원문
            FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id
-           WHERE m.run_id=? ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
-        conn, params=(run_id,))
+           WHERE """ + " AND ".join(where) + """
+           ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
+        conn, params=tuple(params))
