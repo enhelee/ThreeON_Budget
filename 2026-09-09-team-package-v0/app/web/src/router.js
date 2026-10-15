@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -159,12 +159,12 @@ export async function navigate(view, opts = {}) {
   state.view = view;
   state.helpOpen = false;   // 도움말은 화면마다 내용이 달라 — 옮기면 닫는다
   syncHash();
-  // 첫 진입은 아직 연도가 없다 — 나머지 구역이 모두 state.year 를 쓰므로 연도 목록부터 받는다.
-  // 연도가 이미 있으면 연도 목록도 다른 구역과 함께 동시에 새로 받는다(예전처럼 매번 갱신).
+  // 공통 3종(연도 목록·미반영 건수·열린 연도)은 /api/nav-state 한 번으로 받는다.
+  // 첫 진입은 아직 연도가 없다 — 나머지 구역이 모두 state.year 를 쓰므로 이것부터 받는다.
+  // 연도가 이미 있으면 다른 구역과 함께 동시에 새로 받는다(예전처럼 매번 갱신).
   const hadYear = !!state.year;
-  const firstErrs = hadYear ? [] : await settle([["연도 목록", loadOverview]]);
-  const jobs = hadYear ? [["연도 목록", loadOverview]] : [];
-  jobs.push(["미반영 건수", loadPending], ["마감 상태", loadLockStates]);
+  const firstErrs = hadYear ? [] : await settle([["연도 목록", loadNavState]]);
+  const jobs = hadYear ? [["연도 목록", loadNavState]] : [];
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }

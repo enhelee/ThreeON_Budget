@@ -8,11 +8,28 @@ export function realBranches() {
 }
 
 export async function loadOverview() {
-  state.overview = (await api("/api/overview")).years;   // 오름차순 [{year, 손익:{}, 자본:{}}]
+  applyOverview((await api("/api/overview")).years);
+}
+
+function applyOverview(rows) {
+  state.overview = rows;   // 오름차순 [{year, 손익:{}, 자본:{}}]
   const ys = state.overview.map(r => r.year);
   for (const y of ys) if (!state.years.includes(y)) state.years.push(y);
   state.years.sort((a, b) => String(b).localeCompare(String(a)));
   if (!state.year) state.year = state.years[0] || String(new Date().getFullYear());
+}
+
+// 화면 전환 공통 3종(연도 목록·미반영 건수·열린 연도)을 요청 하나로 — DB 연결 3번 → 1번.
+// 연도가 아직 없으면(첫 진입) 서버가 «자료가 있는 최신 연도»로 미반영을 센다. 화면이 고른
+// 연도가 그와 다르면(자료 없는 해) 미반영만 따로 다시 받는다.
+// 미반영·열린 연도는 예전처럼 실패해도 화면을 막지 않는다(null → 배지·배너만 안 뜬다).
+export async function loadNavState() {
+  const q = state.year ? `?year=${encodeURIComponent(state.year)}` : "";
+  const d = await api(`/api/nav-state${q}`);
+  applyOverview(d.years);
+  state.lockStates = d.open;
+  if (d.year === state.year) state.pending = d.pending;
+  else await loadPending();
 }
 
 // 메인 대시보드 전용 — 실패해도 화면 전체를 막지 않는다(해당 카드만 '-' 로 뜬다).
@@ -41,13 +58,8 @@ export async function afterSave(msg) {
   toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
 }
 
-// 마감을 풀어 놓은 연도 — 어느 화면에 있든 배너로 알려야 한다.
-// 실패해도 화면을 막지 않는다(배너만 안 뜬다).
-
-export async function loadLockStates() {
-  try { state.lockStates = (await api("/api/lock-state")).open; }
-  catch { state.lockStates = null; }
-}
+// 마감을 풀어 놓은 연도(state.lockStates) — 어느 화면에 있든 배너로 알려야 한다.
+// loadNavState 가 함께 받는다(실패하면 null → 배너만 안 뜬다).
 
 // 설정 화면 「연도 기준정보」 — 그 해 한 벌을 한 번에 끌어온다.
 // 별칭만 연도가 없다(표기 흔들림 보정은 연도가 바뀌어도 유효하다).
