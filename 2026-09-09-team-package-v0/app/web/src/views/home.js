@@ -201,7 +201,7 @@ function nextActions() {
     items.push({tone: "warn", view: "budget",
                 text: `${state.year}년 분석 이력이 없습니다 — 계획본(양식1)과 zrfm2 를 올린 뒤 상단 분석 실행을 누르세요.`})
   }
-  if (pending) {
+  if (pending && state.yearLocked !== true) {      // 마감 연도엔 분석 반영을 권하지 않는다(423)
     items.push({tone: "warn", view: null,
                 text: `저장된 변경 ${pending}건이 분석에 반영되지 않았습니다 — 상단 분석 반영을 누르세요.`})
   }

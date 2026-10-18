@@ -265,10 +265,15 @@ export async function runAnalyze(silent) {
 export function syncAnalyzeButton() {
   const btn = $("#analyzeBtn"), label = $("#analyzeLabel"), cnt = $("#pendingCount");
   if (!btn || !label || !cnt) return;
-  const n = state.pending?.total || 0;
-  label.textContent = n ? "분석 반영" : "분석 실행";
+  // 마감된 연도는 분석이 서버에서 막힌다(423). 그런데도 «분석 반영 2»를 강조하면 누르고 실패한다
+  // (2026-10-18 Aside 검토 — 연도와 무관한 별칭 변경이 마감 연도에도 미반영으로 잡혔다).
+  const locked = state.yearLocked === true;
+  const n = locked ? 0 : (state.pending?.total || 0);
+  label.textContent = locked ? "마감됨" : n ? "분석 반영" : "분석 실행";
+  btn.disabled = locked;
   btn.classList.toggle("btn-pending", n > 0);
-  btn.title = n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
+  btn.title = locked ? `${state.year}년은 마감(잠금) 상태 — 분석하려면 설정에서 마감을 해제하세요`
+    : n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
   cnt.textContent = n ? String(n) : "";
   cnt.classList.toggle("hidden", !n);
 }

@@ -86,8 +86,8 @@ document.addEventListener("click", async e => {
 
   const act = e.target.closest("[data-action]")?.dataset.action;
   // 도움말·검토미 배너 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
-  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); return; }
-  if (act === "close-help") { state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return; }
+  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); syncFabMini(); return; }
+  if (act === "close-help") { state.helpOpen = false; renderPage(); syncFabMini(); $(".help-fab__btn")?.focus(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
@@ -565,9 +565,24 @@ export function closeMenu() {
   back.focus();
 }
 
+// 스크롤 중에는 도움말을 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게.
+const syncFabMini = () => document.body.classList.toggle("fab-mini", window.scrollY > 80 && !state.helpOpen);
+window.addEventListener("scroll", syncFabMini, {passive: true});
+
+// 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
+// (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
+// 화면 일부만 다시 그리는 곳(3+ 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
+const CLICKABLE_ROW = "#page .clickable:not(button):not(a):not(input):not(select)";
+const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tabindex])`)
+  .forEach(el => el.setAttribute("tabindex", "0"));
+new MutationObserver(markClickable).observe($("#page"), {childList: true, subtree: true});
+
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && state.helpOpen) {
     state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
+  }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(CLICKABLE_ROW)) {
+    e.preventDefault(); e.target.click(); return;
   }
   if (!drawerIsOpen()) return;
   if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }
