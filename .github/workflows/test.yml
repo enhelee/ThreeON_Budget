@@ -1,0 +1,54 @@
+# PR·main 마다 테스트 — 2026-10 까지는 로컬에서만 돌았다(PR 자동 검사 0건).
+# 운영 이미지와 같은 조합으로 돈다: python 3.12 + deploy/requirements.txt(고정 버전).
+# DB 는 SQLite(DATABASE_URL 없음) — 운영 PostgreSQL 에는 붙지 않는다.
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: 2026-09-09-team-package-v0/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: 2026-09-09-team-package-v0/deploy/requirements.txt
+      - name: 의존성(운영 이미지와 같은 고정 버전) + 테스트 도구
+        run: pip install -r ../deploy/requirements.txt pytest httpx
+      - name: pytest
+        env:
+          DATABASE_URL: ""
+          APP_PASSWORD: ""
+        run: python -m pytest -q
+
+  web-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: 2026-09-09-team-package-v0/app/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: 2026-09-09-team-package-v0/app/web/package-lock.json
+      - run: npm ci
+      - run: npm run build
