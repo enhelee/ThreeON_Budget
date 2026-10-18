@@ -73,6 +73,34 @@ def _operator(request: Request):
     return getattr(request.state, "operator", None) or "local"
 
 
+# 연도·예산 구분은 모든 화면이 HTML 에 그대로 찍고(연도 선택기·제목·배너), OUT_DIR 아래
+# 폴더 이름도 된다. 서버가 아무 문자열이나 받아 저장하면 로그인한 누구나 한 번의 요청으로
+# 전 사용자 화면에 스크립트를 심을 수 있었다(2026-09-20 QA P1, `?year=<img onerror=…>`)
+# 및 `/api/lock {"year":"../../x"}` 로 OUT_DIR 밖에 폴더가 생겼다. 그래서 들어오는 길목
+# 하나(이 미들웨어)에서 모양을 강제한다 — 저장된 값은 API 로만 들어오므로 화면 출력도 안전해진다.
+_YEAR_KEYS = ("year", "base_year", "from_year", "to_year")
+_YEAR_RE = re.compile(r"\d{4}")
+_BUDGETS = ("손익", "자본")
+_LOCK_PATH_RE = re.compile(r"^/api/lock/([^/]+)$")
+
+
+def _bad_param(path, query, body):
+    """잘못된 연도·예산 구분이면 사람에게 보일 오류 문장, 정상이면 None."""
+    found = [(k, query.get(k)) for k in _YEAR_KEYS + ("budget",) if k in query]
+    if isinstance(body, dict):
+        found += [(k, body[k]) for k in _YEAR_KEYS + ("budget",) if k in body and body[k] is not None]
+    m = _LOCK_PATH_RE.match(path)
+    if m:
+        found.append(("year", m.group(1)))      # url.path 는 이미 디코드된 값
+    for key, val in found:
+        if key == "budget":
+            if str(val) not in _BUDGETS:
+                return "예산 구분은 손익 또는 자본이어야 합니다."
+        elif not _YEAR_RE.fullmatch(str(val)):
+            return f"연도는 4자리 숫자여야 합니다({key})."
+    return None
+
+
 class AuthAuditMiddleware(BaseHTTPMiddleware):
     """① /api/* 는 세션 쿠키 필수(로그인·상태·헬스체크 제외) ② 변경 요청은 audit_log에 기록.
 
@@ -90,14 +118,20 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
         request.state.operator = operator or ("local" if not AUTH.enabled else None)
 
         body_json = None
+        full_body = None
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
                 and "application/json" in (request.headers.get("content-type") or "")):
             raw = await request.body()           # Starlette가 캐시 → 라우트에서 다시 읽을 수 있다
+            try:
+                full_body = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                full_body = None
             if len(raw) <= 65536:
-                try:
-                    body_json = json.loads(raw.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError):
-                    body_json = None
+                body_json = full_body
+        if path.startswith("/api/"):
+            bad = _bad_param(path, request.query_params, full_body)
+            if bad:
+                return JSONResponse({"detail": bad}, status_code=400)
         response = await call_next(request)
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
                 and path not in ("/api/login", "/api/logout")):

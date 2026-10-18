@@ -112,11 +112,18 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         finally:
             conn.close()
 
+    # 조회 셋(state·benchmark·table)은 base_year 를 비우면 서버가 기본 기준연도(/base-years 의
+    # default 와 같은 함수)를 쓴다. 화면이 첫 진입에 «기준연도 → 가정 → 표»를 차례로 기다리지 않고
+    # 셋을 동시에 부를 수 있게 하려는 것이다(운영 실측 2026-10-15: 2.0 + 1.5 + 6.2초 순차 = 탭 10초).
+    # 응답마다 base_year 가 실려 화면이 어느 해로 계산됐는지 안다.
+    def _base(conn, base_year):
+        return base_year or pf.default_base_year(conn)
+
     @router.get("/state")
-    def get_state(base_year: str):
+    def get_state(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(_state(conn, base_year))
+            return clean_json(_state(conn, _base(conn, base_year)))
         finally:
             conn.close()
 
@@ -163,18 +170,18 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             raise HTTPException(400, f"엑셀을 읽지 못했습니다: {e}")
 
     @router.get("/benchmark")
-    def benchmark(base_year: str):
+    def benchmark(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_benchmark(conn, base_year))
+            return clean_json(pf.run_benchmark(conn, _base(conn, base_year)))
         finally:
             conn.close()
 
     @router.get("/table")
-    def table(base_year: str):
+    def table(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_forecast(conn, base_year))
+            return clean_json(pf.run_forecast(conn, _base(conn, base_year)))
         finally:
             conn.close()
 

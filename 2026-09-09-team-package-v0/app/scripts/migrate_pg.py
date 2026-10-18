@@ -21,13 +21,12 @@ DATABASE_URL 을 원래 값으로 돌리는 것.
 copy 는 대상 하나의 트랜잭션이다 — 중간에 실패하면 대상은 copy 전 상태로 남는다.
 """
 import argparse
-import io
 import os
 import sys
 import time
 import urllib.parse
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+sys.stdout.reconfigure(encoding="utf-8")
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(APP, "src"))
 

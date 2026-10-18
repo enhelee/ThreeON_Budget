@@ -209,3 +209,14 @@ def test_export_longterm_contains_forecast_numbers(client):
                if str(ws.cell(row=r_, column=2).value or "").strip() == "열원경상정비")
     col_2026 = next(c for c in range(1, ws.max_column + 1) if ws.cell(row=4, column=c).value == 26)
     assert ws.cell(row=row, column=col_2026).value == pytest.approx(1200.0 / 1000)   # 천원 → 백만원
+
+
+def test_view_apis_without_base_year_use_server_default(client):
+    """base_year 를 비우면 /base-years 의 default 로 계산한다 — 화면이 첫 진입에 메타·가정·표를
+    동시에 부를 수 있게(순차 대기 2.0+1.5+6.2초 = 탭 10초, 2026-10-15 운영 실측)."""
+    default = client.get("/api/forecast/base-years").json()["default"]
+    for path in ("/api/forecast/state", "/api/forecast/table", "/api/forecast/benchmark"):
+        bare = client.get(path)
+        assert bare.status_code == 200, path
+        assert bare.json()["base_year"] == default, path
+        assert bare.json() == client.get(f"{path}?base_year={default}").json(), path
