@@ -3,7 +3,7 @@ import { busy, toast } from "./components/feedback.js"
 import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
-import { $, fmt } from "./util.js"
+import { $, esc, fmt } from "./util.js"
 import { helpFabHtml } from "./components/characters.js"
 import { loadErrorBannerHtml } from "./components/loaderror.js"
 import { lockBannerHtml } from "./components/lockbanner.js"
@@ -96,7 +96,7 @@ export function renderPage() {
     b.classList.toggle("nav-button-active", b.dataset.view === state.view));
   const ys = $("#yearSelect");
   const years = state.years.length ? state.years : [state.year];
-  ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
+  ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("");
   syncAnalyzeButton();
 }
 
