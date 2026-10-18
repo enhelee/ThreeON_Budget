@@ -841,7 +841,9 @@ def nav_state(year: str = None):
             open_ = dbm.open_years(conn)
         except Exception:
             open_ = None
-        return _clean_json({"years": rows, "year": y, "pending": pend, "open": open_})
+        # 마감된 연도면 화면이 «분석 반영»을 권하지 않는다 — 눌러도 423 이다(2026-10-18 Aside 검토).
+        locked = dbm.is_locked(conn, y) if y else False
+        return _clean_json({"years": rows, "year": y, "pending": pend, "open": open_, "locked": locked})
     finally:
         conn.close()
 

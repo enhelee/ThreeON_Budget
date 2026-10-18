@@ -8,6 +8,7 @@ Phase 6-6. server.py 는 1,480줄이라 여기에 300줄을 더 얹지 않는다
 기준연도(base_year)는 마감 대상이 아니다 — 마감은 분석 연도(2023·2025)의 개념이고
 전망 상태는 «어느 해에 세운 가정인가»다. 그래서 마감 가드가 없다.
 """
+import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
@@ -59,6 +60,39 @@ class RowsReq(BaseModel):
 
 def _frame(rows, cols):
     return pd.DataFrame(rows, columns=cols) if not rows else pd.DataFrame(rows)
+
+
+# ── 표준화·전망 결과 캐시 ────────────────────────────────────────────────
+# 전망 표는 계산이 무겁다(운영 6초 중 서버 계산 ~3.5초 — Render 무료 CPU). 입력(마감 실적·
+# 전망 가정·구성)이 바뀌지 않았으면 같은 답이므로 저장해 두고 다시 쓴다.
+# «바뀌었는가»의 근거는 audit_log 의 최신 id 다 — 이 앱의 모든 쓰기(POST/PUT/PATCH/DELETE
+# /api/*)는 응답이 나가기 전에 감사 로그를 남기므로(AuthAuditMiddleware), 쓰기가 한 번이라도
+# 있으면 키가 바뀌어 다시 계산된다. 감사 기록이 실패하는 드문 경우를 위해 10분이 지나면
+# 어차피 다시 계산한다. 키는 계산 «전»에 읽는다 — 계산 중 들어온 쓰기는 다음 요청이 반영한다.
+# 프로세스 메모리에만 둔다(재시작·배포 때 비워짐).
+_VIEW_CACHE = {}
+VIEW_CACHE_TTL = 600
+_VIEW_CACHE_MAX = 16
+
+
+def _data_version(conn):
+    return conn.execute("SELECT MAX(id) FROM audit_log").fetchone()[0] or 0
+
+
+def _cached_view(kind, conn, base_year, compute):
+    # DB 가 바뀌면(테스트의 임시 DB · 지역 이전 후 새 DATABASE_URL) 다른 답이다.
+    db_id = dbm.dbcore.database_url() or dbm.DEFAULT_DB
+    key = (db_id, kind, str(base_year))
+    ver = _data_version(conn)
+    hit = _VIEW_CACHE.get(key)
+    now = time.monotonic()
+    if hit and hit[0] == ver and now - hit[1] < VIEW_CACHE_TTL:
+        return hit[2]
+    out = compute()
+    if len(_VIEW_CACHE) >= _VIEW_CACHE_MAX:
+        _VIEW_CACHE.pop(min(_VIEW_CACHE, key=lambda k: _VIEW_CACHE[k][1]))
+    _VIEW_CACHE[key] = (ver, now, out)
+    return out
 
 
 def make_router(conn_factory, clean_json) -> APIRouter:
@@ -173,7 +207,8 @@ def make_router(conn_factory, clean_json) -> APIRouter:
     def benchmark(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_benchmark(conn, _base(conn, base_year)))
+            by = _base(conn, base_year)
+            return _cached_view("benchmark", conn, by, lambda: clean_json(pf.run_benchmark(conn, by)))
         finally:
             conn.close()
 
@@ -181,7 +216,8 @@ def make_router(conn_factory, clean_json) -> APIRouter:
     def table(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_forecast(conn, _base(conn, base_year)))
+            by = _base(conn, base_year)
+            return _cached_view("table", conn, by, lambda: clean_json(pf.run_forecast(conn, by)))
         finally:
             conn.close()
 

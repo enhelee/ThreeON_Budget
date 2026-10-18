@@ -28,6 +28,8 @@ export async function loadNavState() {
   const d = await api(`/api/nav-state${q}`);
   applyOverview(d.years);
   state.lockStates = d.open;
+  // 보고 있는 연도가 마감됐는지 — 마감 연도에는 «분석 반영»을 권하지 않는다(눌러도 423).
+  state.yearLocked = d.year === state.year ? !!d.locked : null;
   if (d.year === state.year) state.pending = d.pending;
   else await loadPending();
 }
