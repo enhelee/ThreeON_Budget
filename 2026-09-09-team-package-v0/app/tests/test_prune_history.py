@@ -69,10 +69,20 @@ def test_prune_removes_only_unused_history_and_screens_stay_identical(grown):
     assert p["delete"]["run"] == 2 and p["delete"]["dataset"] == 2
     assert p["delete"]["match_line"] > 0 and p["delete"]["erp_row"] > 0
 
-    ph.apply(conn, p)
+    audit_before = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+    ph.apply(conn, p, note="백업 테스트")
     after = ph.plan(conn)
     assert sum(after["delete"].values()) == 0                 # 더 지울 것이 없다
     assert _snap(client) == before                            # 화면 결과는 그대로
+
+    # 정리 사실이 감사 로그에 남는다 — 설정 «변경 이력»과 전망 캐시 무효화의 근거
+    rows = conn.execute("SELECT operator, method, path, status, detail FROM audit_log"
+                        " WHERE path=?", (ph.AUDIT_PATH,)).fetchall()
+    assert len(rows) == 1 and conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == audit_before + 1
+    op, method, _path, status, detail = rows[0]
+    assert (op, method, status) == (ph.AUDIT_OPERATOR, "SCRIPT", 200)
+    assert f"합계 {sum(p['delete'].values()):,}행" in detail and "백업 테스트" in detail
+    assert client.get("/api/audit?limit=5").json()["rows"][0]["path"] == ph.AUDIT_PATH
     pipeline_db.run_actual_db(conn, out, "2023", "손익", make_files=False)   # 다음 분석도 정상
 
 
@@ -85,6 +95,8 @@ def test_prune_refuses_when_override_points_to_old_erp_row(grown):
     assert p["problems"]
     with pytest.raises(RuntimeError):
         ph.apply(conn, p)
+    assert conn.execute("SELECT COUNT(*) FROM audit_log WHERE path=?",
+                        (ph.AUDIT_PATH,)).fetchone()[0] == 0  # 지우지 않았으면 기록도 없다
     assert ph.plan(conn)["delete"]["erp_row"] > 0             # 아무것도 지우지 않았다
 
 
