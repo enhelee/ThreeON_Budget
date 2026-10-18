@@ -13,6 +13,8 @@
   · --apply 는 «방금 뜬» 백업(backup_pg.py)을 요구한다 — 그 백업의 표별 행 수가 지금 DB 와
     같아야 한다. 지운 것을 되살릴 길이 그 백업이다.
   · 한 트랜잭션 — 중간에 실패하면 그대로.
+  · 지운 내역을 같은 트랜잭션으로 audit_log 에 남긴다(작업자 «스크립트(prune_history)», 경로
+    /scripts/prune_history) — 설정 «변경 이력»에 보이고, 전망 결과 캐시도 바로 다시 계산된다.
 
 사용(app 폴더에서):
     python scripts/prune_history.py                      # 미리보기(지우지 않음) — 운영(app/.env)
@@ -27,7 +29,7 @@ import sys
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(APP, "src"))
 
-from budget import dbcore   # noqa: E402
+from budget import db as dbm, dbcore   # noqa: E402
 
 CHILD_OF_RUN = ("match_line", "biz_line")
 CHILD_OF_DATASET = ("plan_row", "erp_row")
@@ -67,8 +69,18 @@ def plan(conn):
     return out
 
 
-def apply(conn, p):
-    """plan() 결과대로 지운다 — 자식 표부터, 한 트랜잭션."""
+AUDIT_OPERATOR = "스크립트(prune_history)"
+AUDIT_PATH = "/scripts/prune_history"
+
+
+def apply(conn, p, operator=AUDIT_OPERATOR, note=""):
+    """plan() 결과대로 지운다 — 자식 표부터, 한 트랜잭션.
+
+    지운 사실을 audit_log 에 같은 트랜잭션으로 남긴다. ① 설정 화면 «변경 이력»에서 팀이 언제·무엇을
+    정리했는지 본다(공용 비밀번호 체계에서 수정 이력의 근거가 audit_log 다). ② 전망 결과 캐시의
+    데이터 버전이 audit_log 최신 id 라서, 기록이 남아야 캐시가 바로 다시 계산된다(2026-10-19 첫 정리는
+    기록 없이 돌아 캐시가 10분 TTL 까지 옛값을 냈다). db.add_audit 는 스스로 commit 하므로 쓰지 않는다.
+    """
     if p["problems"]:
         raise RuntimeError("안전 조건 위반: " + " · ".join(p["problems"]))
     kr, kd = p["keep_runs"], p["keep_datasets"]
@@ -81,6 +93,10 @@ def apply(conn, p):
             for t in CHILD_OF_DATASET:
                 conn.execute(f"DELETE FROM {t} WHERE dataset_id NOT IN ({_ph(kd)})", tuple(kd))
             conn.execute(f"DELETE FROM dataset WHERE id NOT IN ({_ph(kd)})", tuple(kd))
+        detail = "이력 정리 — " + ", ".join(f"{t} {n:,}" for t, n in p["delete"].items() if n) \
+                 + f" (합계 {sum(p['delete'].values()):,}행)" + (f" · {note}" if note else "")
+        conn.execute("INSERT INTO audit_log(at,operator,method,path,status,detail) VALUES(?,?,?,?,?,?)",
+                     (dbm._now(), operator, "SCRIPT", AUDIT_PATH, 200, detail))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -143,7 +159,7 @@ def main():
         if diffs:
             print("❌ 백업이 지금 DB 와 다릅니다(새로 백업하세요):", "; ".join(diffs))
             return 1
-        apply(conn, p)
+        apply(conn, p, note=f"백업 {os.path.basename(os.path.normpath(a.backup))}")
         after = plan(conn)
         print("✅ 정리 완료 — 남은 정리 대상:", sum(after["delete"].values()), "행")
         return 0
