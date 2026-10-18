@@ -1,5 +1,7 @@
 # PR·main 마다 테스트 — 2026-10 까지는 로컬에서만 돌았다(PR 자동 검사 0건).
-# 운영 이미지와 같은 조합으로 돈다: python 3.12 + deploy/requirements.txt(고정 버전).
+# 운영 이미지와 같은 순서·조합: 화면 빌드(node 24) → python 3.12 + deploy/requirements.txt(고정 버전).
+# 화면 빌드가 먼저인 이유: app/static 은 커밋하지 않는 빌드 산출물인데 HTTP 테스트
+# (index.html no-cache·HEAD /)가 그것을 서빙한다.
 # DB 는 SQLite(DATABASE_URL 없음) — 운영 PostgreSQL 에는 붙지 않는다.
 name: test
 
@@ -16,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  pytest:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -24,6 +26,14 @@ jobs:
         working-directory: 2026-09-09-team-package-v0/app
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: 2026-09-09-team-package-v0/app/web/package-lock.json
+      - name: 화면 빌드 → app/static
+        working-directory: 2026-09-09-team-package-v0/app/web
+        run: npm ci && npm run build
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -36,19 +46,3 @@ jobs:
           DATABASE_URL: ""
           APP_PASSWORD: ""
         run: python -m pytest -q
-
-  web-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: 2026-09-09-team-package-v0/app/web
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: 2026-09-09-team-package-v0/app/web/package-lock.json
-      - run: npm ci
-      - run: npm run build
