@@ -177,9 +177,9 @@ def test_auto_learning_does_not_overwrite_manual(tmp_path, monkeypatch):
     conn.commit()
     detail = pd.DataFrame([
         {"구분": "계획집행", "전표텍스트": "강남 HRSG TUBE 교체", "과목정규": "수선유지비",
-         "매칭사업명": "RO 베셀 교체", "erp_row_id": 1},
+         "매칭사업명": "RO 베셀 교체", "매칭확신도": 0.95, "erp_row_id": 1},
         {"구분": "계획집행", "전표텍스트": "화성 GT 점검", "과목정규": "수선유지비",
-         "매칭사업명": "화성 GT 정기점검", "erp_row_id": 2},
+         "매칭사업명": "화성 GT 정기점검", "매칭확신도": 0.95, "erp_row_id": 2},
     ])
     monkeypatch.setattr(dbm, "latest_run", lambda c, y, b: {"id": 1} if b == "손익" else None)
     monkeypatch.setattr(dbm, "load_match_detail", lambda c, rid: detail)
