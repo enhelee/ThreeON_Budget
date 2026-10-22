@@ -156,6 +156,7 @@ def init_db(conn):
         if col not in cols:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
     _ensure_col("match_line", "매칭행", "INTEGER")
+    _ensure_col("match_line", "매칭근거", "TEXT")      # 재배정·학습·사업명 유사·임의 귀속…(2026-10-22)
     _ensure_col("biz_line", "src_row", "INTEGER")
     _ensure_col("override", "target_dept", "TEXT")   # 타지사 이동(크로스 재배정)
     cur.execute("""CREATE TABLE IF NOT EXISTS learned_match(
@@ -485,12 +486,16 @@ def save_run(conn, year, budget, summary, erp_annotated, commit=True):
     for _, r in erp_annotated.iterrows():
         conf = r.get("매칭확신도")
         mrow = r.get("매칭행")
+        basis = r.get("매칭근거")
         rows.append((run_id, int(r["_erp_row"]),
                      r.get("과목정규"), r.get("처지사정규"), r.get("매칭사업명"),
                      None if conf is None or pd.isna(conf) else float(conf),
                      r.get("구분"),
-                     None if mrow is None or pd.isna(mrow) else int(mrow)))
-    cur.executemany("INSERT INTO match_line VALUES(?,?,?,?,?,?,?,?)", rows)
+                     None if mrow is None or pd.isna(mrow) else int(mrow),
+                     None if basis is None or pd.isna(basis) else str(basis)))
+    # 열 이름을 적는다 — 매칭근거는 나중에 붙인 열이라(ALTER) 옛 DB 에서는 순서가 다를 수 있다.
+    cur.executemany("INSERT INTO match_line(run_id,erp_row_id,과목정규,처지사정규,매칭사업명,"
+                    "매칭확신도,구분,매칭행,매칭근거) VALUES(?,?,?,?,?,?,?,?,?)", rows)
     if commit:
         conn.commit()
     return run_id
@@ -1206,6 +1211,7 @@ def load_match_detail(conn, run_id, branch=None, unmapped=False):
         where.append("m.구분='미반영' AND m.처지사정규 IS NULL")
     return pd.read_sql_query(
         """SELECT m.erp_row_id, m.과목정규, m.처지사정규, m.매칭사업명, m.매칭확신도, m.구분,
+                  m.매칭근거,
                   m.매칭행,
                   e.전표번호, e.사업명 AS 전표텍스트, e.금액천원, e.금액원, e.전기일,
                   e.지사원문, e.부서부원문

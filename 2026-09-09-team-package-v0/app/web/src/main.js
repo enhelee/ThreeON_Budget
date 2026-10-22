@@ -39,6 +39,30 @@ document.addEventListener("click", async e => {
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   const gy = e.target.closest("[data-goyear]");
   if (gy) { changeYear(gy.dataset.goyear); return; }
+  // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
+  const st = e.target.closest("[data-stat-item]");
+  if (st && !e.target.closest("button")) {
+    state.statOpen = state.statOpen === st.dataset.statItem ? null : st.dataset.statItem;
+    renderPage();
+    return;
+  }
+  const dr = e.target.closest("[data-drill]");
+  if (dr) {
+    busy(true, "지사 상세 로딩...");
+    try {
+      await loadDetail(dr.dataset.drill);
+      const d = state.det;
+      d.item = dr.dataset.drillItem || "";
+      d.budget = dr.dataset.drillBudget || "all";
+      d.q = ""; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
+      const hit = d.data.biz.map((b, idx) => ({b, key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}))
+        .filter(({b}) => b.예산과목 === d.item && (d.budget === "all" || b.budget === d.budget));
+      if (hit.length <= 8) hit.forEach(({b, key}) => { if (b.전표.length) d.open.add(key); });
+      state.view = "detail"; syncHash(); renderPage();
+    } catch (err) { toast(err.message); }
+    finally { busy(false); }
+    return;
+  }
   const br = e.target.closest("[data-branch]");
   if (br) {
     busy(true, "지사 상세 로딩...");
