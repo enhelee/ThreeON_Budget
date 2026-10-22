@@ -25,6 +25,8 @@ export const state = {
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
          lowConf: false,   // 검토미 배너 «같이 보기» — 확신도 0.80 미만 계획집행 사업만
+         varOnly: false,   // «사유 대상만» — 집행률 ±20%p 를 벗어난 사업만
+         noteKey: null,    // 차이 사유 입력창이 열린 행
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
          // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
          //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.

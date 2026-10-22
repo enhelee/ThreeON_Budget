@@ -1172,6 +1172,7 @@ def branches(year: str):
         runs = _latest_runs(conn, year)
         if not runs:
             return {"rows": []}
+        notes = dbm.variance_notes(conn, year)
         agg = {}
         for budget, r in runs.items():
             df = dbm.load_biz_lines(conn, r["id"])
@@ -1180,7 +1181,8 @@ def branches(year: str):
                 g = agg.setdefault(dept, {"branch": dept,
                                           "profitPlan": 0, "profitActual": 0,
                                           "capitalPlan": 0, "capitalActual": 0,
-                                          "lowConf": 0, "unmapped": 0})
+                                          "lowConf": 0, "unmapped": 0,
+                                          "variance": 0, "varianceNoted": 0})
                 p = row["연예산"] or 0
                 a = row["실적금액"] or 0
                 if budget == "손익":
@@ -1192,6 +1194,10 @@ def branches(year: str):
                 conf = row["매칭확신도"]
                 if row["구분"] == "계획집행" and conf is not None and conf < 0.8:
                     g["lowConf"] += 1
+                if dbm.is_variance(p, a):
+                    g["variance"] += 1
+                    if (budget, row["예산과목"], row["처지사"], row["사업명"]) in notes:
+                        g["varianceNoted"] += 1
         rows = sorted(agg.values(), key=lambda x: x["branch"])
         # 미매핑 전표는 원문 지사별 가상 행으로 맨 아래에 노출(종합표 미포함 금액)
         for raw, vs in sorted(_unmapped_detail(conn, runs).items()):
@@ -1249,6 +1255,7 @@ def branch_detail(year: str, branch: str):
                                 "biz": biz_out, "unmapped": True})
 
         biz_out = []
+        notes = dbm.variance_notes(conn, year, dept=branch)
         for budget, r in runs.items():
             biz = dbm.load_biz_lines(conn, r["id"])
             biz = biz[biz["처지사"] == branch]
@@ -1297,6 +1304,8 @@ def branch_detail(year: str, branch: str):
                     "실적원": actual_won,
                     "구분": b["구분"], "확신도": b["매칭확신도"],
                     "전표": vouchers,
+                    "편차": dbm.is_variance(b["연예산"], b["실적금액"]),
+                    "사유": (notes.get((budget, b["예산과목"], branch, label)) or {}).get("note"),
                 })
         # 과목 → 계획 사업 먼저(신규는 뒤) → 실적 큰 순
         biz_out.sort(key=lambda x: (str(x["예산과목"]),
@@ -1309,6 +1318,32 @@ def branch_detail(year: str, branch: str):
         attrs += sorted(present - set(attrs))     # 혹시 남은 비표준 값 노출(진단용)
         return _clean_json({"branch": branch, "items": items, "attrs": attrs,
                             "biz": biz_out})
+    finally:
+        conn.close()
+
+
+# ── 차이 사유 (집행률 ±20%p, 권장 입력) ─────────────────────────────────
+
+class VarianceNoteReq(BaseModel):
+    year: str
+    budget: str
+    예산과목: str
+    처지사: str
+    사업명: str
+    note: str = ""
+
+
+@app.put("/api/variance-note")
+def put_variance_note(req: VarianceNoteReq, request: Request):
+    """사유 저장(빈 문자열이면 삭제). 숫자를 바꾸지 않는 설명이라 마감 연도에도 받는다 —
+    사유는 보통 마감 뒤 보고 때 쓰인다. 누가 썼는지는 operator·감사 로그에 남는다."""
+    if len((req.note or "").strip()) > dbm.VARIANCE_NOTE_MAX:
+        raise HTTPException(400, f"사유는 {dbm.VARIANCE_NOTE_MAX}자 이내로 적어 주세요.")
+    conn = _conn()
+    try:
+        saved = dbm.set_variance_note(conn, req.year, req.budget, req.예산과목, req.처지사,
+                                      req.사업명, req.note, operator=_operator(request))
+        return {"note": saved}
     finally:
         conn.close()
 

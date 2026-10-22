@@ -94,7 +94,7 @@ export async function loadDetail(branch) {
   state.det.data = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
   state.det.branch = branch;
   state.det.open = new Set(); state.det.sel = new Set();
-  state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null;
+  state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null; state.det.noteKey = null;
   state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
 }
 
