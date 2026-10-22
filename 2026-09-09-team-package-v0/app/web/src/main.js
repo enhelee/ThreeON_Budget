@@ -315,7 +315,8 @@ document.addEventListener("click", async e => {
     try {
       const r = await api("/api/learn", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({year: state.year})});
-      toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건)`);
+      const kept = r.learned["수동확정보호"] ? ` · 사람확정 유지 ${r.learned["수동확정보호"]}건` : "";
+      toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건${kept})`);
       await navigate("settings");
     } catch (err) { toast(err.message); }
     finally { busy(false); }

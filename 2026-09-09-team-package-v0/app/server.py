@@ -36,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
+from budget import api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -61,7 +61,9 @@ WEB_DIR = STATIC_DIR
 _PARENT = os.path.dirname(APP_DIR)
 AUTH = authm.AuthConfig()
 
-app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None)
+# openapi_url=None — 스키마(/openapi.json)는 인증 미들웨어(/api/* 만 막음) 밖이라 비로그인에게
+# API 목록 전체가 보였다(QA 2026-09-20 P2). 화면은 스키마를 쓰지 않는다.
+app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 def _conn():
@@ -253,7 +255,13 @@ def login(req: LoginReq, request: Request):
     name = authm.clean_operator(req.name)
     if not name:
         raise HTTPException(400, "작업자 이름을 입력하세요(수정 이력에 기록됩니다).")
+    key = authm.client_key(request)
+    wait = AUTH.limiter.retry_after(key)
+    if wait:
+        raise HTTPException(429, f"로그인 실패가 많아 잠시 막았습니다 — {wait // 60 + 1}분 뒤 다시 시도하세요.",
+                            headers={"Retry-After": str(wait)})
     if not AUTH.check_password(req.password):
+        AUTH.limiter.fail(key)
         conn = _conn()
         try:
             dbm.add_audit(conn, name, "POST", "/api/login", 401, "비밀번호 불일치")
@@ -262,6 +270,7 @@ def login(req: LoginReq, request: Request):
         raise HTTPException(401, "비밀번호가 맞지 않습니다.")
     secure = AUTH.cookie_secure or request.url.scheme == "https" \
         or request.headers.get("x-forwarded-proto") == "https"
+    AUTH.limiter.success(key)
     resp = JSONResponse({"ok": True, "operator": name, "enabled": True})
     resp.set_cookie(AUTH.cookie_name, AUTH.issue(name), httponly=True, samesite="lax",
                     secure=secure, max_age=int(AUTH.session_hours * 3600), path="/")
@@ -295,6 +304,22 @@ def _guard_unlocked(conn, year, action="변경"):
         raise HTTPException(
             423, f"{year}년은 마감(잠금) 상태입니다 — {action}이(가) 차단됩니다. "
                  "설정 탭에서 잠금을 해제한 뒤 진행하세요.")
+
+
+# id 로 지우는 라우트는 요청에 연도가 없다 — 행의 연도를 찾아 같은 잠금을 건다.
+# 이게 없으면 마감 연도의 재배정·수정·삭제 지시를 «지우는» 것으로 결과를 바꿀 수 있었다.
+_ROW_YEAR_TABLES = {"override", "biz_edit", "biz_delete", "manual_biz"}
+
+
+def _guard_row_unlocked(conn, table, row_id, action):
+    assert table in _ROW_YEAR_TABLES
+    row = conn.execute(f"SELECT year FROM {table} WHERE id=?", (row_id,)).fetchone()
+    if row is not None:
+        _guard_unlocked(conn, row[0], action)
+
+
+# 업로드 상한·압축 폭탄 검사는 budget/uploads.py (전망 가져오기와 같이 쓴다).
+_read_upload = uploads.read_upload
 
 
 # 연도 단위 «무거운 쓰기»(분석·마감·해제·자료 업로드)는 한 번에 하나만. 2026-10-13 라이브에서
@@ -379,7 +404,7 @@ async def _ingest(files: list, year: str, kind: str):
             fd, tmp = tempfile.mkstemp(suffix=".xlsx")
             tmps.append(tmp)
             with os.fdopen(fd, "wb") as f:
-                f.write(await file.read())
+                f.write(await _read_upload(file))
         label = " + ".join(f.filename for f in files)
         with _year_op(year, "자료 업로드"):
             conn = _conn()
@@ -404,6 +429,8 @@ async def _ingest(files: list, year: str, kind: str):
 async def upload_plan(year: str, file: list[UploadFile] = File(...)):
     try:
         return _clean_json(await _ingest(file, year, "plan"))
+    except HTTPException:
+        raise                          # 413·423·409 는 그대로(예전엔 400 으로 뭉개졌다)
     except Exception as e:
         raise HTTPException(400, f"계획 파일 흡수 실패: {e}")
 
@@ -412,6 +439,8 @@ async def upload_plan(year: str, file: list[UploadFile] = File(...)):
 async def upload_erp(year: str, file: UploadFile = File(...)):
     try:
         return _clean_json(await _ingest([file], year, "erp"))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, f"zrfm2 파일 흡수 실패: {e}")
 
@@ -425,10 +454,11 @@ async def upload_master(kind: str, year: str, file: UploadFile = File(...)):
     """
     if kind not in ("item", "dept"):
         raise HTTPException(400, "kind는 item(예산과목) 또는 dept(부서코드)여야 합니다.")
+    data = await _read_upload(file)
     fd, tmp = tempfile.mkstemp(suffix=".xlsx")
     try:
         with os.fdopen(fd, "wb") as f:
-            f.write(await file.read())
+            f.write(data)
         conn = _conn()
         try:
             _guard_unlocked(conn, year, "마스터 갱신")
@@ -1031,6 +1061,7 @@ def biz_deletes(year: str):
 def restore_biz_delete(del_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "biz_delete", del_id, "사업 삭제 복원")
         dbm.delete_biz_delete(conn, del_id)
         return {"restored": del_id}
     finally:
@@ -1050,6 +1081,7 @@ def biz_edits(year: str):
 def delete_biz_edit(edit_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "biz_edit", edit_id, "사업 수정 취소")
         dbm.delete_biz_edit(conn, edit_id)
         return {"deleted": edit_id}
     finally:
@@ -1101,6 +1133,7 @@ def manual_biz_list(year: str):
 def delete_manual_biz(biz_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "manual_biz", biz_id, "추가 사업 삭제")
         dbm.delete_manual_biz(conn, biz_id)
         return {"deleted": biz_id}
     finally:
@@ -1330,6 +1363,7 @@ def overrides(year: str):
 def delete_override(override_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "override", override_id, "재배정 취소")
         dbm.delete_override(conn, override_id)
         return {"deleted": override_id}
     finally:
@@ -1585,7 +1619,7 @@ def training_add(req: ExampleReq, request: Request):
 async def training_import(request: Request, name: str, file: UploadFile = File(...)):
     if name not in ml_registry.MODEL_NAMES:
         raise HTTPException(400, "모델 이름이 올바르지 않습니다.")
-    content = await file.read()
+    content = await _read_upload(file, xlsx=False)
     conn = _conn()
     try:
         try:

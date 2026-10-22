@@ -16,7 +16,7 @@ from pydantic import BaseModel
 import pandas as pd
 
 from . import config_store, forecast_export, forecast_import, forecast_store as fs, pipeline_forecast as pf
-from . import db as dbm
+from . import db as dbm, uploads
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -185,7 +185,7 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         """엑셀 → 파싱 결과만. 저장은 화면이 미리보기를 확인한 뒤 PUT 으로."""
         if kind not in IMPORTERS:
             raise HTTPException(400, "kind 는 grades·schedule·hot-parts·hq-master 중 하나여야 합니다.")
-        data = await file.read()
+        data = await uploads.read_upload(file)
         conn = conn_factory()
         try:
             sites = pf.forecast_sites(conn, base_year)

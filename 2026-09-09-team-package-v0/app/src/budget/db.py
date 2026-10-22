@@ -847,11 +847,15 @@ def learn_from_year(conn, year):
 
     - 계획집행/신규로 귀속된 전표의 (과목, 텍스트정규) → 사업명 을 저장.
     - 수동 재배정(override) 전표는 source='수동확정'으로 우선 저장(사람 확정).
-    - 같은 키는 최신 학습이 덮어쓴다(사람 확정 > 자동 확정).
-    반환: {"자동확정": n, "수동확정": m}
+    - 같은 키는 최신 학습이 덮어쓴다. 단 사람 확정 > 자동 확정 — 이미 «수동확정»으로 저장된
+      키는 다른 해(또는 같은 해)의 자동확정이 덮지 않는다. 예전엔 2024 수동확정을 2025 학습의
+      자동확정이 지워, 사람이 고친 귀속이 다음 분석에서 되돌아갔다(검토 2026-10-22).
+    반환: {"자동확정": n, "수동확정": m, "수동확정보호": k}
     """
-    counts = {"자동확정": 0, "수동확정": 0}
+    counts = {"자동확정": 0, "수동확정": 0, "수동확정보호": 0}
     cur = conn.cursor()
+    manual_keys = {(r[0], r[1]) for r in conn.execute(
+        "SELECT 과목, 텍스트정규 FROM learned_match WHERE source='수동확정'")}
     for budget in ("손익", "자본"):
         run = latest_run(conn, year, budget)
         if not run:
@@ -876,6 +880,9 @@ def learn_from_year(conn, year):
         for want in ("자동확정", "수동확정"):
             for item, key, name, src in rows:
                 if src != want:
+                    continue
+                if src == "자동확정" and (item, key) in manual_keys:
+                    counts["수동확정보호"] += 1
                     continue
                 cur.execute(
                     "INSERT OR REPLACE INTO learned_match VALUES(?,?,?,?,?,?)",
