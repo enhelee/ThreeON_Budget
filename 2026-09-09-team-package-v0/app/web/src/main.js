@@ -57,6 +57,13 @@ document.addEventListener("click", async e => {
     renderPage();
     return;
   }
+  const nt = e.target.closest("[data-note]");
+  if (nt) {
+    state.det.noteKey = state.det.noteKey === nt.dataset.note ? null : nt.dataset.note;
+    renderPage();
+    if (state.det.noteKey) $("#vnText")?.focus();
+    return;
+  }
   const ed = e.target.closest("[data-edit]");
   if (ed) {
     state.det.editKey = state.det.editKey === ed.dataset.edit ? null : ed.dataset.edit;
@@ -153,6 +160,22 @@ document.addEventListener("click", async e => {
     state.det.sel.clear(); state.det.selBudget = null;
     state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
     renderPage();
+  }
+  if (act === "cancel-note") { state.det.noteKey = null; renderPage(); return; }
+  if (act === "save-note") {
+    const key = e.target.closest("[data-action]").dataset.ekey;
+    const b = state.det.data.biz.find((x, idx) => `${x.budget}|${x.예산과목}|${x.사업명}|${idx}` === key);
+    if (!b) return;
+    try {
+      const r = await api("/api/variance-note", {method: "PUT", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                              처지사: state.det.branch, 사업명: b.사업명, note: $("#vnText").value})});
+      b.사유 = r.note;                   // 숫자가 안 바뀌므로 재분석·재조회 없이 이 행만 고친다
+      state.det.noteKey = null;
+      toast(r.note ? "사유를 저장했습니다." : "사유를 지웠습니다.");
+      renderPage();
+    } catch (err) { toast(err.message); }
+    return;
   }
   if (act === "cancel-edit") { state.det.editKey = null; state.det.delKey = null; renderPage(); }
   if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
@@ -459,6 +482,7 @@ document.addEventListener("change", async e => {
   if (f === "sort") { state.sort = e.target.value; renderPage(); }
   const chk = e.target.dataset.detCheck;
   if (chk === "hideMissing") { state.det.hideMissing = e.target.checked; renderPage(); return; }
+  if (chk === "varOnly") { state.det.varOnly = e.target.checked; renderPage(); return; }
   const det = e.target.dataset.det;
   if (det === "branch" && e.target.value) {
     busy(true, "지사 상세 로딩...");

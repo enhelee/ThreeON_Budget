@@ -69,6 +69,8 @@ REPLACE_TABLES = {
     "dept_master": (("year", "부서코드"), ("year", "부서코드", "부서명", "처지사", "비고")),
     "year_lock": (("year",), ("year", "locked_at")),
     "learned_match": (("과목", "텍스트정규"), ("과목", "텍스트정규", "사업명", "source", "source_year", "created_at")),
+    "variance_note": (("year", "budget", "예산과목", "처지사", "사업명"),
+                      ("year", "budget", "예산과목", "처지사", "사업명", "note", "operator", "updated_at")),
 }
 # id BIGSERIAL을 가진 테이블 — 단건 INSERT 뒤 lastrowid가 필요하므로 RETURNING id를 붙인다
 ID_TABLES = {

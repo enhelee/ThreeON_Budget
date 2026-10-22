@@ -288,6 +288,13 @@ def init_db(conn):
         예산과목 TEXT, 처지사 TEXT, 사업명 TEXT,   -- 대상 사업 식별(현재 이름)
         fields_json TEXT NOT NULL,                 -- {"속성": "...", "사업명": "...", ...}
         created_at TEXT NOT NULL)""")
+    # 차이 사유 — 집행률이 계획 대비 ±20%p 를 벗어난 사업의 설명(권장 입력, 2026-10-22).
+    #   사업을 이름으로 가리킨다(biz_edit 와 같은 키). 숫자를 바꾸지 않는 주석이라 마감 연도에도 쓴다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS variance_note(
+        year TEXT NOT NULL, budget TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
+        note TEXT NOT NULL, operator TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY (year, budget, 예산과목, 처지사, 사업명))""")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_plan_ds ON plan_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_erp_ds ON erp_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_ml_run ON match_line(run_id)")
@@ -1060,6 +1067,57 @@ def delete_biz_delete(conn, del_id):
     conn.commit()
 
 
+# ---------------------------------------------------------------------------
+# 차이 사유(집행률 ±20%p) — 권장 입력
+# ---------------------------------------------------------------------------
+
+VARIANCE_BAND = 0.20      # 집행률이 100% 에서 이만큼(20%p) 넘게 벗어나면 사유를 권한다
+VARIANCE_NOTE_MAX = 500
+
+
+def is_variance(plan, actual):
+    """계획이 있는 사업 중 집행률이 80% 미만 또는 120% 초과(경계는 포함 안 함).
+
+    계획 0 인 신규 사업은 집행률이 없어 대상이 아니다. 미시행(실적 0)은 0% 라 대상이다 —
+    불용 사유도 설명이 필요하다.
+    """
+    try:
+        p = float(plan or 0)
+        a = float(actual or 0)
+    except (TypeError, ValueError):
+        return False
+    if p <= 0:
+        return False
+    return abs(a / p - 1.0) > VARIANCE_BAND + 1e-9
+
+
+def set_variance_note(conn, year, budget, item, dept, name, note, operator=None):
+    """사유 저장. 빈 문자열이면 지운다. 반환: 저장된 사유(지웠으면 None)."""
+    note = (note or "").strip()[:VARIANCE_NOTE_MAX]
+    key = (str(year), budget, item, dept, name)
+    if not note:
+        conn.execute("DELETE FROM variance_note WHERE year=? AND budget=? AND 예산과목=?"
+                     " AND 처지사=? AND 사업명=?", key)
+        conn.commit()
+        return None
+    conn.execute("INSERT OR REPLACE INTO variance_note VALUES(?,?,?,?,?,?,?,?)",
+                 key + (note, operator, _now()))
+    conn.commit()
+    return note
+
+
+def variance_notes(conn, year, dept=None):
+    """{(budget, 예산과목, 처지사, 사업명): {"note", "operator", "updated_at"}}."""
+    sql = ("SELECT budget, 예산과목, 처지사, 사업명, note, operator, updated_at"
+           " FROM variance_note WHERE year=?")
+    params = [str(year)]
+    if dept is not None:
+        sql += " AND 처지사=?"
+        params.append(dept)
+    return {(r[0], r[1], r[2], r[3]): {"note": r[4], "operator": r[5], "updated_at": r[6]}
+            for r in conn.execute(sql, tuple(params)).fetchall()}
+
+
 def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
     """사업명 변경 시 그 사업을 '이름으로' 가리키는 기록을 함께 옮긴다.
 
@@ -1072,6 +1130,10 @@ def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
     """
     if not old_name or not new_name or old_name == new_name:
         return {"override": 0, "learned": 0}
+    # 차이 사유도 이름으로 붙어 있다 — 옮기지 않으면 이름을 고치는 순간 사유가 사라진다.
+    conn.execute("UPDATE variance_note SET 사업명=? WHERE year=? AND budget=? AND 예산과목=?"
+                 " AND 처지사=? AND 사업명=?",
+                 (new_name, str(year), budget, item, dept, old_name))
     run = latest_run(conn, year, budget)
     ov = 0
     if run:

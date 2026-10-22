@@ -1,4 +1,4 @@
-import { confBadge, gubunBadge } from "../components/badges.js"
+import { confBadge, gubunBadge, rateBadge } from "../components/badges.js"
 import { charSay } from "../components/characters.js"
 import { emptyState, pendingBarHtml } from "../components/widgets.js"
 import { realBranches } from "../data.js"
@@ -8,8 +8,37 @@ import { esc, fmt, fmtRate } from "../util.js"
 export const DET_COLS = [
   ["budget", "구분"], ["예산과목", "예산과목"], ["속성", "속성"], ["사업명", "사업명"],
   // 표는 원 단위(전표 금액과 맞추려고), 위 요약 카드는 천원이다 — 머리글에 단위를 밝힌다.
-  ["연예산원", "연예산(A)·원"], ["실적원", "실적금액(B)·원"], ["구분", "상태"], ["확신도", "확신도"],
+  ["연예산원", "연예산(A)·원"], ["실적원", "실적금액(B)·원"], ["집행률", "집행률·사유"],
+  ["구분", "상태"], ["확신도", "확신도"],
 ];
+const NCOL = DET_COLS.length + 1;   // + 수정 열
+
+/** 집행률 칸: 비율 배지 + (±20%p 를 벗어난 사업이면) 사유 버튼. 판정은 서버(db.is_variance).
+ *  사유는 숫자를 바꾸지 않는 설명이라 마감 연도에도 연다. */
+function rateCell(b, key) {
+  const rate = b.연예산 > 0 ? rateBadge(b.연예산, b.실적) : "";
+  if (!b.편차) return rate;
+  const btn = b.사유
+    ? `<button class="badge bg-ok-bg text-ok" data-note="${esc(key)}" title="${esc(b.사유)}">사유 ✓</button>`
+    : `<button class="badge bg-warn-bg text-warn" data-note="${esc(key)}" title="집행률이 계획 대비 ±20%p 를 벗어났어요 — 사유를 적어 두면 보고 때 바로 씁니다">사유 입력</button>`;
+  return `<span class="inline-flex items-center gap-1">${rate}${btn}</span>`;
+}
+
+function noteRowHtml(b, key) {
+  if (state.det.noteKey !== key) return "";
+  return `
+      <tr class="edit-row"><td colspan="${NCOL}" class="p-4">
+        <div class="rounded-control border border-line-strong bg-subtle p-4">
+          <p class="mb-2 text-sm font-bold text-ink">차이 사유 — "${esc(b.사업명)}"
+            <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)}천원 · 실적 ${fmt(b.실적)}천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
+          <textarea id="vnText" class="control min-h-20 w-full" maxlength="500" aria-label="차이 사유" placeholder="예: 정기점검 일정이 내년 3월로 이월 / 긴급 보수로 추가 집행">${esc(b.사유 || "")}</textarea>
+          <div class="mt-3 flex gap-2">
+            <button class="btn-primary" data-action="save-note" data-ekey="${esc(key)}">사유 저장</button>
+            <button class="btn-secondary" data-action="cancel-note">닫기</button>
+          </div>
+        </div>
+      </td></tr>`;
+}
 
 export function detSortArrow(key) {
   if (state.det.sortKey !== key) return '<span class="text-tri">↕</span>';
@@ -23,6 +52,7 @@ export function legend() {
     <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fffbeb"></span><b>노랑</b> = 신규 (계획에 없던 집행)</span>
     <span class="flex items-center gap-1.5"><span class="swatch" style="background:#f1f5f9"></span><b>회색</b> = 미매핑 (지사 미확정 — 재배정으로 지사 지정, 종합표 미포함)</span>
     <span class="flex items-center gap-1.5">확신도: <span class="badge bg-ok-bg text-ok">0.80↑ 자동확정</span><span class="badge bg-warn-bg text-warn">0.80미만 검토 필요</span></span>
+    <span class="flex items-center gap-1.5">집행률 80% 미만·120% 초과: <span class="badge bg-warn-bg text-warn">사유 입력</span> 권장 → <span class="badge bg-ok-bg text-ok">사유 ✓</span></span>
   </div>`;
 }
 
@@ -74,6 +104,7 @@ export function renderDetail() {
         <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">속성</span><select class="control" data-det="attr"><option value="">전체</option>${d.data.attrs.map(a => `<option value="${esc(a)}" ${d.attr === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></label>
         <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-sub">사업명 검색</span><input class="control w-full" data-det="q" value="${esc(d.q)}" placeholder="사업명 일부를 입력"></label>
         <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+        <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
         ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
       </div></section>
       ${!locked && d.addOpen ? addBizFormHtml() : ""}
@@ -158,12 +189,16 @@ export function deleteBoxHtml(b, key) {
 export function detResultsHtml() {
   const d = state.det;
   const data = d.data;
-  let biz = data.biz.map((b, idx) => ({...b, _key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}));
+  let biz = data.biz.map((b, idx) => ({...b, _key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`,
+    집행률: b.연예산 > 0 ? b.실적 / b.연예산 : null}));
+  const varAll = data.biz.filter(b => b.편차);
+  const varNoted = varAll.filter(b => b.사유).length;
   if (d.budget !== "all") biz = biz.filter(b => b.budget === d.budget);
   if (d.item) biz = biz.filter(b => b.예산과목 === d.item);
   if (d.attr) biz = biz.filter(b => String(b.속성 ?? "") === d.attr);
   if (d.hideMissing) biz = biz.filter(b => b.구분 !== "미시행");
   if (d.lowConf) biz = biz.filter(isLowConf);
+  if (d.varOnly) biz = biz.filter(b => b.편차);
   if (d.q.trim()) { const q = d.q.trim().toLocaleLowerCase("ko"); biz = biz.filter(b => String(b.사업명 ?? "").toLocaleLowerCase("ko").includes(q)); }
   if (d.sortKey) {
     const k = d.sortKey, dir = d.sortDir;
@@ -193,6 +228,7 @@ export function detResultsHtml() {
         <td class="table-cell text-xs font-bold text-sub">전표 텍스트(ERP)</td>
         <td class="table-cell text-right text-xs font-bold text-sub">전기일</td>
         <td class="table-cell text-right text-xs font-bold text-sub">전표금액(원)</td>
+        <td></td>
         <td class="table-cell text-right text-xs font-bold text-sub" colspan="2">확신도</td>
         <td></td></tr>`;
     const vrows = !open ? "" : vhead + b.전표.map(v => `
@@ -204,11 +240,12 @@ export function detResultsHtml() {
         <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
         <td class="table-cell text-right text-xs text-tri">${esc(v.전기일 ?? "")}</td>
         <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
+        <td></td>
         <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}</td>
         <td></td></tr>`).join("")
-      + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-tri" colspan="9">귀속 전표 없음 (미시행)</td></tr>` : "");
+      + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-tri" colspan="${NCOL}">귀속 전표 없음 (미시행)</td></tr>` : "");
     const editRow = !editing ? "" : `
-      <tr class="edit-row"><td colspan="9" class="p-4">
+      <tr class="edit-row"><td colspan="${NCOL}" class="p-4">
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-3 text-sm font-bold text-ink">사업 내용 수정 <span class="ml-2 text-xs font-medium text-ink">빈칸으로 저장하면 해당 값이 지워집니다. 저장 즉시 반영 + 이후 분석에도 유지.</span></p>
           <div class="edit-grid">
@@ -239,10 +276,11 @@ export function detResultsHtml() {
         <td class="table-cell font-semibold text-ink cell-name" title="${esc(b.사업명)}"><span class="mr-1 inline-block w-3 text-tri">${b.전표.length ? (open ? "▾" : "▸") : ""}</span>${esc(b.사업명)}</td>
         <td class="table-cell text-right">${fmt(b.연예산원)}</td>
         <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
+        <td class="table-cell text-right">${rateCell(b, key)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
         <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
         <td class="table-cell text-right">${locked ? "" : `<button class="grid h-6 w-6 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button>`}</td>
-      </tr>${editRow}${vrows}`;
+      </tr>${noteRowHtml(b, key)}${editRow}${vrows}`;
   }).join("");
 
   // 이동 대상 지사 — 현재 지사가 실제 지사면 그것이 기본값, 미매핑 가상지사면 미선택
@@ -266,10 +304,11 @@ export function detResultsHtml() {
   })();
 
   return `
-      <section class="grid gap-4 sm:grid-cols-3">
+      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <article class="metric-card"><p class="text-sm font-semibold text-sub">조회 사업</p><p class="mt-3 text-2xl font-bold">${biz.length}건</p></article>
         <article class="metric-card"><p class="text-sm font-semibold text-sub">연예산(A)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article>
         <article class="metric-card"><p class="text-sm font-semibold text-sub">최종 실적금액(B)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.actual)} <span class="text-xs font-semibold text-tri">천원</span></p><p class="mt-1 text-xs text-sub">집행률 ${fmtRate(tot.plan, tot.actual)}</p></article>
+        <article class="metric-card"><p class="text-sm font-semibold text-sub">차이 사유 (±20%p)</p><p class="mt-3 text-2xl font-bold">${varNoted} <span class="text-base font-semibold text-tri">/ ${varAll.length}건</span></p><p class="mt-1 text-xs text-sub">${varAll.length ? (varNoted === varAll.length ? "모두 적었어요" : `${varAll.length - varNoted}건 남음 · 권장 입력`) : "벗어난 사업 없음"}</p></article>
       </section>
       ${selCount && !locked ? `<section class="panel sticky top-16 z-10 mt-6 border-line-strong bg-subtle p-4">
         <div class="flex flex-wrap items-end gap-3">
@@ -286,10 +325,10 @@ export function detResultsHtml() {
       <section class="panel mt-6 overflow-hidden">
         <div class="border-b border-line px-4 py-3">${legend()}</div>
         ${biz.length ? `<div class="overflow-x-auto"><table class="det-table w-full"><thead class="table-head"><tr>
-          ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 7 ?"text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
+          ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 8 ?"text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
           <th class="text-right">수정</th></tr></thead>
         <tbody class="divide-y divide-line-subtle">${rows}</tbody>
-        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="3"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
+        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="4"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
       </section>
       <p class="mt-4 text-xs text-tri">표의 연예산(A)·실적금액(B)·전표금액은 <b>원 단위</b>, 상단 요약 카드는 <b>천원 단위</b>입니다. 재배정은 저장 즉시 자동 재분석되어 반영되고, 그 확정 내용은 자동으로 학습됩니다.</p>`;
 }

@@ -4,6 +4,14 @@ import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt, fmtRate, rateVal } from "../util.js"
 
+/** 차이 사유 입력 현황 — 남으면 노랑, 다 적었으면 초록. 권장 입력이라 빨강은 쓰지 않는다. */
+function varianceBadge(r) {
+  if (!r.variance) return '<span class="text-xs text-tri">-</span>';
+  const done = r.varianceNoted || 0;
+  const cls = done >= r.variance ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn";
+  return `<span class="badge ${cls}">${done}/${r.variance}</span>`;
+}
+
 export function brResultsHtml() {
   const all = (state.branches || []).map(r => ({...r, ...amounts(r)}))
     .filter(r => r.branch.toLocaleLowerCase("ko").includes(state.search.trim().toLocaleLowerCase("ko")));
@@ -17,10 +25,10 @@ export function brResultsHtml() {
   return `
       <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 계획</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 집행률</p><p class="mt-3 text-2xl font-bold">${fmtRate(tot.plan, tot.actual)}</p></article></section>
       <section class="panel mt-6 overflow-hidden">
-        ${rows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">잔액</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">검토대상</th></tr></thead>
-        <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr class="clickable hover:bg-subtle" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-ink">${esc(r.branch)}</td><td class="table-cell text-right">${fmt(r.plan)}</td><td class="table-cell text-right">${fmt(r.actual)}</td><td class="table-cell text-right ${r.plan - r.actual < 0 ?"text-err" : ""}">${fmt(r.plan - r.actual)}</td><td class="table-cell text-right">${rateBadge(r.plan, r.actual)}</td><td class="table-cell text-right">${r.lowConf ? `<span class="badge bg-warn-bg text-warn">${r.lowConf}건</span>` : '<span class="text-xs text-tri">-</span>'}</td></tr>`).join("")}
-        ${unmappedRows.map(r => `<tr class="clickable row-unmapped hover:bg-subtle" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-err">${esc(r.branch)}</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right"><span class="badge bg-subtle text-err">종합표 미포함</span></td><td class="table-cell text-right"><span class="badge bg-subtle text-err">미매핑 ${r.unmapped}건 · ${fmt(r.unmappedAmt)}천원</span></td></tr>`).join("")}</tbody>
-        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold text-ink">합계</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td class="table-cell text-right font-bold">${fmt(tot.plan - tot.actual)}</td><td class="table-cell text-right font-bold">${fmtRate(tot.plan, tot.actual)}</td><td></td></tr></tfoot></table></div>` : emptyState("분석 이력이 없거나 검색 결과가 없습니다.")}
+        ${rows.length ? `<div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">잔액</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">검토대상</th><th class="px-4 py-3 text-right" title="집행률이 계획 대비 ±20%p 를 벗어난 사업 중 사유를 적은 수 / 전체">차이 사유</th></tr></thead>
+        <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr class="clickable hover:bg-subtle" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-ink">${esc(r.branch)}</td><td class="table-cell text-right">${fmt(r.plan)}</td><td class="table-cell text-right">${fmt(r.actual)}</td><td class="table-cell text-right ${r.plan - r.actual < 0 ?"text-err" : ""}">${fmt(r.plan - r.actual)}</td><td class="table-cell text-right">${rateBadge(r.plan, r.actual)}</td><td class="table-cell text-right">${r.lowConf ? `<span class="badge bg-warn-bg text-warn">${r.lowConf}건</span>` : '<span class="text-xs text-tri">-</span>'}</td><td class="table-cell text-right">${varianceBadge(r)}</td></tr>`).join("")}
+        ${unmappedRows.map(r => `<tr class="clickable row-unmapped hover:bg-subtle" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-err">${esc(r.branch)}</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right text-tri">-</td><td class="table-cell text-right"><span class="badge bg-subtle text-err">종합표 미포함</span></td><td class="table-cell text-right"><span class="badge bg-subtle text-err">미매핑 ${r.unmapped}건 · ${fmt(r.unmappedAmt)}천원</span></td><td></td></tr>`).join("")}</tbody>
+        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold text-ink">합계</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td class="table-cell text-right font-bold">${fmt(tot.plan - tot.actual)}</td><td class="table-cell text-right font-bold">${fmtRate(tot.plan, tot.actual)}</td><td></td><td></td></tr></tfoot></table></div>` : emptyState("분석 이력이 없거나 검색 결과가 없습니다.")}
       </section>`;
 }
 
