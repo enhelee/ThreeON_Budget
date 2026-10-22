@@ -95,6 +95,9 @@ document.addEventListener("click", async e => {
   // 도움말·검토미 배너 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
   if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); syncFabMini(); return; }
   if (act === "close-help") { state.helpOpen = false; renderPage(); syncFabMini(); $(".help-fab__btn")?.focus(); return; }
+  if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
+  const ak = e.target.closest("[data-alert-kind]");
+  if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }

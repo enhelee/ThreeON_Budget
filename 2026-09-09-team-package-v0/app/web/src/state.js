@@ -21,6 +21,9 @@ export const state = {
         benchEdits: {methods: {}, overrides: {}} },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
+  alerts: null,     // /api/alerts — {alerts, summary, prev_year}
+  alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
+  alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,

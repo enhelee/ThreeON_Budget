@@ -3,6 +3,45 @@ import { yearPicker } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
 
+const ALERT_KINDS = ["급증", "예산 초과", "음수 실적", "미매칭 비중"];
+
+/** 이상 알림 — 분석이 끝나면 사람이 먼저 볼 곳을 위험도 순으로. 판단은 사람이 한다(알림은 고르기만). */
+export function alertsPanelHtml() {
+  const data = state.alerts;
+  if (!data) return "";
+  const sm = data.summary || {total: 0, high: 0, counts: {}};
+  const kind = state.alertKind;
+  const list = (data.alerts || []).filter(a => !kind || a.kind === kind);
+  const shown = state.alertsAll ? list : list.slice(0, 10);
+  const chip = (k, label, n) => `<button class="badge ${kind === k ? "bg-ink text-white" : "bg-subtle text-ink"}" data-alert-kind="${esc(k)}">${esc(label)} ${n}</button>`;
+  const where = a => [a.budget, a.branch, a.item, a.name].filter(Boolean).map(esc).join(" · ");
+  const link = a => a.branch && a.branch !== "(미매핑)"
+    ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>` : "";
+  return `
+      <section class="panel p-6" aria-labelledby="alertsTitle">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div><h3 id="alertsTitle" class="section-title">이상 알림 — ${esc(state.year)}년</h3>
+          <p class="section-help">급증(${data.prev_year ? `${esc(data.prev_year)}년 대비` : "전년 자료 없음"}) · 예산 초과 · 음수 실적 · 미매칭 비중을 규칙으로 골랐어요. 금액 5천만 원 이상은 <b>높음</b>.</p></div>
+          <p class="text-sm text-sub">전체 <b class="text-ink">${sm.total}</b>건 · 높음 <b class="text-err">${sm.high}</b>건</p>
+        </div>
+        ${sm.total ? `
+        <div class="mt-4 flex flex-wrap gap-2">${chip("", "전체", sm.total)}${ALERT_KINDS.map(k => chip(k, k, sm.counts?.[k] || 0)).join("")}</div>
+        <ul class="mt-4 divide-y divide-line-subtle border-t border-line">
+          ${shown.map(a => `
+          <li class="flex flex-wrap items-start gap-x-3 gap-y-1 py-3 text-sm">
+            <span class="badge ${a.severity === "높음" ? "bg-err-bg text-err" : "bg-warn-bg text-warn"}">${esc(a.severity)}</span>
+            <span class="badge bg-subtle text-ink">${esc(a.kind)}</span>
+            <span class="min-w-0 flex-1"><span class="font-semibold text-ink">${where(a)}</span>
+              <span class="block text-xs text-sub">${esc(a.text)}</span></span>
+            <span class="text-right font-semibold ${a.amount < 0 ? "text-err" : "text-ink"}">${fmt(a.amount)}<span class="ml-0.5 text-xs text-tri">천원</span></span>
+            ${link(a)}
+          </li>`).join("")}
+        </ul>
+        ${list.length > 10 ? `<button class="btn-secondary mt-4" data-action="toggle-alerts">${state.alertsAll ? "위 10건만" : `${list.length}건 모두 보기`}</button>` : ""}`
+        : `<p class="mt-4 text-sm text-sub">${(data.alerts || []).length === 0 && !Object.keys(state.status?.runs || {}).length ? "분석 결과가 생기면 여기에 알림이 나옵니다." : "규칙에 걸린 항목이 없어요."}</p>`}
+      </section>`;
+}
+
 /** 매칭이 한마디 — 업로드 전 / 분석 전 / 분석 끝 세 단계. 숫자는 runs 요약(손익+자본) 그대로. */
 function matchingSay(ds, runs) {
   const done = ["손익", "자본"].map(b => runs[b]?.summary).filter(Boolean);
@@ -55,6 +94,7 @@ export function renderCollect() {
           ${ds.length ? `<ul class="mt-5 space-y-3 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between rounded-control ${i === 0 ?"border border-ok bg-ok-bg" : "bg-subtle"} p-3"><div><p class="font-semibold text-ink">${esc(d.label)}</p><p class="text-xs text-sub">${d.row_count.toLocaleString()}행 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-ok-bg text-ok">사용중</span>' : '<span class="badge bg-subtle text-sub">이전본</span>'}</li>`).join("")}</ul>` : `<p class="mt-5 text-sm text-sub">${esc(state.year)}년 ERP 자료가 아직 없습니다.</p>`}
         </article>
       </section>
+      ${alertsPanelHtml()}
       <section class="grid gap-4 md:grid-cols-3">${sums}
         <article class="metric-card"><p class="text-sm font-semibold text-sub">다음 단계</p>
         <p class="mt-3 text-sm text-sub">매칭 결과를 지사별로 검토하고 잘못 붙은 전표를 재배정하세요.</p>
