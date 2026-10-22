@@ -1252,6 +1252,20 @@ def branches(year: str):
         conn.close()
 
 
+def _basis_fallback(conf, gubun):
+    """매칭근거 열이 생기기 전(2026-10-22 이전) 실행은 확신도로 추정한다 — 화면에 «추정»을 붙인다."""
+    if conf is None or (isinstance(conf, float) and conf != conf):
+        return None
+    if str(gubun).startswith("신규"):
+        return "신규(추정)"
+    c = float(conf)
+    if c >= 0.995:
+        return "재배정·규칙·자재류(추정)"
+    if c >= 0.985:
+        return "학습(추정)"
+    return "사업명 유사(추정)" if c >= 0.8 else "유사도 낮음(추정)"
+
+
 @app.get("/api/branch-detail")
 def branch_detail(year: str, branch: str):
     """지사 상세: 손익·자본 통합 사업 목록 + 사업별 귀속 ERP 전표(트리).
@@ -1313,6 +1327,7 @@ def branch_detail(year: str, branch: str):
                     "금액천원": round(v["금액천원"] or 0),
                     "금액원": round(v["금액원"] or 0),
                     "확신도": v["매칭확신도"],
+                    "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"]),
                 }
                 mrow = v["매칭행"]
                 if mrow is not None and not pd.isna(mrow):
@@ -1469,9 +1484,15 @@ def stats(year: str):
                 g = by_item.setdefault(it, {"예산과목": it,
                                             "대분류": cat_of.get(it, "기타"),
                                             "계획": 0, "실적": 0, "집행": 0, "신규": 0,
-                                            "사업수": 0, "미시행": 0})
+                                            "사업수": 0, "미시행": 0, "_지사": {}})
                 g["계획"] += row["연예산"] or 0
                 g["실적"] += row["실적금액"] or 0
+                # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
+                br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
+                                           {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
+                br["계획"] += row["연예산"] or 0
+                br["실적"] += row["실적금액"] or 0
+                br["사업수"] += 1
                 g["사업수"] += 1
                 if row["구분"] == "미시행":
                     g["미시행"] += 1
@@ -1483,6 +1504,8 @@ def stats(year: str):
                 gg = by_group.setdefault(grp, {"그룹": grp, "계획": 0, "실적": 0})
                 gg["계획"] += row["연예산"] or 0
                 gg["실적"] += row["실적금액"] or 0
+            for g in by_item.values():
+                g["지사"] = sorted(g.pop("_지사").values(), key=lambda b: -abs(b["실적"]))
             order = ["본사", "중대형CHP", "소형CHP", "DH", "기타"]
             out[budget] = {
                 "items": sorted(by_item.values(), key=lambda x: str(x["예산과목"])),

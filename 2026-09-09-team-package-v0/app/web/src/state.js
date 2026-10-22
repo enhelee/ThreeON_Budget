@@ -21,6 +21,7 @@ export const state = {
         benchEdits: {methods: {}, overrides: {}} },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
+  statOpen: null,   // 통계 과목 표에서 펼친 행(«예산|과목») — 지사별 드릴다운
   alerts: null,     // /api/alerts — {alerts, summary, prev_year}
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)

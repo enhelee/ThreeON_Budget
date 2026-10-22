@@ -3,6 +3,21 @@ import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt, fmtRate } from "../util.js"
 
+/** 과목 행을 펼치면 지사별 계획·실적 — 지사를 누르면 3+ 상세(그 과목만)로 가서 사업 → 전표·매칭 근거까지 본다. */
+function drillRows(budget, x) {
+  if (state.statOpen !== `${budget}|${x.예산과목}`) return "";
+  return (x.지사 || []).map(b => `
+    <tr class="voucher-row">
+      <td class="table-cell"></td>
+      <td class="table-cell pl-8 text-sm text-ink">${esc(b.처지사)} <span class="text-xs text-tri">· 사업 ${b.사업수}</span></td>
+      <td class="table-cell text-right text-sm">${fmt(b.계획)}</td>
+      <td class="table-cell text-right text-sm font-semibold">${fmt(b.실적)}</td>
+      <td class="table-cell" colspan="2"></td>
+      <td class="table-cell text-right">${b.계획 > 0 ? rateBadge(b.계획, b.실적) : '<span class="text-xs text-tri">계획 없음</span>'}</td>
+      <td class="table-cell text-right" colspan="2">${b.처지사 === "(미매핑)" ? "" : `<button class="text-xs font-semibold text-ink hover:text-brand" data-drill="${esc(b.처지사)}" data-drill-item="${esc(x.예산과목)}" data-drill-budget="${esc(budget)}">전표 보기 →</button>`}</td>
+    </tr>`).join("");
+}
+
 export function renderStats() {
   const st = state.stats;
   if (!st || !Object.keys(st.budgets || {}).length) {
@@ -23,7 +38,7 @@ export function renderStats() {
           </div>
         </div>
         <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">대분류</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">계획(A)</th><th class="px-4 py-3 text-right">실적(B)</th><th class="px-4 py-3 text-right">└ 계획집행</th><th class="px-4 py-3 text-right">└ 신규</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">사업수</th><th class="px-4 py-3 text-right">미시행</th></tr></thead>
-        <tbody class="divide-y divide-line-subtle">${items.map(x => `<tr class="hover:bg-subtle"><td class="table-cell text-sub">${esc(x.대분류)}</td><td class="table-cell font-semibold text-ink">${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.계획)}</td><td class="table-cell text-right font-semibold">${fmt(x.실적)}</td><td class="table-cell text-right text-sub">${fmt(x.집행)}</td><td class="table-cell text-right text-sub">${fmt(x.신규)}</td><td class="table-cell text-right">${rateBadge(x.계획, x.실적)}</td><td class="table-cell text-right">${x.사업수}</td><td class="table-cell text-right ${x.미시행 ?"text-warn" : "text-tri"}">${x.미시행}</td></tr>`).join("")}</tbody>
+        <tbody class="divide-y divide-line-subtle">${items.map(x => `<tr class="clickable hover:bg-subtle" data-stat-item="${esc(budget)}|${esc(x.예산과목)}" title="눌러서 지사별 실적 → 전표까지 내려가 보기"><td class="table-cell text-sub">${esc(x.대분류)}</td><td class="table-cell font-semibold text-ink"><span class="mr-1 inline-block w-3 text-tri">${state.statOpen === `${budget}|${x.예산과목}` ? "▾" : "▸"}</span>${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.계획)}</td><td class="table-cell text-right font-semibold">${fmt(x.실적)}</td><td class="table-cell text-right text-sub">${fmt(x.집행)}</td><td class="table-cell text-right text-sub">${fmt(x.신규)}</td><td class="table-cell text-right">${rateBadge(x.계획, x.실적)}</td><td class="table-cell text-right">${x.사업수}</td><td class="table-cell text-right ${x.미시행 ?"text-warn" : "text-tri"}">${x.미시행}</td></tr>${drillRows(budget, x)}`).join("")}</tbody>
         <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="2">합계</td><td class="table-cell text-right font-bold">${fmt(tot.p)}</td><td class="table-cell text-right font-bold">${fmt(tot.a)}</td><td colspan="2"></td><td class="table-cell text-right font-bold">${fmtRate(tot.p, tot.a)}</td><td colspan="2"></td></tr></tfoot></table></div>
         <div class="border-t border-line p-5 sm:p-6"><h4 class="text-sm font-bold text-ink">지사그룹별 (계획 파랑 · 실적 청록)</h4>
           <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-ink">${esc(g.그룹)}</span><span class="text-xs text-sub"><span class="font-semibold text-ink">${fmt(g.계획)}</span> / <span class="font-semibold text-ok">${fmt(g.실적)}</span> · ${fmtRate(g.계획, g.실적)}</span></div>

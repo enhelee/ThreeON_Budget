@@ -16,7 +16,9 @@ export function alertsPanelHtml() {
   const chip = (k, label, n) => `<button class="badge ${kind === k ? "bg-ink text-white" : "bg-subtle text-ink"}" data-alert-kind="${esc(k)}">${esc(label)} ${n}</button>`;
   const where = a => [a.budget, a.branch, a.item, a.name].filter(Boolean).map(esc).join(" · ");
   const link = a => a.branch && a.branch !== "(미매핑)"
-    ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>` : "";
+    ? (a.item
+      ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-drill="${esc(a.branch)}" data-drill-item="${esc(a.item)}" data-drill-budget="${esc(a.budget)}">전표 보기 →</button>`
+      : `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>`) : "";
   return `
       <section class="panel p-6" aria-labelledby="alertsTitle">
         <div class="flex flex-wrap items-end justify-between gap-3">

@@ -229,7 +229,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right text-xs font-bold text-sub">전기일</td>
         <td class="table-cell text-right text-xs font-bold text-sub">전표금액(원)</td>
         <td></td>
-        <td class="table-cell text-right text-xs font-bold text-sub" colspan="2">확신도</td>
+        <td class="table-cell text-right text-xs font-bold text-sub" colspan="2">확신도·매칭 근거</td>
         <td></td></tr>`;
     const vrows = !open ? "" : vhead + b.전표.map(v => `
       <tr class="voucher-row">
@@ -241,7 +241,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right text-xs text-tri">${esc(v.전기일 ?? "")}</td>
         <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
         <td></td>
-        <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}</td>
+        <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}${v.근거 ? `<span class="ml-1 block text-[11px] text-sub" title="이 전표가 이 사업에 붙은 이유">${esc(v.근거)}</span>` : ""}</td>
         <td></td></tr>`).join("")
       + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-tri" colspan="${NCOL}">귀속 전표 없음 (미시행)</td></tr>` : "");
     const editRow = !editing ? "" : `
@@ -304,7 +304,7 @@ export function detResultsHtml() {
   })();
 
   return `
-      <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article class="metric-card"><p class="text-sm font-semibold text-sub">조회 사업</p><p class="mt-3 text-2xl font-bold">${biz.length}건</p></article>
         <article class="metric-card"><p class="text-sm font-semibold text-sub">연예산(A)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article>
         <article class="metric-card"><p class="text-sm font-semibold text-sub">최종 실적금액(B)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.actual)} <span class="text-xs font-semibold text-tri">천원</span></p><p class="mt-1 text-xs text-sub">집행률 ${fmtRate(tot.plan, tot.actual)}</p></article>
