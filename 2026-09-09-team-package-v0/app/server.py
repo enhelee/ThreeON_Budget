@@ -1337,9 +1337,8 @@ def add_override(req: OverrideReq):
     conn = _conn()
     try:
         _guard_unlocked(conn, req.year, "전표 재배정")
-        for rid in req.erp_row_ids:
-            dbm.add_override(conn, req.year, req.budget, rid, name, req.memo,
-                             target_dept=dept)
+        dbm.add_overrides(conn, req.year, req.budget, req.erp_row_ids, name, req.memo,
+                          target_dept=dept)
         # 학습은 여기서 하지 않는다(사용자 확정) — 설정 탭 [AI 학습] 버튼으로 분리.
         #   수정 중에 학습이 쌓이면 되돌려도 학습에 흔적이 남고, 저장도 느려진다.
         return {"saved": len(req.erp_row_ids),

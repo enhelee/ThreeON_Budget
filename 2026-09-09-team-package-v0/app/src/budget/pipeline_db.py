@@ -48,8 +48,17 @@ def run_actual_db(conn, out_dir, year, budget, new_policy="group",
         manual_biz=manual_biz, biz_deletes=biz_deletes, make_files=make_files,
     )
     if record_run:
-        run_id = dbm.save_run(conn, year, budget, res["요약"], res["erp_annotated"])
-        dbm.save_biz_lines(conn, run_id, budget, res["plan_rows"], res["new_rows"])
+        # run·match_line·biz_line 은 한 트랜잭션. 나눠 commit 하면 biz_line 저장이 실패했을 때
+        # «사업 행 없는 실행»이 최신 실행이 되어 지사·상세 화면이 비어 보였다.
+        try:
+            run_id = dbm.save_run(conn, year, budget, res["요약"], res["erp_annotated"],
+                                  commit=False)
+            dbm.save_biz_lines(conn, run_id, budget, res["plan_rows"], res["new_rows"],
+                               commit=False)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         res["run_id"] = run_id
     else:
         # 내보내기용 재실행 — 새 실행 이력을 남기지 않는다. 남기면 방금 만든 파일이

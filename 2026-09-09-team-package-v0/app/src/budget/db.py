@@ -431,10 +431,19 @@ def load_erp_df(conn, year):
 
 def add_override(conn, year, budget, erp_row_id, target_name, memo=None,
                  target_dept=None):
-    conn.execute(
+    add_overrides(conn, year, budget, [erp_row_id], target_name, memo, target_dept)
+
+
+def add_overrides(conn, year, budget, erp_row_ids, target_name, memo=None,
+                  target_dept=None):
+    """여러 전표 재배정을 한 번에(한 트랜잭션·executemany). 전표마다 commit 하면
+    중간 실패 시 일부만 저장되고, PG 에서는 전표 수만큼 왕복한다."""
+    now = _now()
+    conn.executemany(
         "INSERT INTO override(year,budget,erp_row_id,target_name,memo,created_at,"
         "target_dept) VALUES(?,?,?,?,?,?,?)",
-        (str(year), budget, int(erp_row_id), target_name, memo, _now(), target_dept))
+        [(str(year), budget, int(rid), target_name, memo, now, target_dept)
+         for rid in erp_row_ids])
     conn.commit()
 
 
@@ -460,7 +469,7 @@ def delete_override(conn, override_id):
     conn.commit()
 
 
-def save_run(conn, year, budget, summary, erp_annotated):
+def save_run(conn, year, budget, summary, erp_annotated, commit=True):
     cur = conn.cursor()
     cur.execute("INSERT INTO run(year,budget,created_at,summary_json) VALUES(?,?,?,?)",
                 (str(year), budget, _now(), json.dumps(summary, ensure_ascii=False)))
@@ -475,7 +484,8 @@ def save_run(conn, year, budget, summary, erp_annotated):
                      r.get("구분"),
                      None if mrow is None or pd.isna(mrow) else int(mrow)))
     cur.executemany("INSERT INTO match_line VALUES(?,?,?,?,?,?,?,?)", rows)
-    conn.commit()
+    if commit:
+        conn.commit()
     return run_id
 
 
@@ -490,7 +500,7 @@ def _f(v):
     return None if f != f else f
 
 
-def save_biz_lines(conn, run_id, budget, plan_rows, new_rows):
+def save_biz_lines(conn, run_id, budget, plan_rows, new_rows, commit=True):
     """분석 결과의 사업 단위 행(계획행+신규행)을 DB에 저장 — 웹 상세화면 소스."""
     rows = []
     for r in plan_rows:
@@ -508,7 +518,8 @@ def save_biz_lines(conn, run_id, budget, plan_rows, new_rows):
                      None, r.get("전표건수", 0), 0, 0, None))
     conn.executemany(
         "INSERT INTO biz_line VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def load_biz_lines(conn, run_id):
@@ -842,6 +853,9 @@ def norm_text(s):
     return normalize.learn_key(s)
 
 
+LEARN_MIN_CONF = 0.80
+
+
 def learn_from_year(conn, year):
     """해당 연도의 최신 실행(손익·자본) 확정 결과를 학습 DB에 반영.
 
@@ -850,9 +864,12 @@ def learn_from_year(conn, year):
     - 같은 키는 최신 학습이 덮어쓴다. 단 사람 확정 > 자동 확정 — 이미 «수동확정»으로 저장된
       키는 다른 해(또는 같은 해)의 자동확정이 덮지 않는다. 예전엔 2024 수동확정을 2025 학습의
       자동확정이 지워, 사람이 고친 귀속이 다음 분석에서 되돌아갔다(검토 2026-10-22).
-    반환: {"자동확정": n, "수동확정": m, "수동확정보호": k}
+    - 자동확정은 전표 확신도가 LEARN_MIN_CONF(0.80, 상세 화면의 «자동확정» 기준과 같다) 이상일
+      때만 배운다. 낮은 유사도로 «일단 붙은» 전표까지 배우면 다음 해 0.99 로 굳고 검토 목록에서도
+      빠진다(강남 HRSG TUBE → «RO 베셀» 사례, 검토 2026-10-22). 사람이 고친 전표는 확신도와 무관.
+    반환: {"자동확정": n, "수동확정": m, "수동확정보호": k, "저확신제외": j}
     """
-    counts = {"자동확정": 0, "수동확정": 0, "수동확정보호": 0}
+    counts = {"자동확정": 0, "수동확정": 0, "수동확정보호": 0, "저확신제외": 0}
     cur = conn.cursor()
     manual_keys = {(r[0], r[1]) for r in conn.execute(
         "SELECT 과목, 텍스트정규 FROM learned_match WHERE source='수동확정'")}
@@ -875,6 +892,11 @@ def learn_from_year(conn, year):
             if not name:
                 continue
             src = "수동확정" if int(r["erp_row_id"]) in manual_ids else "자동확정"
+            if src == "자동확정":
+                conf = r.get("매칭확신도")
+                if conf is None or pd.isna(conf) or float(conf) < LEARN_MIN_CONF:
+                    counts["저확신제외"] += 1
+                    continue
             rows.append((r["과목정규"], key, name, src))
         # 자동확정 먼저, 수동확정 나중(같은 키면 사람 확정이 이긴다)
         for want in ("자동확정", "수동확정"):
