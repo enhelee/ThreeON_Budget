@@ -27,6 +27,7 @@ import contextvars
 import os
 import re
 import sqlite3
+import threading
 import time
 
 # ── 요청별 DB 사용량(Server-Timing 헤더의 근거) ─────────────────────────────
@@ -200,13 +201,84 @@ class PgCursor:
         return iter(self._c)
 
 
+# ── PG 연결 재사용(작은 풀) ──────────────────────────────────────────────
+# 요청마다 psycopg.connect 하면 운영(Render 싱가포르 ↔ Supabase)에서 연결 한 번이 ~0.42초다
+# (Server-Timing conn, 2026-10-22 실측). 화면 하나가 API 3~15개를 부르므로 그만큼 곱해진다.
+# close() 때 트랜잭션을 정리한 연결을 돌려받아 다음 요청이 쓴다. 외부 의존성(psycopg_pool)
+# 없이 리스트 하나로 — 서버는 uvicorn 한 프로세스다. PG_POOL_SIZE=0 이면 예전처럼 매번 연결.
+_POOL = []                 # [(url, raw, 돌려받은 시각)] — 뒤가 최근(LIFO)
+_POOL_LOCK = threading.Lock()
+_POOL_PING_AFTER = 30.0    # 이만큼 놀던 연결은 SELECT 1 로 살아 있는지 보고 쓴다
+
+
+def _pool_size():
+    try:
+        return max(0, int(os.environ.get("PG_POOL_SIZE", "4")))
+    except ValueError:
+        return 0
+
+
+def _pool_take(url):
+    while True:
+        with _POOL_LOCK:
+            idx = next((i for i in range(len(_POOL) - 1, -1, -1) if _POOL[i][0] == url), None)
+            if idx is None:
+                return None
+            _, raw, since = _POOL.pop(idx)
+        if raw.closed:
+            continue
+        if time.time() - since > _POOL_PING_AFTER:
+            try:
+                raw.execute("SELECT 1").fetchone()
+                raw.rollback()
+            except Exception:
+                try:
+                    raw.close()
+                except Exception:
+                    pass
+                continue
+        return raw
+
+
+def _pool_give(url, raw):
+    """정리된 연결만 돌려받는다. 실패·읽기전용·가득 참이면 닫는다."""
+    try:
+        if raw.closed or getattr(raw, "read_only", False):
+            raw.close()
+            return
+        raw.rollback()       # 커밋 안 된 읽기 트랜잭션·실패 트랜잭션을 정리
+        with _POOL_LOCK:
+            if len(_POOL) < _pool_size():
+                _POOL.append((url, raw, time.time()))
+                return
+    except Exception:
+        pass
+    try:
+        raw.close()
+    except Exception:
+        pass
+
+
+def pool_clear():
+    """테스트·종료용 — 놀고 있는 연결을 모두 닫는다."""
+    with _POOL_LOCK:
+        items = list(_POOL)
+        _POOL.clear()
+    for _, raw, _t in items:
+        try:
+            raw.close()
+        except Exception:
+            pass
+
+
 class PgConnection:
     """psycopg 연결 래퍼 — sqlite3.Connection과 같은 호출 방식 제공."""
 
     backend = "postgresql"
 
-    def __init__(self, raw):
+    def __init__(self, raw, pool_url=None):
         self._raw = raw
+        self._pool_url = pool_url     # 있으면 close() 가 풀로 돌려준다
 
     def cursor(self):
         return PgCursor(self._raw.cursor())
@@ -224,7 +296,13 @@ class PgConnection:
         self._raw.rollback()
 
     def close(self):
-        self._raw.close()
+        raw, self._raw = self._raw, None
+        if raw is None:               # 두 번 닫아도 같은 연결을 풀에 두 번 넣지 않게
+            return
+        if self._pool_url and _pool_size():
+            _pool_give(self._pool_url, raw)
+        else:
+            raw.close()
 
 
 def connect(db_path=None, url=None):
@@ -241,10 +319,14 @@ def connect(db_path=None, url=None):
         # prepare_threshold=None: 서버측 prepared statement 사용 안 함.
         # Supavisor transaction 모드(6543)는 prepared statement를 지원하지 않아
         # psycopg 기본값(5회 후 자동 prepare)이면 오류가 난다. session 모드(5432)에서도 무해.
+        if _pool_size():
+            raw = _pool_take(url)
+            if raw is not None:
+                return PgConnection(raw, pool_url=url)
         t = time.perf_counter()
         raw = psycopg.connect(url, prepare_threshold=None)
         _note("conn", t)
-        return PgConnection(raw)
+        return PgConnection(raw, pool_url=url)
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
