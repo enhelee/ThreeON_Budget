@@ -205,6 +205,11 @@ function nextActions() {
     items.push({tone: "warn", view: null,
                 text: `저장된 변경 ${pending}건이 분석에 반영되지 않았습니다 — 상단 분석 반영을 누르세요.`})
   }
+  const al = state.alerts?.summary;
+  if (al?.high) {
+    items.push({tone: "warn", view: "collect",
+                text: `이상 알림 높음 ${al.high}건(전체 ${al.total}건) — 예산 초과·음수 실적·미매칭 비중을 실적 집계에서 확인하세요.`})
+  }
   if (unmapped) {
     items.push({tone: "warn", view: "detail",
                 text: `미배정 전표 ${unmapped}건 — 3+ 상세에서 지사를 지정하면 종합표에 포함됩니다.`})

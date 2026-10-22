@@ -36,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import alerts as alertm, api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -1162,6 +1162,47 @@ def _unmapped_detail(conn, runs):
                 "금액천원": round(v["금액천원"] or 0),
             })
     return out
+
+
+# ── 이상 알림 (규칙 기반, budget/alerts.py) ───────────────────────────────
+
+_ALERT_COLS = ("처지사", "예산과목", "사업명", "연예산", "실적금액", "구분")
+
+
+def _alert_lines(conn, runs):
+    out = []
+    for budget, r in runs.items():
+        df = dbm.load_biz_lines(conn, r["id"])
+        for row in df[list(_ALERT_COLS)].to_dict("records"):
+            row["budget"] = budget
+            out.append(row)
+    return out
+
+
+@app.get("/api/alerts")
+def alerts(year: str):
+    """올해 최신 분석에서 급증(전년 대비)·예산 초과·음수 실적·미매칭 비중을 골라 위험도 순으로.
+
+    분석 결과를 읽기만 한다 — 업로드·분석 뒤 화면이 다시 부르면 그때의 결과가 나온다.
+    """
+    conn = _conn()
+    try:
+        runs = _latest_runs(conn, year)
+        if not runs:
+            return {"alerts": [], "summary": alertm.summarize([]), "prev_year": None}
+        prev_year = str(int(year) - 1)
+        prev_runs = _latest_runs(conn, prev_year)
+        unmapped = {}
+        for budget, r in runs.items():
+            um = dbm.load_match_detail(conn, r["id"], unmapped=True)
+            unmapped[budget] = float(um["금액천원"].fillna(0).sum()) if len(um) else 0.0
+        found = alertm.compute_alerts(_alert_lines(conn, runs),
+                                      _alert_lines(conn, prev_runs) if prev_runs else None,
+                                      unmapped)
+        return _clean_json({"alerts": found, "summary": alertm.summarize(found),
+                            "prev_year": prev_year if prev_runs else None})
+    finally:
+        conn.close()
 
 
 @app.get("/api/branches")

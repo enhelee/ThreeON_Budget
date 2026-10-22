@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -162,7 +162,7 @@ export async function navigate(view, opts = {}) {
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  if (view === "home") jobs.push(["서버 정보", loadHealth]);
+  if (view === "home") jobs.push(["서버 정보", loadHealth], ["이상 알림", loadAlerts]);
   if (view === "forecast") {
     // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
@@ -171,6 +171,7 @@ export async function navigate(view, opts = {}) {
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
+  if (view === "collect") jobs.push(["이상 알림", loadAlerts]);
   if (view === "stats") {
     jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }],
               ["연도 비교", async () => { state.statsCompare = await api(`/api/stats-compare?year=${state.year}`); }]);
