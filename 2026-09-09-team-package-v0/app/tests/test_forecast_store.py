@@ -35,7 +35,7 @@ def _cols(conn, table):
 def test_all_nine_forecast_tables_have_base_year(conn):
     for t in fs.TABLES:
         assert "base_year" in _cols(conn, t), t
-    assert len(fs.TABLES) == 19        # v2 승계 9 + 표준화 방향 반영 10(2026-10-26)
+    assert len(fs.TABLES) == 20        # v2 승계 9 + 표준화 방향 반영 10 + 설정 1(2026-10-26)
 
 
 # ---------------------------------------------------------------- 정비등급 이력

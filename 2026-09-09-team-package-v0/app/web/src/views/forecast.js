@@ -22,6 +22,7 @@ import { esc, fmt } from "../util.js"
 const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급 이력", ["grades", "site_grade_eq"]],
+                     ["learn", "학습 기간·백테스트", ["settings"]],
                      ["factor", "팩터·고온부품", ["factors", "hot_parts"]],
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
                      ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan"]],
@@ -154,7 +155,7 @@ const opts = () => state.fc.data?.options || {}
 const sitesOpt = (d, blank) => [...(blank ? [""] : []), ...new Set([...d.sites])]
 
 function eqPanel(d) {
-  return panel("설비별 정비등급", "#1 GT·#2 GT·ST·DH 행 그대로 · 위 표(대표 등급)가 표준화·전망에 쓰임",
+  return panel("설비별 정비등급", "#1 GT·#2 GT·ST·DH 행 그대로 · 위 표(대표 등급)가 표준화·전망에 쓰임 · 어느 설비든 MI 인 해·A 로 바뀐 해 = A급정비 일정(DH·SRF·PLB 줄 제외, 기준연도 뒤 등급이 있는 지사만)",
     longTable("site_grade_eq", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "연도", label: "연도", type: "int"},
       {f: "설비", label: "설비"}, {f: "등급", label: "등급"}], d.site_grade_eq, "설비별 등급이 없습니다 — «참고 엑셀·대조» 탭에서 가져오세요."), "site_grade_eq")
 }
@@ -187,6 +188,35 @@ function regularBody(d) {
   ${panel("투자계획", "기준연도 이후 투자비는 이 값만 사용 · 기준연도는 계획본(여기 같은 해 값이 있으면 이것)",
     longTable("investment_plan", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "연도", label: "연도", type: "int"},
       {f: "금액", label: "금액(천원)", type: "num"}, {f: "비고", label: "비고"}], d.investment_plan, "투자계획이 없습니다 — 기준연도 이후 투자비는 0 입니다."), "investment_plan")}`
+}
+
+const pct = v => (v === null || v === undefined) ? "—" : `${(v * 100).toFixed(1)}%`
+const sgn = v => {
+  if (v === null || v === undefined) return "—"
+  const n = Math.round(v * 100)
+  return `${n > 0 ? "+" : ""}${n}%`
+}
+const WINDOWS = [["2", "최근 2개년"], ["3", "최근 3개년 (권장)"], ["5", "최근 5개년"], ["10", "최근 10개년"], ["0", "있는 해 전부"]]
+
+/** 학습 기간 · 백테스트(다른 세션의 백테스트 제안 ③⑤를 옮김) */
+function learnBody(d) {
+  const win = String(d.settings?.학습기간 ?? "3")
+  const bt = state.fc.backtest
+  const btBody = bt ? `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>
+      <th class="px-3 py-2">학습 기간</th><th class="px-3 py-2 text-right">과목 합계 오차</th><th class="px-3 py-2 text-right">지사 3년 누적 오차</th><th class="px-3 py-2 text-right">칸별 오차 (참고)</th></tr></thead>
+      <tbody class="divide-y divide-line-subtle">${bt.runs.map(r => `<tr class="${String(r.window) === String(bt.window) ? "bg-subtle font-semibold" : ""}">
+        <td class="table-cell">최근 ${esc(r.window)}개년${String(r.window) === String(bt.window) ? " · 지금 설정" : ""}</td>
+        <td class="table-cell text-right">${pct(r.account)}</td><td class="table-cell text-right">${pct(r.site3)}</td><td class="table-cell text-right text-sub">${pct(r.cell)}</td></tr>`).join("")}</tbody></table>
+      <p class="mt-2 text-xs text-sub">시험 연도 ${esc((bt.runs[0]?.targets || []).join("·") || "없음")} — 그 해보다 앞선 해로 표준금액을 만들어 맞혀 본 결과(마감 ${esc((bt.sources?.마감 || []).join("·") || "없음")} · 참고 엑셀 ${esc((bt.sources?.참고 || []).length)}개년). 고온부품재·LTSA·CRI·재생고온부품은 계획으로 받는 줄이라 뺐습니다.</p>
+      ${bt.runs[0]?.overhaul ? `<p class="mt-1 text-xs text-sub">A급정비 일정 규칙: 실제 ${bt.runs[0].overhaul.events}건 중 ${bt.runs[0].overhaul.hits}건 맞힘 · 헛예측 ${bt.runs[0].overhaul.false_positive}칸 · 총액 ${sgn(bt.runs[0].overhaul.total)}</p>` : ""}</div>`
+    : '<p class="p-5 text-sm text-tri">아직 실행하지 않았습니다.</p>'
+  return `
+    ${panel("학습 기간", "산정 규칙이 없는 칸(사용자지정·자동추천)이 쓰는 최근 실적 해 수 · 규칙은 엑셀처럼 연도를 직접 가리킴 · 백테스트로 비교해 고르세요", `
+      <div class="flex flex-wrap items-end gap-3 p-5">
+        <label class="block"><span class="field-label">학습 기간</span>${sel(WINDOWS.map(w => w[0]), win, 'data-fcsetting="학습기간"', Object.fromEntries(WINDOWS))}</label>
+      </div>`, "settings")}
+    ${panel("백테스트", "평가 단위 = 과목 합계 · 지사 3년 누적 (칸 하나는 사람 연예산도 44~64% 틀림) · 마감 실적 + 참고 엑셀 실적", `
+      <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-action="fc-backtest">백테스트 실행</button></div>${btBody}`)}`
 }
 
 function cmpTable(rows, cols, onlyDiff) {
@@ -243,6 +273,7 @@ function manageBody() {
     ${mt === "ref" ? refBody(d) : ""}
     ${mt === "grades" ? `${gradesPanel(d)}${eqPanel(d)}` : ""}
     ${mt === "history" ? historyBody(d) : ""}
+    ${mt === "learn" ? learnBody(d) : ""}
     ${mt === "regular" ? regularBody(d) : ""}
     ${mt === "factor" ? `${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
       longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"},
@@ -359,6 +390,7 @@ function benchStd() {
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급)</h3>
       <p class="section-help leading-6">${info}</p>
+      <p class="section-help">학습 기간 ${b.window ? `최근 ${esc(b.window)}개년` : "전체"}(규칙 없는 칸) · 재무팀(참고 엑셀) 대비 ±30% 밖은 노랑</p>
       <p class="section-help">산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정»으로 고정 · «규칙» 행은 «산정 규칙»에서 고침${b.has_ltsa ? "" : " ℹ️ 정기비용 유형이 없어 기계장치에서 LTSA·CRI·고온부품을 분리하지 못하고 총액을 씁니다."}</p>
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <label class="block"><span class="field-label">지사그룹</span>
@@ -371,7 +403,7 @@ function benchStd() {
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr>
       <th class="px-3 py-2">지사</th><th class="px-3 py-2">구분</th><th class="px-3 py-2">예산과목</th><th class="px-3 py-2">등급</th>
       <th class="px-3 py-2">산출방식</th><th class="px-3 py-2">방식출처</th><th class="px-3 py-2">추천사유</th>
-      <th class="px-3 py-2 text-right">표준금액(천원)</th><th class="px-3 py-2">근거</th></tr></thead>
+      <th class="px-3 py-2 text-right">표준금액(천원)</th><th class="px-3 py-2 text-right">재무팀(천원)</th><th class="px-3 py-2 text-right">재무팀 대비</th><th class="px-3 py-2">근거</th></tr></thead>
       <tbody class="divide-y divide-line-subtle">${rows.length ? rows.map(r => {
         const mk = `${r.사업장}|${r.예산과목}`, ak = `${mk}|${r.등급}`
         const mch = mk in ed.methods, ach = ak in ed.overrides
@@ -381,8 +413,10 @@ function benchStd() {
           <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
           <td class="table-cell text-sub">${esc(r.방식출처)}</td><td class="table-cell text-xs text-sub">${esc(r.추천사유 || "")}</td>
           <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
+          <td class="table-cell text-right text-sub">${r.재무팀금액 == null ? "—" : fmt(r.재무팀금액)}</td>
+          <td class="table-cell text-right ${r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3 ? "bg-warn-bg text-warn" : "text-sub"}">${sgn(r.재무팀대비)}</td>
           <td class="table-cell text-xs text-sub">${esc(r.근거 || r.비고 || "")}</td></tr>`
-      }).join("") : '<tr><td class="table-cell text-tri" colspan="9">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
+      }).join("") : '<tr><td class="table-cell text-tri" colspan="11">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
   </article>`
 }
 
@@ -398,21 +432,30 @@ function tableBody() {
   if (t.notes.budget_plan_missing) notes.push(["info", `${esc(t.base_year)}년 계획본이 없어 투자비를 0 으로 두고, 표준화 대상 과목의 ${esc(t.base_year)}년도 표준금액으로 대체합니다. 1단계에서 ${esc(t.base_year)}년 계획본을 올리면 확정 예산을 씁니다.`])
   if (t.notes.grade_empty) notes.push(["info", "정비등급 이력이 없어 등급 «표준» 한 종으로 계산했습니다. 기준정보 탭에서 이력을 가져오면 등급별 표준금액이 살아납니다."])
   const sums = Object.fromEntries(t.years.map(y => [y, rows.reduce((s, r) => s + (r[String(y)] || 0), 0)]))
+  const ranges = site === TOTAL ? {} : (t.ranges?.[site] || {})
+  const show = state.fc.showRange && site !== TOTAL
+  const ohy = site === TOTAL ? [] : (t.overhaul_years?.[site] || [])
+  const cellOf = (r, y) => {
+    const v = r[String(y)], rg = ranges[r.예산과목]?.[String(y)]
+    const tip = rg ? ` title="학습 기간 실적 범위 ${fmt(rg[0])} ~ ${fmt(rg[1])}"` : ""
+    return `<td class="table-cell text-right"${tip}>${fmt(v)}${show && rg ? `<div class="text-[11px] text-tri">${fmt(rg[0])}~${fmt(rg[1])}</div>` : ""}</td>`
+  }
   return `
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-ink">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
-      <p class="section-help">기준연도 = 계획본 + 본사배분 · 이후 = 표준금액 × 팩터 · 단위 천원</p>
+      <p class="section-help">기준연도 = 계획본 + 본사배분 · 이후 = 표준금액 × 팩터 · 단위 천원 · 판단은 지사 3년 누적·과목 합계로${ohy.length ? ` · A급정비(외주비-열원정기점검) 일정 ${esc(ohy.filter(y => y >= Number(t.base_year)).join("·") || "기간 안 없음")}` : ""}</p>
       ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-control ${tone ==="warn" ? "bg-warn-bg text-warn" : "bg-subtle text-sub"} px-3 py-2 text-xs">${msg}</p>`).join("")}
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <label class="block"><span class="field-label">지사</span>
           <select class="control" data-fcsite><option value="${TOTAL}" ${site === TOTAL ? "selected" : ""}>전사 합계 (${t.sites.length}개 지사)</option>${t.sites.map(s => `<option value="${esc(s)}" ${s === site ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
+        ${site === TOTAL ? "" : `<label class="flex items-center gap-2 text-sm text-sub"><input type="checkbox" data-fcrange ${state.fc.showRange ? "checked" : ""}> 예측 범위 보기</label>`}
         <button class="btn-secondary" data-fcexport="longterm" title="재무팀 중장기예산 참고 양식(지사 탭·본사 원가분배·총원가 배분·총괄표)에 결과를 채워 내려받습니다">중장기 예산 양식으로 내보내기 (xlsx)</button>
       </div>
       ${exportNote()}
     </div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(r[String(y)])}</td>`).join("")}</tr>`).join("")}
+      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
       <tr class="bg-subtle font-bold"><td class="table-cell text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
   </article>
   ${criPanel(t, site)}`

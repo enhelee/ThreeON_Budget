@@ -97,6 +97,10 @@ async function saveDirty() {
   busy(true, `${state.fc.baseYear}년 기준 전망 가정 저장 중...`)
   try {
     for (const key of keys) {
+      if (key === "settings") {
+        await api("/api/forecast/settings", json({base_year: state.fc.baseYear, values: state.fc.data.settings}))
+        continue
+      }
       const body = key === "hq_master"
         ? {columns: state.fc.data.hq_master.columns, rows: state.fc.data.hq_master.rows}
         : {rows: rowsOf(key)}
@@ -104,6 +108,7 @@ async function saveDirty() {
     }
   } catch (err) { toast(`저장 실패: ${err.message}`); return }
   finally { busy(false) }
+  state.fc.backtest = null            // 학습 기간이 바뀌었을 수 있다 — 다시 실행하게
   await reload()
   toast(`${keys.length}개 표를 ${state.fc.baseYear}년 기준으로 저장했습니다 — 표준화·전망은 다음 조회에 반영됩니다.`)
 }
@@ -188,6 +193,14 @@ async function applyPreview(mode) {
   toast("가져온 자료를 저장했습니다.")
 }
 
+async function runBacktest() {
+  busy(true, "백테스트 계산 중… 학습 기간 넷 × 시험 연도 다섯")
+  try { state.fc.backtest = await api(`/api/forecast/backtest?base_year=${state.fc.baseYear}`) }
+  catch (err) { toast(`백테스트 실패: ${err.message}`); return }
+  finally { busy(false) }
+  renderPage()
+}
+
 // ── 이벤트 위임 ──────────────────────────────────────────────
 
 export async function fcClick(e) {
@@ -240,6 +253,7 @@ export async function fcClick(e) {
   if (act === "fc-apply-replace") { await applyPreview("replace"); return true }
   if (act === "fc-cancel-preview") { state.fc.preview = null; renderPage(); return true }
   if (act === "fc-ref-apply") { if (state.fc.refFile) await referenceUpload(state.fc.refFile, true); return true }
+  if (act === "fc-backtest") { await runBacktest(); return true }
   if (act === "fc-ref-cancel") { state.fc.refPreview = null; state.fc.refFile = null; renderPage(); return true }
   return false
 }
@@ -257,6 +271,11 @@ export async function fcChange(e) {
     if (f && kind === "reference") await referenceUpload(f, false)
     else if (f && kind) await uploadPreview(kind, f)
     return true
+  }
+  if (t.matches("[data-fcrange]")) { state.fc.showRange = t.checked; renderPage(); return true }
+  if (t.matches("[data-fcsetting]")) {
+    state.fc.data.settings = {...(state.fc.data.settings || {}), [t.dataset.fcsetting]: t.value}
+    markDirty("settings"); return true
   }
   if (t.matches("[data-fccmpdiff]")) { state.fc.cmpOnlyDiff = t.checked; renderPage(); return true }
   if (t.dataset.fctag) {

@@ -39,6 +39,17 @@ DEFAULT_METHOD = "등급별 평균"
 # — 연도별 집행계획으로 따로 산정하기 때문이다(v2 표준화방향 시트).
 LTSA_LIKE_DETAILS = {"LTSA", "CRI"}
 
+DEFAULT_WINDOW = 3          # 학습 기간 기본값. 백테스트 2021~2025: 2년 45.3% · 3년 42.8% · 5년 46.7% · 10년 52.6%(칸별)
+
+
+def recent_window(actuals_df: pd.DataFrame, n_years) -> pd.DataFrame:
+    """실적이 있는 해 중 최근 n 개년만. n 이 없거나 0 이하면 전부."""
+    if actuals_df.empty or not n_years or int(n_years) <= 0:
+        return actuals_df
+    keep = sorted(actuals_df["연도"].unique())[-int(n_years):]
+    return actuals_df[actuals_df["연도"].isin(keep)]
+
+
 CURRENT_YEAR_FALLBACK = 2025      # 정비등급 이력이 하나도 없을 때만 쓰는 기본값
 
 
@@ -246,7 +257,8 @@ def _num(v, default):
 def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.DataFrame,
                               method_map: pd.DataFrame = None, overrides: pd.DataFrame = None,
                               item_alias: dict = None, rules: pd.DataFrame = None,
-                              events: pd.DataFrame = None, budget_lookup: dict = None) -> pd.DataFrame:
+                              events: pd.DataFrame = None, budget_lookup: dict = None,
+                              window: int = None) -> pd.DataFrame:
     """
     actuals_df: 사업장, 연도, 예산과목, 금액 컬럼 필요. «유형» 열(정기비용 성격)이 있으면 기계장치의
                 고온부품재생·LTSA·CRI 와 정기유지보수의 LTSA 를 빼고 표준화한다(REGULAR_EXCLUDED).
@@ -256,6 +268,8 @@ def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.Data
            참조지사·참조등급·조정액. 규칙 > method_map(사용자지정) > recommend_method(자동추천) 순.
     events: 지사 구조변화(site_event) — «실적사용시작» 이전 실적은 뺀다.
     budget_lookup: {(사업장, 예산과목): 기준연도 계획금액} — «예산 대체» 방식이 쓴다.
+    window: 학습 기간(최근 N개년). 규칙 없는 칸(사용자지정·자동추천)만 이 창 안 실적을 쓴다 — 산정
+            규칙은 엑셀처럼 연도를 직접 가리키므로 전체 실적을 본다.
     overrides(수동수정)는 무엇보다 앞선다.
     반환: 사업장, 구분(손익/자본), 예산과목, 등급, 표준금액, 산출방식, 방식출처, 추천사유, 비고, 근거
     """
@@ -278,8 +292,16 @@ def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.Data
         # 둘 다 없으면 '기계장치'를 정기비용 분리 없이 총액 그대로 쓴다(화면이 한 번 안내한다).
         df = apply_usage_events(df, events)
 
-    yearly_by = {k: g.groupby("연도")["금액"].sum() for k, g in df.groupby(["사업장", "예산과목"])} \
-        if not df.empty else {}
+    # 연도별 합계는 한 번의 groupby 로 — 지사×과목 그룹마다 groupby 하면 계산 시간의 절반이다(백테스트 13초 → 6초).
+    def _yearly(frame):
+        cells = {}
+        if not frame.empty:
+            for (site, account, year), amount in frame.groupby(["사업장", "예산과목", "연도"])["금액"].sum().items():
+                cells.setdefault((site, account), {})[year] = amount
+        return {k: pd.Series(v, dtype=float).sort_index() for k, v in cells.items()}
+
+    yearly_by = _yearly(df)
+    yearly_win = _yearly(recent_window(df, window)) if window else yearly_by
     grades_by_site = {}
     for site, g in grade_history_df.groupby("사업장") if not grade_history_df.empty else []:
         grades_by_site[site] = dict(zip(g["연도"], g["등급"]))
@@ -349,7 +371,7 @@ def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.Data
                 reason = _txt(rule.get("사유"))
                 out = (amount, str(rule["방식"]), "규칙", reason, note, basis)
             else:
-                yearly = yearly_by.get((site, account), empty)
+                yearly = yearly_win.get((site, account), empty)
                 gby = grades_by_site.get(site, {})
                 explicit = method_dict.get((site, account))
                 if explicit:
@@ -363,7 +385,7 @@ def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.Data
         return out
 
     combos = {}
-    for (site, account) in yearly_by:
+    for (site, account) in yearly_win:
         combos.setdefault((site, account), set())
     for (site, account, grade) in rule_dict:
         if account in ALL_ACCOUNTS:

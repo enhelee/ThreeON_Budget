@@ -34,7 +34,8 @@ TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_fact
           "forecast_hot_parts", "hq_master", "hq_ratio", "hq_temp", "forecast_surprise",
           # 표준화 방향 반영(2026-10-26) — 아래 SPECS 가 모양을 정한다
           "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
-          "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard")
+          "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
+          "forecast_setting")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
@@ -401,6 +402,36 @@ def save_table(conn, base_year, name, df: pd.DataFrame) -> pd.DataFrame:
     return load_table(conn, base_year, name)
 
 
+# ── 설정 (키 → 값) — 백테스트 제안(2026-10-26) ────────────────────────────────
+SETTING_KEYS = {"학습기간": "3"}        # 키 → 기본값(문자열). 백테스트 2021~2025: 최근 3개년이 과목 합계 오차가 가장 작다
+
+
+def load_settings(conn, base_year) -> dict:
+    out = dict(SETTING_KEYS)
+    for k, v in conn.execute("SELECT 키, 값 FROM forecast_setting WHERE base_year=?", (str(base_year),)):
+        if k in SETTING_KEYS:
+            out[k] = v
+    return out
+
+
+def save_settings(conn, base_year, values: dict) -> dict:
+    """알려진 키만 받는다. 기본값과 같은 값도 저장한다(«손댄 것»으로 남는다)."""
+    stored = dict(_select(conn, "forecast_setting", base_year, ["키", "값"], "키"))
+    for k, v in (values or {}).items():
+        if k in SETTING_KEYS and _s(v) != "":
+            stored[k] = _s(v)
+    _replace(conn, "forecast_setting", base_year, ["키", "값"], list(stored.items()))
+    return load_settings(conn, base_year)
+
+
+def learning_window(conn, base_year) -> int:
+    """학습 기간(최근 N개년). 0 = 있는 해 전부."""
+    try:
+        return max(0, int(load_settings(conn, base_year)["학습기간"]))
+    except (TypeError, ValueError):
+        return int(SETTING_KEYS["학습기간"])
+
+
 def list_base_years(conn) -> list:
     """상태가 하나라도 있는 기준연도들(정렬)."""
     years = set()
@@ -437,6 +468,7 @@ _COPY_COLS = {
     "hq_temp": HQ_TEMP_COLS,
     "forecast_surprise": SURPRISE_COLS,
     **{t: sp["cols"] for t, sp in SPECS.items()},
+    "forecast_setting": ["키", "값"],
 }
 _ID_TABLES = ("hq_temp", "forecast_surprise", "site_event", "regular_contract", "investment_plan")
 

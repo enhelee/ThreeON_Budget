@@ -15,7 +15,8 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_export, forecast_import, forecast_reference, forecast_store as fs, pipeline_forecast as pf
+from . import config_store, forecast_backtest, forecast_export, forecast_import, forecast_reference
+from . import forecast_store as fs, pipeline_forecast as pf
 from . import benchmark as bm, db as dbm, uploads
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -54,6 +55,11 @@ class CopyReq(BaseModel):
     from_year: str
     to_year: str
     overwrite: bool = False
+
+
+class SettingsReq(BaseModel):
+    base_year: str
+    values: dict = {}
 
 
 class RowsReq(BaseModel):
@@ -127,6 +133,7 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             "reference": {name: int(conn.execute(f"SELECT COUNT(*) FROM {name} WHERE base_year=?",
                                                  (str(base_year),)).fetchone()[0])
                           for name in ("reference_actual", "reference_standard")},
+            "settings": fs.load_settings(conn, base_year),
             "options": {"rule_methods": bm.RULE_METHODS, "event_types": fs.EVENT_TYPES,
                         "tag_types": fs.TAG_TYPES, "contract_items": fs.CONTRACT_ITEMS,
                         "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"]},
@@ -252,6 +259,33 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                           pd.DataFrame(plan, columns=fs.SPECS["regular_contract"]["cols"]))
             counts["regular_contract"] = len(plan)
             return clean_json({"applied": True, "counts": counts, "warnings": parsed["warnings"]})
+        finally:
+            conn.close()
+
+    @router.put("/settings")
+    def put_settings(req: SettingsReq):
+        conn = conn_factory()
+        try:
+            return clean_json({"settings": fs.save_settings(conn, req.base_year, req.values)})
+        finally:
+            conn.close()
+
+    @router.get("/backtest")
+    def backtest(base_year: str = None):
+        """학습 기간별 백테스트(제안 ⑤) — 과목 합계·지사 3년 누적·칸별 오차와 A급정비 일정 적중."""
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+
+            def compute():
+                fs.bind_site_resolvers(conn, by)
+                actuals, locked, ref_years = pf.actuals_with_reference(conn, by)
+                runs = forecast_backtest.compare_windows(
+                    actuals, fs.load_grade_history(conn, by), (2, 3, 5, 10),
+                    fs.load_table(conn, by, "site_grade_eq"), pf.site_groups(conn, by))
+                return clean_json({"base_year": str(by), "window": fs.learning_window(conn, by),
+                                   "sources": {"마감": locked, "참고": ref_years}, "runs": runs})
+            return _cached_view("backtest", conn, by, compute)
         finally:
             conn.close()
 

@@ -320,6 +320,10 @@ def init_db(conn):
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL,
         예산과목 TEXT NOT NULL, 유형 TEXT NOT NULL, 금액 REAL NOT NULL,
         PRIMARY KEY(base_year, 사업장, 연도, 예산과목, 유형))""")
+    # 전망 설정(키 → 값) — «학습기간»(표준금액에 쓰는 최근 실적 해 수). 백테스트로 고른다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS forecast_setting(
+        base_year TEXT NOT NULL, 키 TEXT NOT NULL, 값 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 키))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS reference_standard(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
         등급 TEXT NOT NULL, 표준금액 REAL NOT NULL, 엑셀수식 TEXT,
