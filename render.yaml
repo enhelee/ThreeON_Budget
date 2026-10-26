@@ -12,7 +12,8 @@ services:
     dockerfilePath: ./2026-09-09-team-package-v0/deploy/Dockerfile
     dockerContext: ./2026-09-09-team-package-v0
     healthCheckPath: /healthz
-    autoDeploy: true            # ⚠ 실제로는 걸리지 않는다(2026-09 반복 실측) — 병합 뒤 대시보드에서 Manual Deploy
+    autoDeploy: true            # main 병합마다 자동 배포(Render Events «Auto-Deploy», 2026-10 확인). 반영까지 몇 분 — /healthz 의 commit 으로 판별
+                                #   ※ 이 서비스는 Blueprint 동기화가 아니라 대시보드 설정이 기준이다(아래 APP_REV 도 운영은 대시보드 값)
     envVars:
       - key: APP_PASSWORD
         sync: false                 # 대시보드에서 입력 — 팀 공용 비밀번호

@@ -1,4 +1,4 @@
-# HANDOFF — 개발자 인수인계 (현행, 2026-10-19)
+# HANDOFF — 개발자 인수인계 (현행, 2026-10-26)
 
 > **이 문서가 개발자 진입점이다.** 새 세션·새 사람이 이어받을 때 이것부터 읽고, 구조·로직·API 는 [통합_인수인계_MASTER.md](통합_인수인계_MASTER.md), 팀원용 요약은 [팀공유_최종안내.html](팀공유_최종안내.html).
 > 이전에 로컬에만 두던 인수인계(2026-09-19·20·21 판)를 여기로 합쳤다. 1단계 Streamlit 시절의 옛 HANDOFF 는 [archive/](archive/) 에 있다.
@@ -11,9 +11,10 @@
 |---|---|
 | 저장소 | `enhelee/ThreeON_Budget` — 앱과 문서는 전부 `2026-09-09-team-package-v0/`(이하 «패키지»). 루트에는 `render.yaml`·`README.md`·`.gitignore` 만 |
 | 앱 | FastAPI + Vanilla JS SPA **하나**. 1~5단계(계획·실적 집계·분석·통계·표준화/중장기 전망) + 설정. 프로세스 하나(uvicorn) |
-| 배포 | Render 무료(Docker, **싱가포르**) + Supabase PostgreSQL(**서울** ap-northeast-2). 병합하면 **자동 배포 ~1분**(2026-10 확인 — 예전엔 Manual Deploy 필요했다). 판별은 `/healthz` 의 `commit` |
-| 테스트 | `cd app && py -m pytest -q` → **335 passed**(2026-10-19). 4~8분. PR 마다 GitHub Actions(`.github/workflows/test.yml`)도 돈다 |
-| 마지막 큰 변화 | Phase 8 한난 디자인(09-21) → **속도 개선·보안 P1·CI·백업·이력 정리(10-15~19, #47·#48·#49)** — [속도개선_운영점검_2026-10.md](속도개선_운영점검_2026-10.md) |
+| 배포 | Render 무료(Docker, **싱가포르**) + Supabase PostgreSQL(**서울** ap-northeast-2). main 병합하면 **자동 배포**(Render Events «Auto-Deploy», 빌드 40~60초 + 대기로 몇 분). **Manual Deploy 는 필요 없다.** 판별은 `/healthz` 의 `commit` |
+| 테스트 | `cd app && py -m pytest -q` → **379 passed**(2026-10-26). 5~9분. PR 마다 GitHub Actions(`.github/workflows/test.yml`)도 돈다 |
+| 마지막 큰 변화 | 속도 개선·CI·백업(10-15~19, #47~#50) → **종합 검토 반영(10-22, #51~#55: 보안 P1·학습 기준·PG 풀·차이 사유·이상 알림·드릴다운)** → **화면 정리(10-26, #56·#57: 설명문 삭제·상세 표·설정/예측 탭·사이드바 자동 펼침·산점도)** — [변경이력](변경이력_CHANGELOG.md) rev22~28 |
+| 운영 배포 | `142ad20`(2026-10-26, 번들 `index-C1wU7Pof.js`) |
 | 속도(운영) | 로그인 후 화면 전환 2.9~5.5초(10-15 에는 33~40초) · 전망 표 탭 7.4초, 재방문 3.0초 |
 | 검증 연도 | 2023 · 2024 · 2025 모두 마감. 2025 손익 98,554,802 · 자본 49,709,177 천원 |
 
@@ -29,7 +30,7 @@
 │  ├─ scripts/                운영 스크립트 — backup_pg(주간 백업·복원) · prune_history(이력 정리) · migrate_pg(DB 지역 이전)
 │  │                          + 1회성(db_check · db_정리 · make_db_snapshot · make_hanan_font · restyle_sweep)
 │  ├─ templates/              내장 엑셀 양식 (표준화·중장기예산)
-│  ├─ tests/                  pytest 335
+│  ├─ tests/                  pytest 379
 │  └─ data/ config/ output/ .env   로컬 상태·비밀 — 커밋 안 함
 ├─ deploy/                    Dockerfile · entrypoint.sh · docker-compose.yml · requirements.txt · onprem/(사내 반입 스크립트)
 ├─ docs/                      이 문서들 (§7) · img/ (캡처) · superpowers/ (설계·계획) · archive/ (역사)
@@ -41,14 +42,14 @@
 
 ```bash
 cd 2026-09-09-team-package-v0/app/web && npm install && npm run build   # 프론트 수정 후 반드시 (static/ 은 커밋 안 함)
-cd 2026-09-09-team-package-v0/app && py -m pytest -q                      # 335 passed
+cd 2026-09-09-team-package-v0/app && py -m pytest -q                      # 379 passed
 cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app --port 8010   # 로컬 sqlite
 ```
 
 - **`DATABASE_URL` 은 공백 한 칸(`" "`)으로 비운다** — 진짜로 비우면 `.env` 의 운영 PostgreSQL 에 붙는다. `/healthz` 가 `db: sqlite` 인지 매번 확인.
 - 로컬 `app/data/budget.db` 에는 마감 기록이 없다(마감은 운영 PG). 5번 탭을 실측하려면 사본에서 `POST /api/lock` 으로 2023·2025 를 마감한 뒤.
 - 배포본 로그인은 팀 비밀번호가 필요하므로 Claude 가 입력하지 않는다. 운영 화면을 재야 하면 **사용자가 Aside 브라우저에서 로그인**하고 Claude 가 그 세션으로 측정한다(조회만 — 저장·업로드·분석·마감은 누르지 않는다). 측정법은 [속도개선_운영점검_2026-10.md](속도개선_운영점검_2026-10.md) §7.
-- 배포 확인 순서: 병합(CI 통과 후) → 자동 배포 ~1분(안 걸리면 Render Manual Deploy) → `/healthz` 의 `commit` == 병합 커밋 → 배포 `index.html` 의 번들 해시 == 로컬 `app/static/index.html`. 배포 직후 첫 요청 한 번은 DB 스키마 확인으로 ~4초 더 걸린다.
+- 배포 확인 순서: 병합(CI 통과 후) → 자동 배포(**몇 분 기다린다** — 1~2분 만에 보면 아직 옛 커밋이라 «안 걸렸다»고 오판하기 쉽다, 2026-10-26 실제로 그랬다) → `/healthz` 의 `commit` == 병합 커밋 → 배포 `index.html` 의 번들 해시 == 로컬 `app/static/index.html`. 배포 직후 첫 요청 한 번은 DB 스키마 확인으로 ~4초 더 걸린다.
 
 ## 3. 결정 기록 (되돌리려면 비용이 큰 것)
 
@@ -71,6 +72,12 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 | 10-19 | 전망 결과 캐시의 데이터 버전 = **audit_log 최신 id**(+TTL 10분). 그러니 **DB 를 직접 바꾸는 스크립트도 감사 로그를 남긴다**(prune_history) | 모든 API 쓰기는 응답 전 감사 기록 |
 | 10-19 | 이력 보존 규칙 = (연도, 손익\|자본)별 **최신 실행** + (계획\|ERP, 연도)별 **최신 데이터셋**만 | 화면·분석·전망이 읽는 것이 이것뿐(코드 확인) |
 | 10-19 | 0원/0원 «신규» 행은 숨기지 않는다 | 상계 전표(+x/−x) — 검토 근거 |
+| 10-22 | 학습 자동확정은 확신도 0.80↑ 전표만 · 차이 사유는 ±20%p · 권장 입력 · 마감 연도에도 저장 | 사용자 결정(rev23·24) |
+| 10-26 | **화면 설명문은 두지 않는다** — 페이지·카드 아래 안내문 삭제, 숫자·상태 줄만. 설명은 «? 도움말»(`characters.js HELP`). 예측 입력칸만 계산 규칙 한 줄 | 사용자 결정(rev27) — 새 화면도 이 방향 |
+| 10-26 | **집행률 색 = 80~120% 초록 · 80% 미만 노랑 · 120% 초과 빨강**(배지·산점도 공통, 산점도는 ▲●▼ 모양도) | 차이 사유 ±20%p 와 같은 선 · 적록 색약 대비 |
+| 10-26 | 계획·집계 화면 본문의 연도 선택 칸은 **유지**(헤더와 중복이어도) | 사용자 결정 — 업로드 전 연도 재확인 |
+| 10-26 | 마감 해제 안내 = 보고 있는 연도면 헤더 배지 · 다른 연도는 메인 «다음 할 일» 한 줄(큰 띠 없음) | 사용자 결정 |
+| 10-26 | 설정·중장기 예측 기준정보는 **탭**으로 한 묶음씩 · 사이드바는 **마우스 올리면 펼침**(접기 버튼 없음) | 사용자 결정(rev27·28) |
 
 ## 4. 코드 지도
 
@@ -82,7 +89,9 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 
 **프론트 `app/web/`**
 - `index.html`(셸: 헤더 72px·사이드바·건너뛰기 링크·토스트·바쁨) · `src/main.js`(부팅·이벤트 위임·드로어 Escape/포커스) · `router.js`(해시 라우팅 `#/view`·딥링크 `#/detail/<지사>`·`#/forecast/bench|table`, 페이지 제목) · `data.js`·`state.js`·`api.js`
-- `views/` 10개(home plan collect branches detail stats forecast settings yearconfig gate) · `components/`(sidebar badges widgets lockbanner loaderror feedback) · `forecast_actions.js`
+- `views/` 10개(home plan collect branches detail stats forecast settings yearconfig gate) · `components/`(sidebar badges widgets lockbanner loaderror feedback characters) · `forecast_actions.js`
+- 화면 상태 키(`state.js`): `settingsTab`(설정 탭) · `fc.manageTab`(예측 기준정보 탭) · `brTableOpen`(지사 표 접기) · `det.guideOpen`(«? 표 보는 법») · `helpOpen`(도움말 말풍선)
+- 2026-10-26 추가: `lockbanner.js`(헤더 마감 배지 `lockBadgeHtml` + 메인 줄 `openLockItems`) · `branches.js brScatterHtml`(산점도, 색·모양은 `scColor`/`scMark`) · `badges.js rateBadge`(집행률 3색) · `sidebar.js renderHeaderBrand` · `main.js` 사이드바 펼침(`html.sb-rail` 고정 + `sb-collapsed` 를 hover/focus 로 토글)
 - 스타일: `tailwind.config.js`(한난 토큰 이름) · `src/styles/app.css`(`:root` 변수·`@font-face`·컴포넌트 클래스) · `custom.css`(손으로 쓴 규칙 — **det-table 열폭은 여기, 바꾸지 않는다**) · `public/assets/`(시그니처 SVG·`fonts/HananCha-v1.woff2`)
 
 **표 열폭·CSS 함정**은 MASTER §7. 옛 팔레트(`blue-*`·`slate-*`)를 새 화면에 쓰면 `tests/test_ui_shell.py` 가 깨진다.
@@ -96,7 +105,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - Render 무료 CPU 는 로컬보다 3~4배 느리다 — 로컬 프로파일 1초짜리 계산이 운영 3~4초.
 
 **배포·인프라**
-- Render 자동 배포는 2026-10 부터 걸린다(병합 후 ~1분). 그래도 판별은 `/healthz` 의 `commit` — 예전에 Manual Deploy 가 옛 커밋을 띄운 적이 있다.
+- Render 자동 배포는 정상이다(Events 에 #51~#57 모두 «Auto-Deploy»). 반영까지 몇 분 — 판별은 `/healthz` 의 `commit`. 이 서비스는 Blueprint 동기화가 아니라 **대시보드 설정이 기준**(운영 `APP_REV`=rev17 ≠ `render.yaml` rev20) — `render.yaml` 값을 바꿔도 운영엔 안 들어간다.
 - CI(`.github/workflows/test.yml`)는 **화면 빌드 → pytest** 순서. `app/static` 이 없으면 HTTP 테스트 2개가 500 으로 깨진다.
 - 운영 DB 백업: 사용자 PC 작업 스케줄러 `ThreeON_DB_주간백업`(월 09:00) → `문서\ThreeON_DB백업\`. 이력 정리·지역 이전 전에는 **새 백업 먼저**. [백업_복원.md](백업_복원.md).
 - Render `/data` 는 비영속 — 앱 상태는 전부 DB 라 무관, `output/` 산출물만 재생성.
@@ -112,7 +121,9 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - 양식 채우기는 셀 좌표를 박지 않고 라벨 스캔. 재기준화는 시트 개명 임시 이름 경유·수식 치환 단일 패스.
 - 매칭 학습은 설정 탭 [AI 학습] 버튼으로만(자동 학습 없음). 저장(즉시) · 분석(모아서 «분석 반영 N») · 학습(수동) 3분리.
 
-**프론트·디자인(Phase 8)**
+**프론트·디자인(Phase 8 · 2026-10-26 정리)**
+- 상세 표 행 색은 `custom.css :root --row-missing/--row-new/--row-unmapped`(+`-line` 테두리) — 범례 칸과 같은 토큰을 쓴다. 연한 `--err-bg` 등은 흰 바탕과 구별이 안 돼 바꿨다.
+- 내장 브라우저 pane(미리보기)은 CSS transition 이 진행되지 않아 사이드바 폭이 288px 로 «안 바뀐» 것처럼 재진다 — `style.transition='none'` 으로 끄고 재면 76px. 실제 브라우저는 정상.
 - 한난체 원본 TTF 의 글리프 9개(래·챕·챗·쳅·햅·햇·헵·헷·혭)는 빈 윤곽을 하나 더 갖고 있어 Chrome OTS 가 폰트 전체를 거부한다 → `make_hanan_font.py` 의 `repair_empty_contours()` 필수.
 - `custom.css` 는 Tailwind 유틸리티 **뒤**에 로드된다 → `display` 를 주면 `.hidden` 을 이긴다(`.pending-count.hidden{display:none}` 이 그 흔적).
 - 토큰 값은 `tailwind.config.js` 와 `app.css :root` **두 곳** — 함께 바꾼다. 대비표·근거는 UI 제작메모 §4-3.
@@ -123,6 +134,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - Bash heredoc 은 백슬래시를 뭉갠다 → 이스케이프가 필요한 파일은 Write/Edit 도구. `.gitignore` 줄 끝 주석 금지. 콘솔 cp949 → `sys.stdout.reconfigure(encoding='utf-8')`. `subprocess` 로 Edge 를 부를 땐 `encoding='utf-8', errors='replace'`.
 - 로컬 확인 서버는 `.claude/launch.json` 의 `budget-local`(:8099) — 세션 scratch 의 `run_local.py`(`DATABASE_URL=" "`·`APP_PASSWORD=" "`·`DATA_DIR`=실DB 사본). 새 세션이면 경로를 다시 쓴다.
 - `gh` CLI 로 PR 생성(`--body-file`). 병합은 사용자 승인 후(CI 통과 확인).
+- **같은 체크아웃(`C:\Users\User\Desktop\ThreeON_Budget`)을 여러 Claude 세션이 동시에 고친다**(2026-10-26 세 세션). 편집 전 `git status`·파일 mtime 을 보고, 남의 미커밋 변경을 덮어쓰지 않는다. 합칠 때는 한 세션이 모아 한 PR 로.
 - Aside REPL 은 한 번에 120초 — 긴 측정은 페이지 안 `window.__x` 에 백그라운드로 돌리고 나눠 읽는다. Aside 는 `/healthz` 요청을 막고(홈 «시스템 확인 불가»는 Aside 한정) 뷰포트 크기를 못 바꾼다(모바일은 다른 방법).
 - 내장 브라우저 pane 이 숨겨져 있으면 프로그램 `scrollTo` 가 scroll 이벤트를 안 쏜다 — 스크롤 동작은 실제 휠(Aside `mouse.wheel`)로 확인.
 - `migrate_pg.py`·`backup_pg.py` 처럼 스크립트 둘을 함께 import 할 때 `sys.stdout = TextIOWrapper(...)` 를 두 번 하면 스트림이 닫힌다 → `sys.stdout.reconfigure(encoding="utf-8")`.
