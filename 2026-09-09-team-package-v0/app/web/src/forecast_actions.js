@@ -5,6 +5,7 @@ import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
 import { TOTAL } from "./views/forecast.js"
+import { FV_LEVELS } from "./views/forecast_viz.js"
 
 // ─────────────────────────────────────────────────────────────
 // 5번 탭 핸들러 — views/forecast.js 가 그린 DOM(data-fc*)을 읽어 상태를 바꾸고 저장한다.
@@ -201,6 +202,79 @@ async function runBacktest() {
   renderPage()
 }
 
+// ── 중장기 전망 한눈에 보기(views/forecast_viz.js) ───────────
+
+/** 애니메이션 한 번만 — 그리고 나서 지워야 다음 renderPage 에서 다시 튀지 않는다. */
+function fvGo({anim, origin} = {}) {
+  const v = state.fc.viz
+  v.anim = anim || null
+  if (origin) v.origin = origin
+  renderPage()
+  v.anim = null
+}
+
+/** 누른 자리(단계 영역 기준 %)가 확대 기점. 키보드로 누르면(e.detail 0) 가운데. */
+function fvOrigin(e) {
+  const st = document.querySelector("[data-fvstage]")
+  if (!st || !e.detail) return "50% 30%"
+  const r = st.getBoundingClientRect()
+  return `${((e.clientX - r.left) / r.width * 100).toFixed(1)}% ${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`
+}
+
+function fvClick(e) {
+  const v = state.fc.viz
+  const mode = e.target.closest("[data-fvmode]")
+  if (mode) { v.mode = mode.dataset.fvmode; fvGo({anim: "fade"}); return true }
+  if (e.target.closest('[data-action="fv-present"]')) { fvPresent(!v.present); return true }
+  const go = e.target.closest("[data-fvlevel]")
+  if (!go) return false
+  const d = go.dataset
+  const from = FV_LEVELS.indexOf(v.level), to = FV_LEVELS.indexOf(d.fvlevel)
+  const siteChange = d.fvsite !== undefined && d.fvsite !== state.fc.site
+  if (d.fvsite !== undefined) state.fc.site = d.fvsite
+  if (d.fvyear) v.year = Number(d.fvyear)
+  if (d.fvacct !== undefined) v.acct = d.fvacct
+  v.level = d.fvlevel
+  // 깊어지거나 더 좁은 범위(지사)로 가면 확대, 얕아지거나 전사로 나오면 축소, 같은 단계 안 이동은 페이드
+  const anim = to > from || (siteChange && d.fvsite !== TOTAL) ? "zoom-in" : to < from || siteChange ? "zoom-out" : "fade"
+  fvGo({anim, origin: fvOrigin(e)})
+  return true
+}
+
+/** 발표 모드 — 화면 전체(가능하면 Fullscreen API) + 패널만 크게. */
+function fvPresent(on) {
+  state.fc.viz.present = on
+  if (on) document.documentElement.requestFullscreen?.().catch(() => {})
+  else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  fvGo({anim: "fade"})
+}
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && state.fc.viz.present) { state.fc.viz.present = false; if (state.view === "forecast") renderPage() }
+})
+
+/** 발표 모드 키 — ←→ 연도, ↑ 한 단계 위로, Esc 끝내기. 처리했으면 true. */
+export function fcKey(e) {
+  const v = state.fc.viz
+  if (state.view !== "forecast" || state.fc.tab !== "table" || !v.present) return false
+  if (e.target.matches?.("input, select, textarea")) return false
+  if (e.key === "Escape") { fvPresent(false); return true }
+  const years = (state.fc.table?.years || []).map(Number)
+  if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && years.length) {
+    const i = years.indexOf(v.year) + (e.key === "ArrowRight" ? 1 : -1)
+    if (i < 0 || i >= years.length) return true
+    v.year = years[i]
+    if (v.level === "map") v.level = "year"
+    fvGo({anim: "fade"}); return true
+  }
+  if (e.key === "ArrowUp") {
+    const i = FV_LEVELS.indexOf(v.level)
+    if (i > 0) { v.level = FV_LEVELS[i - 1]; fvGo({anim: "zoom-out", origin: "50% 30%"}) }
+    else if (state.fc.site !== TOTAL) { state.fc.site = TOTAL; fvGo({anim: "zoom-out", origin: "50% 30%"}) }
+    return true
+  }
+  return false
+}
+
 // ── 이벤트 위임 ──────────────────────────────────────────────
 
 export async function fcClick(e) {
@@ -219,6 +293,7 @@ export async function fcClick(e) {
   }
   const bview = e.target.closest("[data-fcbview]")
   if (bview) { state.fc.benchView = bview.dataset.fcbview; renderPage(); return true }
+  if (fvClick(e)) return true
   const add = e.target.closest("[data-fcadd]")
   if (add) {
     const key = add.dataset.fcadd
@@ -291,7 +366,8 @@ export async function fcChange(e) {
     return true
   }
   if (t.matches("[data-fcgroup]")) { state.fc.benchGroup = t.value; renderPage(); return true }
-  if (t.matches("[data-fcsite]")) { state.fc.site = t.value || TOTAL; renderPage(); return true }
+  if (t.matches("[data-fcsite]")) { state.fc.site = t.value || TOTAL; fvGo({anim: "fade"}); return true }
+  if (t.matches("[data-fvacctsel]")) { state.fc.viz.acct = t.value; fvGo({anim: "fade"}); return true }
   const bench = t.dataset.fcbench
   if (bench) {
     // 편집만 기록한다 — 저장 버튼에서 기존 방식·수정값과 병합해 두 표를 한 번에 보낸다.

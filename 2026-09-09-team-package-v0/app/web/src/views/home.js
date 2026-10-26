@@ -3,6 +3,7 @@ import { openLockItems } from "../components/lockbanner.js"
 import { STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
+import { fvModel } from "./forecast_viz.js"
 import { esc, fmt, fmtRate } from "../util.js"
 
 // ─────────────────────────────────────────────────────────────
@@ -10,10 +11,11 @@ import { esc, fmt, fmtRate } from "../util.js"
 //
 // 위에서 아래로 다섯 덩어리다.
 //   ① 헤더 스트립      제목·단계·기준일·리비전·단위         — 설명이므로 고정 문구
-//   ② 현황 카드        계획/실적/집행률·미배정·DB·최근분석   — 전부 DB 실측치
-//   ③ STAGE 01~04     카드가 곧 이동 버튼
-//   ④ 이음새·다음 할 일  v2 연계 시각 + 지금 해야 할 것
-//   ⑤ 다년도 패널      최근 개년 막대 + 연도별 요약표
+//   ② 다년도 패널      최근 개년 막대 + 연도별 요약표
+//   ③ 중장기 전망      전사 10개년 막대 + 상위 과목 — 표는 늦게 받아 따로 그린다(router.js)
+//   ④ 현황 카드        계획/실적/집행률·미배정·DB·최근분석   — 전부 DB 실측치
+//   ⑤ 다음 할 일 · STAGE 01~04
+//   (2026-10-26 사용자 요청으로 다년도·전망을 맨 위로 올렸다)
 //
 // 원칙: 하드코딩하는 것은 설명 문구뿐이고, 숫자는 전부 DB에서 끌어온다.
 // 메인을 열 때마다 현재 상태가 찍히므로 사내 이관 논의 때 이 화면 하나만 띄우면 된다.
@@ -253,13 +255,63 @@ function multiYearPanels() {
   </section>`
 }
 
+// ── ③ 중장기 전망 패널 ──────────────────────────────────────
+// 5번 탭과 같은 /api/forecast/table(전사 합계)을 쓴다. 막대를 누르면 5번 탭 «한눈에 보기» 그 해 구성으로.
+
+const eok = v => { const x = v / 1e5; return Math.abs(x) >= 100 ? fmt(x) : x.toFixed(1) }
+
+function forecastPanel() {
+  const t = state.fc.table
+  const head = (badge) => `<div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">중장기 소요 전망 ${t ? `${t.years[0]}~${t.years[t.years.length - 1]}` : "10개년"}</h3>
+      <p class="section-help">전사 합계 · 단위 억원 · 기준연도 = 계획본 + 본사배분, 이후 = 표준금액 × 팩터</p></div>
+      <div class="flex items-center gap-3">${badge}<button class="text-sm font-semibold text-ink hover:text-brand" data-homefc="">전망 자세히 →</button></div></div>`
+  if (!t) return `<section class="panel p-5 sm:p-6">${head("")}<p class="mt-6 text-sm text-tri">${state.fc.homeErr ? "전망을 불러오지 못했습니다 — 5번 탭에서 확인하세요." : "전망을 불러오는 중…"}</p></section>`
+  const m = fvModel(t, "", true)
+  if (!m.years.length || !m.yearTot.some(v => v > 0)) return `<section class="panel p-5 sm:p-6">${head("")}<p class="mt-6 text-sm text-tri">아직 전망 금액이 없습니다 — 연도를 마감하면 5번 탭에서 전망을 만들 수 있습니다.</p></section>`
+  const n = m.years.length, tot = m.yearTot.reduce((a, b) => a + b, 0)
+  const cagr = m.yearTot[0] > 0 ? ((m.yearTot[n - 1] / m.yearTot[0]) ** (1 / (n - 1)) - 1) * 100 : null
+  const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
+  // 10개년 막대 — 기준연도는 옅은 파랑(계획본), 이후는 파랑(전망). 막대 위에 억원, 마우스를 올리면 천원.
+  const W = 760, H = 260, L = 8, R = 8, T = 30, B = 44, bw = (W - L - R) / n, max = Math.max(...m.yearTot) || 1
+  let s = `<text x="${L}" y="12" font-size="12" font-weight="600" fill="#5D5D5D">(단위 억원)</text><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#C9C9C9"/>`
+  m.yearTot.forEach((v, i) => {
+    const h = v / max * (H - T - B), x = L + i * bw + bw * .2, w = bw * .6, y = H - B - h
+    s += `<g class="clickable" data-homefc="${m.years[i]}"><title>전사 ${m.years[i]}년 ${fmt(v)}천원${i ? ` · 전년 대비 ${((v / m.yearTot[i - 1] - 1) * 100).toFixed(1)}%` : " · 기준연도"} (클릭: 그 해 과목 구성)</title>
+      <rect x="${L + i * bw}" y="${T - 22}" width="${bw}" height="${H - T - B + 22}" fill="transparent"/>
+      ${h > 0 ? `<path d="M${x},${H - B} V${y + Math.min(4, h)} q0,-4 4,-4 h${w - 8} q4,0 4,4 V${H - B} Z" fill="${i === 0 ? "#9ec5f4" : i === peak ? "#184f95" : "#256abf"}"/>` : ""}
+      <text x="${x + w / 2}" y="${y - 7}" text-anchor="middle" font-size="12" font-weight="700" fill="#0D0D0D">${eok(v)}</text>
+      <text x="${x + w / 2}" y="${H - B + 18}" text-anchor="middle" font-size="12" font-weight="600" fill="#5D5D5D">${m.years[i]}</text>
+      ${i === 0 ? `<text x="${x + w / 2}" y="${H - B + 33}" text-anchor="middle" font-size="10" fill="#767676">기준연도</text>` : ""}</g>`
+  })
+  const top = m.acctRows.slice(0, 5), mx = top[0]?.total || 1
+  const kpi = (k, v, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-lg font-bold text-ink">${v}</p><p class="text-xs text-tri">${sub}</p></div>`
+  return `
+  <section class="panel p-5 sm:p-6">
+    ${head(`<span class="badge bg-subtle text-sub">기준 ${esc(t.base_year)}년</span>`)}
+    <div class="mt-5 grid gap-3 sm:grid-cols-3">
+      ${kpi("10년 누계", `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)}천원`)}
+      ${kpi("연평균 증감", cagr === null ? "-" : `${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%`, `${m.years[0]} ${eok(m.yearTot[0])}억 → ${m.years[n - 1]} ${eok(m.yearTot[n - 1])}억`)}
+      ${kpi("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
+    </div>
+    <div class="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+      <div class="overflow-x-auto"><svg viewBox="0 0 ${W} ${H}" class="w-full min-w-[520px]" role="img" aria-label="전사 중장기 10개년 소요 전망">${s}</svg>
+        <p class="flex items-center gap-2 text-xs text-sub"><span class="h-2 w-2 rounded-full bg-line-strong"></span>막대를 누르면 5번 탭에서 그 해 과목 구성을 봅니다. 옅은 막대 = 기준연도(계획본), 짙은 막대 = 가장 많은 해.</p></div>
+      <div><h4 class="text-sm font-bold text-ink">10년 누계 상위 과목 <span class="font-semibold text-sub">(억원)</span></h4>
+        <div class="mt-4 space-y-4">${top.map(r => `<div><div class="mb-1.5 flex items-end justify-between gap-3"><span class="truncate text-sm font-semibold text-ink">${esc(r.key)}</span><span class="shrink-0 text-xs text-sub"><span class="font-semibold text-ink">${eok(r.total)}억</span> · ${(r.total / tot * 100).toFixed(0)}%</span></div>
+          <div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full" style="width:${r.total / mx * 100}%;background:#256abf"></div></div></div>`).join("")}</div>
+        ${m.acctRows.length > 5 ? `<p class="mt-4 text-xs text-tri">외 ${m.acctRows.length - 5}개 과목 ${eok(m.acctRows.slice(5).reduce((a, r) => a + r.total, 0))}억원</p>` : ""}</div>
+    </div>
+  </section>`
+}
+
 export function renderHome() {
   return `
     <div class="space-y-6">
       ${headerStrip()}
+      ${multiYearPanels()}
+      ${forecastPanel()}
       ${statusCards()}
       ${nextActions()}
       ${stageCards()}
-      ${multiYearPanels()}
     </div>`
 }

@@ -2,6 +2,7 @@ import { charSay } from "../components/characters.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
+import { fcVizHtml } from "./forecast_viz.js"
 
 // ─────────────────────────────────────────────────────────────
 // 5번 탭 — 예산 표준화(3단계) · 중장기 전망(4단계)  (#/forecast)
@@ -454,6 +455,10 @@ function tableBody() {
       </div>
       ${exportNote()}
     </div>
+  </article>
+  ${fcVizHtml(t, site, site === TOTAL)}
+  <article class="panel overflow-hidden">
+    <div class="border-b border-line px-5 py-3"><h3 class="section-title">10개년 상세 표 · ${site === TOTAL ? "전사 합계" : esc(site)}</h3><p class="text-xs text-tri">단위 천원</p></div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
       <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
       <tr class="bg-subtle font-bold"><td class="table-cell text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
