@@ -35,7 +35,7 @@ def _cols(conn, table):
 def test_all_nine_forecast_tables_have_base_year(conn):
     for t in fs.TABLES:
         assert "base_year" in _cols(conn, t), t
-    assert len(fs.TABLES) == 9
+    assert len(fs.TABLES) == 19        # v2 승계 9 + 표준화 방향 반영 10(2026-10-26)
 
 
 # ---------------------------------------------------------------- 정비등급 이력
@@ -104,7 +104,8 @@ def test_factors_seed_default_inflation_on_first_read_and_persist(conn):
     DB 에 고정한다(dept_config 와 같은 이유 — 나중에 시드를 고쳐도 과거 기준연도가
     조용히 바뀌지 않는다)."""
     factors = fs.load_factors(conn, "2026")
-    assert list(factors.columns) == ["팩터명", "연간비율", "활성"]
+    assert list(factors.columns) == ["팩터명", "연간비율", "활성", "적용구분"]
+    assert factors.iloc[0]["적용구분"] == "전체"
     assert factors.iloc[0]["팩터명"] == "물가상승률"
     assert factors.iloc[0]["연간비율"] == pytest.approx(0.015)
     assert factors.iloc[0]["활성"] is True or factors.iloc[0]["활성"] == True  # noqa: E712

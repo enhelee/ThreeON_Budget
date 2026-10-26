@@ -15,8 +15,8 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_export, forecast_import, forecast_store as fs, pipeline_forecast as pf
-from . import db as dbm, uploads
+from . import config_store, forecast_export, forecast_import, forecast_reference, forecast_store as fs, pipeline_forecast as pf
+from . import benchmark as bm, db as dbm, uploads
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -37,6 +37,11 @@ EMPTY_COLS = {
     "factors": fs.FACTOR_COLS, "hot-parts": fs.HOT_PARTS_COLS, "hq-ratio": fs.HQ_RATIO_COLS,
     "hq-temp": fs.HQ_TEMP_COLS, "surprise": fs.SURPRISE_COLS,
 }
+# 표준화 방향 반영 표(2026-10-26) — URL 이름 → forecast_store.SPECS 이름. 참고 엑셀 표 둘은
+# 가져오기로만 채운다(손으로 고치는 값이 아니라 대조 기준이라서).
+SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site-grade-eq": "site_grade_eq",
+               "benchmark-rule": "benchmark_rule", "actual-tag": "actual_tag",
+               "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,
@@ -118,6 +123,13 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             "hq_ratio": pf.records(fs.load_hq_ratio(conn, base_year)),
             "hq_temp": pf.records(fs.load_hq_temp_projects(conn, base_year)),
             "surprise": pf.records(fs.load_surprise_projects(conn, base_year)),
+            **{name: pf.records(fs.load_table(conn, base_year, name)) for name in SPEC_TABLES.values()},
+            "reference": {name: int(conn.execute(f"SELECT COUNT(*) FROM {name} WHERE base_year=?",
+                                                 (str(base_year),)).fetchone()[0])
+                          for name in ("reference_actual", "reference_standard")},
+            "options": {"rule_methods": bm.RULE_METHODS, "event_types": fs.EVENT_TYPES,
+                        "tag_types": fs.TAG_TYPES, "contract_items": fs.CONTRACT_ITEMS,
+                        "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"]},
         }
 
     @router.get("/base-years")
@@ -173,6 +185,10 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                     ratio = fs.save_hq_ratio(conn, req.base_year, _frame(req.ratio_rows, fs.HQ_RATIO_COLS))
                     out["ratio_rows"] = pf.records(ratio)
                 return clean_json(out)
+            if table in SPEC_TABLES:
+                name = SPEC_TABLES[table]
+                saved = fs.save_table(conn, req.base_year, name, _frame(req.rows, fs.SPECS[name]["cols"]))
+                return clean_json({"table": table, "rows": pf.records(saved)})
             if table not in SAVERS:
                 raise HTTPException(404, f"모르는 전망 상태 표: {table}")
             saved = SAVERS[table](conn, req.base_year, _frame(req.rows, EMPTY_COLS[table]))
@@ -202,6 +218,60 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             raise
         except Exception as e:                       # 깨진 xlsx·다른 양식 — 400 으로 알린다
             raise HTTPException(400, f"엑셀을 읽지 못했습니다: {e}")
+
+    @router.post("/reference")
+    async def reference_import(base_year: str, apply: bool = False, file: UploadFile = File(...)):
+        """참고 엑셀(예산표준화 V3 양식) — apply=false 면 미리보기(건수·표본), true 면 저장.
+
+        저장하는 것: 참고 실적·표준금액(대조 기준), 설비별·대표 정비등급, 산정 규칙(엑셀 수식 해석),
+        지사 연혁(그룹 시트 수식), CRI 규칙 초안, LTSA 정기계약 초안(최근 실적 유지 가정).
+        그 기준연도의 해당 표는 통째로 바뀐다 — 다른 기준연도는 그대로다."""
+        data = await uploads.read_upload(file)
+        conn = conn_factory()
+        try:
+            sites = pf.forecast_sites(conn, base_year)
+            try:
+                parsed = forecast_reference.parse_reference(data, sites)
+            except Exception as e:
+                raise HTTPException(400, f"엑셀을 읽지 못했습니다: {e}")
+            counts = forecast_reference.preview_counts(parsed)
+            if not apply:
+                sample = {k: v[:30] for k, v in parsed.items() if isinstance(v, list) and k != "warnings"}
+                return clean_json({"counts": counts, "warnings": parsed["warnings"], "sample": sample})
+            if not parsed["reference_standard"] and not parsed["reference_actual"]:
+                raise HTTPException(400, "이 파일에서 지사 시트를 찾지 못했습니다 — 시트명이 지사 이름(예: 화성)인지 확인하세요.")
+            frames = forecast_reference.to_frames(parsed)
+            for name in ("reference_actual", "reference_standard", "site_grade_eq", "benchmark_rule",
+                         "site_history", "cri_rule"):
+                fs.save_table(conn, base_year, name, frames[name] if not frames[name].empty
+                              else pd.DataFrame(columns=fs.SPECS[name]["cols"]))
+            fs.save_grade_history(conn, base_year, frames["site_grade"] if not frames["site_grade"].empty
+                                  else pd.DataFrame(columns=fs.GRADE_COLS))
+            plan = forecast_reference.contract_plan(parsed["regular_contract"], int(base_year))
+            fs.save_table(conn, base_year, "regular_contract",
+                          pd.DataFrame(plan, columns=fs.SPECS["regular_contract"]["cols"]))
+            counts["regular_contract"] = len(plan)
+            return clean_json({"applied": True, "counts": counts, "warnings": parsed["warnings"]})
+        finally:
+            conn.close()
+
+    @router.get("/compare")
+    def compare(base_year: str = None):
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return _cached_view("compare", conn, by, lambda: clean_json(pf.compare_reference(conn, by)))
+        finally:
+            conn.close()
+
+    @router.get("/regular")
+    def regular(base_year: str = None):
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return _cached_view("regular", conn, by, lambda: clean_json(pf.regular_breakdown(conn, by)))
+        finally:
+            conn.close()
 
     @router.get("/benchmark")
     def benchmark(base_year: str = None):

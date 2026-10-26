@@ -106,7 +106,14 @@ SITE_TABLE_LINES = [
     ("건설중인자산_재생고온부품", "고온부품:신품구매"),
     ("건설중인자산-자산화예비품", "표준화:건설중인자산-자산화예비품"),
     ("저장품-열원(보수)", "표준화:저장품-열원(보수)"),
+    # 표준화 방향 4-4·4-5 — 등급별 표준화 대신 연도별 계획으로 잡는 정기비용(2026-10-26)
+    ("수선유지비-열원정기유지보수_LTSA", "정기계약:손익"),
+    ("기계장치_LTSA", "정기계약:자본"),
+    ("기계장치_CRI", "CRI:"),
 ]
+PL_LINES = {"수선유지비-건물/구축물", "수선유지비-열원정기점검", "수선유지비-열원경상정비",
+            "수선유지비-열원정기유지보수", "수선유지비-열원보완및개선", "지급수수료-열원점검수수료",
+            "비저장품(보수자재)", "소모품(자재공기구)", "수선유지비-열원정기유지보수_LTSA"}
 
 
 def forecast_years(base_year: int = BASE_YEAR) -> list:
@@ -118,16 +125,52 @@ def forecast_years(base_year: int = BASE_YEAR) -> list:
     return list(range(int(base_year), int(base_year) + 10))
 
 
-def year_multiplier(year: int, factors_df: pd.DataFrame, base_year: int = BASE_YEAR) -> float:
-    """등록된 모든 활성 팩터의 (1+연간비율)을 (year-기준연도)년만큼 복리로 곱한 배수."""
+def year_multiplier(year: int, factors_df: pd.DataFrame, base_year: int = BASE_YEAR, scope: str = None) -> float:
+    """등록된 모든 활성 팩터의 (1+연간비율)을 (year-기준연도)년만큼 복리로 곱한 배수.
+
+    scope('손익'|'자본')를 주면 적용구분이 «전체»이거나 그 구분인 팩터만 곱한다(2026-10-26) —
+    손익은 생산자물가, 자본은 건설공사비처럼 따로 걸기 위해서다. 적용구분 열이 없으면 전부.
+    """
     n = year - int(base_year)
     if n <= 0 or factors_df.empty:
         return 1.0
     active = factors_df[factors_df["활성"].astype(bool)] if "활성" in factors_df.columns else factors_df
+    if scope and "적용구분" in active.columns:
+        active = active[active["적용구분"].fillna("전체").isin(["전체", "", scope])]
     multiplier = 1.0
     for _, row in active.iterrows():
         multiplier *= (1 + float(row["연간비율"])) ** n
     return multiplier
+
+
+def line_scope(label: str) -> str:
+    """전망 표 행의 손익/자본 구분 — 팩터 적용구분을 고르는 데 쓴다."""
+    return "손익" if label in PL_LINES else "자본"
+
+
+def cri_events(grade_hist: pd.DataFrame, cri_rules: pd.DataFrame, factors_df: pd.DataFrame,
+               years: list) -> pd.DataFrame:
+    """CRI 자동 발생(표준화 방향 4-5). MI 가 잡힌 해(과거 이력 포함) + 지급시차 년이 전망 기간에
+    들면 그 해에 기준단가 × 자본 물가배수(단가기준연도 → 지급연도)를 MI 지사에 잡는다.
+    엑셀 메모: «MI+1년 로터 반출, +2~+3년 대가 지급», 반출 로터는 짝지사(동일 기종)에 장착.
+    반환: 사업장, MI연도, 반출연도, 지급연도, 짝지사, 금액"""
+    cols = ["사업장", "MI연도", "반출연도", "지급연도", "짝지사", "금액"]
+    if cri_rules is None or cri_rules.empty or grade_hist.empty:
+        return pd.DataFrame(columns=cols)
+    lo, hi = min(years), max(years)
+    out = []
+    for _, rule in cri_rules.iterrows():
+        if not bool(rule.get("활성", True)):
+            continue
+        site, lag = rule["사업장"], int(rule["지급시차"])
+        mask = (grade_hist["사업장"] == site) & grade_hist["등급"].astype(str).str.contains("MI")
+        for mi in sorted(int(y) for y in grade_hist.loc[mask, "연도"]):
+            pay = mi + lag
+            if lo <= pay <= hi:
+                amt = float(rule["기준단가"]) * year_multiplier(pay, factors_df, int(rule["단가기준연도"]), "자본")
+                out.append({"사업장": site, "MI연도": mi, "반출연도": mi + 1, "지급연도": pay,
+                            "짝지사": rule.get("짝지사") or "", "금액": amt})
+    return pd.DataFrame(out, columns=cols)
 
 
 def _classify_grade_row(values: dict) -> str | None:
@@ -239,7 +282,8 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                         hq_temp_alloc: pd.DataFrame, factors_df: pd.DataFrame,
                         surprise_df: pd.DataFrame, investment_df: pd.DataFrame,
                         budget_lookup: dict = None, base_year: int = BASE_YEAR,
-                        years: list = None) -> pd.DataFrame:
+                        years: list = None, contracts_df: pd.DataFrame = None,
+                        cri_df: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None) -> pd.DataFrame:
     """한 지사의 기준연도~+9년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
 
     표준화 대상 계정과목(SITE_TABLE_LINES의 "표준화:" 항목)의 당해년도(BASE_YEAR) 금액은
@@ -274,12 +318,29 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
 
     # 배수는 연도에만 달린다 — 행(예산과목)마다 다시 구하면 지사 19 × 행 17 × 10년 = 3,230번
     # 팩터 표를 거르고 iterrows 한다(전망 표 시간의 92%, 운영 13초 — 2026-10-15 실측).
-    mult_by_year = {year: year_multiplier(year, factors_df, base_year) for year in years}
+    scoped = "적용구분" in factors_df.columns and         factors_df["적용구분"].fillna("전체").isin(["손익", "자본"]).any()
+    if scoped:
+        mult_by_scope = {sc: {year: year_multiplier(year, factors_df, base_year, sc) for year in years}
+                         for sc in ("손익", "자본")}
+    else:                           # 구분 없는 팩터뿐이면 배수는 하나 — 연도 수만큼만 구한다(성능 가드)
+        same = {year: year_multiplier(year, factors_df, base_year) for year in years}
+        mult_by_scope = {"손익": same, "자본": same}
+    contract_lookup = {}
+    if contracts_df is not None and not contracts_df.empty:
+        for _, r in contracts_df[contracts_df["사업장"] == site].iterrows():
+            sc = "손익" if str(r["예산과목"]).startswith(("수선유지비", "지급수수료")) else "자본"
+            key = (int(r["연도"]), sc)
+            contract_lookup[key] = contract_lookup.get(key, 0.0) + float(r["금액"])
+    cri_lookup = {}
+    if cri_df is not None and not cri_df.empty:
+        for _, r in cri_df[cri_df["사업장"] == site].iterrows():
+            cri_lookup[int(r["지급연도"])] = cri_lookup.get(int(r["지급연도"]), 0.0) + float(r["금액"])
 
     rows = []
     for label, source in SITE_TABLE_LINES:
         row = {"예산과목": label}
         base_multiplier_year_values = {}
+        mult_by_year = mult_by_scope[line_scope(label)]
         for year in years:
             mult = mult_by_year[year]
             grade = grade_by_year.get(year, latest_known_grade)
@@ -308,6 +369,16 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
             elif source.startswith("고온부품:"):
                 item = source.split(":", 1)[1]
                 amount = hot_parts_lookup.get((site, year, item), 0.0)
+            elif source.startswith(("정기계약:", "CRI:")):
+                # 기준연도에 그 과목의 확정 예산(계획본)이 있으면 LTSA·CRI 는 이미 그 안에 있다 — 또 더하지 않는다.
+                scope = source.split(":", 1)[1] or "자본"
+                plan_account = "수선유지비-열원정기유지보수" if scope == "손익" else "기계장치"
+                if year == base_year and budget_lookup.get((site, plan_account)) is not None:
+                    amount = 0.0
+                elif source.startswith("CRI:"):
+                    amount = cri_lookup.get(year, 0.0)
+                else:
+                    amount = contract_lookup.get((year, scope), 0.0)
             elif source.startswith("본사배분:"):
                 account = source.split(":", 1)[1]
                 amount = hq_amount_by_site_acct.get((site, account), 0.0) * mult
@@ -322,8 +393,20 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
 
     site_investment = investment_df[investment_df["사업장"] == site]["금액"].sum() if not investment_df.empty else 0.0
     invest_row = {"예산과목": "투자비"}
-    for year in years:
-        invest_row[year] = site_investment * mult_by_year[year]
+    if invest_plan_df is None:
+        # v2 동작: 기준연도 투자비를 팩터만 곱해 10년 반복
+        for year in years:
+            invest_row[year] = site_investment * mult_by_scope["자본"][year]
+    else:
+        # 표준화 방향(투자비는 표준화 대상이 아님): 기준연도 = 계획본(투자계획에 그 해 값이 있으면 그것),
+        # 이후 = 투자계획에 적은 값만. 반복하지 않는다.
+        plan = invest_plan_df[invest_plan_df["사업장"] == site] if not invest_plan_df.empty else invest_plan_df
+        by_year = plan.groupby("연도")["금액"].sum().to_dict() if not plan.empty else {}
+        for year in years:
+            if year in by_year:
+                invest_row[year] = float(by_year[year])
+            else:
+                invest_row[year] = float(site_investment) if year == base_year else 0.0
     rows.append(invest_row)
 
     return pd.DataFrame(rows)
@@ -334,14 +417,18 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                        hq_temp_df: pd.DataFrame, hq_ratio_df: pd.DataFrame,
                        factors_df: pd.DataFrame, surprise_df: pd.DataFrame,
                        investment_df: pd.DataFrame, budget_df: pd.DataFrame = None,
-                       base_year: int = BASE_YEAR, years: list = None) -> dict:
+                       base_year: int = BASE_YEAR, years: list = None, contracts_df: pd.DataFrame = None,
+                       cri_rules: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None) -> dict:
     """지사별 표를 한 번에 계산. 반환: {사업장: DataFrame}"""
     hq_amount = hq_amount_by_site_account(hq_master_df)
     hq_temp_alloc = allocate_hq_temp_projects(hq_temp_df, hq_ratio_df)
     budget_lookup = budget_amount_by_site_account(budget_df) if budget_df is not None else {}
+    years = list(years) if years else forecast_years(base_year)
+    cri_df = cri_events(grade_hist, cri_rules, factors_df, years)
     return {
         site: compute_site_table(site, grade_hist, standard_df, hot_parts_df, hq_amount,
                                   hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup,
-                                  base_year=base_year, years=years)
+                                  base_year=base_year, years=years, contracts_df=contracts_df,
+                                  cri_df=cri_df, invest_plan_df=invest_plan_df)
         for site in sites
     }

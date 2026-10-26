@@ -149,4 +149,4 @@ def test_run_forecast_with_nothing_still_returns_shape(conn):
     out = pf.run_forecast(conn, "2027")
     assert out["years"] == list(range(2027, 2037))
     assert out["notes"] == {"budget_plan_missing": True, "grade_empty": True, "actuals_empty": True}
-    assert len(out["sites"]) > 0 and all(len(rows) == 17 for rows in out["tables"].values())
+    assert len(out["sites"]) > 0 and all(len(rows) == 20 for rows in out["tables"].values())  # 17 + 정기계약 2 + CRI 1

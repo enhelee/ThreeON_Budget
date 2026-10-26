@@ -662,12 +662,37 @@ def build_hq_master_download(hq_master_df, site_names, base_year: int = forecast
     return _bytes(wb)
 
 
+# 양식에 줄이 없는 정기비용 행(2026-10-26) → 양식의 어느 줄에 더하는가.
+# 양식 총원가 배분의 «고온부품재생+LTSA» 줄이 이미 둘을 한 줄로 본다. CRI 도 기계장치 정기비용이다.
+TEMPLATE_FOLD = {
+    "수선유지비-열원정기유지보수_LTSA": "수선유지비-열원정기유지보수",
+    "기계장치_LTSA": "기계장치_고온부품재생",
+    "기계장치_CRI": "기계장치_고온부품재생",
+}
+
+
+def fold_for_template(table):
+    """전망 표의 정기계약·CRI 행을 양식 줄에 더해 접는다 — 양식 합계가 화면 합계와 같아지게."""
+    df = table.copy()
+    year_cols = [c for c in df.columns if c != "예산과목"]
+    for extra, target in TEMPLATE_FOLD.items():
+        src = df[df["예산과목"] == extra]
+        if src.empty or not (df["예산과목"] == target).any():
+            continue
+        idx = df.index[df["예산과목"] == target][0]
+        for c in year_cols:
+            df.at[idx, c] = float(df.at[idx, c]) + float(src[c].sum())
+        df = df[df["예산과목"] != extra]
+    return df.reset_index(drop=True)
+
+
 def fill_longterm_workbook(site_tables, grade_hist, hq_master_df, site_names,
                            base_year: int = forecast_calc.BASE_YEAR, template_path: str = LT_TEMPLATE) -> bytes:
     """지사 탭 + NN년 본사 원가분배 + NN년 총원가 배분 + 총괄표. 27~35년 개별 시트·원본 일정/고온부품 시트는
     건드리지 않는다(v2 정책 그대로 — 기준연도만 상세, 이후는 지사 탭으로 충분)."""
     wb = load_workbook(template_path)
     rebase_workbook_years(wb, base_year)
+    site_tables = {k: fold_for_template(v) for k, v in site_tables.items()}
     short_to_full = site_sheet_map(site_names)
     for sheet_name in wb.sheetnames:
         site = short_to_full.get(sheet_name.strip())

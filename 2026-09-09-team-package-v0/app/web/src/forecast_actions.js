@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastCompare, loadForecastRegular, loadForecastState } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -15,9 +15,15 @@ import { TOTAL } from "./views/forecast.js"
 // ─────────────────────────────────────────────────────────────
 
 const TABLE_URL = {grades: "grades", hot_parts: "hot-parts", factors: "factors", hq_temp: "hq-temp",
-                   surprise: "surprise", hq_ratio: "hq-ratio", hq_master: "hq-master"}
-const INT_FIELDS = new Set(["연도"])
-const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액"])
+                   surprise: "surprise", hq_ratio: "hq-ratio", hq_master: "hq-master",
+                   // 표준화 방향 반영(2026-10-26)
+                   site_history: "site-history", site_event: "site-event", site_grade_eq: "site-grade-eq",
+                   benchmark_rule: "benchmark-rule", actual_tag: "actual-tag", regular_contract: "regular-contract",
+                   cri_rule: "cri-rule", investment_plan: "investment-plan"}
+const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도"])
+const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가"])
+// 비우면 «없음»(null)인 칸 — 0 과 뜻이 다르다(보정률 0 ≠ 보정 없음)
+const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도"])
 
 const firstSite = () => state.fc.data?.sites?.[0] || ""
 const firstAccount = () => (state.fc.data?.accounts?.["손익"] || [])[0] || ""
@@ -28,6 +34,15 @@ const NEW_ROW = {
   surprise: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear), 예산과목: firstAccount(), 금액: 0, 사유: ""}),
   hq_ratio: () => ({사업장: firstSite(), 계약체결금액: 0}),
   hq_master: () => Object.fromEntries(state.fc.data.hq_master.columns.map((c, i) => [c, i < 3 ? "" : 0])),
+  site_grade_eq: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear), 설비: "#1 GT", 등급: ""}),
+  site_history: () => ({사업장: firstSite(), 시작연도: Number(state.fc.baseYear), 종료연도: null, 그룹: "", 설비: "", 비고: ""}),
+  site_event: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear), 유형: "실적사용시작", 예산과목: "", 비고: ""}),
+  benchmark_rule: () => ({사업장: firstSite(), 예산과목: firstAccount(), 등급: "*", 방식: "최근실적", 연도목록: "",
+                          보정률: null, 참조지사: "", 참조등급: "", 조정액: null, 사유: ""}),
+  regular_contract: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear), 항목: "GT LTSA",
+                            예산과목: "수선유지비-열원정기유지보수", 금액: 0, 비고: ""}),
+  cri_rule: () => ({사업장: firstSite(), 짝지사: "", 지급시차: 2, 기준단가: 0, 단가기준연도: Number(state.fc.baseYear) - 1, 활성: true, 비고: ""}),
+  investment_plan: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear) + 1, 금액: 0, 비고: ""}),
 }
 
 const json = body => ({method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
@@ -49,8 +64,29 @@ function markDirty(key) {
 
 async function reload(withBench) {
   await loadForecastState()
-  if (withBench || state.fc.tab === "bench") await loadForecastBench()
+  if (withBench || state.fc.tab === "bench") await Promise.all([loadForecastBench(), loadForecastRegular()])
+  if (state.fc.compare || state.fc.manageTab === "ref") await loadForecastCompare()
   renderPage()
+}
+
+// ── 참고 엑셀(예산표준화 양식) — 미리보기 → 적용. 파일은 적용 때 한 번 더 보낸다(서버는 상태를 들고 있지 않음).
+async function referenceUpload(file, apply) {
+  busy(true, apply ? "참고 엑셀 적용 중..." : "참고 엑셀 읽는 중...")
+  try {
+    const fd = new FormData()
+    fd.append("file", file)
+    const res = await api(`/api/forecast/reference?base_year=${state.fc.baseYear}${apply ? "&apply=true" : ""}`, {method: "POST", body: fd})
+    if (apply) {
+      state.fc.refPreview = null; state.fc.refFile = null
+      busy(false)
+      await reload(true)
+      toast(`참고 엑셀을 ${state.fc.baseYear}년 기준으로 적용했습니다 — 규칙 ${res.counts.benchmark_rule}건 · 표준금액 ${res.counts.reference_standard}건.`)
+      return
+    }
+    state.fc.refPreview = res; state.fc.refFile = file
+    renderPage()
+  } catch (err) { toast(err.message) }
+  finally { busy(false) }
 }
 
 // ── 저장 ─────────────────────────────────────────────────────
@@ -160,7 +196,16 @@ export async function fcClick(e) {
   if (tab) { state.fc.tab = tab.dataset.fctab; state.fc.preview = null; await navigate("forecast"); return true }
   // 기준정보 안쪽 탭 — 다시 불러오지 않고 그리기만(손댄 값은 state.fc.data 에 남아 있다)
   const mtab = e.target.closest("[data-fcmtab]")
-  if (mtab) { state.fc.manageTab = mtab.dataset.fcmtab; renderPage(); return true }
+  if (mtab) {
+    state.fc.manageTab = mtab.dataset.fcmtab
+    if (state.fc.manageTab === "ref" && !state.fc.compare) {
+      busy(true, "참고 엑셀과 대조 중...")
+      try { await loadForecastCompare() } catch (err) { toast(err.message) } finally { busy(false) }
+    }
+    renderPage(); return true
+  }
+  const bview = e.target.closest("[data-fcbview]")
+  if (bview) { state.fc.benchView = bview.dataset.fcbview; renderPage(); return true }
   const add = e.target.closest("[data-fcadd]")
   if (add) {
     const key = add.dataset.fcadd
@@ -194,6 +239,8 @@ export async function fcClick(e) {
   if (act === "fc-apply-merge") { await applyPreview("merge"); return true }
   if (act === "fc-apply-replace") { await applyPreview("replace"); return true }
   if (act === "fc-cancel-preview") { state.fc.preview = null; renderPage(); return true }
+  if (act === "fc-ref-apply") { if (state.fc.refFile) await referenceUpload(state.fc.refFile, true); return true }
+  if (act === "fc-ref-cancel") { state.fc.refPreview = null; state.fc.refFile = null; renderPage(); return true }
   return false
 }
 
@@ -207,7 +254,21 @@ export async function fcChange(e) {
   if (t.id === "fcImportFile") {
     const f = t.files[0], kind = t.dataset.kind
     t.value = ""
-    if (f && kind) await uploadPreview(kind, f)
+    if (f && kind === "reference") await referenceUpload(f, false)
+    else if (f && kind) await uploadPreview(kind, f)
+    return true
+  }
+  if (t.matches("[data-fccmpdiff]")) { state.fc.cmpOnlyDiff = t.checked; renderPage(); return true }
+  if (t.dataset.fctag) {
+    // 사업별 정기비용 유형 — 바꾼 것만 actual_tag 에 둔다(자동 판정과 같아져도 사람이 확정한 값으로 남김).
+    const [site, year, acct, ...rest] = t.dataset.fctag.split("|")
+    const name = rest.join("|")
+    const rows = state.fc.data.actual_tag
+    const i = rows.findIndex(r => r.사업장 === site && Number(r.연도) === Number(year) && r.예산과목 === acct && r.사업명 === name)
+    if (i >= 0) rows[i].유형 = t.value
+    else rows.push({사업장: site, 연도: Number(year), 예산과목: acct, 사업명: name, 유형: t.value})
+    t.closest("td")?.classList.add("bg-warn-bg")
+    markDirty("actual_tag")
     return true
   }
   if (t.matches("[data-fcgroup]")) { state.fc.benchGroup = t.value; renderPage(); return true }
@@ -244,6 +305,7 @@ export async function fcChange(e) {
   let v
   if (t.type === "checkbox") v = t.checked
   else if (INT_FIELDS.has(f)) v = t.value === "" ? null : parseInt(t.value, 10)
+  else if (NULLABLE_FIELDS.has(f)) v = t.value === "" ? null : Number(t.value)
   else if (NUM_FIELDS.has(f) || (fc === "hq_master" && t.type === "number")) v = t.value === "" ? 0 : Number(t.value)
   else v = t.value
   row[f] = v

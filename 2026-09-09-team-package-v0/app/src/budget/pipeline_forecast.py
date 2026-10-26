@@ -21,7 +21,7 @@ import json
 
 import pandas as pd
 
-from . import benchmark, config_store, forecast_calc
+from . import benchmark, config_store, forecast_calc, normalize
 from . import db as dbm
 from . import forecast_store as fs
 
@@ -51,6 +51,61 @@ def locked_actuals(conn):
         if used:
             years_used.append(str(year))
     return pd.DataFrame(rows, columns=ACTUAL_COLS), years_used
+
+
+DETAIL_COLS = ["사업장", "연도", "예산과목", "사업명", "금액", "유형", "유형출처"]
+
+
+def locked_actuals_detail(conn, base_year):
+    """마감 실적을 사업 단위로 — 정기비용 성격(«유형»)을 붙인다(표준화 방향 1·4-4).
+
+    유형은 사람이 고친 값(actual_tag, 기준연도 축)이 먼저고, 없으면 사업명 키워드
+    (`benchmark.regular_type`)로 판정한다. 기계장치의 고온부품재생·LTSA·CRI 와
+    정기유지보수의 LTSA 는 표준화에서 빠지고 연도별 계획(고온부품·정기계약·CRI)으로 잡힌다.
+    """
+    alias = config_store.load_item_alias(conn)
+    tags = fs.load_table(conn, base_year, "actual_tag")
+    tag = {(r["사업장"], int(r["연도"]), r["예산과목"], r["사업명"]): r["유형"] for _, r in tags.iterrows()}
+    years_used, rows = [], []
+    for year in sorted(dbm.locked_years(conn)):
+        used = False
+        for budget in ("손익", "자본"):
+            run = dbm.latest_run(conn, year, budget)
+            if not run:
+                continue
+            used = True
+            for dept, item, name, amt, gubun in conn.execute(
+                    "SELECT 처지사,예산과목,사업명,실적금액,구분 FROM biz_line WHERE run_id=?", (run["id"],)):
+                if gubun not in KEEP or not amt:
+                    continue
+                acct = normalize.normalize_item(item, alias)
+                key = (dept, int(year), acct, name or "")
+                if key in tag:
+                    kind, src = tag[key], "수동"
+                else:
+                    kind, src = benchmark.regular_type(acct, name), "자동"
+                rows.append({"사업장": dept, "연도": int(year), "예산과목": acct, "사업명": name or "",
+                             "금액": float(amt), "유형": kind, "유형출처": src})
+        if used:
+            years_used.append(str(year))
+    return pd.DataFrame(rows, columns=DETAIL_COLS), years_used
+
+
+def regular_breakdown(conn, base_year):
+    """정기비용 분리 현황 — 기계장치·정기유지보수 실적을 지사×연도×유형으로, 그리고 판정한 사업 목록."""
+    fs.bind_site_resolvers(conn, base_year)
+    detail, years_used = locked_actuals_detail(conn, base_year)
+    d = detail[detail["예산과목"].isin(list(benchmark.REGULAR_EXCLUDED))] if not detail.empty else detail
+    summary = []
+    if not d.empty:
+        piv = d.groupby(["사업장", "연도", "예산과목", "유형"])["금액"].sum().reset_index()
+        for (site, year, acct), g in piv.groupby(["사업장", "연도", "예산과목"]):
+            row = {"사업장": site, "연도": int(year), "예산과목": acct, "총액": float(g["금액"].sum())}
+            for t in fs.TAG_TYPES:
+                row[t] = float(g.loc[g["유형"] == t, "금액"].sum())
+            summary.append(row)
+    projects = d.groupby(["사업장", "연도", "예산과목", "사업명", "유형", "유형출처"])["금액"].sum()         .reset_index().sort_values(["사업장", "연도", "예산과목", "금액"], ascending=[True, True, True, False])         if not d.empty else d
+    return {"years_used": years_used, "summary": summary, "projects": records(projects)}
 
 
 def budget_plan_for(conn, base_year):
@@ -90,13 +145,72 @@ def records(df: pd.DataFrame) -> list:
 
 
 # ---------------------------------------------------------------- 실행
+def actuals_with_reference(conn, base_year):
+    """마감 실적 + 참고 엑셀 실적(마감되지 않은 연도만). 앱에 마감 연도가 2~3개뿐이어도
+    엑셀이 가진 10년 이력으로 «5개년 평균»·«등급별 최근실적»이 엑셀과 같은 모집단을 쓴다.
+    같은 연도는 마감 실적이 이긴다 — 마감 = 대외 보고 확정값."""
+    actuals, years_used = locked_actuals_detail(conn, base_year)
+    ref = fs.load_table(conn, base_year, "reference_actual")
+    if ref.empty:
+        return actuals, years_used, []
+    locked = {int(y) for y in years_used}
+    ref = ref[~ref["연도"].isin(locked) & (ref["금액"] != 0)].copy()
+    if ref.empty:
+        return actuals, years_used, []
+    ref["사업명"] = ""
+    ref["유형출처"] = "참고엑셀"
+    merged = pd.concat([actuals, ref[DETAIL_COLS]], ignore_index=True)
+    return merged, years_used, sorted({str(y) for y in ref["연도"]})
+
+
 def _standard(conn, base_year):
-    actuals, years_used = locked_actuals(conn)
+    actuals, years_used, ref_years = actuals_with_reference(conn, base_year)
+    years_used = years_used + [f"{y}(참고)" for y in ref_years]
     grade = fs.load_grade_history(conn, base_year)
+    budget_lookup = forecast_calc.budget_amount_by_site_account(budget_plan_for(conn, base_year))
     std = benchmark.compute_standard_amounts(
         actuals, grade, fs.load_method_map(conn, base_year), fs.load_overrides(conn, base_year),
-        item_alias=config_store.load_item_alias(conn))
+        item_alias=config_store.load_item_alias(conn), rules=fs.load_table(conn, base_year, "benchmark_rule"),
+        events=fs.load_table(conn, base_year, "site_event"), budget_lookup=budget_lookup)
     return std, actuals, years_used, grade
+
+
+def compare_reference(conn, base_year):
+    """참고 엑셀과 대조 — ① 마감 연도 실적(지사×연도×예산과목) ② 표준금액(지사×예산과목×등급)."""
+    fs.bind_site_resolvers(conn, base_year)
+    ref_act = fs.load_table(conn, base_year, "reference_actual")
+    ref_std = fs.load_table(conn, base_year, "reference_standard")
+    detail, years_used = locked_actuals_detail(conn, base_year)
+    actual_rows = []
+    if not ref_act.empty and years_used:
+        locked = [int(y) for y in years_used]
+        a = detail.groupby(["사업장", "연도", "예산과목"])["금액"].sum() if not detail.empty else pd.Series(dtype=float)
+        r = ref_act[ref_act["연도"].isin(locked)].groupby(["사업장", "연도", "예산과목"])["금액"].sum()
+        keys = sorted(set(a.index) | set(r.index))
+        for k in keys:
+            av, rv = float(a.get(k, 0.0)), float(r.get(k, 0.0))
+            actual_rows.append({"사업장": k[0], "연도": int(k[1]), "예산과목": k[2], "앱": av, "엑셀": rv,
+                                "차이": av - rv})
+    std_rows = []
+    if not ref_std.empty:
+        std = _standard(conn, base_year)[0]
+        app = {(x["사업장"], x["예산과목"], x["등급"]): x for _, x in std.iterrows()} if not std.empty else {}
+        for _, x in ref_std.iterrows():
+            k = (x["사업장"], x["예산과목"], x["등급"])
+            mine = app.get(k)
+            av = float(mine["표준금액"]) if mine is not None else None
+            std_rows.append({"사업장": k[0], "예산과목": k[1], "등급": k[2], "앱": av, "엑셀": float(x["표준금액"]),
+                             "차이": None if av is None else av - float(x["표준금액"]),
+                             "산출방식": mine["산출방식"] if mine is not None else "", "근거": mine["근거"] if mine is not None else "",
+                             "엑셀수식": x["엑셀수식"]})
+    def summary(rows):
+        n = len(rows)
+        same = sum(1 for r in rows if r["차이"] is not None and abs(r["차이"]) < 1)
+        return {"rows": n, "same": same, "app_total": sum(r["앱"] or 0 for r in rows),
+                "excel_total": sum(r["엑셀"] for r in rows)}
+    return {"base_year": str(base_year), "locked_years": years_used,
+            "actual": {"summary": summary(actual_rows), "rows": actual_rows},
+            "standard": {"summary": summary(std_rows), "rows": std_rows}}
 
 
 def run_benchmark(conn, base_year):
@@ -134,9 +248,14 @@ def forecast_frames(conn, base_year):
         sites, grade, std, fs.load_hot_parts(conn, base_year), hq_master,
         fs.load_hq_temp_projects(conn, base_year), fs.load_hq_ratio(conn, base_year),
         fs.load_factors(conn, base_year), fs.load_surprise_projects(conn, base_year),
-        forecast_calc.investment_by_site(budget_df), budget_df, base_year=by, years=years)
+        forecast_calc.investment_by_site(budget_df), budget_df, base_year=by, years=years,
+        contracts_df=fs.load_table(conn, base_year, "regular_contract"),
+        cri_rules=fs.load_table(conn, base_year, "cri_rule"),
+        invest_plan_df=fs.load_table(conn, base_year, "investment_plan"))
+    cri = forecast_calc.cri_events(grade, fs.load_table(conn, base_year, "cri_rule"),
+                                   fs.load_factors(conn, base_year), years)
     return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,
-            "hq_master": hq_master, "budget_df": budget_df, "actuals": actuals}
+            "hq_master": hq_master, "budget_df": budget_df, "actuals": actuals, "cri": cri}
 
 
 def run_forecast(conn, base_year):
@@ -156,7 +275,7 @@ def run_forecast(conn, base_year):
             for y in years:
                 acc[str(y)] += r[str(y)]
     return {"base_year": str(base_year), "years": years, "years_used": years_used, "sites": sites,
-            "tables": out_tables,
+            "tables": out_tables, "cri_events": records(f["cri"]),
             "total_rows": [{"예산과목": k, **v} for k, v in total.items()],
             "notes": {"budget_plan_missing": bool(budget_df.empty), "grade_empty": bool(grade.empty),
                       "actuals_empty": bool(actuals.empty)}}

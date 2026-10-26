@@ -19,7 +19,9 @@ export const state = {
   fc: { baseYear: "", baseYears: [], lockedYears: [], tab: "manage", manageTab: "grades",
         data: null, bench: null, table: null, site: "__total__",
         dirty: new Set(), preview: null, benchGroup: "all",
-        benchEdits: {methods: {}, overrides: {}} },
+        benchEdits: {methods: {}, overrides: {}},
+        // 표준화 방향 반영(2026-10-26) — 참고 엑셀 대조 · 정기비용 분리 · 표준화 탭 안쪽 보기
+        compare: null, regular: null, refPreview: null, refFile: null, benchView: "std", cmpOnlyDiff: true },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   statOpen: null,   // 통계 과목 표에서 펼친 행(«예산|과목») — 지사별 드릴다운

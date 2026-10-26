@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadBranches, loadDetail, loadForecastBench, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -167,7 +167,8 @@ export async function navigate(view, opts = {}) {
     // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
-    if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench]);
+    if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench], ["정기비용 분리", loadForecastRegular]);
+    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
