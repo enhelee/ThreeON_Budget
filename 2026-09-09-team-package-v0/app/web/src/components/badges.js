@@ -6,7 +6,8 @@ import { esc, rateVal } from "../util.js"
 export function rateBadge(p, a) {
   const r = rateVal(p, a);
   if (r === null) return '<span class="badge bg-subtle text-sub">-</span>';
-  const cls = r >= 95 ? "bg-info-bg text-info" : r >= 85 ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn";
+  // 80~120% 정상 · 80% 미만 미달 · 120% 초과 초과 — 차이 사유(±20%p) 기준과 같은 선(2026-10-26 사용자 결정)
+  const cls = r > 120 ? "bg-err-bg text-err" : r >= 80 ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn";
   return `<span class="badge ${cls}">${r.toFixed(1)}%</span>`;
 }
 

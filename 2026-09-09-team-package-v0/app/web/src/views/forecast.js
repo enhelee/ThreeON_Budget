@@ -64,10 +64,9 @@ function header() {
     <div>
       <p class="text-sm font-semibold text-ink">STAGE 03 · 04</p>
       <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 표준화 · 중장기 전망</h2>
-      <p class="section-help max-w-30 leading-6">마감된 연도(<b class="text-ink">${esc(locked)}</b>)의 분석 결과가 표준금액의 입력입니다. 가정(정비등급·고온부품·본사배분·팩터·임시·돌발사업)은 기준연도마다 한 벌 — 내년 전망을 시작해도 올해 가정이 남습니다.</p>
     </div>
     <div class="flex flex-wrap items-end gap-2">
-      <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">전망 기준연도</span>
+      <label class="block"><span class="field-label">전망 기준연도</span>
         <select class="control" data-fcbase>${years.map(y => `<option value="${esc(y)}" ${y === fc.baseYear ? "selected" : ""}>${esc(y)}년 기준${fc.baseYears.includes(y) ? "" : " (아직 저장된 가정 없음)"}</option>`).join("")}</select></label>
       <button class="btn-secondary" data-action="fc-add-base" title="직전 기준연도의 가정을 복사해 새 기준연도를 만듭니다">＋기준연도</button>
     </div>
@@ -107,7 +106,7 @@ function gradesPanel(d) {
   const sites = [...new Set([...d.sites, ...d.grades.map(r => r.사업장)])]
   const cell = {}
   d.grades.forEach(r => { cell[`${r.사업장}|${r.연도}`] = r.등급 })
-  return panel("정비등급 이력", "지사×연도 등급. 과거는 <b>표준화 참고 엑셀</b>, 미래(기준연도~)는 <b>정기점검보수공사 일정</b>에서 가져오거나 직접 칩니다. 중대형CHP MI·TI·CI·간이·HGPI·BSI, 소형CHP A·B·C. 빈 칸 = 그 해 이력 없음. 이력이 하나도 없는 지사는 등급 «표준» 한 종으로 표준화됩니다.", `
+  return panel("정비등급 이력", "빈 칸 = 그 해 이력 없음 · 이력이 없는 지사는 «표준» 한 종으로 계산", `
     <div class="flex flex-wrap gap-2 p-5 pb-0">
       <button class="btn-secondary" data-fcimport="grades">표준화 참고 엑셀에서 가져오기</button>
       <button class="btn-secondary" data-fcimport="schedule">정기점검 일정 엑셀에서 가져오기</button>
@@ -123,7 +122,7 @@ function hqMasterPanel(d) {
   const rows = d.hq_master.rows
   const body = rows.map((r, i) => `<tr>${cols.map((c, j) => `<td class="px-2 py-1">${cellInput("hq_master", i, {f: c, type: j < 3 ? "text" : "num"}, r[c])}</td>`).join("")}
       <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="hq_master" data-idx="${i}">삭제</button></td></tr>`).join("")
-  return panel("본사 원가분배 마스터", "«NN년 본사 원가분배» 양식의 배분 구조·금액을 그대로 씁니다 — 앱이 비율을 다시 계산하지 않습니다. 열은 대분류·중분류·세부내역·기준연도 예산·지사들. 아래 <b>배분비율(계약체결금액)</b>은 본사 임시사업을 지사에 나누는 기준입니다.", `
+  return panel("본사 원가분배 마스터", "양식 금액을 그대로 사용 · 배분비율(계약체결금액)로 본사 임시사업을 나눔", `
     <div class="flex flex-wrap gap-2 p-5 pb-0">
       <button class="btn-secondary" data-fcimport="hq-master">본사 원가분배 엑셀에서 가져오기 (마스터 + 배분비율)</button>
       <button class="btn-secondary" data-fcexport="hq-master">현재값이 채워진 양식 내려받기</button>
@@ -143,18 +142,18 @@ function manageBody() {
   return `
   <div class="space-y-6">
     ${gradesPanel(d)}
-    ${panel("팩터", "미래 연도 금액에 곱하는 연간 비율. 활성인 팩터의 (1+비율)을 기준연도부터 복리로 곱합니다. 물가상승률 외에 노후화 등을 더할 수 있습니다.",
+    ${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
       longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"}], d.factors), "factors")}
-    ${panel("고온부품 계획", "지사×연도×항목(고온부품재생/신품구매) 금액을 그대로 반영합니다 — 팩터를 곱하지 않습니다. «고온부품(NN)» 양식에서 가져올 수 있습니다.", `
+    ${panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음", `
       <div class="flex flex-wrap gap-2 p-5 pb-0">
         <button class="btn-secondary" data-fcimport="hot-parts">고온부품 엑셀에서 가져오기</button>
         <button class="btn-secondary" data-fcexport="hot-parts">현재값이 채워진 양식 내려받기</button>
       </div>
       ${longTable("hot_parts", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "항목", label: "항목", type: "select", options: HOT_ITEMS}, {f: "금액", label: "금액(천원)", type: "num"}], d.hot_parts, "고온부품 계획이 없습니다.")}`, "hot_parts")}
     ${hqMasterPanel(d)}
-    ${panel("본사 일시적 사업", "계획에 없던 본사 사업. 위 배분비율(계약체결금액)로 지사에 자동 배분됩니다.",
+    ${panel("본사 일시적 사업", "배분비율(계약체결금액)로 지사에 자동 배분",
       longTable("hq_temp", [{f: "사업명", label: "사업명"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "연도", label: "연도", type: "int"}, {f: "금액", label: "금액(천원)", type: "num"}], d.hq_temp, "없음"), "hq_temp")}
-    ${panel("지사별 돌발 사업", "표준금액에 없던 지사 사업을 그 해 그 과목에 더합니다.",
+    ${panel("지사별 돌발 사업", "그 해 그 과목에 더함",
       longTable("surprise", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "금액", label: "금액(천원)", type: "num"}, {f: "사유", label: "사유"}], d.surprise, "없음"), "surprise")}
     <div class="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-card border border-line bg-white/95 p-4 shadow-float backdrop-blur">
       <button class="btn-primary" id="fcSaveBtn" data-action="fc-save" ${n ? "" : "disabled"}>저장${n ? ` (${n}표)` : ""}</button>
@@ -210,9 +209,9 @@ function benchBody() {
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급)</h3>
       <p class="section-help leading-6">${info}</p>
-      <p class="section-help">«자동추천»은 실적 패턴(연도별 변동·등급별 편차)으로 방식을 골랐고 근거가 «추천사유»에 있습니다. <b>산출방식</b>을 바꾸면 그 (지사,과목)은 «사용자지정»으로, <b>표준금액</b>을 고치면 그 (지사,과목,등급)은 «수동수정»으로 고정됩니다.${b.has_ltsa ? "" : " ℹ️ «투자유형세부»가 없어 기계장치에서 LTSA/CRI 를 분리하지 못하고 총액을 씁니다."}</p>
+      <p class="section-help">산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정»으로 고정${b.has_ltsa ? "" : " ℹ️ «투자유형세부»가 없어 기계장치에서 LTSA/CRI 를 분리하지 못하고 총액을 씁니다."}</p>
       <div class="mt-3 flex flex-wrap items-end gap-3">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사그룹</span>
+        <label class="block"><span class="field-label">지사그룹</span>
           ${sel(["all", ...GROUPS], g, "data-fcgroup", {all: "전체"})}</label>
         <button class="btn-primary" data-action="fc-save-bench" ${nEdits ? "" : "disabled"}>변경 저장${nEdits ? ` (${nEdits}건)` : ""}</button>
         <button class="btn-secondary" data-fcexport="standardization" title="재무팀 표준화 참고 양식(25시트)에 실적·정비등급·표준금액을 채워 내려받습니다">표준화 양식으로 내보내기 (xlsx)</button>
@@ -253,10 +252,10 @@ function tableBody() {
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-ink">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
-      <p class="section-help">기준연도는 계획본(있으면) + 본사배분, 이후는 표준금액 × 팩터 복리. 고온부품은 계획값 그대로, 임시·돌발사업은 그 해에 더합니다. 단위 천원.</p>
+      <p class="section-help">기준연도 = 계획본 + 본사배분 · 이후 = 표준금액 × 팩터 · 단위 천원</p>
       ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-control ${tone ==="warn" ? "bg-warn-bg text-warn" : "bg-subtle text-sub"} px-3 py-2 text-xs">${msg}</p>`).join("")}
       <div class="mt-3 flex flex-wrap items-end gap-3">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사</span>
+        <label class="block"><span class="field-label">지사</span>
           <select class="control" data-fcsite><option value="${TOTAL}" ${site === TOTAL ? "selected" : ""}>전사 합계 (${t.sites.length}개 지사)</option>${t.sites.map(s => `<option value="${esc(s)}" ${s === site ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
         <button class="btn-secondary" data-fcexport="longterm" title="재무팀 중장기예산 참고 양식(지사 탭·본사 원가분배·총원가 배분·총괄표)에 결과를 채워 내려받습니다">중장기 예산 양식으로 내보내기 (xlsx)</button>
       </div>

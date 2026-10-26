@@ -6,7 +6,7 @@ import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
 import { helpFabHtml } from "./components/characters.js"
 import { loadErrorBannerHtml } from "./components/loaderror.js"
-import { lockBannerHtml } from "./components/lockbanner.js"
+import { lockBadgeHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
@@ -86,12 +86,12 @@ export function renderPage() {
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
   const lb = $("#lockBanner");
-  if (lb) lb.innerHTML = loadErrorBannerHtml() + lockBannerHtml();
+  if (lb) lb.innerHTML = loadErrorBannerHtml();
+  const lk = $("#lockBadge");
+  if (lk) lk.innerHTML = lockBadgeHtml();
   const hf = $("#helpFab");
   if (hf) hf.innerHTML = helpFabHtml();
-  const [title, subtitle] = viewMeta[state.view];
-  $("#pageTitle").textContent = title;
-  $("#pageSubtitle").textContent = subtitle;
+  $("#pageTitle").textContent = viewMeta[state.view];
   document.querySelectorAll("nav [data-view]").forEach(b =>
     b.classList.toggle("nav-button-active", b.dataset.view === state.view));
   const ys = $("#yearSelect");

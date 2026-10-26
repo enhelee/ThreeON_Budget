@@ -40,7 +40,7 @@ export function renderStats() {
         <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">대분류</th><th class="px-4 py-3">예산과목</th><th class="px-4 py-3 text-right">계획(A)</th><th class="px-4 py-3 text-right">실적(B)</th><th class="px-4 py-3 text-right">└ 계획집행</th><th class="px-4 py-3 text-right">└ 신규</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">사업수</th><th class="px-4 py-3 text-right">미시행</th></tr></thead>
         <tbody class="divide-y divide-line-subtle">${items.map(x => `<tr class="clickable hover:bg-subtle" data-stat-item="${esc(budget)}|${esc(x.예산과목)}" title="눌러서 지사별 실적 → 전표까지 내려가 보기"><td class="table-cell text-sub">${esc(x.대분류)}</td><td class="table-cell font-semibold text-ink"><span class="mr-1 inline-block w-3 text-tri">${state.statOpen === `${budget}|${x.예산과목}` ? "▾" : "▸"}</span>${esc(x.예산과목)}</td><td class="table-cell text-right">${fmt(x.계획)}</td><td class="table-cell text-right font-semibold">${fmt(x.실적)}</td><td class="table-cell text-right text-sub">${fmt(x.집행)}</td><td class="table-cell text-right text-sub">${fmt(x.신규)}</td><td class="table-cell text-right">${rateBadge(x.계획, x.실적)}</td><td class="table-cell text-right">${x.사업수}</td><td class="table-cell text-right ${x.미시행 ?"text-warn" : "text-tri"}">${x.미시행}</td></tr>${drillRows(budget, x)}`).join("")}</tbody>
         <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="2">합계</td><td class="table-cell text-right font-bold">${fmt(tot.p)}</td><td class="table-cell text-right font-bold">${fmt(tot.a)}</td><td colspan="2"></td><td class="table-cell text-right font-bold">${fmtRate(tot.p, tot.a)}</td><td colspan="2"></td></tr></tfoot></table></div>
-        <div class="border-t border-line p-5 sm:p-6"><h4 class="text-sm font-bold text-ink">지사그룹별 (계획 파랑 · 실적 청록)</h4>
+        <div class="border-t border-line p-5 sm:p-6"><h4 class="text-sm font-bold text-ink">지사그룹별 (계획 검정 · 실적 초록)</h4>
           <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-ink">${esc(g.그룹)}</span><span class="text-xs text-sub"><span class="font-semibold text-ink">${fmt(g.계획)}</span> / <span class="font-semibold text-ok">${fmt(g.실적)}</span> · ${fmtRate(g.계획, g.실적)}</span></div>
           <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full bg-ink" style="width:${g.계획 / maxA * 100}%"></div></div>
           <div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full bg-ok" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
@@ -58,8 +58,7 @@ export function renderStats() {
     </section>`;
   }).join("");
   return `<div class="space-y-6">
-    <section><p class="text-sm font-semibold text-ink">STAGE 4</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">통계 · 내보내기 — ${esc(state.year)}년</h2>
-    <p class="mt-2 text-sm text-sub">검토(재배정·수정)가 반영된 최신 분석 기준입니다.</p></section>
+    <section><p class="text-sm font-semibold text-ink">STAGE 4</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">통계 · 내보내기 — ${esc(state.year)}년</h2></section>
     ${sections}${cmpSection}</div>`;
 }
 

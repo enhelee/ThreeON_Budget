@@ -4,7 +4,7 @@ import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { injectCharacterSprite } from "./components/characters.js"
-import { renderSidebar } from "./components/sidebar.js"
+import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
@@ -101,6 +101,13 @@ document.addEventListener("click", async e => {
     renderPage();
     return;
   }
+  // 3번 탭 지사 표 접기/펼치기 — 결과 영역만 다시 그린다(검색창 DOM 유지)
+  if (e.target.closest("[data-brtable]")) {
+    state.brTableOpen = !state.brTableOpen;
+    const el = $("#brResults");
+    if (el) el.innerHTML = brResultsHtml();
+    return;
+  }
   // 「연도 기준정보」 탭 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
   const yct = e.target.closest("[data-yctab]");
   if (yct) { state.ycTab = yct.dataset.yctab; renderPage(); return; }
@@ -122,6 +129,9 @@ document.addEventListener("click", async e => {
   if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
+  const stab = e.target.closest("[data-settab]");
+  if (stab) { state.settingsTab = stab.dataset.settab; renderPage(); return; }
+  if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
@@ -618,9 +628,10 @@ export function closeMenu() {
   back.focus();
 }
 
-// 스크롤 중에는 도움말을 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게.
-const syncFabMini = () => document.body.classList.toggle("fab-mini", window.scrollY > 80 && !state.helpOpen);
-window.addEventListener("scroll", syncFabMini, {passive: true});
+// 도움말은 늘 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게. 말풍선을 열 때만 글자도 보인다.
+//   (2026-10-26 사용자 결정: 늘 작게 + 본문 오른쪽 여백)
+const syncFabMini = () => document.body.classList.toggle("fab-mini", !state.helpOpen);
+syncFabMini();
 
 // 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
 // (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
@@ -681,6 +692,23 @@ $("#trainingFile").addEventListener("change", async e => {
 // 캐릭터 그림(<symbol>)은 사이드바·화면이 <use> 로 가져다 쓰므로 그보다 먼저 심는다.
 injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
+$("#headerBrand").innerHTML = renderHeaderBrand();
+
+// 데스크톱 사이드바 접기 — 번호만 남은 좁은 막대로. 고른 상태는 이 브라우저에 기억한다.
+// 접힌 동안은 글자가 안 보이므로 마우스를 올리면 메뉴 이름이 뜨게 title 을 붙인다.
+// (모바일 드로어는 원래대로 — 접기 버튼은 lg 미만에서 숨는다)
+function setSidebarCollapsed(on) {
+  document.documentElement.classList.toggle("sb-collapsed", on);
+  const btn = $("#sidebarToggle");
+  btn.setAttribute("aria-expanded", on ? "false" : "true");
+  btn.setAttribute("aria-label", on ? "메뉴 펼치기" : "메뉴 접기");
+  btn.title = on ? "메뉴 펼치기" : "";
+  $("#sidebar").querySelectorAll(".nav-button[data-label]").forEach(b => { b.title = on ? b.dataset.label : ""; });
+  try { localStorage.setItem("sidebar_collapsed", on ? "1" : "0"); } catch {}
+}
+setSidebarCollapsed((() => { try { return localStorage.getItem("sidebar_collapsed") === "1"; } catch { return false; } })());
+$("#sidebarToggle").addEventListener("click", () =>
+  setSidebarCollapsed(!document.documentElement.classList.contains("sb-collapsed")));
 
 // 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
 window.addEventListener("hashchange", onHashChange);

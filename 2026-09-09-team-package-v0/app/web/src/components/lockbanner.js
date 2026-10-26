@@ -1,16 +1,20 @@
 import { state } from "../state.js"
 import { esc } from "../util.js"
 
-// 마감된 연도의 숫자는 대외 보고에 쓰인 값이다. 열려 있다는 사실이 설정 화면
-// 안쪽에만 있으면 잊힌다 — 다른 연도·다른 화면을 보고 있어도 보이도록 헤더에
-// 붙여 둔다. 헤더는 sticky 라 스크롤해도 따라온다.
-export function lockBannerHtml() {
-  const open = Object.entries(state.lockStates || {})
-  if (!open.length) return ""
-  return open.map(([year, s]) => `
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-warn bg-warn-bg px-4 py-2 text-sm sm:px-6 lg:px-8">
-      <span class="font-bold text-warn">🔓 ${esc(year)}년이 마감 해제 상태입니다</span>
-      <span class="text-xs text-warn">${esc(s.reason || "")}${s.by ? ` · ${esc(s.by)}` : ""}${s.unlocked_at ? ` · ${esc(s.unlocked_at)}` : ""}</span>
-      <button class="btn-secondary ml-auto" data-action="relock-year" data-year="${esc(year)}">${esc(year)}년 다시 마감</button>
-    </div>`).join("")
+// 마감된 연도의 숫자는 대외 보고에 쓰인 값이다. 열려 있다는 사실을 잊지 않게 하되,
+// 다른 연도를 보는 동안까지 화면마다 큰 띠를 띄우면 소음이다(2026-10-26 사용자 결정):
+//   보고 있는 연도가 열려 있으면 → 헤더 제목 옆 작은 배지(+ 다시 마감)
+//   다른 연도를 보고 있으면     → 메인 «다음 할 일»에 한 줄(openLockItems)
+export function lockBadgeHtml() {
+  const s = (state.lockStates || {})[String(state.year)]
+  if (!s) return ""
+  const meta = [s.reason, s.by, s.unlocked_at].filter(Boolean).join(" · ")
+  return `<span class="lock-chip" title="${esc(meta)}">🔓 ${esc(state.year)} 마감 해제
+    <button class="lock-chip__btn" data-action="relock-year" data-year="${esc(state.year)}">다시 마감</button></span>`
+}
+
+/** 메인 «다음 할 일»에 넣을 줄 — 지금 보고 있지 않은 연도까지 포함해 열린 연도 전부. */
+export function openLockItems() {
+  return Object.keys(state.lockStates || {}).map(year => ({tone: "warn", view: "settings",
+    text: `${year}년 마감 해제됨 — 검토가 끝나면 다시 마감하세요.`}))
 }
