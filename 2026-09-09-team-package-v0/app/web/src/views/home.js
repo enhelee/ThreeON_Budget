@@ -1,4 +1,5 @@
 import { rateBadge } from "../components/badges.js"
+import { openLockItems } from "../components/lockbanner.js"
 import { STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
@@ -47,14 +48,6 @@ function unmappedTotals() {
 
 // ── ① 헤더 스트립 ────────────────────────────────────────────
 
-function stageFlow() {
-  return STAGES.map((s, i) => `
-    <span class="inline-flex items-center gap-1.5">
-      <span class="grid h-5 w-5 place-items-center rounded-md bg-subtle text-[0.65rem] font-bold text-ink">${i + 1}</span>
-      <span class="text-xs font-medium text-sub">${esc(s.title)}</span>
-    </span>
-    ${i < STAGES.length - 1 ? '<span class="text-tri" aria-hidden="true">→</span>' : ""}`).join("")
-}
 
 function metaItem(label, value) {
   return `<div><dt class="font-semibold text-tri">${esc(label)}</dt><dd class="mt-0.5 font-bold text-ink">${value}</dd></div>`
@@ -67,7 +60,6 @@ function headerStrip() {
       <div class="min-w-0">
         <p class="text-sm font-semibold text-ink">메인</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지</h2>
-        <p class="section-help max-w-30 leading-6">지사 19곳의 예산계획과 SAP 실적 전표를 자동으로 맞춰 보고, 그 결과를 정비등급별 표준금액과 2026~2035년 전망의 근거로 넘깁니다.</p>
       </div>
       <dl class="grid shrink-0 grid-cols-3 gap-x-6 gap-y-2 text-xs">
         ${metaItem("기준일", today())}
@@ -75,16 +67,13 @@ function headerStrip() {
         ${metaItem("단위", "화면 천원 · 연계 원")}
       </dl>
     </div>
-    <div class="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-line pt-4">
-      ${stageFlow()}
-    </div>
   </section>`
 }
 
 // ── ② 현황 카드 ──────────────────────────────────────────────
 
 function card(title, badge, body) {
-  return `<article class="metric-card">
+  return `<article class="metric-card h-full">
     <div class="flex items-start justify-between gap-2">
       <p class="text-sm font-semibold text-sub">${esc(title)}</p>${badge}
     </div>
@@ -135,19 +124,6 @@ function unmappedCard() {
      <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`)
 }
 
-function systemCard() {
-  const h = state.health
-  const db = !h ? dash : h.db === "postgresql" ? "PostgreSQL" : "SQLite"
-  const auth = !h
-    ? dash
-    : h.auth
-      ? '<b class="text-ink">세션 로그인</b> · 변경 이력 기록'
-      : '<b class="text-ink">인증 꺼짐</b> (사내망 모드)'
-  return card("시스템", h ? badgeOk("정상") : badgeMuted("확인 불가"),
-    `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${db}</p>
-     <p class="mt-2 text-sm text-sub">${auth}</p>
-     <p class="mt-1 text-sm text-sub">리비전 ${esc(h?.rev || "-")}</p>`)
-}
 
 function lastRunCard() {
   const c = curRow()
@@ -162,9 +138,10 @@ function lastRunCard() {
 }
 
 function statusCards() {
-  return `<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-    ${budgetCard("손익")}${budgetCard("자본")}${prevYearCard()}
-    ${unmappedCard()}${systemCard()}${lastRunCard()}
+  // 6칸 격자: 윗줄 3장(2칸씩) · 아랫줄 2장(3칸씩) — 카드 5장이 빈칸 없이 찬다
+  return `<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+    <div class="xl:col-span-2">${budgetCard("손익")}</div><div class="xl:col-span-2">${budgetCard("자본")}</div><div class="xl:col-span-2">${prevYearCard()}</div>
+    <div class="xl:col-span-3">${unmappedCard()}</div><div class="md:col-span-2 xl:col-span-3">${lastRunCard()}</div>
   </section>`
 }
 
@@ -173,7 +150,6 @@ function statusCards() {
 function stageCards() {
   return `<section>
     <h3 class="section-title">업무 단계</h3>
-    <p class="section-help">카드를 누르면 해당 화면으로 이동합니다. 왼쪽 메뉴와 같은 자리입니다.</p>
     <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       ${STAGES.map(s => `
       <button type="button" data-view="${s.view}" class="metric-card text-left transition hover:border-ink">
@@ -197,6 +173,7 @@ function nextActions() {
   const learn = state.pending?.learn_pending || 0
   const locked = state.status ? !!state.status.locked : null
 
+  items.push(...openLockItems())
   if (!c) {
     items.push({tone: "warn", view: "budget",
                 text: `${state.year}년 분석 이력이 없습니다 — 계획본(양식1)과 zrfm2 를 올린 뒤 상단 분석 실행을 누르세요.`})
@@ -231,8 +208,7 @@ function nextActions() {
   return `
   <article class="panel p-5 sm:p-6">
     <h3 class="section-title">다음 할 일</h3>
-    <p class="section-help">${esc(state.year)}년 기준으로 지금 필요한 작업입니다.</p>
-    <ul class="mt-4 space-y-3 border-t border-line pt-4">
+    <ul class="mt-4 grid gap-x-8 gap-y-3 border-t border-line pt-4 lg:grid-cols-2">
       ${items.slice(0, 4).map(it => `
       <li class="flex items-start gap-2.5 text-sm">
         <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot[it.tone]}"></span>
@@ -256,7 +232,7 @@ function multiYearPanels() {
   return `
   <section class="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
     <article class="panel p-5 sm:p-6">
-      <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3><p class="section-help">파랑=계획 · 청록=실적 (손익+자본, 천원)</p></div><span class="badge bg-subtle text-sub">${recent.length}개 연도</span></div>
+      <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3><p class="section-help">검정=계획 · 초록=실적 (손익+자본, 천원)</p></div><span class="badge bg-subtle text-sub">${recent.length}개 연도</span></div>
       <div class="mt-7 space-y-6">
         ${recent.map(r => {
           const p = (r["손익"]?.계획 || 0) + (r["자본"]?.계획 || 0)
@@ -282,10 +258,8 @@ export function renderHome() {
     <div class="space-y-6">
       ${headerStrip()}
       ${statusCards()}
+      ${nextActions()}
       ${stageCards()}
-      <section class="grid gap-6 xl:grid-cols-2">
-        ${nextActions()}
-      </section>
       ${multiYearPanels()}
     </div>`
 }

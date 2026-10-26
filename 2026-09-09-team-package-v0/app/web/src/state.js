@@ -1,6 +1,7 @@
 export const state = {
   view: "home", year: "", years: [],
   type: "all", search: "", sort: "rateDesc",
+  brTableOpen: true,   // 3번 탭 지사 표 펼침 — 접으면 아래 계획–실적 분포 차트가 바로 보인다
   status: null, branches: null, stats: null, overview: null,
   health: null,        // GET /healthz — DB 종류·인증 여부·리비전 (메인 헤더/카드)
   returnHash: null,  // 401 로 게이트에 튕기기 직전 보던 주소 — 로그인 후 여기로 돌아간다
@@ -25,10 +26,12 @@ export const state = {
   alerts: null,     // /api/alerts — {alerts, summary, prev_year}
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
+  settingsTab: "year",   // 설정 화면 탭(연도·학습 | 기준정보 | 데이터셋·모델 | 이력)
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
-         lowConf: false,   // 검토미 배너 «같이 보기» — 확신도 0.80 미만 계획집행 사업만
+         lowConf: false,
+         guideOpen: false,  // «? 표 보는 법» 펼침(표 머리 줄)
          varOnly: false,   // «사유 대상만» — 집행률 ±20%p 를 벗어난 사업만
          noteKey: null,    // 차이 사유 입력창이 열린 행
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
@@ -38,14 +41,14 @@ export const state = {
 };
 
 export const viewMeta = {
-  home: ["메인", "계획·실적·전망의 오늘 기준 현황입니다. 숫자는 모두 DB 실측치입니다."],
-  budget: ["예산 계획", "연도를 선택하고 계획본(양식1)을 업로드해 DB에 등록합니다."],
-  collect: ["실적 집계", "연도를 선택하고 ERP(zrfm2)를 업로드 → 자동 매칭을 실행합니다."],
-  branches: ["실적 분석", "전체 지사의 계획·실적·집행률을 조회합니다."],
-  detail: ["실적분석(상세)", "지사별 사업 목록과 귀속 ERP 전표를 검토·수정합니다."],
-  stats: ["통계·내보내기", "손익/자본 통계와 Excel 산출물을 내려받습니다."],
-  forecast: ["중장기 예측", "마감된 연도의 실적으로 표준금액을 만들고(3단계) 기준연도부터 10개년을 전망합니다(4단계)."],
-  settings: ["설정", "데이터셋·수동 재배정·학습·사업수정 이력을 관리합니다."],
+  home: "메인",
+  budget: "예산 계획",
+  collect: "실적 집계",
+  branches: "실적 분석",
+  detail: "실적분석(상세)",
+  stats: "통계·내보내기",
+  forecast: "중장기 예측",
+  settings: "설정",
 };
 
 // ───────────────────────── 공통 유틸 ─────────────────────────

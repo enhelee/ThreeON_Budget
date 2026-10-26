@@ -53,7 +53,6 @@ function aliasTable() {
   return `
     <div class="p-5 sm:p-6">
       <div class="flex flex-wrap gap-2">${kindBtn("dept", "처지사 별칭")}${kindBtn("item", "예산과목 별칭")}</div>
-      <p class="section-help mt-3">표기가 흔들리는 자료를 하나로 모읍니다. <b>연도 구분이 없습니다</b> — 옛 표기가 몇 년 뒤 자료에 다시 나타나기 때문입니다. <b>기본</b> 표시가 붙은 항목은 프로그램에 내장된 값이라 수정·삭제할 수 없습니다.</p>
       <div class="mt-4 flex flex-wrap items-end gap-2">
         <label class="text-xs font-semibold text-sub">${esc(srcLabel)}<input id="ycAliasSrc" class="control mt-1 block" placeholder="예: 경남지사(양산RPS 태양광)"></label>
         <label class="text-xs font-semibold text-sub">${esc(dstLabel)}<input id="ycAliasDst" class="control mt-1 block" placeholder="예: 양산지사"></label>
@@ -108,7 +107,6 @@ export function renderYearConfig() {
   <section class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">📐 ${esc(state.year)}년 기준정보</h3>
-      <p class="section-help">이 연도에만 적용됩니다. 지사는 준공·이관으로 성격이 바뀌므로(양산지사는 2023년 DH, 2025년 중대형CHP) 연도마다 따로 관리합니다. 저장하면 상단 <b>분석 반영</b>에 포함됩니다.</p>
       ${locked ? `<p class="mt-3 text-xs font-semibold text-warn">🔒 ${esc(state.year)}년은 마감 상태라 기준정보를 고칠 수 없습니다 — 위 '잠금 해제'를 먼저 누르세요.</p>` : ""}
       <div class="mt-4 flex flex-wrap gap-2">${TABS.map(([k, l]) => btn(k, l)).join("")}</div>
     </div>

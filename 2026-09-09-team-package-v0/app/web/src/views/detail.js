@@ -45,14 +45,16 @@ export function detSortArrow(key) {
   return state.det.sortDir > 0 ? "▲" : "▼";
 }
 
-export function legend() {
-  return `<div class="flex flex-wrap items-center gap-4 text-xs text-sub">
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fff;border:1px solid #cbd5e1"></span>계획집행 — 계획 사업에 실적이 붙음</span>
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fef2f2"></span><b>분홍</b> = 미시행 (계획은 있으나 실적 0)</span>
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:#fffbeb"></span><b>노랑</b> = 신규 (계획에 없던 집행)</span>
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:#f1f5f9"></span><b>회색</b> = 미매핑 (지사 미확정 — 재배정으로 지사 지정, 종합표 미포함)</span>
-    <span class="flex items-center gap-1.5">확신도: <span class="badge bg-ok-bg text-ok">0.80↑ 자동확정</span><span class="badge bg-warn-bg text-warn">0.80미만 검토 필요</span></span>
-    <span class="flex items-center gap-1.5">집행률 80% 미만·120% 초과: <span class="badge bg-warn-bg text-warn">사유 입력</span> 권장 → <span class="badge bg-ok-bg text-ok">사유 ✓</span></span>
+/** «표 보는 법» — 표 머리 줄의 «? 표 보는 법» 버튼으로 펼치고 접는다(기본 접힘). 행 색·배지 뜻만 한 줄로. */
+export function guideHtml() {
+  if (!state.det.guideOpen) return "";
+  return `<div id="detGuide" class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line bg-subtle px-4 py-2.5 text-xs text-sub">
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--err-bg)"></span>미시행</span>
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--warn-bg)"></span>신규</span>
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--subtle)"></span>미매핑(종합표 제외)</span>
+    <span class="flex items-center gap-1.5"><span class="badge bg-warn-bg text-warn">0.80 미만</span>검토 필요</span>
+    <span class="flex items-center gap-1.5"><span class="badge bg-warn-bg text-warn">사유 입력</span>집행률 ±20%p</span>
+    <span>사업 클릭=전표 · ✎=수정</span>
   </div>`;
 }
 
@@ -65,10 +67,10 @@ export function reviewBannerHtml() {
   const d = state.det;
   const n = (d.data?.biz || []).filter(isLowConf).length;
   if (!n && !d.lowConf) {
-    return charSay({who: "gt", title: "확신도 낮은 사업이 없어요.",
+    return charSay({who: "gt", compact: true, title: "확신도 낮은 사업이 없어요.",
       body: "신규(노랑)·미시행(분홍) 행만 훑어보면 돼요."});
   }
-  return charSay({who: "gt",
+  return charSay({who: "gt", compact: true,
     title: d.lowConf ? `확신도 0.80 미만 사업 ${n}건만 보고 있어요.` : `애매한 사업 ${n}건을 골랐어요.`,
     body: "확신도 0.80 미만만 모았어요. 이건 제가 정하면 안 돼요 — 전표를 펼쳐 보고 맞는 사업으로 재배정해 주세요.",
     action: `<button class="btn-secondary" data-action="toggle-lowconf">${d.lowConf ? "전체 보기" : "같이 보기"}</button>`});
@@ -79,9 +81,8 @@ export function renderDetail() {
   const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
   if (!d.data) {
     return `<div class="space-y-6">
-      <section><p class="text-sm font-semibold text-ink">STAGE 3+</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2>
-      <p class="mt-2 text-sm text-sub">지사를 선택하면 손익·자본 구분 없이 전체 사업 목록이 표시됩니다.</p></section>
-      <section class="panel p-5"><label class="block max-w-sm"><span class="mb-1.5 block text-xs font-semibold text-sub">지사 선택</span>
+      <section><p class="text-sm font-semibold text-ink">STAGE 3+</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2></section>
+      <section class="panel p-5"><label class="block max-w-sm"><span class="field-label">지사 선택</span>
       <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
       ${!(state.branches || []).length ? `<div class="mt-4">${charSay({who: "hj", title: "아직 자리를 찾은 전표가 없어요.", body: "분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.", action: `<button class="btn-secondary" data-view="collect">실적 집계로 가기</button>`})}</div>` : ""}</section>
     </div>`;
@@ -91,20 +92,17 @@ export function renderDetail() {
     <div class="space-y-6">
       <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div><p class="text-sm font-semibold text-ink">STAGE 3+ · ${esc(state.year)}년</p>
-        <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(d.branch)} — 사업별 실적 검토</h2>
-        <p class="mt-2 text-sm text-sub">사업 클릭=전표 트리 · 컬럼 제목 클릭=정렬 · ✎=내용 수정 · 전표 체크=재배정. <b>수정은 즉시 저장되고, 분석 반영은 모아서 한 번</b> 하면 됩니다.</p></div>
+        <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(d.branch)} — 사업별 실적 검토</h2></div>
         <button class="btn-secondary" data-view="branches">← 전체 지사</button>
       </section>
       ${pendingBarHtml()}
       ${locked ? "" : reviewBannerHtml()}
-      <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">예산과목</span><select class="control" data-det="item"><option value="">전체</option>${d.data.items.map(it => `<option value="${esc(it)}" ${d.item === it ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">속성</span><select class="control" data-det="attr"><option value="">전체</option>${d.data.attrs.map(a => `<option value="${esc(a)}" ${d.attr === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></label>
-        <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-sub">사업명 검색</span><input class="control w-full" data-det="q" value="${esc(d.q)}" placeholder="사업명 일부를 입력"></label>
-        <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
-        <label class="flex items-center gap-2 pb-2 text-sm font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
+      <section class="panel p-4"><div class="flex flex-wrap items-end gap-3">
+        <label class="block"><span class="field-label">지사</span><select class="control" data-det="branch">${branchOpts}</select></label>
+        <label class="block"><span class="field-label">예산구분</span><select class="control" data-det="budget"><option value="all" ${d.budget === "all" ? "selected" : ""}>전체</option><option value="손익" ${d.budget === "손익" ? "selected" : ""}>손익</option><option value="자본" ${d.budget === "자본" ? "selected" : ""}>자본</option></select></label>
+        <label class="block"><span class="field-label">예산과목</span><select class="control" data-det="item"><option value="">전체</option>${d.data.items.map(it => `<option value="${esc(it)}" ${d.item === it ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
+        <label class="block"><span class="field-label">속성</span><select class="control" data-det="attr"><option value="">전체</option>${d.data.attrs.map(a => `<option value="${esc(a)}" ${d.attr === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select></label>
+        <label class="block min-w-48 flex-1"><span class="field-label">사업명 검색</span><input class="control w-full" data-det="q" value="${esc(d.q)}" placeholder="사업명 일부를 입력"></label>
         ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
       </div></section>
       ${!locked && d.addOpen ? addBizFormHtml() : ""}
@@ -125,18 +123,18 @@ export function addBizFormHtml() {
       <p class="mb-3 text-sm font-bold text-ink">＋ 사업 추가 — <b>${esc(d.branch)}</b>에 계획본에 없는 사업을 등록합니다
         <span class="ml-2 text-xs font-medium text-ink">저장 후 자동 재분석되어 목록에 나타나고(실적 없으면 '미시행'), 전표 재배정 대상 사업으로 쓸 수 있습니다.</span></p>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산구분</span>
+        <label class="block"><span class="field-label text-ink">예산구분</span>
           <select id="abBudget" class="control w-full" data-add-budget="1">
             <option value="손익" ${add.budget === "손익" ? "selected" : ""}>손익</option>
             <option value="자본" ${add.budget === "자본" ? "selected" : ""}>자본</option></select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산과목 *</span>
+        <label class="block"><span class="field-label text-ink">예산과목 *</span>
           <select id="abItem" class="control w-full">${items.map(it => `<option value="${esc(it)}">${esc(it)}</option>`).join("")}</select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">속성 (비우면 마스터 자동)</span>
+        <label class="block"><span class="field-label text-ink">속성 (비우면 마스터 자동)</span>
           <select id="abAttr" class="control w-full"><option value="">(자동)</option>${["일반", "제조", "건가", "자산"].map(a => `<option value="${a}">${a}</option>`).join("")}</select></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">연예산 (천원)</span><input id="abPlan" class="control w-full" type="number" min="0" placeholder="0"></label>
-        <label class="block sm:col-span-2"><span class="mb-1.5 block text-xs font-semibold text-ink">사업명 *</span><input id="abName" class="control w-full" placeholder="사업명을 입력하세요"></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">주관부서명</span><input id="abOwner" class="control w-full"></label>
-        <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산귀속 부서명(부)</span><input id="abPart" class="control w-full"></label>
+        <label class="block"><span class="field-label text-ink">연예산 (천원)</span><input id="abPlan" class="control w-full" type="number" min="0" placeholder="0"></label>
+        <label class="block sm:col-span-2"><span class="field-label text-ink">사업명 *</span><input id="abName" class="control w-full" placeholder="사업명을 입력하세요"></label>
+        <label class="block"><span class="field-label text-ink">주관부서명</span><input id="abOwner" class="control w-full"></label>
+        <label class="block"><span class="field-label text-ink">예산귀속 부서명(부)</span><input id="abPart" class="control w-full"></label>
       </div>
       <div class="mt-4 flex gap-2">
         <button class="btn-primary" data-action="save-add">사업 추가 (자동 재분석)</button>
@@ -249,15 +247,15 @@ export function detResultsHtml() {
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-3 text-sm font-bold text-ink">사업 내용 수정 <span class="ml-2 text-xs font-medium text-ink">빈칸으로 저장하면 해당 값이 지워집니다. 저장 즉시 반영 + 이후 분석에도 유지.</span></p>
           <div class="edit-grid">
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산귀속 지사(처.지사)</span>
+            <label class="block"><span class="field-label text-ink">예산귀속 지사(처.지사)</span>
               <select id="edBranch" class="control w-full">${realBranches().map(x => `<option value="${esc(x)}" ${x === state.det.branch ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산과목</span>
+            <label class="block"><span class="field-label text-ink">예산과목</span>
               <select id="edItem" class="control w-full">${(((state.status || {}).items || {})[b.budget] || [b.예산과목]).map(x => `<option value="${esc(x)}" ${x === b.예산과목 ? "selected" : ""}>${esc(x)}</option>`).join("")}${(((state.status || {}).items || {})[b.budget] || []).includes(b.예산과목) ? "" : `<option value="${esc(b.예산과목)}" selected>${esc(b.예산과목)} (구성에 없음)</option>`}</select></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">사업명</span><input id="edName" class="control w-full" value="${esc(b.사업명)}"></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">속성</span><input id="edAttr" class="control w-full" value="${esc(b.속성 ?? "")}" placeholder="예: 제조/자산/건가"></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">주관부서명</span><input id="edDept" class="control w-full" value="${esc(b.주관부서명 ?? "")}"></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">예산귀속 부서명(부)</span><input id="edPart" class="control w-full" value="${esc(b.부서부 ?? "")}"></label>
-            <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">연예산(A) · 천원</span><input id="edPlan" class="control w-full text-right" value="${b.연예산 ?? ""}" placeholder="천원 단위"></label>
+            <label class="block"><span class="field-label text-ink">사업명</span><input id="edName" class="control w-full" value="${esc(b.사업명)}"></label>
+            <label class="block"><span class="field-label text-ink">속성</span><input id="edAttr" class="control w-full" value="${esc(b.속성 ?? "")}" placeholder="예: 제조/자산/건가"></label>
+            <label class="block"><span class="field-label text-ink">주관부서명</span><input id="edDept" class="control w-full" value="${esc(b.주관부서명 ?? "")}"></label>
+            <label class="block"><span class="field-label text-ink">예산귀속 부서명(부)</span><input id="edPart" class="control w-full" value="${esc(b.부서부 ?? "")}"></label>
+            <label class="block"><span class="field-label text-ink">연예산(A) · 천원</span><input id="edPlan" class="control w-full text-right" value="${b.연예산 ?? ""}" placeholder="천원 단위"></label>
           </div>
           <p class="mt-2 text-xs text-ink"><b>예산귀속 지사</b>를 바꾸면 이 사업이 연예산(A)·귀속 전표까지 <b>통째로</b> 그 지사로 이동합니다(삭제·재생성 아님). <b>예산과목</b>은 같은 예산(${esc(b.budget)}) 안에서만 바꿀 수 있고, 전표의 과목은 ERP 계정코드가 정하므로 <b>귀속 전표는 옛 과목에 신규로 남습니다</b>. <b>주관부서명</b>은 표기용 텍스트라 종합표·지사별 집계는 바뀌지 않습니다. <b>연예산</b>을 고치면 원본 계획본은 그대로 두고 이후 모든 분석·종합표·집행률에 그 값이 쓰입니다.</p>
           ${deleteBoxHtml(b, key)}
@@ -273,13 +271,13 @@ export function detResultsHtml() {
         <td class="table-cell"><span class="badge ${b.budget ==="손익" ? "bg-subtle text-ink" : "bg-ok-bg text-ok"}">${b.budget}</span></td>
         <td class="table-cell text-ink cell-item" title="${esc(b.예산과목)}">${esc(b.예산과목)}</td>
         <td class="table-cell text-sub">${esc(b.속성 ?? "-")}</td>
-        <td class="table-cell font-semibold text-ink cell-name" title="${esc(b.사업명)}"><span class="mr-1 inline-block w-3 text-tri">${b.전표.length ? (open ? "▾" : "▸") : ""}</span>${esc(b.사업명)}</td>
+        <td class="table-cell font-semibold text-ink cell-name" title="${esc(b.사업명)}"><span class="flex items-start gap-1"><span class="w-3 shrink-0 text-tri">${b.전표.length ? (open ? "▾" : "▸") : ""}</span><span class="min-w-0">${esc(b.사업명)}</span></span></td>
         <td class="table-cell text-right">${fmt(b.연예산원)}</td>
         <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
         <td class="table-cell text-right">${rateCell(b, key)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
         <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
-        <td class="table-cell text-right">${locked ? "" : `<button class="grid h-6 w-6 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button>`}</td>
+        ${locked ? "" : `<td class="table-cell text-center"><button class="mx-auto grid h-7 w-7 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button></td>`}
       </tr>${noteRowHtml(b, key)}${editRow}${vrows}`;
   }).join("");
 
@@ -304,33 +302,38 @@ export function detResultsHtml() {
   })();
 
   return `
-      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article class="metric-card"><p class="text-sm font-semibold text-sub">조회 사업</p><p class="mt-3 text-2xl font-bold">${biz.length}건</p></article>
-        <article class="metric-card"><p class="text-sm font-semibold text-sub">연예산(A)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article>
-        <article class="metric-card"><p class="text-sm font-semibold text-sub">최종 실적금액(B)</p><p class="mt-3 text-2xl font-bold">${fmt(tot.actual)} <span class="text-xs font-semibold text-tri">천원</span></p><p class="mt-1 text-xs text-sub">집행률 ${fmtRate(tot.plan, tot.actual)}</p></article>
-        <article class="metric-card"><p class="text-sm font-semibold text-sub">차이 사유 (±20%p)</p><p class="mt-3 text-2xl font-bold">${varNoted} <span class="text-base font-semibold text-tri">/ ${varAll.length}건</span></p><p class="mt-1 text-xs text-sub">${varAll.length ? (varNoted === varAll.length ? "모두 적었어요" : `${varAll.length - varNoted}건 남음 · 권장 입력`) : "벗어난 사업 없음"}</p></article>
+      <section class="panel flex flex-wrap items-baseline gap-x-6 gap-y-1 px-5 py-3 text-sm text-sub" aria-label="조회 요약">
+        <span>조회 <b class="text-base text-ink">${biz.length}</b>건</span>
+        <span>연예산(A) <b class="text-base text-ink">${fmt(tot.plan)}</b> 천원</span>
+        <span>실적(B) <b class="text-base text-ink">${fmt(tot.actual)}</b> 천원</span>
+        <span class="inline-flex items-center gap-1.5">집행률 ${rateBadge(tot.plan, tot.actual)}</span>
+        <span>차이 사유(±20%p) <b class="text-base text-ink">${varNoted}</b> / ${varAll.length}건${varAll.length && varNoted < varAll.length ? ` <span class="text-warn">· ${varAll.length - varNoted}건 남음</span>` : ""}</span>
       </section>
       ${selCount && !locked ? `<section class="panel sticky top-16 z-10 mt-6 border-line-strong bg-subtle p-4">
         <div class="flex flex-wrap items-end gap-3">
           <p class="font-bold text-ink">${selCount}건 전표 선택 (${esc(d.selBudget)})</p>
-          <label class="block"><span class="mb-1.5 block text-xs font-semibold text-ink">이동할 지사</span>
+          <label class="block"><span class="field-label text-ink">이동할 지사</span>
             <select id="ovDept" class="control">${ovDeptSel ? "" : '<option value="">— 지사 선택 —</option>'}${realBranches().map(b => `<option value="${esc(b)}" ${b === ovDeptSel ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
-          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-ink">이동할 사업 선택 <span class="font-bold">(${esc(ovDeptSel || "지사 미선택")} 기준${ovNames ? ` · ${ovNames.length}건` : ""})</span></span><select id="ovTarget" class="control w-full">${targetOpts}</select></label>
-          <label class="block min-w-48 flex-1"><span class="mb-1.5 block text-xs font-semibold text-ink">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용" value="${esc(d.ovManual || "")}"></label>
+          <label class="block min-w-48 flex-1"><span class="field-label text-ink">이동할 사업 선택 <span class="font-bold">(${esc(ovDeptSel || "지사 미선택")} 기준${ovNames ? ` · ${ovNames.length}건` : ""})</span></span><select id="ovTarget" class="control w-full">${targetOpts}</select></label>
+          <label class="block min-w-48 flex-1"><span class="field-label text-ink">또는 사업명 직접 입력</span><input id="ovManual" class="control w-full" placeholder="입력 시 이 이름이 우선 적용" value="${esc(d.ovManual || "")}"></label>
           <button class="btn-primary" data-action="save-override">재배정 저장 (자동 재분석)</button>
           <button class="btn-secondary" data-action="clear-sel">선택 해제</button>
         </div>
         <p class="mt-2 text-xs text-ink">사업 목록은 <b>이동할 지사</b>의 기존 사업입니다 — 그 지사·처에 이미 있는 사업에 붙이려면 목록에서 고르세요. <b>새 사업</b>으로 옮기려면 <b>'— 선택 없음 —'</b> 그대로 두고 사업명을 직접 입력하면 그 지사의 신규 사업으로 귀속됩니다.</p>
         </section>` : ""}
-      <section class="panel mt-6 overflow-hidden">
-        <div class="border-b border-line px-4 py-3">${legend()}</div>
-        ${biz.length ? `<div class="overflow-x-auto"><table class="det-table w-full"><thead class="table-head"><tr>
+      <section class="panel mt-4 overflow-hidden">
+        <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-2">
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
+          <button class="push-right text-xs font-semibold text-sub hover:text-ink" data-action="toggle-guide" aria-expanded="${!!d.guideOpen}" aria-controls="detGuide">? 표 보는 법</button>
+        </div>
+        ${guideHtml()}
+        ${biz.length ? `<div class="det-scroll"><table class="det-table w-full"><thead class="table-head"><tr>
           ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 8 ?"text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
-          <th class="text-right">수정</th></tr></thead>
+          ${locked ? "" : '<th class="text-center">수정</th>'}</tr></thead>
         <tbody class="divide-y divide-line-subtle">${rows}</tbody>
         <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="4"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
-      </section>
-      <p class="mt-4 text-xs text-tri">표의 연예산(A)·실적금액(B)·전표금액은 <b>원 단위</b>, 상단 요약 카드는 <b>천원 단위</b>입니다. 재배정은 저장 즉시 자동 재분석되어 반영되고, 그 확정 내용은 자동으로 학습됩니다.</p>`;
+      </section>`;
 }
 
 // ───────────────────────── 4 통계·내보내기 ─────────────────────────

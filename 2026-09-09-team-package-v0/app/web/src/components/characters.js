@@ -105,8 +105,8 @@ export function charSvg(who, cls = "", {head = false} = {}) {
  * 캐릭터가 한마디 하는 안내 줄. title·body 는 HTML 이다 — 부르는 쪽이 esc() 로 감싼다.
  * tone 을 주면 배경을 그 의미색으로 바꾼다("warn" = 마감 등 주의).
  */
-export function charSay({who, title, body = "", action = "", tone = ""}) {
-  return `<section class="char-say char-say--${tone || who}">
+export function charSay({who, title, body = "", action = "", tone = "", compact = false}) {
+  return `<section class="char-say char-say--${tone || who}${compact ? " char-say--compact" : ""}">
     ${charSvg(who, "char-say__img")}
     <div class="min-w-0">
       <p class="char-say__title"><b class="char-say__name">${NAMES[who]}</b> ${title}</p>
@@ -147,7 +147,7 @@ export const HELP = {
 
 export function helpFabHtml() {
   const steps = HELP[state.view] || []
-  const title = `${(viewMeta[state.view] || ["이 화면"])[0]}에서는`
+  const title = `${(viewMeta[state.view] || "이 화면")}에서는`
   const open = !!state.helpOpen && steps.length > 0
   return `<div class="help-fab">
     ${open ? `<div class="help-bubble" id="helpBubble" role="dialog" aria-label="${esc(title)} 도움말">

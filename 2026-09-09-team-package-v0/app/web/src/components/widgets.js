@@ -20,9 +20,9 @@ export function emptyState(msg) {
 
 export function yearPicker(prefix) {
   return `<div class="flex flex-wrap items-end gap-3">
-    <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">대상연도</span>
+    <label class="block"><span class="field-label">대상연도</span>
     <select class="control" data-yearpick="1">${state.years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("")}</select></label>
-    <label class="block"><span class="mb-1.5 block text-xs font-semibold text-sub">새 연도 직접 입력</span>
+    <label class="block"><span class="field-label">새 연도 직접 입력</span>
     <div class="flex gap-2"><input id="${prefix}NewYear" class="control" style="width:7rem" placeholder="예: 2021" maxlength="4">
     <button class="btn-secondary" data-action="add-year" data-input="${prefix}NewYear">추가</button></div></label>
   </div>`;
