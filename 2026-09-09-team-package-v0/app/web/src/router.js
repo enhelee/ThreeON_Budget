@@ -196,6 +196,12 @@ export async function navigate(view, opts = {}) {
   renderPage();
   closeMenu();
   window.scrollTo({top: 0, behavior: "smooth"});
+  // 메인의 중장기 전망 패널 — 전망 계산이 무거워(운영 수 초) 메인을 막지 않게 뒤에서 받아 다시 그린다.
+  if (view === "home" && !state.fc.table) {
+    state.fc.homeErr = false;
+    loadForecastTable().catch(() => { state.fc.homeErr = true; })
+      .finally(() => { if (state.view === "home") renderPage(); });
+  }
 }
 
 export async function changeYear(y) {

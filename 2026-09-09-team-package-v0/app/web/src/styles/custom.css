@@ -198,3 +198,59 @@
 /* 작은 도움말 버튼(2.5rem + 오른쪽 1rem) 자리만큼 본문 오른쪽을 비워 표 끝 열이 가려지지 않게 */
 @media (min-width:640px){#page{padding-right:4.5rem}}
 @media print{#page{padding-right:0}}
+
+/* 5번 탭 중장기 전망 «한눈에 보기» (views/forecast_viz.js) — 히트맵·막대·확대 애니메이션·발표 모드 */
+.fv-step{min-height:34px;padding:0 .9rem;border:1px solid #E5E5E5;border-radius:999px;background:#fff;font-size:.8rem;font-weight:600;color:#5D5D5D}
+.fv-step:hover:not(:disabled){border-color:#0D0D0D;color:#0D0D0D}
+.fv-step:disabled{opacity:.45;cursor:default}
+.fv-step-on{background:#0D0D0D;border-color:#0D0D0D;color:#fff}
+.fv-step-on:hover:not(:disabled){color:#fff}
+.fv-chip{min-width:3.6rem;min-height:34px;border-radius:.6rem;border:1px solid #E5E5E5;background:#fff;font-size:.8rem;font-weight:600;color:#5D5D5D}
+.fv-chip:hover{border-color:#0D0D0D;color:#0D0D0D}
+.fv-chip-on{background:#0d366b;border-color:#0d366b;color:#fff}
+.fv-chip-on:hover{color:#fff}
+.fv-grid{display:grid;gap:3px;align-items:stretch}
+.fv-colhead{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;border-radius:.4rem}
+.fv-colhead:hover{background:#F2F2F2}
+.fv-colbar{display:flex;align-items:flex-end;width:60%;height:44px}
+.fv-colbar>span{display:block;width:100%;border-radius:4px 4px 0 0;background:#9ec5f4;min-height:2px}
+.fv-colhead:hover .fv-colbar>span{background:#256abf}
+.fv-rowhead{padding:0 .5rem;text-align:left;font-size:.8rem;font-weight:600;color:#0D0D0D;border-radius:.4rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fv-rowhead:hover{background:#F2F2F2;text-decoration:underline}
+.fv-cell{min-height:34px;border-radius:4px;font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;transition:transform .12s,box-shadow .12s}
+.fv-cell:hover,.fv-cell:focus-visible{transform:scale(1.12);box-shadow:0 0 0 2px #fff,0 0 0 4px #0D0D0D;position:relative;z-index:1}
+.fv-barrow{display:grid;grid-template-columns:minmax(7rem,13rem) minmax(5rem,1fr) 5rem 3.5rem 4.5rem;align-items:center;gap:.75rem;width:100%;padding:.35rem .5rem;border-radius:.5rem}
+.fv-barrow-site{grid-template-columns:minmax(7rem,13rem) minmax(5rem,1fr) 5rem 3.5rem}
+.fv-barrow:hover{background:#F7F7F8}
+.fv-bartrack{display:block;height:14px}
+.fv-bartrack>span{display:block;height:100%;min-width:2px;border-radius:0 4px 4px 0;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.fv-barrow:hover .fv-bartrack>span{filter:brightness(.8)}
+#fvPanel{overflow:hidden}
+#fvPanel.fv-present{overflow-x:hidden;overflow-y:auto}
+.fv-stage{transform-origin:var(--fv-o,50% 30%)}
+.fv-zoom-in{animation:fvIn .5s cubic-bezier(.2,.7,.2,1)}
+.fv-zoom-out{animation:fvOut .45s cubic-bezier(.2,.7,.2,1)}
+.fv-fade{animation:fvFade .25s ease}
+@keyframes fvIn{from{opacity:0;transform:scale(.25)}to{opacity:1;transform:none}}
+@keyframes fvOut{from{opacity:0;transform:scale(1.6)}to{opacity:1;transform:none}}
+@keyframes fvFade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.fv-zoom-in,.fv-zoom-out,.fv-fade{animation:none}.fv-bartrack>span{transition:none}}
+.fv-present{position:fixed;inset:0;z-index:70;overflow:auto;border-radius:0;padding:2rem max(2rem,4vw)!important;background:#fff}
+.fv-present .fv-cell{min-height:44px;font-size:13px}
+.fv-present .fv-rowhead{font-size:.95rem}
+@media (max-width:640px){.fv-barrow{grid-template-columns:7rem minmax(4rem,1fr) 4.5rem;gap:.5rem}.fv-barrow>span:nth-child(n+4){display:none}}
+/* 범위 머리(지금 보는 범위) · 범위 꼬리표 · 히트맵 왼쪽 위 칸 */
+.fv-scope{border-left:6px solid #FE0009;padding:.25rem 0 .25rem 1rem}
+.fv-scope-total{border-left-color:#0D0D0D}
+.fv-scope-name{margin:.15rem 0;font-size:clamp(1.75rem,3.2vw,2.5rem);font-weight:700;line-height:1.15;color:#0D0D0D;letter-spacing:-.01em}
+.fv-scope-sub{margin-left:.6rem;padding:.15rem .6rem;border-radius:999px;background:#F2F2F2;font-size:.8rem;font-weight:600;color:#5D5D5D;vertical-align:middle}
+.fv-tag{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .75rem;border-radius:999px;background:#FFF0F0;border:1.5px solid #FE0009;color:#B42318;font-size:.85rem;font-weight:700;white-space:nowrap}
+.fv-tag-total{background:#F2F2F2;border-color:#0D0D0D;color:#0D0D0D}
+.fv-tag-big{padding:.35rem 1rem;font-size:1.15rem}
+.fv-tag-dot{width:.55rem;height:.55rem;border-radius:999px;background:currentColor}
+.fv-headline{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem .8rem;padding-bottom:.9rem;border-bottom:1px solid #E5E5E5}
+.fv-headline-t{font-size:1.5rem;font-weight:700;color:#0D0D0D;letter-spacing:-.01em}
+.fv-corner{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:0 .5rem 4px;border-left:4px solid #0D0D0D}
+.fv-corner-k{font-size:.95rem;font-weight:800;color:#0D0D0D;line-height:1.2}
+.fv-rowcap{grid-column:1/-1;padding:.4rem .5rem .1rem;font-size:.75rem;font-weight:700;color:#5D5D5D;border-top:1px solid #E5E5E5}
+.fv-present .fv-scope-name{font-size:3rem}

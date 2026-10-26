@@ -11,7 +11,7 @@ import { state } from "./state.js"
 import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, unassignedName } from "./views/detail.js"
-import { fcChange, fcClick } from "./forecast_actions.js"
+import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -37,6 +37,14 @@ document.addEventListener("click", async e => {
   if (await fcClick(e)) return;
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
+  // 메인 중장기 전망 패널 → 5번 탭 «한눈에 보기»(전사). 연도가 있으면 그 해 구성으로.
+  const hf = e.target.closest("[data-homefc]");
+  if (hf) {
+    state.fc.site = "__total__";
+    Object.assign(state.fc.viz, hf.dataset.homefc ? {level: "year", year: Number(hf.dataset.homefc)} : {level: "map"});
+    navigate("forecast", {tab: "table"});
+    return;
+  }
   const gy = e.target.closest("[data-goyear]");
   if (gy) { changeYear(gy.dataset.goyear); return; }
   // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
@@ -642,6 +650,7 @@ const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tab
 new MutationObserver(markClickable).observe($("#page"), {childList: true, subtree: true});
 
 document.addEventListener("keydown", e => {
+  if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
   if (e.key === "Escape" && state.helpOpen) {
     state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
   }
