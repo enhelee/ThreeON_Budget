@@ -271,6 +271,63 @@ def init_db(conn):
         base_year TEXT NOT NULL,
         사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 예산과목 TEXT NOT NULL,
         금액 REAL NOT NULL, 사유 TEXT)""")
+    # ── 표준화 방향(예산표준화 V3 «표준화방향» 시트) 반영 — 2026-10-26 ──────────
+    # 팩터를 손익·자본에 따로 걸 수 있게 한다(손익=생산자물가, 자본=건설공사비). 기존 행은 «전체».
+    _ensure_col("forecast_factor", "적용구분", "TEXT")
+    # 지사 연혁 — 연도별 그룹·설비 구성. 양산은 2023년까지 DH, 2024년부터 중대형CHP.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_history(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 시작연도 INTEGER NOT NULL,
+        종료연도 INTEGER, 그룹 TEXT, 설비 TEXT, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장, 시작연도))""")
+    # 구조 변화 — «실적사용시작»만 계산에 쓰인다(그 해 이전 실적은 표준화에서 뺀다). 나머지는 표시용.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_event(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, base_year TEXT NOT NULL,
+        사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 유형 TEXT NOT NULL,
+        예산과목 TEXT, 비고 TEXT)""")
+    # 설비별 정비등급(#1 GT·#2 GT·ST·DH…). 대표 등급은 site_grade 에 따로 둔다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_grade_eq(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL,
+        설비 TEXT NOT NULL, 등급 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 연도, 설비))""")
+    # 산정 규칙 — 방식·대상연도·보정률·차용(지사·등급)·조정액·사유. 등급 '*' = 모든 등급.
+    cur.execute("""CREATE TABLE IF NOT EXISTS benchmark_rule(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
+        등급 TEXT NOT NULL, 방식 TEXT NOT NULL, 연도목록 TEXT, 보정률 REAL,
+        참조지사 TEXT, 참조등급 TEXT, 조정액 REAL, 사유 TEXT,
+        PRIMARY KEY(base_year, 사업장, 예산과목, 등급))""")
+    # 실적 사업의 정기비용 성격(LTSA·CRI·고온부품재생·기타) — 자동 판정을 사람이 고친 것만 둔다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS actual_tag(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL,
+        예산과목 TEXT NOT NULL, 사업명 TEXT NOT NULL, 유형 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 연도, 예산과목, 사업명))""")
+    # 정기계약(LTSA) 연도별 집행계획 — 등급별 표준화가 아니라 계획값을 그대로 쓴다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS regular_contract(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, base_year TEXT NOT NULL,
+        사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 항목 TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 금액 REAL NOT NULL, 비고 TEXT)""")
+    # CRI — MI 가 잡힌 해 + 지급시차 년에 기준단가(물가 환산)를 자동 발생시킨다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS cri_rule(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 짝지사 TEXT,
+        지급시차 INTEGER NOT NULL, 기준단가 REAL NOT NULL, 단가기준연도 INTEGER NOT NULL,
+        활성 INTEGER NOT NULL DEFAULT 1, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장))""")
+    # 투자계획 — 기준연도 이후 투자비는 이 값만 쓴다(표준화·반복 없음).
+    cur.execute("""CREATE TABLE IF NOT EXISTS investment_plan(
+        id INTEGER PRIMARY KEY AUTOINCREMENT, base_year TEXT NOT NULL,
+        사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 금액 REAL NOT NULL, 비고 TEXT)""")
+    # 참고 엑셀(예산표준화 V3)에서 읽은 실적·표준금액 — 앱 계산과 대조하는 기준값.
+    cur.execute("""CREATE TABLE IF NOT EXISTS reference_actual(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL,
+        예산과목 TEXT NOT NULL, 유형 TEXT NOT NULL, 금액 REAL NOT NULL,
+        PRIMARY KEY(base_year, 사업장, 연도, 예산과목, 유형))""")
+    # 전망 설정(키 → 값) — «학습기간»(표준금액에 쓰는 최근 실적 해 수). 백테스트로 고른다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS forecast_setting(
+        base_year TEXT NOT NULL, 키 TEXT NOT NULL, 값 TEXT NOT NULL,
+        PRIMARY KEY(base_year, 키))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS reference_standard(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
+        등급 TEXT NOT NULL, 표준금액 REAL NOT NULL, 엑셀수식 TEXT,
+        PRIMARY KEY(base_year, 사업장, 예산과목, 등급))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS manual_biz(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         year TEXT NOT NULL, budget TEXT NOT NULL,

@@ -31,12 +31,17 @@ from . import db as dbm
 
 # ── 표 이름과 v2 컬럼 ────────────────────────────────────────────────────────
 TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_factor",
-          "forecast_hot_parts", "hq_master", "hq_ratio", "hq_temp", "forecast_surprise")
+          "forecast_hot_parts", "hq_master", "hq_ratio", "hq_temp", "forecast_surprise",
+          # 표준화 방향 반영(2026-10-26) — 아래 SPECS 가 모양을 정한다
+          "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
+          "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
+          "forecast_setting")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
 OVERRIDE_COLS = ["사업장", "예산과목", "등급", "표준금액"]
-FACTOR_COLS = ["팩터명", "연간비율", "활성"]
+FACTOR_COLS = ["팩터명", "연간비율", "활성", "적용구분"]
+FACTOR_SCOPES = ["전체", "손익", "자본"]
 HOT_PARTS_COLS = ["사업장", "연도", "항목", "금액"]
 HQ_MASTER_FIXED_COLS = list(forecast_calc.HQ_MASTER_FIXED_COLS)      # 대분류·중분류·세부내역
 HQ_RATIO_COLS = ["사업장", "계약체결금액"]
@@ -186,7 +191,14 @@ def load_factors(conn, base_year) -> pd.DataFrame:
     rows = _select(conn, "forecast_factor", base_year, FACTOR_COLS, "순서, 팩터명")
     if not rows:
         return save_factors(conn, base_year, pd.DataFrame(DEFAULT_FACTORS))
+    rows = [(*r[:3], _scope(r[3])) for r in rows]
     return _frame(rows, FACTOR_COLS, floats=["연간비율"], bools=["활성"])
+
+
+def _scope(v):
+    """팩터 적용구분 — 없거나 모르는 값은 «전체»(이 열이 생기기 전 행과 v2 CSV)."""
+    s = _s(v)
+    return s if s in FACTOR_SCOPES else "전체"
 
 
 def save_factors(conn, base_year, df: pd.DataFrame) -> pd.DataFrame:
@@ -196,7 +208,8 @@ def save_factors(conn, base_year, df: pd.DataFrame) -> pd.DataFrame:
         if not name or name in seen:
             continue
         seen.add(name)
-        rows.append((name, _f(r["연간비율"]), 1 if _b(r.get("활성", True)) else 0, len(rows)))
+        rows.append((name, _f(r["연간비율"]), 1 if _b(r.get("활성", True)) else 0,
+                     _scope(r.get("적용구분")), len(rows)))
     _replace(conn, "forecast_factor", base_year, FACTOR_COLS + ["순서"], rows)
     return load_factors(conn, base_year) if rows else _frame([], FACTOR_COLS)
 
@@ -309,6 +322,116 @@ def append_surprise_project(conn, base_year, 사업장, 연도, 예산과목, �
 
 
 # ── 기준연도 관리 ─────────────────────────────────────────────────────────────
+# ── 표준화 방향 반영 표 10종 (2026-10-26) ────────────────────────────────────
+# 모양이 «열·형·자연키»만 다른 표들이라 하나의 명세로 읽고 쓴다.
+#   key  : 자연키 열(같은 키는 뒤의 것이 이긴다). None 이면 id 순서를 그대로 둔다.
+#   need : 비면 그 행을 버리는 열.
+EVENT_TYPES = ["실적사용시작", "신규설비", "설비제외", "역무증가"]
+TAG_TYPES = ["기타", "LTSA", "CRI", "고온부품재생"]
+CONTRACT_ITEMS = ["GT LTSA", "연료전지 LTSA", "기타 LTSA"]
+SPECS = {
+    "site_history": dict(cols=["사업장", "시작연도", "종료연도", "그룹", "설비", "비고"],
+                         ints=["시작연도"], opt_ints=["종료연도"], key=["사업장", "시작연도"],
+                         need=["사업장", "시작연도"], order="사업장, 시작연도"),
+    "site_event": dict(cols=["사업장", "연도", "유형", "예산과목", "비고"], ints=["연도"],
+                       key=None, need=["사업장", "연도", "유형"], order="id"),
+    "site_grade_eq": dict(cols=["사업장", "연도", "설비", "등급"], ints=["연도"],
+                          key=["사업장", "연도", "설비"], need=["사업장", "연도", "설비", "등급"],
+                          order="사업장, 연도, 설비"),
+    "benchmark_rule": dict(cols=["사업장", "예산과목", "등급", "방식", "연도목록", "보정률",
+                                 "참조지사", "참조등급", "조정액", "사유"],
+                           opt_floats=["보정률", "조정액"], key=["사업장", "예산과목", "등급"],
+                           need=["사업장", "예산과목", "등급", "방식"], order="사업장, 예산과목, 등급"),
+    "actual_tag": dict(cols=["사업장", "연도", "예산과목", "사업명", "유형"], ints=["연도"],
+                       key=["사업장", "연도", "예산과목", "사업명"],
+                       need=["사업장", "연도", "예산과목", "사업명", "유형"], order="사업장, 연도, 예산과목, 사업명"),
+    "regular_contract": dict(cols=["사업장", "연도", "항목", "예산과목", "금액", "비고"], ints=["연도"],
+                             floats=["금액"], key=None, need=["사업장", "연도", "항목", "예산과목"], order="id"),
+    "cri_rule": dict(cols=["사업장", "짝지사", "지급시차", "기준단가", "단가기준연도", "활성", "비고"],
+                     ints=["지급시차", "단가기준연도"], floats=["기준단가"], bools=["활성"], key=["사업장"],
+                     need=["사업장", "지급시차", "단가기준연도"], order="사업장"),
+    "investment_plan": dict(cols=["사업장", "연도", "금액", "비고"], ints=["연도"], floats=["금액"],
+                            key=None, need=["사업장", "연도"], order="id"),
+    "reference_actual": dict(cols=["사업장", "연도", "예산과목", "유형", "금액"], ints=["연도"], floats=["금액"],
+                             key=["사업장", "연도", "예산과목", "유형"], need=["사업장", "연도", "예산과목", "유형"],
+                             order="사업장, 연도, 예산과목, 유형"),
+    "reference_standard": dict(cols=["사업장", "예산과목", "등급", "표준금액", "엑셀수식"], floats=["표준금액"],
+                               key=["사업장", "예산과목", "등급"], need=["사업장", "예산과목", "등급"],
+                               order="사업장, 예산과목, 등급"),
+}
+
+
+def load_table(conn, base_year, name) -> pd.DataFrame:
+    sp = SPECS[name]
+    rows = _select(conn, name, base_year, sp["cols"], sp["order"])
+    df = _frame(rows, sp["cols"], ints=sp.get("ints", ()), floats=sp.get("floats", ()),
+                bools=sp.get("bools", ()))
+    for c in sp.get("opt_ints", ()):
+        if not df.empty:
+            df[c] = df[c].apply(lambda v: None if v is None or v != v else int(v)).astype(object)
+    for c in sp.get("opt_floats", ()):
+        if not df.empty:
+            df[c] = df[c].apply(lambda v: None if v is None or v != v else float(v)).astype(object)
+    return df
+
+
+def save_table(conn, base_year, name, df: pd.DataFrame) -> pd.DataFrame:
+    sp = SPECS[name]
+    out = {}
+    for n, (_, r) in enumerate(df.iterrows()):
+        if any(_s(r.get(c, "")) == "" for c in sp["need"]):
+            continue
+        vals = []
+        for c in sp["cols"]:
+            v = r.get(c)
+            if c in sp.get("ints", ()):
+                vals.append(_i(v))
+            elif c in sp.get("opt_ints", ()):
+                vals.append(None if _s(v) == "" else _i(v))
+            elif c in sp.get("floats", ()):
+                vals.append(_f(v))
+            elif c in sp.get("opt_floats", ()):
+                vals.append(_f(v, None))
+            elif c in sp.get("bools", ()):
+                vals.append(1 if _b(True if v is None else v) else 0)
+            else:
+                vals.append(_s(v))
+        key = tuple(vals[sp["cols"].index(k)] for k in sp["key"]) if sp["key"] else n
+        out[key] = tuple(vals)
+    _replace(conn, name, base_year, sp["cols"], list(out.values()))
+    return load_table(conn, base_year, name)
+
+
+# ── 설정 (키 → 값) — 백테스트 제안(2026-10-26) ────────────────────────────────
+SETTING_KEYS = {"학습기간": "3"}        # 키 → 기본값(문자열). 백테스트 2021~2025: 최근 3개년이 과목 합계 오차가 가장 작다
+
+
+def load_settings(conn, base_year) -> dict:
+    out = dict(SETTING_KEYS)
+    for k, v in conn.execute("SELECT 키, 값 FROM forecast_setting WHERE base_year=?", (str(base_year),)):
+        if k in SETTING_KEYS:
+            out[k] = v
+    return out
+
+
+def save_settings(conn, base_year, values: dict) -> dict:
+    """알려진 키만 받는다. 기본값과 같은 값도 저장한다(«손댄 것»으로 남는다)."""
+    stored = dict(_select(conn, "forecast_setting", base_year, ["키", "값"], "키"))
+    for k, v in (values or {}).items():
+        if k in SETTING_KEYS and _s(v) != "":
+            stored[k] = _s(v)
+    _replace(conn, "forecast_setting", base_year, ["키", "값"], list(stored.items()))
+    return load_settings(conn, base_year)
+
+
+def learning_window(conn, base_year) -> int:
+    """학습 기간(최근 N개년). 0 = 있는 해 전부."""
+    try:
+        return max(0, int(load_settings(conn, base_year)["학습기간"]))
+    except (TypeError, ValueError):
+        return int(SETTING_KEYS["학습기간"])
+
+
 def list_base_years(conn) -> list:
     """상태가 하나라도 있는 기준연도들(정렬)."""
     years = set()
@@ -344,7 +467,10 @@ _COPY_COLS = {
     "hq_ratio": HQ_RATIO_COLS,
     "hq_temp": HQ_TEMP_COLS,
     "forecast_surprise": SURPRISE_COLS,
+    **{t: sp["cols"] for t, sp in SPECS.items()},
+    "forecast_setting": ["키", "값"],
 }
+_ID_TABLES = ("hq_temp", "forecast_surprise", "site_event", "regular_contract", "investment_plan")
 
 
 def copy_base_year(conn, from_year, to_year):
@@ -354,7 +480,7 @@ def copy_base_year(conn, from_year, to_year):
         raise ValueError("같은 기준연도로는 복사할 수 없습니다.")
     for t in TABLES:
         cols = ",".join(_COPY_COLS[t])
-        order = " ORDER BY id" if t in ("hq_temp", "forecast_surprise") else ""
+        order = " ORDER BY id" if t in _ID_TABLES else ""
         conn.execute(f"DELETE FROM {t} WHERE base_year=?", (str(to_year),))
         conn.execute(f"INSERT INTO {t}(base_year,{cols}) SELECT ?,{cols} FROM {t} WHERE base_year=?{order}",
                      (str(to_year), str(from_year)))

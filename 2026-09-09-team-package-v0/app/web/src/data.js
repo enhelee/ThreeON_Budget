@@ -154,3 +154,11 @@ export async function loadForecastTable() {
   state.fc.table = await api(`/api/forecast/table${fcQuery()}`);
   adoptBase(state.fc.table);
 }
+
+export async function loadForecastCompare() {
+  state.fc.compare = await api(`/api/forecast/compare${fcQuery()}`);
+}
+
+export async function loadForecastRegular() {
+  state.fc.regular = await api(`/api/forecast/regular${fcQuery()}`);
+}
