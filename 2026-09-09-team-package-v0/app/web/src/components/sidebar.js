@@ -32,7 +32,7 @@ export const STAGES = [
    desc: "ERP(zrfm2) 전표를 올려 계획 사업에 자동으로 붙입니다."},
   {no: "03", view: "branches", title: "실적 분석·표준화",
    desc: "지사별 집행률을 확인하고 재배정·수정으로 근거를 확정합니다."},
-  {no: "04", view: "forecast", title: "중장기 전망",
+  {no: "05", view: "forecast", title: "중장기 전망",
    desc: "정비등급별 표준금액으로 10개년 소요를 전망합니다."},
 ]
 

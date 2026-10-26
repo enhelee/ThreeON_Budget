@@ -41,7 +41,7 @@ export async function loadHealth() {
   catch { state.health = null; }
 }
 
-// 이상 알림(급증·예산 초과·음수 실적·미매칭 비중) — 분석 결과를 읽어 규칙으로 고른 목록.
+// 이상 알림(급증·예산 초과·과다 귀속·음수 실적·미매칭 비중) — 분석 결과를 읽어 규칙으로 고른 목록.
 export async function loadAlerts() {
   state.alerts = await api(`/api/alerts?year=${state.year}`);
 }

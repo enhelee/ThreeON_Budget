@@ -1,9 +1,9 @@
-import { charSay } from "../components/characters.js"
+import { charSay, lockedSay } from "../components/characters.js"
 import { yearPicker } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
 
-const ALERT_KINDS = ["급증", "예산 초과", "음수 실적", "미매칭 비중"];
+const ALERT_KINDS = ["급증", "예산 초과", "과다 귀속", "음수 실적", "미매칭 비중"];
 
 /** 이상 알림 — 분석이 끝나면 사람이 먼저 볼 곳을 위험도 순으로. 판단은 사람이 한다(알림은 고르기만). */
 export function alertsPanelHtml() {
@@ -63,6 +63,8 @@ function matchingSay(ds, runs) {
 export function renderCollect() {
   const ds = (state.status?.datasets || []).filter(d => d.kind === "erp" && String(d.year) === String(state.year));
   const runs = state.status?.runs || {};
+  const locked = !!state.status?.locked;
+  const lockAttr = locked ? 'disabled aria-disabled="true" title="마감된 연도 — 설정 탭에서 해제 후 사용"' : "";
   const sums = ["손익", "자본"].map(b => {
     const s = runs[b]?.summary;
     if (!s) return `<article class="metric-card"><p class="text-sm font-semibold text-sub">${b} 매칭</p><p class="mt-3 text-sm text-sub">미실행</p></article>`;
@@ -73,20 +75,18 @@ export function renderCollect() {
   return `
     <div class="space-y-6">
       <section><p class="text-sm font-semibold text-ink">STAGE 2</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적 집계와 사업 매칭</h2></section>
-      ${state.status?.locked
-        ? charSay({who: "gt", tone: "warn", title: `${esc(state.year)}년은 마감(잠금) 상태예요.`, body: "업로드·분석이 차단됩니다. 고치려면 설정 탭에서 마감을 해제하세요."})
-        : matchingSay(ds, runs)}
+      ${locked ? lockedSay("업로드·분석이 차단됩니다.") : matchingSay(ds, runs)}
       <section class="panel p-5">${yearPicker("cp")}</section>
       <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
         <article class="panel p-6"><h3 class="section-title">ERP(zrfm2) 업로드 — <span class="text-ink">${esc(state.year)}년</span>으로 등록</h3>
-          <button class="drop-zone flex w-full flex-col items-center justify-center px-6 text-center hover:border-ink" data-action="pick-erp">
+          <button class="drop-zone flex w-full flex-col items-center justify-center px-6 text-center ${locked ? "cursor-not-allowed opacity-50" : "hover:border-ink"}" data-action="pick-erp" ${lockAttr}>
             <span class="grid h-12 w-12 place-items-center rounded-card bg-white text-ink"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
             <span class="mt-4 font-bold text-ink">zrfm2 Excel(xlsx) 선택</span>
             <span class="mt-1 text-sm text-ink">업로드 즉시 DB로 흡수 · 원본 미보관</span></button>
           <input id="erpFile" class="hidden" type="file" accept=".xlsx">
           <div class="mt-6 flex items-center justify-between rounded-control bg-subtle p-4">
             <div><p class="font-semibold text-ink">자동 매칭 분석 (${esc(state.year)}년)</p><p class="text-xs text-sub">손익·자본을 한 번에 실행합니다 (약 1분) · 학습 DB 자동 적용</p></div>
-            <button class="btn-primary" data-action="analyze">분석 실행</button>
+            <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-40" data-action="analyze" ${lockAttr}>분석 실행</button>
           </div>
         </article>
         <article class="panel p-6"><h3 class="section-title">이 연도의 ERP 데이터셋</h3>

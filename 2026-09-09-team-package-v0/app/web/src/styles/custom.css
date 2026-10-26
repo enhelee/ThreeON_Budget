@@ -197,6 +197,9 @@
 @media print{.help-fab{display:none}}
 /* 작은 도움말 버튼(2.5rem + 오른쪽 1rem) 자리만큼 본문 오른쪽을 비워 표 끝 열이 가려지지 않게 */
 @media (min-width:640px){#page{padding-right:4.5rem}}
+/* 폰 폭(640px 미만)은 오른쪽을 비울 여유가 없다 — 캐릭터를 늘 작게, 반투명으로 두고
+   본문 끝에 그만큼 여백을 줘 마지막 줄 링크(«전체 지사 →» 등)가 가려지지 않게(2026-10-26 Aside 390px). */
+@media (max-width:639px){.help-fab__pill{display:none}.help-fab__img{width:2.25rem;height:2.55rem}.help-fab:not(:hover) .help-fab__img{opacity:.7}#page{padding-bottom:4rem}}
 @media print{#page{padding-right:0}}
 
 /* 5번 탭 중장기 전망 «한눈에 보기» (views/forecast_viz.js) — 히트맵·막대·확대 애니메이션·발표 모드 */

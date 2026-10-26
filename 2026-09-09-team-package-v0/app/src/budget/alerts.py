@@ -9,8 +9,11 @@
   예산 초과  같은 예산·지사·과목에서 실적이 계획을 OVER_MIN 이상 넘었다(계획 있는 것만).
   음수 실적  사업 행의 실적이 −NEG_MIN 이하다(계정대체·취소 전표가 엉뚱한 사업에 붙은 경우가 많다).
   미매칭 비중 계획에 못 붙은 실적(신규 + 미매핑)이 전체의 UNMATCHED_SHARE 이상이다 — 예산별, 그리고 지사별.
+  과다 귀속  계획 사업 한 줄에 연예산의 OVERLOAD_RATIO 배 이상, HIGH_AMT 이상 더 붙었다 — 확신도가 높아도
+             다른 사업 전표가 잘못 붙은 경우가 많다(예: 공조기 필터 3백만 원 계획에 1.2억 원).
 위험도: 금액이 HIGH_AMT(심의대상 기준 5천만 원) 이상이면 «높음», 아니면 «보통».
 """
+from . import matching
 from .config_store import SIMUI_THRESHOLD_THOUSAND
 
 HIGH_AMT = SIMUI_THRESHOLD_THOUSAND          # 50,000천원
@@ -21,8 +24,9 @@ NEG_MIN = 1_000
 UNMATCHED_SHARE = 0.20                       # 예산 전체
 UNMATCHED_SHARE_HIGH = 0.30
 BRANCH_UNMATCHED_SHARE = 0.30                # 지사별(금액 HIGH_AMT 이상만)
+OVERLOAD_RATIO = 3.0
 
-KINDS = ("급증", "예산 초과", "음수 실적", "미매칭 비중")
+KINDS = ("급증", "예산 초과", "과다 귀속", "음수 실적", "미매칭 비중")
 
 
 def _num(v):
@@ -38,10 +42,16 @@ def _is_new(gubun):
 
 
 def _group(lines):
-    """(budget, 지사, 과목) → {"plan", "actual"}."""
+    """(budget, 지사, 과목) → {"plan", "actual"}.
+
+    본사 배정·지사 집행 과목(경상정비)은 지사를 본사 한 줄로 모은다 — 매칭 규칙이 바뀐 해와
+    옛 해(지사별 «신규»)를 비교해도 «전년 실적 없음» 급증이 생기지 않게.
+    """
     out = {}
     for r in lines:
-        k = (r["budget"], r.get("처지사") or "(미매핑)", r.get("예산과목") or "(과목 없음)")
+        item = r.get("예산과목") or "(과목 없음)"
+        dept = matching.HQ_DEPT if item in matching.HQ_ALLOC_ITEMS else (r.get("처지사") or "(미매핑)")
+        k = (r["budget"], dept, item)
         g = out.setdefault(k, {"plan": 0.0, "actual": 0.0})
         g["plan"] += _num(r.get("연예산"))
         g["actual"] += _num(r.get("실적금액"))
@@ -85,6 +95,25 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
             alerts.append({"kind": "급증", "severity": _sev(inc), "budget": budget,
                            "branch": branch, "item": item, "name": None, "amount": round(inc),
                            "text": why})
+
+    # 과다 귀속(계획 사업 행) — 과목에 계획 사업이 하나뿐이면 «예산 초과»와 같은 말이라 뺀다.
+    plan_cnt = {}
+    for r in cur_lines:
+        if r.get("구분") in ("계획집행", "미시행"):
+            k = (r["budget"], r.get("처지사"), r.get("예산과목"))
+            plan_cnt[k] = plan_cnt.get(k, 0) + 1
+    for r in cur_lines:
+        if r.get("구분") != "계획집행":
+            continue
+        if plan_cnt.get((r["budget"], r.get("처지사"), r.get("예산과목")), 0) < 2:
+            continue
+        p, a = _num(r.get("연예산")), _num(r.get("실적금액"))
+        if p > 0 and a >= p * OVERLOAD_RATIO and a - p >= HIGH_AMT:
+            alerts.append({"kind": "과다 귀속", "severity": _sev(a - p), "budget": r["budget"],
+                           "branch": r.get("처지사") or "(미매핑)", "item": r.get("예산과목"),
+                           "name": r.get("사업명"), "amount": round(a - p),
+                           "text": f"계획 {p:,.0f} → 실적 {a:,.0f}천원 ({a / p * 100:,.0f}%) — "
+                                   "다른 사업 전표가 붙었는지 전표를 확인하세요"})
 
     # 음수 실적(사업 행)
     for r in cur_lines:

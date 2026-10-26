@@ -21,7 +21,7 @@ import json
 
 import pandas as pd
 
-from . import benchmark, config_store, forecast_calc, normalize
+from . import benchmark, config_store, forecast_calc, matching, normalize
 from . import db as dbm
 from . import forecast_store as fs
 
@@ -34,6 +34,38 @@ BUDGET_COLS = ["예산과목", DEPT_COL, AMOUNT_COL]
 
 
 # ---------------------------------------------------------------- 입력
+def _run_lines(conn, run_id):
+    """한 실행의 사업 단위 실적 (처지사, 예산과목, 사업명, 금액, 구분).
+
+    본사 배정·지사 집행 과목(경상정비)은 biz_line 이 아니라 전표(match_line)에서 다시 모은다 —
+    매칭이 그 실적을 본사 계획행에 붙여도(matching.HQ_ALLOC_ITEMS) 전망은 지사별 실적이
+    필요하기 때문이다. 전표의 처지사는 지사 그대로라 옛 실행(전부 지사 «신규»)과 새 실행이
+    같은 모양으로 나온다.
+    """
+    alloc = set(matching.HQ_ALLOC_ITEMS)
+    if alloc:
+        marks = ",".join("?" * len(alloc))
+        # 전표 행이 없는 실행(테스트·옛 DB)은 biz_line 그대로 쓴다.
+        if not conn.execute(f"SELECT 1 FROM match_line WHERE run_id=? AND 과목정규 IN ({marks}) LIMIT 1",
+                            (run_id, *alloc)).fetchone():
+            alloc = set()
+    for dept, item, name, amt, gubun in conn.execute(
+            "SELECT 처지사,예산과목,사업명,실적금액,구분 FROM biz_line WHERE run_id=?", (run_id,)):
+        if item not in alloc:
+            yield dept, item, name, amt, gubun
+    if not alloc:
+        return
+    for dept, item, name, gubun, amt in conn.execute(
+            "SELECT m.처지사정규, m.과목정규, m.매칭사업명, m.구분, SUM(e.금액천원)"
+            " FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id"
+            f" WHERE m.run_id=? AND m.과목정규 IN ({marks}) AND m.구분 IN ('계획집행','신규')"
+            " GROUP BY m.처지사정규, m.과목정규, m.매칭사업명, m.구분", (run_id, *alloc)):
+        name = str(name or "")
+        if name.startswith("[신규] "):
+            name = name[len("[신규] "):]
+        yield dept, item, name, amt, gubun
+
+
 def locked_actuals(conn):
     """마감 연도의 최신 분석 결과 → (사업장, 연도, 예산과목, 금액), 쓰인 연도 목록."""
     years_used, rows = [], []
@@ -44,8 +76,7 @@ def locked_actuals(conn):
             if not run:
                 continue
             used = True
-            for dept, item, amt, gubun in conn.execute(
-                    "SELECT 처지사,예산과목,실적금액,구분 FROM biz_line WHERE run_id=?", (run["id"],)):
+            for dept, item, _name, amt, gubun in _run_lines(conn, run["id"]):
                 if gubun in KEEP and amt:
                     rows.append({"사업장": dept, "연도": int(year), "예산과목": item, "금액": float(amt)})
         if used:
@@ -74,8 +105,7 @@ def locked_actuals_detail(conn, base_year):
             if not run:
                 continue
             used = True
-            for dept, item, name, amt, gubun in conn.execute(
-                    "SELECT 처지사,예산과목,사업명,실적금액,구분 FROM biz_line WHERE run_id=?", (run["id"],)):
+            for dept, item, name, amt, gubun in _run_lines(conn, run["id"]):
                 if gubun not in KEEP or not amt:
                     continue
                 acct = normalize.normalize_item(item, alias)

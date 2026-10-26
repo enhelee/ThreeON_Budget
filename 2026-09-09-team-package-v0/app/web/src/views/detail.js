@@ -1,5 +1,5 @@
 import { confBadge, gubunBadge, rateBadge } from "../components/badges.js"
-import { charSay } from "../components/characters.js"
+import { charSay, lockedSay } from "../components/characters.js"
 import { emptyState, pendingBarHtml } from "../components/widgets.js"
 import { realBranches } from "../data.js"
 import { state } from "../state.js"
@@ -7,8 +7,8 @@ import { esc, fmt, fmtRate } from "../util.js"
 
 export const DET_COLS = [
   ["budget", "구분"], ["예산과목", "예산과목"], ["속성", "속성"], ["사업명", "사업명"],
-  // 표는 원 단위(전표 금액과 맞추려고), 위 요약 카드는 천원이다 — 머리글에 단위를 밝힌다.
-  ["연예산원", "연예산(A)·원"], ["실적원", "실적금액(B)·원"], ["집행률", "집행률·사유"],
+  // 화면은 천원으로 통일한다(요약 카드·지사표와 같은 단위). 원 단위는 전표 금액에 마우스를 올리면 보인다.
+  ["연예산원", "연예산(A)·천원"], ["실적원", "실적(B)·천원"], ["집행률", "집행률·사유"],
   ["구분", "상태"], ["확신도", "확신도"],
 ];
 const NCOL = DET_COLS.length + 1;   // + 수정 열
@@ -76,6 +76,18 @@ export function reviewBannerHtml() {
     action: `<button class="btn-secondary" data-action="toggle-lowconf">${d.lowConf ? "전체 보기" : "같이 보기"}</button>`});
 }
 
+/** 지사를 고르기 전 빈 화면 대신 — 집행률이 100%에서 먼 순서로 지사 카드. 누르면 그 지사 상세. */
+function branchPickGrid() {
+  const rows = (state.branches || []).map(r => ({...r, plan: (r.profitPlan || 0) + (r.capitalPlan || 0),
+    actual: (r.profitActual || 0) + (r.capitalActual || 0)})).filter(r => r.plan > 0 || r.actual)
+  if (!rows.length) return ""
+  const gap = r => r.plan > 0 ? Math.abs(r.actual / r.plan * 100 - 100) : Infinity
+  return `<section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${[...rows].sort((a, b) => gap(b) - gap(a)).map(r => `
+    <button class="metric-card text-left hover:border-ink" data-branch="${esc(r.branch)}">
+      <span class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">${esc(r.branch)}</span>${rateBadge(r.plan, r.actual)}</span>
+      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · 검토 ${r.lowConf}건` : ""}</span></button>`).join("")}</section>`
+}
+
 export function renderDetail() {
   const d = state.det;
   const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
@@ -85,6 +97,7 @@ export function renderDetail() {
       <section class="panel p-5"><label class="block max-w-sm"><span class="field-label">지사 선택</span>
       <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
       ${!(state.branches || []).length ? `<div class="mt-4">${charSay({who: "hj", title: "아직 자리를 찾은 전표가 없어요.", body: "분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.", action: `<button class="btn-secondary" data-view="collect">실적 집계로 가기</button>`})}</div>` : ""}</section>
+      ${branchPickGrid()}
     </div>`;
   }
   const locked = !!state.status?.locked;
@@ -106,8 +119,7 @@ export function renderDetail() {
         ${locked ? "" : `<button class="btn-secondary" data-action="toggle-add">＋ 사업 추가</button>`}
       </div></section>
       ${!locked && d.addOpen ? addBizFormHtml() : ""}
-      ${locked ? charSay({who: "gt", tone: "warn", title: `${esc(state.year)}년은 마감(잠금) 상태예요.`,
-        body: "확인이 끝나 잠가 뒀어요. 조회만 가능하고 재배정·수정은 차단됩니다. (설정 탭에서 해제 가능)"}) : ""}
+      ${locked ? lockedSay("조회와 차이 사유 입력만 되고 재배정·수정은 차단됩니다.") : ""}
       <div id="detResults">${detResultsHtml()}</div>
     </div>`;
 }
@@ -207,9 +219,8 @@ export function detResultsHtml() {
       return String(va ?? "").localeCompare(String(vb ?? ""), "ko") * dir;
     });
   }
-  const tot = biz.reduce((a, b) => { a.plan += b.연예산; a.actual += b.실적;
-    a.planWon += b.연예산원; a.actualWon += b.실적원; return a; },
-    {plan: 0, actual: 0, planWon: 0, actualWon: 0});
+  const tot = biz.reduce((a, b) => { a.plan += b.연예산; a.actual += b.실적; return a; },
+    {plan: 0, actual: 0});
   const selCount = d.sel.size;
   const locked = !!state.status?.locked;
 
@@ -237,7 +248,7 @@ export function detResultsHtml() {
         <td class="table-cell cell-doc text-xs text-sub">${esc(v.전표번호 ?? "-")}</td>
         <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
         <td class="table-cell text-right text-xs text-tri">${esc(v.전기일 ?? "")}</td>
-        <td class="table-cell text-right font-medium">${fmt(v.금액원)}</td>
+        <td class="table-cell text-right font-medium" title="${fmt(v.금액원)}원">${fmt(v.금액천원)}</td>
         <td></td>
         <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}${v.근거 ? `<span class="ml-1 block text-[11px] text-sub" title="이 전표가 이 사업에 붙은 이유">${esc(v.근거)}</span>` : ""}</td>
         <td></td></tr>`).join("")
@@ -272,8 +283,8 @@ export function detResultsHtml() {
         <td class="table-cell text-ink cell-item" title="${esc(b.예산과목)}">${esc(b.예산과목)}</td>
         <td class="table-cell text-sub">${esc(b.속성 ?? "-")}</td>
         <td class="table-cell font-semibold text-ink cell-name" title="${esc(b.사업명)}"><span class="flex items-start gap-1"><span class="w-3 shrink-0 text-tri">${b.전표.length ? (open ? "▾" : "▸") : ""}</span><span class="min-w-0">${esc(b.사업명)}</span></span></td>
-        <td class="table-cell text-right">${fmt(b.연예산원)}</td>
-        <td class="table-cell text-right font-semibold">${fmt(b.실적원)}</td>
+        <td class="table-cell text-right">${fmt(b.연예산)}</td>
+        <td class="table-cell text-right font-semibold">${fmt(b.실적)}</td>
         <td class="table-cell text-right">${rateCell(b, key)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
         <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
@@ -331,7 +342,7 @@ export function detResultsHtml() {
           ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 8 ?"text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
           ${locked ? "" : '<th class="text-center">수정</th>'}</tr></thead>
         <tbody class="divide-y divide-line-subtle">${rows}</tbody>
-        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 원)</td><td class="table-cell text-right font-bold">${fmt(tot.planWon)}</td><td class="table-cell text-right font-bold">${fmt(tot.actualWon)}</td><td colspan="4"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
+        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 천원)</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td colspan="4"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
       </section>`;
 }
 

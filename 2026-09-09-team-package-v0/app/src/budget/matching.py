@@ -28,6 +28,14 @@ from . import normalize
 _MATERIAL_RE = re.compile(r"자산화예비품|재생고온부품|저장품|공구와기구")
 
 
+# 본사 배정·지사 집행 과목: 예산은 본사(플랜트기술처)에 한 줄로 잡고 지사가 나눠 쓴다
+# (경상정비 — 사용자 확인 2026-10-26). 지사에 그 과목 계획이 없으면 전표를 본사의 같은 과목
+# 계획 사업에 붙인다. 붙은 실적은 본사 계획행으로 가고, 전표의 처지사(match_line)는 그대로
+# 지사로 남는다 — 10개년 전망은 그 처지사로 지사별 실적을 다시 나눈다(pipeline_forecast).
+HQ_ALLOC_ITEMS = ("수선유지비-열원경상정비",)
+HQ_DEPT = "플랜트기술처"
+
+
 def _is_material(item):
     return bool(item and _MATERIAL_RE.search(str(item)))
 
@@ -92,7 +100,8 @@ def _sim(a, b):
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                   threshold=80, new_policy="group", small_threshold=2000,
                   selected_depts=None, budget_all=None, other_budget_all=None,
-                  overrides=None, learned=None):
+                  overrides=None, learned=None, hq_alloc_items=HQ_ALLOC_ITEMS,
+                  hq_dept=HQ_DEPT):
     """계획행별 실적금액 산출 + 신규사업 집계 + 미반영 분류.
 
     plan_df: 계획본 양식1(월별) 로드 결과(loaders.PLAN_COLUMNS + _row).
@@ -115,6 +124,8 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     learned: {(과목정규, 텍스트정규) -> 사업명} — 과년도 확정 결과 학습 맵.
         대표 텍스트가 학습 키와 일치하면 유사도보다 우선 적용(확신도 0.99).
         같은 그룹에 그 이름의 계획행이 있으면 그 행으로, 신규 클러스터엔 이름 부여.
+    hq_alloc_items, hq_dept: 본사 배정·지사 집행 과목. 지사(과목×지사)에 계획행이 없으면
+        hq_dept 의 같은 과목 계획행을 후보로 쓴다(근거 앞에 «본사 배분»).
 
     반환 dict: plan_rows, new_rows, erp_annotated, unmatched_dept,
                unclassified_item, unreflected_amt, unreflected_by_key.
@@ -211,9 +222,15 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
 
     manual_cnt = 0    # 수동지정(오버라이드) 전표수
     learned_cnt = 0   # 학습 맵으로 확정된 전표수
+    hq_alloc_cnt = 0  # 본사 배정 계획에 붙은 지사 전표수
+    hq_alloc_amt = 0.0
 
     for key, idxs in groups.items():
         candidates = plan_by_key.get(key, [])
+        hq_alloc = False
+        if not candidates and key[0] in (hq_alloc_items or ()) and key[1] != hq_dept:
+            candidates = plan_by_key.get((key[0], hq_dept), [])
+            hq_alloc = bool(candidates)
         # ── 참조전표번호 묶음: 같은 전표번호 = 하나의 내역.
         #    대표 텍스트 = 묶음 내 |금액| 최대 전표의 사업명(본 대금 전표).
         vmap = defaultdict(list)
@@ -350,6 +367,12 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                         best["임의귀속전표수"] += 1
                 attributed[i] = best
                 erp_match_name[i] = best.get("사업명")
+        if hq_alloc:
+            for i in idxs:
+                if attributed.get(i) is not None:
+                    erp_basis[i] = f"본사 배분({hq_dept}) · {erp_basis.get(i) or ''}".rstrip(" ·")
+                    hq_alloc_cnt += 1
+                    hq_alloc_amt += _amt(i)
 
     # 계획행 구분 + 매칭확신도(0~1, 귀속전표 평균 유사도) 확정
     for rec in plan_rows:
@@ -574,4 +597,6 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         "excluded_by_reason": dict(excluded_by_reason),
         "manual_cnt": manual_cnt,
         "learned_cnt": learned_cnt,
+        "hq_alloc_cnt": hq_alloc_cnt,
+        "hq_alloc_amt": round(hq_alloc_amt),
     }

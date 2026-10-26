@@ -359,6 +359,8 @@ def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
             "임의귀속 계획행 실적(천원)": ambiguous_amt,
             "수동지정 전표수": res.get("manual_cnt", 0),
             "학습확정 전표수": res.get("learned_cnt", 0),
+            "본사배분 전표수": res.get("hq_alloc_cnt", 0),
+            "본사배분 실적(천원)": res.get("hq_alloc_amt", 0),
             "미반영(천원)": res.get("unreflected_amt", 0),
         },
     }

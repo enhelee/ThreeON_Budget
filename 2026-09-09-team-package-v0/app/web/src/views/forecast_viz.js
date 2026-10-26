@@ -129,13 +129,19 @@ function mapView(v, m, isTotal, scope) {
     <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-sub">${legend}<span class="ml-3 text-tri">단위 억원 · 칸에 마우스를 올리면 천원</span></div>`
 }
 
+/** 기준연도 값이 어디서 왔는지 — 그 해 계획본이 없으면 표준금액으로 대체된다(forecast 표 notes). */
+export function baseYearRule(t) {
+  if (t?.notes?.budget_plan_missing) return `기준연도 ${t.base_year} = 표준금액(계획본 없음)`
+  return "기준연도 = 계획본 + 본사배분"
+}
+
 // ② 연도 구성 ───────────────────────────────────────────────
 function yearView(v, m, isTotal, scope) {
   const i = Math.max(0, m.years.indexOf(v.year))
   const rows = m.acctRows.map(r => ({key: r.key, val: r.vals[i], prev: i ? r.vals[i - 1] : null})).filter(r => r.val > 0).sort((a, b) => b.val - a.val)
   const tot = m.yearTot[i], max = rows[0]?.val || 1
   const chips = `<div class="flex flex-wrap gap-1.5" role="group" aria-label="연도">${m.years.map(y => `<button class="fv-chip ${y === v.year ? "fv-chip-on" : ""}" data-fvlevel="year" data-fvyear="${y}">${y}</button>`).join("")}</div>`
-  const delta = i ? `<span class="${tot >= m.yearTot[i - 1] ? "text-err" : "text-ok"}">전년 대비 ${pctTxt(pct(tot, m.yearTot[i - 1]))}</span>` : '<span class="text-tri">기준연도 (계획본 + 본사배분)</span>'
+  const delta = i ? `<span class="${tot >= m.yearTot[i - 1] ? "text-err" : "text-ok"}">전년 대비 ${pctTxt(pct(tot, m.yearTot[i - 1]))}</span>` : `<span class="text-tri">${esc(baseYearRule(state.fc.table))}</span>`
   return `
     <div class="fv-headline">${scopeTag(scope, isTotal, true)}<h4 class="fv-headline-t">${v.year}년 예산과목 구성</h4></div>
     <div class="mt-3">${chips}</div>

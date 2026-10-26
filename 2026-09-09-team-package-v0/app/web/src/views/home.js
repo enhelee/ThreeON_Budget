@@ -3,7 +3,7 @@ import { openLockItems } from "../components/lockbanner.js"
 import { STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
-import { fvModel } from "./forecast_viz.js"
+import { fvModel, baseYearRule } from "./forecast_viz.js"
 import { esc, fmt, fmtRate } from "../util.js"
 
 // ─────────────────────────────────────────────────────────────
@@ -187,7 +187,13 @@ function nextActions() {
   const al = state.alerts?.summary;
   if (al?.high) {
     items.push({tone: "warn", view: "collect",
-                text: `이상 알림 높음 ${al.high}건(전체 ${al.total}건) — 예산 초과·음수 실적·미매칭 비중을 실적 집계에서 확인하세요.`})
+                text: `이상 알림 높음 ${al.high}건(전체 ${al.total}건) — 예산 초과·과다 귀속·미매칭 비중을 실적 집계에서 확인하세요.`})
+  }
+  // 차이 사유(집행률 ±20%p) — 마감 뒤에도 입력할 수 있고 보고 때 쓰인다.
+  const varNeed = (state.branches || []).reduce((a, r) => a + Math.max(0, (r.variance || 0) - (r.varianceNoted || 0)), 0)
+  if (varNeed) {
+    items.push({tone: "info", view: "detail",
+                text: `차이 사유 미입력 ${varNeed}건(집행률 ±20%p 사업) — 3+ 상세에서 «사유 입력»으로 적어 두세요.`})
   }
   if (unmapped) {
     items.push({tone: "warn", view: "detail",
@@ -229,16 +235,17 @@ function multiYearPanels() {
     return emptyState("아직 분석 이력이 없습니다. ① 계획 업로드 → ② zrfm2 업로드 → 상단 분석 실행을 눌러주세요.")
   }
   const recent = analyzed.slice(-5)                 // 최근 최대 5개년(오름차순)
-  const maxV = Math.max(1, ...recent.flatMap(r => ["손익", "자본"].flatMap(b =>
-    r[b] ? [r[b].계획, r[b].실적] : [])))
+  // 막대는 손익+자본 합계를 그린다 — 기준(최댓값)도 같은 합계로 잡아야 100%를 넘지 않는다.
+  const tot = (r, k) => (r["손익"]?.[k] || 0) + (r["자본"]?.[k] || 0)
+  const maxV = Math.max(1, ...recent.flatMap(r => [tot(r, "계획"), tot(r, "실적")]))
   return `
   <section class="grid gap-6 xl:grid-cols-[1.05fr_.95fr]">
     <article class="panel p-5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3><p class="section-help">검정=계획 · 초록=실적 (손익+자본, 천원)</p></div><span class="badge bg-subtle text-sub">${recent.length}개 연도</span></div>
       <div class="mt-7 space-y-6">
         ${recent.map(r => {
-          const p = (r["손익"]?.계획 || 0) + (r["자본"]?.계획 || 0)
-          const a = (r["손익"]?.실적 || 0) + (r["자본"]?.실적 || 0)
+          const p = tot(r, "계획")
+          const a = tot(r, "실적")
           return `<div><div class="mb-2 flex items-end justify-between gap-3"><div><span class="font-bold text-ink clickable" data-goyear="${r.year}">${r.year}</span><span class="ml-2 text-xs text-sub">집행률 ${fmtRate(p, a)}</span></div>
           <div class="text-right text-xs text-sub"><span class="font-semibold text-ink">${fmt(p)}</span><span class="mx-1">/</span><span class="font-semibold text-ok">${fmt(a)}</span></div></div>
           <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full bg-ink" style="width:${p / maxV * 100}%"></div></div>
@@ -263,7 +270,7 @@ const eok = v => { const x = v / 1e5; return Math.abs(x) >= 100 ? fmt(x) : x.toF
 function forecastPanel() {
   const t = state.fc.table
   const head = (badge) => `<div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">중장기 소요 전망 ${t ? `${t.years[0]}~${t.years[t.years.length - 1]}` : "10개년"}</h3>
-      <p class="section-help">전사 합계 · 단위 억원 · 기준연도 = 계획본 + 본사배분, 이후 = 표준금액 × 팩터</p></div>
+      <p class="section-help">전사 합계 · 단위 억원 · ${baseYearRule(t)}, 이후 = 표준금액 × 팩터</p></div>
       <div class="flex items-center gap-3">${badge}<button class="text-sm font-semibold text-ink hover:text-brand" data-homefc="">전망 자세히 →</button></div></div>`
   if (!t) return `<section class="panel p-5 sm:p-6">${head("")}<p class="mt-6 text-sm text-tri">${state.fc.homeErr ? "전망을 불러오지 못했습니다 — 5번 탭에서 확인하세요." : "전망을 불러오는 중…"}</p></section>`
   const m = fvModel(t, "", true)
