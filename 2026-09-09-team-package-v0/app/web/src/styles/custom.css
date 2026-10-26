@@ -24,9 +24,11 @@
 .clickable{cursor:pointer}
 .voucher-row td{background:var(--subtle);border-bottom:1px dashed var(--line);padding-top:.4rem;padding-bottom:.4rem}
 .voucher-head td{background:var(--line-subtle);border-bottom:1px solid var(--line);padding-top:.35rem;padding-bottom:.35rem}
-.row-new td{background:var(--warn-bg)}
-.row-missing td{background:var(--err-bg)}
-.row-unmapped td{background:var(--subtle)}
+/* 행 색 — 연한 토큰(err-bg 등)은 흰 바탕과 거의 구별되지 않아(2026-10-26 사용자 지적) 한 단계 진하게 */
+:root{--row-missing:#F9D7D7;--row-missing-line:#C2453D;--row-new:#FDE8A6;--row-new-line:#B07D00;--row-unmapped:#E4E4E8;--row-unmapped-line:#6E6E78}
+.row-new td{background:var(--row-new)}
+.row-missing td{background:var(--row-missing)}
+.row-unmapped td{background:var(--row-unmapped)}
 .edit-row td{background:var(--subtle)}
 .spinner{width:2rem;height:2rem;border-radius:9999px;border:3px solid var(--line);border-top-color:var(--brand);animation:spin .8s linear infinite}
 /* 위험 동작(삭제) — 이 페이지 CSS는 프로토타입에서 컴파일된 유틸리티만 담고 있어
@@ -93,7 +95,7 @@
 .det-table td.text-right{white-space:nowrap}    /* 금액·날짜는 숫자 중간에서 끊기지 않게 */
 .det-table .badge{padding:.12rem .4rem;font-size:.68rem}
 .det-table .voucher-row td,.det-table .voucher-head td{white-space:normal}
-.swatch{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;border:1px solid var(--line);flex:none}
+.swatch{display:inline-block;width:1rem;height:1rem;border-radius:.25rem;border:1.5px solid var(--line-strong);flex:none}
 
 /* ── 로그인 게이트 (Phase 2) ──────────────────────────────────────
    Tailwind 의 .hidden{display:none} 은 #appShell 의 lg:flex 를 이기지 못한다.
@@ -138,15 +140,13 @@
 
 .sidebar-mascot{width:1.75rem;height:1.6rem;margin-left:.15rem;display:inline-block}
 
-/* 사이드바 접기 버튼 — 메뉴 맨 아래. 데스크톱(lg)에서만 보인다(모바일은 드로어라 해당 없음) */
-.sb-toggle{display:none;align-items:center;gap:.75rem;width:100%;min-height:44px;margin-top:.75rem;padding:.625rem .75rem;border:1px solid var(--line);border-radius:12px;background:var(--base);color:var(--sub);font-size:.8125rem;font-weight:600;cursor:pointer}
-.sb-toggle:hover{background:var(--subtle);color:var(--ink)}
-.sb-toggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.sb-toggle__icon{margin-left:.375rem;transition:transform .2s ease}
+/* 데스크톱 사이드바 — 평소 76px 막대(.sb-rail), 마우스를 올리면 본문 위로 288px 펼침(.sb-collapsed 해제).
+   본문은 76px 자리만 비워 두므로 펼쳐도 밀리지 않는다. 모바일(<1024)은 ☰ 드로어 그대로 */
 @media (min-width:1024px){
-  .sb-toggle{display:flex}
-  #sidebar{transition:width .2s ease,padding .2s ease}
-  /* 접힘: 폭 76px — 번호 칩·캐릭터 머리만. 글자는 화면에서만 숨기고 화면낭독기에는 남긴다 */
+  .sb-rail #appShell{padding-left:76px}
+  .sb-rail #sidebar{position:fixed;top:0;left:0;height:100vh;transition:width .18s ease,padding .18s ease,box-shadow .18s ease}
+  .sb-rail:not(.sb-collapsed) #sidebar{box-shadow:var(--shadow-float);z-index:50}
+  /* 접힘: 번호 칩·캐릭터 머리만. 글자는 화면에서만 숨기고 화면낭독기에는 남긴다 */
   .sb-collapsed #sidebar{width:76px;padding-left:.75rem;padding-right:.75rem}
   .sb-collapsed #sidebar .sb-full,
   .sb-collapsed #sidebar .nav-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -156,10 +156,8 @@
   .sb-collapsed #sidebar .nav-button{justify-content:center;padding-left:0;padding-right:0}
   /* 묶음 이름(업무 단계·관리)은 얇은 구분선으로 */
   .sb-collapsed #sidebar .nav-group{height:0;padding:0;margin:.75rem .5rem;border-top:1px solid var(--line);overflow:hidden;color:transparent}
-  .sb-collapsed #sidebar .sb-toggle{justify-content:center;padding-left:0;padding-right:0}
-  .sb-collapsed #sidebar .sb-toggle__icon{margin:0;transform:rotate(180deg)}
 }
-@media (prefers-reduced-motion:reduce){#sidebar,.sb-toggle__icon{transition:none}}
+@media (prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
 /* 표지(로고·ThreeON) — 누르면 메인. 사이드바 맨 위 + 접혔을 때 상단 머리글 */
 .brand-link{background:none;border:0;cursor:pointer;border-radius:12px}
@@ -170,7 +168,7 @@
 .header-brand__mascot{width:1.5rem;height:1.35rem;margin-left:.15rem;display:inline-block}
 /* 머리글 표지와 화면 제목 사이 구분선 */
 .header-brand::after{content:"";align-self:stretch;margin:.25rem 0 .25rem .375rem;border-left:1px solid var(--line)}
-@media (min-width:1024px){.sb-collapsed .header-brand{display:flex}}
+@media (min-width:1024px){.sb-rail .header-brand{display:flex}}
 /* 좁은 데스크톱에서는 설명 줄을 빼고 로고·ThreeON 만 */
 @media (min-width:1024px) and (max-width:1279px){.header-brand__text > span:last-child{display:none}}
 .empty-state__img{width:3.25rem;height:4rem;margin:0 auto;display:block}

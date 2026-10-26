@@ -49,9 +49,9 @@ export function detSortArrow(key) {
 export function guideHtml() {
   if (!state.det.guideOpen) return "";
   return `<div id="detGuide" class="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line bg-subtle px-4 py-2.5 text-xs text-sub">
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--err-bg)"></span>미시행</span>
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--warn-bg)"></span>신규</span>
-    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--subtle)"></span>미매핑(종합표 제외)</span>
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--row-missing);border-color:var(--row-missing-line)"></span><b class="text-ink">분홍</b> 미시행</span>
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--row-new);border-color:var(--row-new-line)"></span><b class="text-ink">노랑</b> 신규</span>
+    <span class="flex items-center gap-1.5"><span class="swatch" style="background:var(--row-unmapped);border-color:var(--row-unmapped-line)"></span><b class="text-ink">회색</b> 미매핑(종합표 제외)</span>
     <span class="flex items-center gap-1.5"><span class="badge bg-warn-bg text-warn">0.80 미만</span>검토 필요</span>
     <span class="flex items-center gap-1.5"><span class="badge bg-warn-bg text-warn">사유 입력</span>집행률 ±20%p</span>
     <span>사업 클릭=전표 · ✎=수정</span>
@@ -311,7 +311,6 @@ export function detResultsHtml() {
       </section>
       ${selCount && !locked ? `<section class="panel sticky top-16 z-10 mt-6 border-line-strong bg-subtle p-4">
         <div class="flex flex-wrap items-end gap-3">
-          <p class="font-bold text-ink">${selCount}건 전표 선택 (${esc(d.selBudget)})</p>
           <label class="block"><span class="field-label text-ink">이동할 지사</span>
             <select id="ovDept" class="control">${ovDeptSel ? "" : '<option value="">— 지사 선택 —</option>'}${realBranches().map(b => `<option value="${esc(b)}" ${b === ovDeptSel ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
           <label class="block min-w-48 flex-1"><span class="field-label text-ink">이동할 사업 선택 <span class="font-bold">(${esc(ovDeptSel || "지사 미선택")} 기준${ovNames ? ` · ${ovNames.length}건` : ""})</span></span><select id="ovTarget" class="control w-full">${targetOpts}</select></label>
@@ -319,7 +318,7 @@ export function detResultsHtml() {
           <button class="btn-primary" data-action="save-override">재배정 저장 (자동 재분석)</button>
           <button class="btn-secondary" data-action="clear-sel">선택 해제</button>
         </div>
-        <p class="mt-2 text-xs text-ink">사업 목록은 <b>이동할 지사</b>의 기존 사업입니다 — 그 지사·처에 이미 있는 사업에 붙이려면 목록에서 고르세요. <b>새 사업</b>으로 옮기려면 <b>'— 선택 없음 —'</b> 그대로 두고 사업명을 직접 입력하면 그 지사의 신규 사업으로 귀속됩니다.</p>
+        <p class="mt-3 px-3 text-sm text-ink"><b>${selCount}건 전표 선택 (${esc(d.selBudget)})</b><span class="ml-2 text-xs text-sub">목록 = 이동할 지사의 기존 사업 · 새 사업은 «선택 없음» 두고 이름 직접 입력</span></p>
         </section>` : ""}
       <section class="panel mt-4 overflow-hidden">
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-2">

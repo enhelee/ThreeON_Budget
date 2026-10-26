@@ -158,6 +158,9 @@ export async function fcClick(e) {
   if (state.view !== "forecast") return false
   const tab = e.target.closest("[data-fctab]")
   if (tab) { state.fc.tab = tab.dataset.fctab; state.fc.preview = null; await navigate("forecast"); return true }
+  // 기준정보 안쪽 탭 — 다시 불러오지 않고 그리기만(손댄 값은 state.fc.data 에 남아 있다)
+  const mtab = e.target.closest("[data-fcmtab]")
+  if (mtab) { state.fc.manageTab = mtab.dataset.fcmtab; renderPage(); return true }
   const add = e.target.closest("[data-fcadd]")
   if (add) {
     const key = add.dataset.fcadd
