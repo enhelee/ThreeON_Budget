@@ -64,7 +64,7 @@ def test_order_high_first_then_amount():
                                L("C", "x", 100_000, 200_000)])           # 초과 10만 → 높음
     assert [a["branch"] for a in found] == ["B", "C", "A"]
     sm = al.summarize(found)
-    assert sm == {"total": 3, "high": 2, "counts": {"급증": 0, "예산 초과": 3, "음수 실적": 0, "미매칭 비중": 0}}
+    assert sm == {"total": 3, "high": 2, "counts": {"급증": 0, "예산 초과": 3, "과다 귀속": 0, "음수 실적": 0, "미매칭 비중": 0}}
 
 
 def test_api_empty_year_and_analyzed_year(srv):

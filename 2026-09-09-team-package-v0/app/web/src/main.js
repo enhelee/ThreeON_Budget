@@ -397,7 +397,11 @@ document.addEventListener("click", async e => {
     const ask = reopened
       ? `${year}년을 다시 마감할까요? 열린 동안의 변경이 이 값으로 굳습니다.`
       : `${year}년을 마감(잠금)할까요? 업로드·분석·재배정·수정이 차단됩니다.`;
-    if (!confirm(ask)) return;
+    // 순서는 «분석 반영 → AI 학습 → 마감». 학습 전에 잠그면 그 해 재배정이 다음 분석에 안 쓰인다.
+    let learnLeft = 0;
+    try { learnLeft = (await api(`/api/pending?year=${encodeURIComponent(year)}`)).learn_pending || 0; } catch { /* 못 세면 묻지 않는다 */ }
+    const warn = learnLeft ? `\n\n⚠ 학습 대기 ${learnLeft}건이 남아 있습니다. 먼저 «AI 학습»을 실행하는 것이 순서입니다.` : "";
+    if (!confirm(ask + warn)) return;
     // 마감은 산출물 6종을 새로 만들어 보관한 뒤 잠근다 — 처음 마감하는 연도는 1분쯤 걸린다
     busy(true, `${year}년 마감 중 — 실적본·재검토본·전표 CSV를 만들어 보관하고 있습니다 (약 1분)`);
     try {
@@ -432,8 +436,23 @@ document.addEventListener("click", async e => {
   const exp = e.target.closest("[data-export]");
   if (exp) {
     // 산출물 파일은 분석 때 만들지 않는다(그래야 수정이 빠름) → 첫 다운로드에서 생성.
-    toast("내보내기 준비 중… 분석 후 첫 다운로드는 파일 생성으로 30초쯤 걸립니다. 잠시 기다려 주세요.");
-    window.location.href = `/api/export?year=${state.year}&budget=${exp.dataset.budget}&kind=${exp.dataset.export}`;
+    //   운영 실측 첫 생성 50~60초 — 주소 이동으로 받으면 그동안 화면에 아무 표시가 없어 고장처럼 보인다.
+    busy(true, "내보내기 파일을 만드는 중 — 분석 후 첫 다운로드는 1분 가까이 걸립니다");
+    try {
+      const res = await fetch(`/api/export?year=${encodeURIComponent(state.year)}&budget=${encodeURIComponent(exp.dataset.budget)}&kind=${encodeURIComponent(exp.dataset.export)}`);
+      if (!res.ok) {
+        let msg = res.statusText;
+        try { msg = (await res.json()).detail || msg; } catch {}
+        throw new Error(msg);
+      }
+      const cd = res.headers.get("content-disposition") || "";
+      const m = /filename\*=utf-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
+      const url = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement("a"), {href: url, download: m ? decodeURIComponent(m[1]) : "export"});
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) { toast(`내보내기 실패 — ${err.message}`); }
+    finally { busy(false); }
   }
   const delOv = e.target.closest("[data-del-override]");
   if (delOv) {
@@ -533,7 +552,7 @@ document.addEventListener("change", async e => {
     busy(true, "지사 상세 로딩...");
     try { await loadDetail(e.target.value); } catch (err) { toast(err.message); }
     finally { busy(false); }
-    renderPage(); return;
+    syncHash(); renderPage(); return;
   }
   if (det === "budget") { state.det.budget = e.target.value; renderPage(); }
   if (det === "item") { state.det.item = e.target.value; renderPage(); }

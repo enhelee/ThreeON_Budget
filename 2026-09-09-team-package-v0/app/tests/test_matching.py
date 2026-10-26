@@ -231,3 +231,34 @@ def test_critical_point_keyword_autoconfirms():
     assert row["실적금액"] == 10000.0
     assert row["매칭확신도"] == 1.0     # 크리티칼 키워드 자동확정
     assert len(res["new_rows"]) == 0    # 신규로 새지 않음
+
+
+def test_hq_alloc_item_branch_vouchers_go_to_hq_plan():
+    """경상정비: 예산은 본사(플랜트기술처)에 잡고 지사가 나눠 쓴다(2026-10-26).
+    지사에 그 과목 계획이 없으면 본사 계획 사업에 붙고, 전표의 처지사는 지사로 남는다."""
+    item = "수선유지비-열원경상정비"
+    erp = pd.DataFrame([
+        {"계정코드": "60909007", "예산과목원문": item, "연도": "2025", "전표번호": "K1",
+         "금액원": 6_000_000_000, "금액천원": 6_000_000.0,
+         "사업명": "2025년중대형CHP경상정비공사", "지사원문": "화성지사"},
+        {"계정코드": "60909007", "예산과목원문": item, "연도": "2025", "전표번호": "K2",
+         "금액원": 400_000_000, "금액천원": 400_000.0,
+         "사업명": "2024년도DH지사경상정비공사", "지사원문": "용인지사"},
+    ])
+    plan = pd.DataFrame([
+        {"_row": 1, "예산과목": item, "처지사": "플랜트기술처", "사업명": "중대형CHP 경상정비 공사", "연예산": 30_000_000.0},
+        {"_row": 2, "예산과목": item, "처지사": "플랜트기술처", "사업명": "DH 경상정비 공사", "연예산": 3_000_000.0},
+    ])
+    pl = {item}
+    res = matching.match_actuals(plan, _erp_norm(erp), pl, pl, set(), threshold=80)
+    by = {r["사업명"]: r for r in res["plan_rows"]}
+    assert by["중대형CHP 경상정비 공사"]["실적금액"] == 6_000_000.0
+    assert by["DH 경상정비 공사"]["실적금액"] == 400_000.0
+    assert res["new_rows"] == []
+    assert res["hq_alloc_cnt"] == 2
+    ann = res["erp_annotated"]
+    assert list(ann["처지사정규"]) == ["화성지사", "용인지사"]       # 전망은 이 처지사로 지사별 실적을 나눈다
+    assert all(str(b).startswith("본사 배분(플랜트기술처)") for b in ann["매칭근거"])
+    # 규칙을 끄면 예전처럼 지사 신규
+    res0 = matching.match_actuals(plan, _erp_norm(erp), pl, pl, set(), threshold=80, hq_alloc_items=())
+    assert {r["처지사"] for r in res0["new_rows"]} == {"화성지사", "용인지사"}

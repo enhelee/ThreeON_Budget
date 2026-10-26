@@ -2,7 +2,7 @@ import { charSay } from "../components/characters.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
-import { fcVizHtml } from "./forecast_viz.js"
+import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 
 // ─────────────────────────────────────────────────────────────
 // 5번 탭 — 예산 표준화(3단계) · 중장기 전망(4단계)  (#/forecast)
@@ -72,7 +72,7 @@ function header() {
   return `
   <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
     <div>
-      <p class="text-sm font-semibold text-ink">STAGE 03 · 04</p>
+      <p class="text-sm font-semibold text-ink">STAGE 5</p>
       <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 표준화 · 중장기 전망</h2>
     </div>
     <div class="flex flex-wrap items-end gap-2">
@@ -384,7 +384,7 @@ function benchStd() {
   const ed = state.fc.benchEdits
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
-    ? `마감 연도 <b>${esc(b.years_used.join("·"))}</b> · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)}천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
+    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)}천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
     : '<span class="text-warn">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
   return `
   <article class="panel overflow-hidden">
@@ -445,7 +445,7 @@ function tableBody() {
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">${esc(t.base_year)}~${esc(String(t.years[t.years.length - 1]))}년 소요 전망 · <span class="text-ink">${site === TOTAL ? "전사 합계" : esc(site)}</span></h3>
-      <p class="section-help">기준연도 = 계획본 + 본사배분 · 이후 = 표준금액 × 팩터 · 단위 천원 · 판단은 지사 3년 누적·과목 합계로${ohy.length ? ` · A급정비(외주비-열원정기점검) 일정 ${esc(ohy.filter(y => y >= Number(t.base_year)).join("·") || "기간 안 없음")}` : ""}</p>
+      <p class="section-help">${baseYearRule(t)} · 이후 = 표준금액 × 팩터 · 단위 천원 · 판단은 지사 3년 누적·과목 합계로${ohy.length ? ` · A급정비(외주비-열원정기점검) 일정 ${esc(ohy.filter(y => y >= Number(t.base_year)).join("·") || "기간 안 없음")}` : ""}</p>
       ${notes.map(([tone, msg]) => `<p class="mt-2 rounded-control ${tone ==="warn" ? "bg-warn-bg text-warn" : "bg-subtle text-sub"} px-3 py-2 text-xs">${msg}</p>`).join("")}
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <label class="block"><span class="field-label">지사</span>
@@ -475,6 +475,13 @@ function criPanel(t, site) {
       <tbody class="divide-y divide-line-subtle">${ev.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${r.MI연도}</td><td class="table-cell">${r.반출연도}</td><td class="table-cell">${esc(r.짝지사)}</td><td class="table-cell">${r.지급연도}</td><td class="table-cell text-right">${fmt(r.금액)}</td></tr>`).join("")}</tbody></table></div>`
       : '<p class="p-5 text-sm text-sub">전망 기간에 잡힌 CRI 가 없습니다 — CRI 규칙과 미래 MI 일정을 확인하세요.</p>'}
   </article>`
+}
+
+/** «2016(참고)…2022(참고)» → « · 참고 실적 2016~2022» (연도 순, 마감 연도와 나눠 읽게). */
+function refYears(used) {
+  const ys = (used || []).filter(y => String(y).endsWith("(참고)")).map(y => parseInt(y, 10)).sort((a, b) => a - b)
+  if (!ys.length) return ""
+  return ` · 참고 실적 ${ys[0]}${ys.length > 1 ? `~${ys[ys.length - 1]}` : ""}`
 }
 
 export function renderForecast() {

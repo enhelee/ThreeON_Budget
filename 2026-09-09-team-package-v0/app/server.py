@@ -546,7 +546,22 @@ def status(year: str):
             items_cfg[b] = [_norm.normalize_item(x["과목"], item_alias) for x in cfg
                             if config_store.to_bool(x.get("포함"), True)
                             and config_store.to_bool(x.get("실적반영"), True)]
+        # 계획 데이터셋 합계와 분석에 쓰인 계획이 다른 이유 — 분석 대상이 아닌 과목(건설공사 외주비 등).
+        #   1단계 화면이 «173억 올렸는데 왜 164억?»에 답하도록 과목별 제외액을 같이 준다.
+        plan_scope = None
+        plan_ds = next((d for d in ds if d["kind"] == "plan" and str(d["year"]) == str(year)), None)
+        if plan_ds:
+            in_scope = set(items_cfg["손익"]) | set(items_cfg["자본"])
+            excluded = {}
+            for item, amt in conn.execute(
+                    "SELECT 예산과목, SUM(연예산) FROM plan_row WHERE dataset_id=? GROUP BY 예산과목",
+                    (plan_ds["id"],)).fetchall():
+                if _norm.normalize_item(item, item_alias) not in in_scope and amt:
+                    excluded[item] = float(amt)
+            plan_scope = {"total": float(plan_ds.get("total_amount") or 0),
+                          "excluded": dict(sorted(excluded.items(), key=lambda kv: -kv[1]))}
         return _clean_json({
+            "plan_scope": plan_scope,
             "year": year, "years": years,
             "datasets": ds[:10],
             "locked": dbm.is_locked(conn, year),

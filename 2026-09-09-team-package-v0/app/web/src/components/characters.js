@@ -116,6 +116,12 @@ export function charSay({who, title, body = "", action = "", tone = "", compact 
   </section>`
 }
 
+/** 마감 연도 안내 — 1·2·3+ 화면이 같은 모양·같은 말로 쓴다. blocked = 그 화면에서 막히는 일. */
+export function lockedSay(blocked) {
+  return charSay({who: "gt", tone: "warn", title: `${state.year}년은 마감(잠금) 상태예요.`,
+    body: `${blocked} 고치려면 설정 탭에서 마감을 해제하세요.`});
+}
+
 // ── 도움말 — 오른쪽 아래 매칭이. 누르면 지금 화면에서 할 일 세 줄 ─────────────
 // 내용은 docs/팀원_실행가이드.md 「한 해를 돌리는 순서」를 화면별로 나눈 것이다.
 export const HELP = {
