@@ -8,6 +8,7 @@ Phase 6-6. server.py 는 1,480줄이라 여기에 300줄을 더 얹지 않는다
 기준연도(base_year)는 마감 대상이 아니다 — 마감은 분석 연도(2023·2025)의 개념이고
 전망 상태는 «어느 해에 세운 가정인가»다. 그래서 마감 가드가 없다.
 """
+import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
@@ -15,7 +16,7 @@ from pydantic import BaseModel
 import pandas as pd
 
 from . import config_store, forecast_export, forecast_import, forecast_store as fs, invest_type, ml_registry, pipeline_forecast as pf
-from . import db as dbm
+from . import db as dbm, uploads
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -59,6 +60,39 @@ class RowsReq(BaseModel):
 
 def _frame(rows, cols):
     return pd.DataFrame(rows, columns=cols) if not rows else pd.DataFrame(rows)
+
+
+# ── 표준화·전망 결과 캐시 ────────────────────────────────────────────────
+# 전망 표는 계산이 무겁다(운영 6초 중 서버 계산 ~3.5초 — Render 무료 CPU). 입력(마감 실적·
+# 전망 가정·구성)이 바뀌지 않았으면 같은 답이므로 저장해 두고 다시 쓴다.
+# «바뀌었는가»의 근거는 audit_log 의 최신 id 다 — 이 앱의 모든 쓰기(POST/PUT/PATCH/DELETE
+# /api/*)는 응답이 나가기 전에 감사 로그를 남기므로(AuthAuditMiddleware), 쓰기가 한 번이라도
+# 있으면 키가 바뀌어 다시 계산된다. 감사 기록이 실패하는 드문 경우를 위해 10분이 지나면
+# 어차피 다시 계산한다. 키는 계산 «전»에 읽는다 — 계산 중 들어온 쓰기는 다음 요청이 반영한다.
+# 프로세스 메모리에만 둔다(재시작·배포 때 비워짐).
+_VIEW_CACHE = {}
+VIEW_CACHE_TTL = 600
+_VIEW_CACHE_MAX = 16
+
+
+def _data_version(conn):
+    return conn.execute("SELECT MAX(id) FROM audit_log").fetchone()[0] or 0
+
+
+def _cached_view(kind, conn, base_year, compute):
+    # DB 가 바뀌면(테스트의 임시 DB · 지역 이전 후 새 DATABASE_URL) 다른 답이다.
+    db_id = dbm.dbcore.database_url() or dbm.DEFAULT_DB
+    key = (db_id, kind, str(base_year))
+    ver = _data_version(conn)
+    hit = _VIEW_CACHE.get(key)
+    now = time.monotonic()
+    if hit and hit[0] == ver and now - hit[1] < VIEW_CACHE_TTL:
+        return hit[2]
+    out = compute()
+    if len(_VIEW_CACHE) >= _VIEW_CACHE_MAX:
+        _VIEW_CACHE.pop(min(_VIEW_CACHE, key=lambda k: _VIEW_CACHE[k][1]))
+    _VIEW_CACHE[key] = (ver, now, out)
+    return out
 
 
 def make_router(conn_factory, clean_json) -> APIRouter:
@@ -112,11 +146,18 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         finally:
             conn.close()
 
+    # 조회 셋(state·benchmark·table)은 base_year 를 비우면 서버가 기본 기준연도(/base-years 의
+    # default 와 같은 함수)를 쓴다. 화면이 첫 진입에 «기준연도 → 가정 → 표»를 차례로 기다리지 않고
+    # 셋을 동시에 부를 수 있게 하려는 것이다(운영 실측 2026-10-15: 2.0 + 1.5 + 6.2초 순차 = 탭 10초).
+    # 응답마다 base_year 가 실려 화면이 어느 해로 계산됐는지 안다.
+    def _base(conn, base_year):
+        return base_year or pf.default_base_year(conn)
+
     @router.get("/state")
-    def get_state(base_year: str):
+    def get_state(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(_state(conn, base_year))
+            return clean_json(_state(conn, _base(conn, base_year)))
         finally:
             conn.close()
 
@@ -144,7 +185,7 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         """엑셀 → 파싱 결과만. 저장은 화면이 미리보기를 확인한 뒤 PUT 으로."""
         if kind not in IMPORTERS:
             raise HTTPException(400, "kind 는 grades·schedule·hot-parts·hq-master 중 하나여야 합니다.")
-        data = await file.read()
+        data = await uploads.read_upload(file)
         conn = conn_factory()
         try:
             sites = pf.forecast_sites(conn, base_year)
@@ -163,18 +204,20 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             raise HTTPException(400, f"엑셀을 읽지 못했습니다: {e}")
 
     @router.get("/benchmark")
-    def benchmark(base_year: str):
+    def benchmark(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_benchmark(conn, base_year))
+            by = _base(conn, base_year)
+            return _cached_view("benchmark", conn, by, lambda: clean_json(pf.run_benchmark(conn, by)))
         finally:
             conn.close()
 
     @router.get("/table")
-    def table(base_year: str):
+    def table(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(pf.run_forecast(conn, base_year))
+            by = _base(conn, base_year)
+            return _cached_view("table", conn, by, lambda: clean_json(pf.run_forecast(conn, by)))
         finally:
             conn.close()
 
@@ -237,12 +280,14 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         """«실적 분석» 엑셀(사업마다 투자유형이 붙은 것) 여러 개 → 학습데이터(사람 확정) → 두 모델 재학습."""
         import os
         import tempfile
+        # 크기 상한·압축 폭탄 검사는 다른 업로드와 같이(uploads.read_upload) — 넘으면 413/400 그대로
+        datas = [(f, await uploads.read_upload(f)) for f in file]
         tmps = []
         try:
-            for f in file:
+            for f, data in datas:
                 fd, tmp = tempfile.mkstemp(suffix=".xlsx")
                 with os.fdopen(fd, "wb") as out:
-                    out.write(await f.read())
+                    out.write(data)
                 # 파일 이름의 «(25년) 손익» 으로 연도·예산을 읽으므로 원래 이름을 붙여 둔다
                 named = os.path.join(os.path.dirname(tmp), f"{os.path.basename(tmp)}_{os.path.basename(f.filename)}")
                 os.replace(tmp, named)

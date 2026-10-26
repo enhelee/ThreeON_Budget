@@ -135,6 +135,15 @@ def test_api_import_rejects_unlabeled_workbook(client, tmp_path):
     assert r.status_code == 400
 
 
+def test_api_import_labels_obeys_upload_cap(client, tmp_path, monkeypatch):
+    from budget import uploads
+    monkeypatch.setattr(uploads, "MAX_UPLOAD_BYTES", 1000)
+    p = _book(tmp_path / "(24년) 자본예산 실적 분석_c.xlsx", [_row(i, "기계장치", f"사업 {i}", i, "정기점검") for i in range(40)])
+    XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    r = client.post("/api/forecast/invest-type/import-labels", files=[("file", ("x.xlsx", open(p, "rb").read(), XLSX))])
+    assert r.status_code == 413, r.text
+
+
 def test_ui_has_invest_type_tab():
     src = os.path.join(APP_DIR, "web", "src")
     view = open(os.path.join(src, "views", "forecast.js"), encoding="utf-8").read()
