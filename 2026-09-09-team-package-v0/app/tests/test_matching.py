@@ -262,3 +262,19 @@ def test_hq_alloc_item_branch_vouchers_go_to_hq_plan():
     # 규칙을 끄면 예전처럼 지사 신규
     res0 = matching.match_actuals(plan, _erp_norm(erp), pl, pl, set(), threshold=80, hq_alloc_items=())
     assert {r["처지사"] for r in res0["new_rows"]} == {"화성지사", "용인지사"}
+
+
+def test_override_matches_plan_name_with_trailing_space():
+    """계획 사업명 끝 공백 — API 가 strip 한 재배정 이름도 그 계획 사업에 붙는다(신규로 새지 않는다)."""
+    item = "기계장치"
+    erp = pd.DataFrame([{"_erp_row": 7, "계정코드": "20703001", "예산과목원문": item, "연도": "2025",
+                         "전표번호": "D1", "금액원": 234_714_000, "금액천원": 234_714.0,
+                         "사업명": "대구지사축열조#2상부보수공사", "지사원문": "대구지사"}])
+    plan = pd.DataFrame([
+        {"_row": 1, "예산과목": item, "처지사": "대구지사", "사업명": "대구지사 축열조 #2 상부 보수공사 ", "연예산": 300_000.0},
+        {"_row": 2, "예산과목": item, "처지사": "대구지사", "사업명": "대구지사 다른 사업", "연예산": 100_000.0},
+    ])
+    res = matching.match_actuals(plan, _erp_norm(erp), {item}, set(), {item}, threshold=80,
+                                 overrides={7: "대구지사 축열조 #2 상부 보수공사"})
+    assert res["new_rows"] == []
+    assert res["plan_rows"][0]["실적금액"] == 234_714.0

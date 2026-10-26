@@ -36,6 +36,15 @@ HQ_ALLOC_ITEMS = ("수선유지비-열원경상정비",)
 HQ_DEPT = "플랜트기술처"
 
 
+def _same_name(a, b):
+    """사업명 비교 — 공백 차이는 같은 이름으로 본다. 계획본에는 끝에 공백이 붙은 사업명이 있고
+    재배정 API 는 대상 이름을 strip 한다 → 정확 비교면 계획 사업에 못 붙고 같은 이름의 신규가 됐다
+    (2026-10-27 운영 보정사전 재배정 21개 전표)."""
+    if a is None or b is None:
+        return False
+    return " ".join(str(a).split()) == " ".join(str(b).split())
+
+
 def _is_material(item):
     return bool(item and _MATERIAL_RE.search(str(item)))
 
@@ -254,7 +263,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             # ── 수동 재배정(오버라이드): 묶음 전체를 지정 사업으로.
             if vg["수동지정"]:
                 target = vg["수동지정"]
-                prec = next((p for p in candidates if p.get("사업명") == target), None)
+                prec = next((p for p in candidates if _same_name(p.get("사업명"), target)), None)
                 manual_cnt += len(vg["rows"])
                 if prec is not None:
                     for i in vg["rows"]:
@@ -264,7 +273,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                         prec["매칭전표수"] += 1
                         prec["_점수합"] += 100.0
                         attributed[i] = prec
-                        erp_match_name[i] = target
+                        erp_match_name[i] = prec.get("사업명")
                 else:
                     # 지정 이름의 계획행이 없음 → 그 이름의 신규 사업으로 강제
                     for i in vg["rows"]:
@@ -279,7 +288,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             #    learn_key = 회차·월·연도 마커 제거 → 반복 기성·월별이 한 번 확정되면 매년 자동확정.
             lname = learned.get((key[0], normalize.learn_key(rep_name)))
             if lname:
-                prec = next((p for p in candidates if p.get("사업명") == lname), None)
+                prec = next((p for p in candidates if _same_name(p.get("사업명"), lname)), None)
                 if prec is not None:
                     learned_cnt += len(vg["rows"])
                     for i in vg["rows"]:
