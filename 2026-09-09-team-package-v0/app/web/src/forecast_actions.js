@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastState, loadForecastType } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -177,6 +177,23 @@ export async function fcClick(e) {
     window.location.href = `/api/forecast/export?kind=${ex.dataset.fcexport}&base_year=${state.fc.baseYear}`
     return true
   }
+  // 투자유형별 탭 — 숫자 칸을 누르면 그 (연도,유형) 사업 목록을 펼친다. 같은 칸을 다시 누르면 닫는다.
+  const it = e.target.closest("[data-ittype]")
+  if (it) {
+    const open = state.fc.typeOpen, type = it.dataset.ittype, year = it.dataset.ityear
+    if (open && open.type === type && String(open.year) === year) { state.fc.typeOpen = null; renderPage(); return true }
+    state.fc.typeOpen = {type, year, rows: null}; renderPage()
+    try {
+      const r = await api(`/api/forecast/invest-type/rows?year=${encodeURIComponent(year)}&type=${encodeURIComponent(type)}`)
+      if (state.fc.typeOpen && state.fc.typeOpen.type === type) { state.fc.typeOpen.rows = r.rows; renderPage() }
+    } catch (err) { state.fc.typeOpen = null; toast(err.message); renderPage() }
+    return true
+  }
+  if (e.target.closest("[data-itexport]")) {
+    toast("투자유형별 엑셀을 만드는 중…")
+    window.location.href = `/api/forecast/invest-type/export?base_year=${state.fc.baseYear}`
+    return true
+  }
   const imp = e.target.closest("[data-fcimport]")
   if (imp) {
     const input = $("#fcImportFile")
@@ -191,6 +208,8 @@ export async function fcClick(e) {
   if (act === "fc-apply-merge") { await applyPreview("merge"); return true }
   if (act === "fc-apply-replace") { await applyPreview("replace"); return true }
   if (act === "fc-cancel-preview") { state.fc.preview = null; renderPage(); return true }
+  if (act === "it-import") { $("#itImportFile").click(); return true }
+  if (act === "it-close") { state.fc.typeOpen = null; renderPage(); return true }
   return false
 }
 
@@ -205,6 +224,22 @@ export async function fcChange(e) {
     const f = t.files[0], kind = t.dataset.kind
     t.value = ""
     if (f && kind) await uploadPreview(kind, f)
+    return true
+  }
+  if (t.id === "itImportFile") {
+    const files = [...t.files]
+    t.value = ""
+    if (!files.length) return true
+    busy(true, `실적 분석 엑셀 ${files.length}개에서 투자유형 라벨을 읽고 다시 학습하는 중… (수십 초)`)
+    try {
+      const fd = new FormData()
+      for (const f of files) fd.append("file", f)
+      const r = await api("/api/forecast/invest-type/import-labels", {method: "POST", body: fd})
+      const m = r.trained?.["투자유형_사업명"] || {}
+      toast(`라벨 ${r.rows.toLocaleString()}행 — 새로 ${r.added.투자유형.inserted}건 · 고침 ${r.added.투자유형.updated}건${m.version ? ` · 모델 v${m.version} (교차검증 ${m.cv_accuracy == null ? "-" : Math.round(m.cv_accuracy * 100) + "%"})` : ""}`)
+      await loadForecastType(); renderPage()
+    } catch (err) { toast(err.message) }
+    finally { busy(false) }
     return true
   }
   if (t.matches("[data-fcgroup]")) { state.fc.benchGroup = t.value; renderPage(); return true }
