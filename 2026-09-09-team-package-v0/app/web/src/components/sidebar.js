@@ -60,7 +60,7 @@ export function renderSidebar() {
 
     <div class="rounded-card border border-line bg-subtle p-4">
       <div class="flex items-center gap-2 text-sm font-semibold text-ink">
-        <span class="h-2 w-2 rounded-full bg-ok" aria-hidden="true"></span>사내망 · 백엔드 DB 저장
+        <span class="h-2 w-2 rounded-full bg-ok" aria-hidden="true"></span>서버 DB 저장
       </div>
       <p class="mt-2 text-xs leading-5 text-sub">업로드 자료는 서버 DB에만 저장되고 원본 파일은 남지 않습니다. 화면에는 분석 결과만 표출됩니다.</p>
     </div>`

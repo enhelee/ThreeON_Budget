@@ -209,3 +209,36 @@ def test_export_longterm_contains_forecast_numbers(client):
                if str(ws.cell(row=r_, column=2).value or "").strip() == "열원경상정비")
     col_2026 = next(c for c in range(1, ws.max_column + 1) if ws.cell(row=4, column=c).value == 26)
     assert ws.cell(row=row, column=col_2026).value == pytest.approx(1200.0 / 1000)   # 천원 → 백만원
+
+
+def test_view_apis_without_base_year_use_server_default(client):
+    """base_year 를 비우면 /base-years 의 default 로 계산한다 — 화면이 첫 진입에 메타·가정·표를
+    동시에 부를 수 있게(순차 대기 2.0+1.5+6.2초 = 탭 10초, 2026-10-15 운영 실측)."""
+    default = client.get("/api/forecast/base-years").json()["default"]
+    for path in ("/api/forecast/state", "/api/forecast/table", "/api/forecast/benchmark"):
+        bare = client.get(path)
+        assert bare.status_code == 200, path
+        assert bare.json()["base_year"] == default, path
+        assert bare.json() == client.get(f"{path}?base_year={default}").json(), path
+
+
+def test_view_cache_reuses_until_any_write_or_ttl(client, monkeypatch):
+    """전망 표·표준화 결과 캐시 — 입력이 그대로면 다시 계산하지 않고, 쓰기가 한 번이라도
+    있으면(감사 로그 id 가 바뀌면) 다시 계산하며, TTL 이 지나도 다시 계산한다.
+    운영에서 전망 표 6초 중 ~3.5초가 서버 계산이다(Render 무료 CPU, 2026-10-18 실측)."""
+    from budget import api_forecast, pipeline_forecast as pf
+    calls = []
+    orig = pf.run_forecast
+    monkeypatch.setattr(pf, "run_forecast", lambda c, by: calls.append(by) or orig(c, by))
+    first = client.get("/api/forecast/table?base_year=2026").json()
+    assert client.get("/api/forecast/table?base_year=2026").json() == first
+    assert len(calls) == 1                                    # 두 번째는 캐시
+
+    client.put("/api/forecast/state/factors", json={"base_year": "2026", "rows": [
+        {"팩터명": "물가상승률", "연간비율": 0.05, "활성": True}]})
+    client.get("/api/forecast/table?base_year=2026")
+    assert len(calls) == 2                                    # 쓰기 뒤에는 다시 계산
+
+    monkeypatch.setattr(api_forecast, "VIEW_CACHE_TTL", 0)
+    client.get("/api/forecast/table?base_year=2026")
+    assert len(calls) == 3                                    # TTL 지나면 다시 계산

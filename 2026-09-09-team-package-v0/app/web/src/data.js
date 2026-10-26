@@ -8,11 +8,30 @@ export function realBranches() {
 }
 
 export async function loadOverview() {
-  state.overview = (await api("/api/overview")).years;   // 오름차순 [{year, 손익:{}, 자본:{}}]
+  applyOverview((await api("/api/overview")).years);
+}
+
+function applyOverview(rows) {
+  state.overview = rows;   // 오름차순 [{year, 손익:{}, 자본:{}}]
   const ys = state.overview.map(r => r.year);
   for (const y of ys) if (!state.years.includes(y)) state.years.push(y);
   state.years.sort((a, b) => String(b).localeCompare(String(a)));
   if (!state.year) state.year = state.years[0] || String(new Date().getFullYear());
+}
+
+// 화면 전환 공통 3종(연도 목록·미반영 건수·열린 연도)을 요청 하나로 — DB 연결 3번 → 1번.
+// 연도가 아직 없으면(첫 진입) 서버가 «자료가 있는 최신 연도»로 미반영을 센다. 화면이 고른
+// 연도가 그와 다르면(자료 없는 해) 미반영만 따로 다시 받는다.
+// 미반영·열린 연도는 예전처럼 실패해도 화면을 막지 않는다(null → 배지·배너만 안 뜬다).
+export async function loadNavState() {
+  const q = state.year ? `?year=${encodeURIComponent(state.year)}` : "";
+  const d = await api(`/api/nav-state${q}`);
+  applyOverview(d.years);
+  state.lockStates = d.open;
+  // 보고 있는 연도가 마감됐는지 — 마감 연도에는 «분석 반영»을 권하지 않는다(눌러도 423).
+  state.yearLocked = d.year === state.year ? !!d.locked : null;
+  if (d.year === state.year) state.pending = d.pending;
+  else await loadPending();
 }
 
 // 메인 대시보드 전용 — 실패해도 화면 전체를 막지 않는다(해당 카드만 '-' 로 뜬다).
@@ -20,6 +39,11 @@ export async function loadOverview() {
 export async function loadHealth() {
   try { state.health = await api("/healthz"); }
   catch { state.health = null; }
+}
+
+// 이상 알림(급증·예산 초과·음수 실적·미매칭 비중) — 분석 결과를 읽어 규칙으로 고른 목록.
+export async function loadAlerts() {
+  state.alerts = await api(`/api/alerts?year=${state.year}`);
 }
 
 export async function loadStatus() {
@@ -41,13 +65,8 @@ export async function afterSave(msg) {
   toast(msg + (n ? ` · 미반영 ${n}건 — 상단 '분석 반영'을 누르면 결과에 적용됩니다.` : ""));
 }
 
-// 마감을 풀어 놓은 연도 — 어느 화면에 있든 배너로 알려야 한다.
-// 실패해도 화면을 막지 않는다(배너만 안 뜬다).
-
-export async function loadLockStates() {
-  try { state.lockStates = (await api("/api/lock-state")).open; }
-  catch { state.lockStates = null; }
-}
+// 마감을 풀어 놓은 연도(state.lockStates) — 어느 화면에 있든 배너로 알려야 한다.
+// loadNavState 가 함께 받는다(실패하면 null → 배너만 안 뜬다).
 
 // 설정 화면 「연도 기준정보」 — 그 해 한 벌을 한 번에 끌어온다.
 // 별칭만 연도가 없다(표기 흔들림 보정은 연도가 바뀌어도 유효하다).
@@ -80,7 +99,7 @@ export async function loadDetail(branch) {
   state.det.data = await api(`/api/branch-detail?year=${state.year}&branch=${encodeURIComponent(branch)}`);
   state.det.branch = branch;
   state.det.open = new Set(); state.det.sel = new Set();
-  state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null;
+  state.det.selBudget = null; state.det.editKey = null; state.det.delKey = null; state.det.noteKey = null;
   state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
 }
 
@@ -106,6 +125,12 @@ export function amounts(row) {
 // 기준연도(base_year)는 헤더 대상연도와 다른 축이다 — 서버가 기본값을 정한다
 // (상태가 있는 최신 기준연도, 없으면 마감 최신연도+1). 사용자가 고른 값은 유지한다.
 
+// 기준연도를 아직 모르면(첫 진입) base_year 를 비워 보낸다 — 서버가 /base-years 의 default 와
+// 같은 함수로 정하고 응답에 base_year 를 싣는다. 그래서 메타·가정·표를 동시에 부를 수 있다
+// (순차로 기다리면 운영에서 탭 하나가 10초였다 — 2026-10-15 실측).
+const fcQuery = () => state.fc.baseYear ? `?base_year=${encodeURIComponent(state.fc.baseYear)}` : "";
+const adoptBase = d => { if (!state.fc.baseYear && d?.base_year) state.fc.baseYear = String(d.base_year); };
+
 export async function loadForecastMeta() {
   const m = await api("/api/forecast/base-years");
   state.fc.baseYears = m.base_years;
@@ -114,17 +139,20 @@ export async function loadForecastMeta() {
 }
 
 export async function loadForecastState() {
-  state.fc.data = await api(`/api/forecast/state?base_year=${state.fc.baseYear}`);
+  state.fc.data = await api(`/api/forecast/state${fcQuery()}`);
+  adoptBase(state.fc.data);
   state.fc.dirty = new Set();
 }
 
 export async function loadForecastBench() {
-  state.fc.bench = await api(`/api/forecast/benchmark?base_year=${state.fc.baseYear}`);
+  state.fc.bench = await api(`/api/forecast/benchmark${fcQuery()}`);
+  adoptBase(state.fc.bench);
   state.fc.benchEdits = {methods: {}, overrides: {}};
 }
 
 export async function loadForecastTable() {
-  state.fc.table = await api(`/api/forecast/table?base_year=${state.fc.baseYear}`);
+  state.fc.table = await api(`/api/forecast/table${fcQuery()}`);
+  adoptBase(state.fc.table);
 }
 
 export async function loadForecastType() {

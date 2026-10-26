@@ -141,4 +141,10 @@
 .help-bubble__close{position:absolute;top:.4rem;right:.45rem;width:1.75rem;height:1.75rem;border:0;border-radius:999px;background:none;color:var(--sub);font-size:1.1rem;line-height:1;cursor:pointer}
 .help-bubble__close:hover{background:var(--subtle);color:var(--ink)}
 .help-bubble__close:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+/* 스크롤 중에는 캐릭터만 작게 — 펼친 «? 도움말»+캐릭터(약 9rem)가 표 오른쪽 끝 열을 가렸다
+   (2026-10-18 Aside 검토). 맨 위로 오면 원래 모양. 도움말이 열려 있으면 줄이지 않는다(main.js). */
+.help-fab__pill,.help-fab__img{transition:opacity .15s ease,width .15s ease,height .15s ease}
+.fab-mini .help-fab__pill{opacity:0;width:0;padding:0;border:0;overflow:hidden;white-space:nowrap}
+.fab-mini .help-fab__img{width:2.5rem;height:2.85rem}
+@media (prefers-reduced-motion:reduce){.help-fab__pill,.help-fab__img{transition:none}}
 @media print{.help-fab{display:none}}

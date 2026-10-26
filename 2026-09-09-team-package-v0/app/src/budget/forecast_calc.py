@@ -272,12 +272,16 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
             key = (int(r["연도"]), r["예산과목"])
             surprise_lookup[key] = surprise_lookup.get(key, 0) + r["금액"]
 
+    # 배수는 연도에만 달린다 — 행(예산과목)마다 다시 구하면 지사 19 × 행 17 × 10년 = 3,230번
+    # 팩터 표를 거르고 iterrows 한다(전망 표 시간의 92%, 운영 13초 — 2026-10-15 실측).
+    mult_by_year = {year: year_multiplier(year, factors_df, base_year) for year in years}
+
     rows = []
     for label, source in SITE_TABLE_LINES:
         row = {"예산과목": label}
         base_multiplier_year_values = {}
         for year in years:
-            mult = year_multiplier(year, factors_df, base_year)
+            mult = mult_by_year[year]
             grade = grade_by_year.get(year, latest_known_grade)
 
             if source.startswith("표준화:"):
@@ -319,7 +323,7 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     site_investment = investment_df[investment_df["사업장"] == site]["금액"].sum() if not investment_df.empty else 0.0
     invest_row = {"예산과목": "투자비"}
     for year in years:
-        invest_row[year] = site_investment * year_multiplier(year, factors_df, base_year)
+        invest_row[year] = site_investment * mult_by_year[year]
     rows.append(invest_row)
 
     return pd.DataFrame(rows)

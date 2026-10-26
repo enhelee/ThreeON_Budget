@@ -39,6 +39,30 @@ document.addEventListener("click", async e => {
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   const gy = e.target.closest("[data-goyear]");
   if (gy) { changeYear(gy.dataset.goyear); return; }
+  // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
+  const st = e.target.closest("[data-stat-item]");
+  if (st && !e.target.closest("button")) {
+    state.statOpen = state.statOpen === st.dataset.statItem ? null : st.dataset.statItem;
+    renderPage();
+    return;
+  }
+  const dr = e.target.closest("[data-drill]");
+  if (dr) {
+    busy(true, "지사 상세 로딩...");
+    try {
+      await loadDetail(dr.dataset.drill);
+      const d = state.det;
+      d.item = dr.dataset.drillItem || "";
+      d.budget = dr.dataset.drillBudget || "all";
+      d.q = ""; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
+      const hit = d.data.biz.map((b, idx) => ({b, key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}))
+        .filter(({b}) => b.예산과목 === d.item && (d.budget === "all" || b.budget === d.budget));
+      if (hit.length <= 8) hit.forEach(({b, key}) => { if (b.전표.length) d.open.add(key); });
+      state.view = "detail"; syncHash(); renderPage();
+    } catch (err) { toast(err.message); }
+    finally { busy(false); }
+    return;
+  }
   const br = e.target.closest("[data-branch]");
   if (br) {
     busy(true, "지사 상세 로딩...");
@@ -55,6 +79,13 @@ document.addEventListener("click", async e => {
       else { state.det.sortKey = ""; state.det.sortDir = 1; }   // 3번째 클릭=기본 정렬
     } else { state.det.sortKey = k; state.det.sortDir = 1; }
     renderPage();
+    return;
+  }
+  const nt = e.target.closest("[data-note]");
+  if (nt) {
+    state.det.noteKey = state.det.noteKey === nt.dataset.note ? null : nt.dataset.note;
+    renderPage();
+    if (state.det.noteKey) $("#vnText")?.focus();
     return;
   }
   const ed = e.target.closest("[data-edit]");
@@ -86,8 +117,11 @@ document.addEventListener("click", async e => {
 
   const act = e.target.closest("[data-action]")?.dataset.action;
   // 도움말·검토미 배너 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
-  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); return; }
-  if (act === "close-help") { state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return; }
+  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); syncFabMini(); return; }
+  if (act === "close-help") { state.helpOpen = false; renderPage(); syncFabMini(); $(".help-fab__btn")?.focus(); return; }
+  if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
+  const ak = e.target.closest("[data-alert-kind]");
+  if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
@@ -153,6 +187,22 @@ document.addEventListener("click", async e => {
     state.det.sel.clear(); state.det.selBudget = null;
     state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
     renderPage();
+  }
+  if (act === "cancel-note") { state.det.noteKey = null; renderPage(); return; }
+  if (act === "save-note") {
+    const key = e.target.closest("[data-action]").dataset.ekey;
+    const b = state.det.data.biz.find((x, idx) => `${x.budget}|${x.예산과목}|${x.사업명}|${idx}` === key);
+    if (!b) return;
+    try {
+      const r = await api("/api/variance-note", {method: "PUT", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({year: state.year, budget: b.budget, 예산과목: b.예산과목,
+                              처지사: state.det.branch, 사업명: b.사업명, note: $("#vnText").value})});
+      b.사유 = r.note;                   // 숫자가 안 바뀌므로 재분석·재조회 없이 이 행만 고친다
+      state.det.noteKey = null;
+      toast(r.note ? "사유를 저장했습니다." : "사유를 지웠습니다.");
+      renderPage();
+    } catch (err) { toast(err.message); }
+    return;
   }
   if (act === "cancel-edit") { state.det.editKey = null; state.det.delKey = null; renderPage(); }
   if (act === "toggle-add") { state.det.addOpen = !state.det.addOpen; renderPage(); }
@@ -315,7 +365,9 @@ document.addEventListener("click", async e => {
     try {
       const r = await api("/api/learn", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({year: state.year})});
-      toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건)`);
+      const kept = (r.learned["수동확정보호"] ? ` · 사람확정 유지 ${r.learned["수동확정보호"]}건` : "")
+        + (r.learned["저확신제외"] ? ` · 확신도 0.8 미만 제외 ${r.learned["저확신제외"]}건` : "");
+      toast(`${r.notice} (사람확정 ${r.learned["수동확정"]}건 · 자동 ${r.learned["자동확정"]}건${kept})`);
       await navigate("settings");
     } catch (err) { toast(err.message); }
     finally { busy(false); }
@@ -457,6 +509,7 @@ document.addEventListener("change", async e => {
   if (f === "sort") { state.sort = e.target.value; renderPage(); }
   const chk = e.target.dataset.detCheck;
   if (chk === "hideMissing") { state.det.hideMissing = e.target.checked; renderPage(); return; }
+  if (chk === "varOnly") { state.det.varOnly = e.target.checked; renderPage(); return; }
   const det = e.target.dataset.det;
   if (det === "branch" && e.target.value) {
     busy(true, "지사 상세 로딩...");
@@ -565,9 +618,24 @@ export function closeMenu() {
   back.focus();
 }
 
+// 스크롤 중에는 도움말을 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게.
+const syncFabMini = () => document.body.classList.toggle("fab-mini", window.scrollY > 80 && !state.helpOpen);
+window.addEventListener("scroll", syncFabMini, {passive: true});
+
+// 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
+// (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
+// 화면 일부만 다시 그리는 곳(3+ 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
+const CLICKABLE_ROW = "#page .clickable:not(button):not(a):not(input):not(select)";
+const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tabindex])`)
+  .forEach(el => el.setAttribute("tabindex", "0"));
+new MutationObserver(markClickable).observe($("#page"), {childList: true, subtree: true});
+
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && state.helpOpen) {
     state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
+  }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(CLICKABLE_ROW)) {
+    e.preventDefault(); e.target.click(); return;
   }
   if (!drawerIsOpen()) return;
   if (e.key === "Escape") { e.preventDefault(); closeMenu(); return; }

@@ -49,6 +49,7 @@ def connect(db_path=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         conn = dbcore.connect(db_path=path)
     init_db(conn)
+    dbcore.track_sqlite(conn)        # 요청 집계가 열려 있을 때만(Server-Timing) — init_db 는 빼고 센다
     return conn
 
 
@@ -155,6 +156,7 @@ def init_db(conn):
         if col not in cols:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
     _ensure_col("match_line", "매칭행", "INTEGER")
+    _ensure_col("match_line", "매칭근거", "TEXT")      # 재배정·학습·사업명 유사·임의 귀속…(2026-10-22)
     _ensure_col("biz_line", "src_row", "INTEGER")
     _ensure_col("override", "target_dept", "TEXT")   # 타지사 이동(크로스 재배정)
     cur.execute("""CREATE TABLE IF NOT EXISTS learned_match(
@@ -287,6 +289,13 @@ def init_db(conn):
         예산과목 TEXT, 처지사 TEXT, 사업명 TEXT,   -- 대상 사업 식별(현재 이름)
         fields_json TEXT NOT NULL,                 -- {"속성": "...", "사업명": "...", ...}
         created_at TEXT NOT NULL)""")
+    # 차이 사유 — 집행률이 계획 대비 ±20%p 를 벗어난 사업의 설명(권장 입력, 2026-10-22).
+    #   사업을 이름으로 가리킨다(biz_edit 와 같은 키). 숫자를 바꾸지 않는 주석이라 마감 연도에도 쓴다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS variance_note(
+        year TEXT NOT NULL, budget TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
+        note TEXT NOT NULL, operator TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY (year, budget, 예산과목, 처지사, 사업명))""")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_plan_ds ON plan_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_erp_ds ON erp_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_ml_run ON match_line(run_id)")
@@ -430,10 +439,19 @@ def load_erp_df(conn, year):
 
 def add_override(conn, year, budget, erp_row_id, target_name, memo=None,
                  target_dept=None):
-    conn.execute(
+    add_overrides(conn, year, budget, [erp_row_id], target_name, memo, target_dept)
+
+
+def add_overrides(conn, year, budget, erp_row_ids, target_name, memo=None,
+                  target_dept=None):
+    """여러 전표 재배정을 한 번에(한 트랜잭션·executemany). 전표마다 commit 하면
+    중간 실패 시 일부만 저장되고, PG 에서는 전표 수만큼 왕복한다."""
+    now = _now()
+    conn.executemany(
         "INSERT INTO override(year,budget,erp_row_id,target_name,memo,created_at,"
         "target_dept) VALUES(?,?,?,?,?,?,?)",
-        (str(year), budget, int(erp_row_id), target_name, memo, _now(), target_dept))
+        [(str(year), budget, int(rid), target_name, memo, now, target_dept)
+         for rid in erp_row_ids])
     conn.commit()
 
 
@@ -459,7 +477,7 @@ def delete_override(conn, override_id):
     conn.commit()
 
 
-def save_run(conn, year, budget, summary, erp_annotated):
+def save_run(conn, year, budget, summary, erp_annotated, commit=True):
     cur = conn.cursor()
     cur.execute("INSERT INTO run(year,budget,created_at,summary_json) VALUES(?,?,?,?)",
                 (str(year), budget, _now(), json.dumps(summary, ensure_ascii=False)))
@@ -468,13 +486,18 @@ def save_run(conn, year, budget, summary, erp_annotated):
     for _, r in erp_annotated.iterrows():
         conf = r.get("매칭확신도")
         mrow = r.get("매칭행")
+        basis = r.get("매칭근거")
         rows.append((run_id, int(r["_erp_row"]),
                      r.get("과목정규"), r.get("처지사정규"), r.get("매칭사업명"),
                      None if conf is None or pd.isna(conf) else float(conf),
                      r.get("구분"),
-                     None if mrow is None or pd.isna(mrow) else int(mrow)))
-    cur.executemany("INSERT INTO match_line VALUES(?,?,?,?,?,?,?,?)", rows)
-    conn.commit()
+                     None if mrow is None or pd.isna(mrow) else int(mrow),
+                     None if basis is None or pd.isna(basis) else str(basis)))
+    # 열 이름을 적는다 — 매칭근거는 나중에 붙인 열이라(ALTER) 옛 DB 에서는 순서가 다를 수 있다.
+    cur.executemany("INSERT INTO match_line(run_id,erp_row_id,과목정규,처지사정규,매칭사업명,"
+                    "매칭확신도,구분,매칭행,매칭근거) VALUES(?,?,?,?,?,?,?,?,?)", rows)
+    if commit:
+        conn.commit()
     return run_id
 
 
@@ -489,7 +512,7 @@ def _f(v):
     return None if f != f else f
 
 
-def save_biz_lines(conn, run_id, budget, plan_rows, new_rows):
+def save_biz_lines(conn, run_id, budget, plan_rows, new_rows, commit=True):
     """분석 결과의 사업 단위 행(계획행+신규행)을 DB에 저장 — 웹 상세화면 소스."""
     rows = []
     for r in plan_rows:
@@ -507,7 +530,8 @@ def save_biz_lines(conn, run_id, budget, plan_rows, new_rows):
                      None, r.get("전표건수", 0), 0, 0, None))
     conn.executemany(
         "INSERT INTO biz_line VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def load_biz_lines(conn, run_id):
@@ -841,16 +865,26 @@ def norm_text(s):
     return normalize.learn_key(s)
 
 
+LEARN_MIN_CONF = 0.80
+
+
 def learn_from_year(conn, year):
     """해당 연도의 최신 실행(손익·자본) 확정 결과를 학습 DB에 반영.
 
     - 계획집행/신규로 귀속된 전표의 (과목, 텍스트정규) → 사업명 을 저장.
     - 수동 재배정(override) 전표는 source='수동확정'으로 우선 저장(사람 확정).
-    - 같은 키는 최신 학습이 덮어쓴다(사람 확정 > 자동 확정).
-    반환: {"자동확정": n, "수동확정": m}
+    - 같은 키는 최신 학습이 덮어쓴다. 단 사람 확정 > 자동 확정 — 이미 «수동확정»으로 저장된
+      키는 다른 해(또는 같은 해)의 자동확정이 덮지 않는다. 예전엔 2024 수동확정을 2025 학습의
+      자동확정이 지워, 사람이 고친 귀속이 다음 분석에서 되돌아갔다(검토 2026-10-22).
+    - 자동확정은 전표 확신도가 LEARN_MIN_CONF(0.80, 상세 화면의 «자동확정» 기준과 같다) 이상일
+      때만 배운다. 낮은 유사도로 «일단 붙은» 전표까지 배우면 다음 해 0.99 로 굳고 검토 목록에서도
+      빠진다(강남 HRSG TUBE → «RO 베셀» 사례, 검토 2026-10-22). 사람이 고친 전표는 확신도와 무관.
+    반환: {"자동확정": n, "수동확정": m, "수동확정보호": k, "저확신제외": j}
     """
-    counts = {"자동확정": 0, "수동확정": 0}
+    counts = {"자동확정": 0, "수동확정": 0, "수동확정보호": 0, "저확신제외": 0}
     cur = conn.cursor()
+    manual_keys = {(r[0], r[1]) for r in conn.execute(
+        "SELECT 과목, 텍스트정규 FROM learned_match WHERE source='수동확정'")}
     for budget in ("손익", "자본"):
         run = latest_run(conn, year, budget)
         if not run:
@@ -870,11 +904,19 @@ def learn_from_year(conn, year):
             if not name:
                 continue
             src = "수동확정" if int(r["erp_row_id"]) in manual_ids else "자동확정"
+            if src == "자동확정":
+                conf = r.get("매칭확신도")
+                if conf is None or pd.isna(conf) or float(conf) < LEARN_MIN_CONF:
+                    counts["저확신제외"] += 1
+                    continue
             rows.append((r["과목정규"], key, name, src))
         # 자동확정 먼저, 수동확정 나중(같은 키면 사람 확정이 이긴다)
         for want in ("자동확정", "수동확정"):
             for item, key, name, src in rows:
                 if src != want:
+                    continue
+                if src == "자동확정" and (item, key) in manual_keys:
+                    counts["수동확정보호"] += 1
                     continue
                 cur.execute(
                     "INSERT OR REPLACE INTO learned_match VALUES(?,?,?,?,?,?)",
@@ -934,30 +976,41 @@ def count_learn_pending(conn, year):
 
     재배정 저장 시 자동 학습을 떼어냈으므로(설정 탭 [AI 학습] 버튼으로 분리),
     학습 대기 = override 중 (과목, 텍스트정규)가 learned_match에 없는 것.
+
+    ⚠ 이 값은 /api/pending 을 거쳐 «모든 화면 전환»마다 계산된다. 재배정 1건마다
+      match_line·learned_match 를 따로 묻던 옛 구현은 운영 PG(질의당 ~75ms 왕복)에서
+      재배정 193건에 30초가 걸렸다(2026-10-15 실측). 그래서 예산별로 묶어서 읽는다.
     """
     n = 0
     for budget in ("손익", "자본"):
-        run = latest_run(conn, year, budget)
         rows = conn.execute(
             "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
             " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
             " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
+        if not rows:
+            continue
+        run = latest_run(conn, year, budget)
+        item_of = {}
+        if run:
+            for rid, item in conn.execute(
+                    "SELECT erp_row_id, 과목정규 FROM match_line WHERE run_id=? AND erp_row_id IN"
+                    " (SELECT erp_row_id FROM override WHERE year=? AND budget=?)",
+                    (run["id"], str(year), budget)):
+                item_of.setdefault(int(rid), item)
+        cands = []
         for rid, target, item_raw, text in rows:
-            item = None
-            if run:
-                r = conn.execute(
-                    "SELECT 과목정규 FROM match_line WHERE run_id=? AND erp_row_id=?",
-                    (run["id"], int(rid))).fetchone()
-                item = r[0] if r else None
-            item = item or item_raw
+            item = item_of.get(int(rid)) or item_raw
             key = norm_text(text)
-            if not item or not key:
-                continue          # 텍스트 없는 전표는 학습 대상 아님
-            hit = conn.execute(
-                "SELECT 사업명 FROM learned_match WHERE 과목=? AND 텍스트정규=?",
-                (item, key)).fetchone()
-            if not hit or hit[0] != target:
-                n += 1
+            if item and key:          # 텍스트 없는 전표는 학습 대상 아님
+                cands.append((item, key, target))
+        if not cands:
+            continue
+        items = sorted({c[0] for c in cands})
+        ph = ",".join("?" for _ in items)
+        learned = {(a, b): c for a, b, c in conn.execute(
+            f"SELECT 과목, 텍스트정규, 사업명 FROM learned_match WHERE 과목 IN ({ph})",
+            tuple(items))}
+        n += sum(1 for item, key, target in cands if learned.get((item, key)) != target)
     return n
 
 
@@ -1019,6 +1072,57 @@ def delete_biz_delete(conn, del_id):
     conn.commit()
 
 
+# ---------------------------------------------------------------------------
+# 차이 사유(집행률 ±20%p) — 권장 입력
+# ---------------------------------------------------------------------------
+
+VARIANCE_BAND = 0.20      # 집행률이 100% 에서 이만큼(20%p) 넘게 벗어나면 사유를 권한다
+VARIANCE_NOTE_MAX = 500
+
+
+def is_variance(plan, actual):
+    """계획이 있는 사업 중 집행률이 80% 미만 또는 120% 초과(경계는 포함 안 함).
+
+    계획 0 인 신규 사업은 집행률이 없어 대상이 아니다. 미시행(실적 0)은 0% 라 대상이다 —
+    불용 사유도 설명이 필요하다.
+    """
+    try:
+        p = float(plan or 0)
+        a = float(actual or 0)
+    except (TypeError, ValueError):
+        return False
+    if p <= 0:
+        return False
+    return abs(a / p - 1.0) > VARIANCE_BAND + 1e-9
+
+
+def set_variance_note(conn, year, budget, item, dept, name, note, operator=None):
+    """사유 저장. 빈 문자열이면 지운다. 반환: 저장된 사유(지웠으면 None)."""
+    note = (note or "").strip()[:VARIANCE_NOTE_MAX]
+    key = (str(year), budget, item, dept, name)
+    if not note:
+        conn.execute("DELETE FROM variance_note WHERE year=? AND budget=? AND 예산과목=?"
+                     " AND 처지사=? AND 사업명=?", key)
+        conn.commit()
+        return None
+    conn.execute("INSERT OR REPLACE INTO variance_note VALUES(?,?,?,?,?,?,?,?)",
+                 key + (note, operator, _now()))
+    conn.commit()
+    return note
+
+
+def variance_notes(conn, year, dept=None):
+    """{(budget, 예산과목, 처지사, 사업명): {"note", "operator", "updated_at"}}."""
+    sql = ("SELECT budget, 예산과목, 처지사, 사업명, note, operator, updated_at"
+           " FROM variance_note WHERE year=?")
+    params = [str(year)]
+    if dept is not None:
+        sql += " AND 처지사=?"
+        params.append(dept)
+    return {(r[0], r[1], r[2], r[3]): {"note": r[4], "operator": r[5], "updated_at": r[6]}
+            for r in conn.execute(sql, tuple(params)).fetchall()}
+
+
 def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
     """사업명 변경 시 그 사업을 '이름으로' 가리키는 기록을 함께 옮긴다.
 
@@ -1031,6 +1135,10 @@ def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
     """
     if not old_name or not new_name or old_name == new_name:
         return {"override": 0, "learned": 0}
+    # 차이 사유도 이름으로 붙어 있다 — 옮기지 않으면 이름을 고치는 순간 사유가 사라진다.
+    conn.execute("UPDATE variance_note SET 사업명=? WHERE year=? AND budget=? AND 예산과목=?"
+                 " AND 처지사=? AND 사업명=?",
+                 (new_name, str(year), budget, item, dept, old_name))
     run = latest_run(conn, year, budget)
     ov = 0
     if run:
@@ -1088,13 +1196,26 @@ def patch_latest_run_biz(conn, year, budget, item, dept, name, fields):
     return n
 
 
-def load_match_detail(conn, run_id):
-    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인."""
+def load_match_detail(conn, run_id, branch=None, unmapped=False):
+    """트리 검토용: 매칭 결과 + ERP 전표 원장 조인.
+
+    branch: 그 처지사의 행만 · unmapped: 미반영이면서 처지사가 비어 있는 행만.
+    화면 하나가 쓰는 행은 실행 하나의 수 %다(2025: 강남 840 / 14,290행). 전부 받아
+    pandas 로 거르면 서울 DB → 싱가포르 서버로 실행 전체를 매번 옮기게 되므로 SQL 에서 거른다.
+    """
+    where, params = ["m.run_id=?"], [run_id]
+    if branch is not None:
+        where.append("m.처지사정규=?")
+        params.append(branch)
+    if unmapped:
+        where.append("m.구분='미반영' AND m.처지사정규 IS NULL")
     return pd.read_sql_query(
         """SELECT m.erp_row_id, m.과목정규, m.처지사정규, m.매칭사업명, m.매칭확신도, m.구분,
+                  m.매칭근거,
                   m.매칭행,
                   e.전표번호, e.사업명 AS 전표텍스트, e.금액천원, e.금액원, e.전기일,
                   e.지사원문, e.부서부원문
            FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id
-           WHERE m.run_id=? ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
-        conn, params=(run_id,))
+           WHERE """ + " AND ".join(where) + """
+           ORDER BY m.과목정규, m.처지사정규, m.매칭사업명, e.id""",
+        conn, params=tuple(params))

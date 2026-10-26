@@ -22,10 +22,16 @@ export const state = {
         type: null, typeOpen: null },   // 투자유형별 탭 — report · 펼친 (연도,유형) 사업 목록
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
+  statOpen: null,   // 통계 과목 표에서 펼친 행(«예산|과목») — 지사별 드릴다운
+  alerts: null,     // /api/alerts — {alerts, summary, prev_year}
+  alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
+  alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
          lowConf: false,   // 검토미 배너 «같이 보기» — 확신도 0.80 미만 계획집행 사업만
+         varOnly: false,   // «사유 대상만» — 집행률 ±20%p 를 벗어난 사업만
+         noteKey: null,    // 차이 사유 입력창이 열린 행
          open: new Set(), sel: new Set(), selBudget: null, editKey: null, delKey: null,
          // 재배정 바 입력값 — 전표 체크·검색마다 #detResults가 다시 그려지므로
          //   상태로 들고 있어야 입력한 지사·사업명이 날아가지 않는다.

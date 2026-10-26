@@ -4,7 +4,7 @@ import { charSvg } from "./characters.js"
 
 export function pendingBarHtml() {
   const p = state.pending;
-  if (!p || !p.total) return "";
+  if (!p || !p.total || state.yearLocked === true) return "";   // 마감 연도엔 반영할 수 없다(423)
   const detail = Object.entries(p.counts || {}).map(([k, v]) => `${k} ${v}건`).join(" · ");
   return `<section class="pending-bar mb-4">
     <b>분석 미반영 변경 ${p.total}건</b>

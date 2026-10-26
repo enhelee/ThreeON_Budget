@@ -1,9 +1,9 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadForecastType, loadHealth, loadLockStates, loadOverview, loadPending, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadBranches, loadDetail, loadForecastBench, loadForecastMeta, loadForecastState, loadForecastTable, loadForecastType, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
-import { $, fmt } from "./util.js"
+import { $, esc, fmt } from "./util.js"
 import { helpFabHtml } from "./components/characters.js"
 import { loadErrorBannerHtml } from "./components/loaderror.js"
 import { lockBannerHtml } from "./components/lockbanner.js"
@@ -96,7 +96,7 @@ export function renderPage() {
     b.classList.toggle("nav-button-active", b.dataset.view === state.view));
   const ys = $("#yearSelect");
   const years = state.years.length ? state.years : [state.year];
-  ys.innerHTML = years.map(y => `<option value="${y}" ${String(y) === String(state.year) ? "selected" : ""}>${y}년</option>`).join("");
+  ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("");
   syncAnalyzeButton();
 }
 
@@ -104,12 +104,25 @@ export function renderPage() {
 // 앞의 하나가 죽는 순간 뒤가 통째로 건너뛰어지고, 화면은 «데이터가 없다»처럼 보인다.
 // 실제로 배포 직후 502 한 번에 설정 화면 전체가 빈 것처럼 보여 데이터 소실로 오인됐다
 // (2026-09-19). 그래서 구역마다 따로 실패시키고, 실패한 구역을 배너로 밝힌다.
-async function settle(jobs) {
-  const errs = [];
-  for (const [label, fn] of jobs) {
-    try { await fn(); } catch (e) { errs.push(`${label}: ${e.message}`); }
-  }
-  return errs;
+//
+// 구역들은 서로 독립이라 동시에 부른다 — 하나씩 기다리면 화면 시간이 «모든 API 의 합»이
+// 된다(운영 실측 2026-10-15: 설정 화면 API 13개 순차 → 40초). 다만 서버는 요청마다 DB
+// 연결을 새로 맺고 Supabase Session pooler 는 동시 연결 수에 한도가 있으므로, 한꺼번에
+// 쏟지 않고 SETTLE_LIMIT 개씩만 동시에 돌린다.
+const SETTLE_LIMIT = 4;
+
+async function settle(jobs, limit = SETTLE_LIMIT) {
+  const errs = jobs.map(() => null);        // 구역 순서대로 모아 배너 순서를 예전과 같게
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const i = next++;
+      const [label, fn] = jobs[i];
+      try { await fn(); } catch (e) { errs[i] = `${label}: ${e.message}`; }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(limit, jobs.length)}, worker));
+  return errs.filter(Boolean);
 }
 
 export async function navigate(view, opts = {}) {
@@ -140,21 +153,26 @@ export async function navigate(view, opts = {}) {
   state.view = view;
   state.helpOpen = false;   // 도움말은 화면마다 내용이 달라 — 옮기면 닫는다
   syncHash();
-  const jobs = [["연도 목록", loadOverview], ["미반영 건수", loadPending],
-                ["마감 상태", loadLockStates]];
+  // 공통 3종(연도 목록·미반영 건수·열린 연도)은 /api/nav-state 한 번으로 받는다.
+  // 첫 진입은 아직 연도가 없다 — 나머지 구역이 모두 state.year 를 쓰므로 이것부터 받는다.
+  // 연도가 이미 있으면 다른 구역과 함께 동시에 새로 받는다(예전처럼 매번 갱신).
+  const hadYear = !!state.year;
+  const firstErrs = hadYear ? [] : await settle([["연도 목록", loadNavState]]);
+  const jobs = hadYear ? [["연도 목록", loadNavState]] : [];
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  if (view === "home") jobs.push(["서버 정보", loadHealth]);
+  if (view === "home") jobs.push(["서버 정보", loadHealth], ["이상 알림", loadAlerts]);
   if (view === "forecast") {
-    // 기준연도 → 가정 → (탭에 따라) 표준화 결과 | 전망 표. settle 이 순서대로 돌리므로
-    // 메타가 정한 기준연도를 뒤의 둘이 그대로 쓴다.
+    // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
+    // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
     if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
     if (state.fc.tab === "type") jobs.push(["투자유형별", loadForecastType]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
+  if (view === "collect") jobs.push(["이상 알림", loadAlerts]);
   if (view === "stats") {
     jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }],
               ["연도 비교", async () => { state.statsCompare = await api(`/api/stats-compare?year=${state.year}`); }]);
@@ -171,7 +189,7 @@ export async function navigate(view, opts = {}) {
       ["사업 삭제 이력", async () => { state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`); }],
       ["연도 기준정보", loadYearConfig]);
   }
-  state.loadErrors = await settle(jobs);
+  state.loadErrors = [...firstErrs, ...await settle(jobs)];
   busy(false);
   if (state.loadErrors.length) {
     toast(`${state.loadErrors.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
@@ -249,10 +267,15 @@ export async function runAnalyze(silent) {
 export function syncAnalyzeButton() {
   const btn = $("#analyzeBtn"), label = $("#analyzeLabel"), cnt = $("#pendingCount");
   if (!btn || !label || !cnt) return;
-  const n = state.pending?.total || 0;
-  label.textContent = n ? "분석 반영" : "분석 실행";
+  // 마감된 연도는 분석이 서버에서 막힌다(423). 그런데도 «분석 반영 2»를 강조하면 누르고 실패한다
+  // (2026-10-18 Aside 검토 — 연도와 무관한 별칭 변경이 마감 연도에도 미반영으로 잡혔다).
+  const locked = state.yearLocked === true;
+  const n = locked ? 0 : (state.pending?.total || 0);
+  label.textContent = locked ? "마감됨" : n ? "분석 반영" : "분석 실행";
+  btn.disabled = locked;
   btn.classList.toggle("btn-pending", n > 0);
-  btn.title = n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
+  btn.title = locked ? `${state.year}년은 마감(잠금) 상태 — 분석하려면 설정에서 마감을 해제하세요`
+    : n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";
   cnt.textContent = n ? String(n) : "";
   cnt.classList.toggle("hidden", !n);
 }

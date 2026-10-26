@@ -55,7 +55,7 @@ export function renderSettings() {
   const edits = state.bizEdits || [];
   return `<div class="space-y-6">
     <section><p class="text-sm font-semibold text-ink">운영 관리</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">데이터 관리</h2>
-    <p class="mt-2 text-sm text-sub">모든 원자료는 백엔드 DB(data/budget.db)에만 저장됩니다.</p></section>
+    <p class="mt-2 text-sm text-sub">모든 원자료는 서버 DB에만 저장됩니다(원본 파일은 남기지 않음).</p></section>
     ${renderSettingsExtra()}
 
     <section class="panel p-6">
@@ -81,7 +81,7 @@ export function renderSettings() {
           <button class="btn-secondary" data-action="clear-learned">학습 초기화</button>
         </div>
       </div>
-      ${(state.pending?.total || 0) ? `<p class="mt-4 text-xs font-semibold text-warn">⚠ 분석 미반영 변경 ${state.pending.total}건이 있습니다 — 먼저 상단 '분석 반영'을 누르세요.</p>` : ""}
+      ${(state.pending?.total || 0) && state.yearLocked !== true ? `<p class="mt-4 text-xs font-semibold text-warn">⚠ 분석 미반영 변경 ${state.pending.total}건이 있습니다 — 먼저 상단 '분석 반영'을 누르세요.</p>` : ""}
       <div class="mt-5 grid gap-3 sm:grid-cols-3">
         <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-sub">학습된 매핑 총계 (전체 연도 공용)</p><p class="mt-1 text-2xl font-bold">${(learned["총계"] || 0).toLocaleString()}건</p></div>
         <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-ink">사람 확정(재배정)</p><p class="mt-1 text-2xl font-bold text-ink">${(learned["수동확정"] || 0).toLocaleString()}건</p></div>

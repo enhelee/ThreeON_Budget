@@ -187,6 +187,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     attributed = {}      # erp idx -> plan rec / None(신규)
     erp_match_name = {}  # erp idx -> 귀속된 계획 사업명 / None(신규)
     erp_score = {}       # erp idx -> 최고 사업명 유사도(0~100)
+    erp_basis = {}       # erp idx -> 매칭 근거(사람이 읽는 짧은 말) — 상세 화면 «왜 여기 붙었나»
 
     def _rec_row(rec):
         """귀속 계획행의 원본 행번호 — 동명 사업 구분용(전표 트리 정합)."""
@@ -241,6 +242,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                 if prec is not None:
                     for i in vg["rows"]:
                         erp_score[i] = 100.0
+                        erp_basis[i] = "재배정"
                         prec["실적금액"] += _amt(i)
                         prec["매칭전표수"] += 1
                         prec["_점수합"] += 100.0
@@ -250,6 +252,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     # 지정 이름의 계획행이 없음 → 그 이름의 신규 사업으로 강제
                     for i in vg["rows"]:
                         erp_score[i] = 100.0
+                        erp_basis[i] = "재배정(신규 사업)"
                         attributed[i] = None
                         erp_match_name[i] = None
                     vg["강제신규명"] = target
@@ -264,6 +267,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     learned_cnt += len(vg["rows"])
                     for i in vg["rows"]:
                         erp_score[i] = 99.0
+                        erp_basis[i] = "학습"
                         prec["실적금액"] += _amt(i)
                         prec["매칭전표수"] += 1
                         prec["_점수합"] += 99.0
@@ -275,6 +279,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     learned_cnt += len(vg["rows"])
                     for i in vg["rows"]:
                         erp_score[i] = 99.0
+                        erp_basis[i] = "학습(신규 사업)"
                         attributed[i] = None
                         erp_match_name[i] = None
                     vg["강제신규명"] = lname
@@ -285,6 +290,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     attributed[i] = None       # 그룹에 계획행 없음 → 신규
                     erp_match_name[i] = None
                     erp_score[i] = 0.0
+                    erp_basis[i] = "계획 없음(신규)"
                 unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
             # ── 크리티칼 포인트 용역: 이름 표기가 흔들려 유사도가 낮아도, 그룹에
@@ -295,6 +301,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     cbest = max(crit, key=lambda p: (_clean_na(p.get("연예산")) or 0.0))
                     for i in vg["rows"]:
                         erp_score[i] = 100.0
+                        erp_basis[i] = "규칙(크리티칼 용역)"
                         cbest["실적금액"] += _amt(i)
                         cbest["매칭전표수"] += 1
                         cbest["_점수합"] += 100.0
@@ -313,6 +320,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             if new_policy == "strict_name" and best_score < threshold:
                 for i in vg["rows"]:
                     erp_score[i] = float(best_score)
+                    erp_basis[i] = "유사도 미달(신규)"
                     attributed[i] = None       # 엄격정책: 사업명 미달 → 신규
                     erp_match_name[i] = None
                 unattributed_vgroups.setdefault(key, []).append(vg)
@@ -323,6 +331,14 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             for i in vg["rows"]:
                 score = 100.0 if mat else float(best_score)
                 erp_score[i] = score
+                if mat:
+                    erp_basis[i] = "총액 기준(자재류)"
+                elif best_score >= threshold:
+                    erp_basis[i] = "사업명 유사"
+                elif len(candidates) > 1:
+                    erp_basis[i] = "임의 귀속(유사도 낮음)"
+                else:
+                    erp_basis[i] = "유일한 계획 사업"
                 best["실적금액"] += _amt(i)
                 best["매칭전표수"] += 1
                 best["_점수합"] += score
@@ -491,10 +507,11 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
 
     # zrfm2_V1 / matched CSV용 전표별 주석: 매칭사업명 · 매칭확신도(0~1) · 구분
     #   in-scope → 계획집행/신규, 타예산 → 공란, 그 외(미선택 과목·지사/미분류/미매핑) → 미반영.
-    r_labels, r_conf, r_gubun, r_rows = [], [], [], []
+    r_labels, r_conf, r_gubun, r_rows, r_basis = [], [], [], [], []
     unreflected_by_key = defaultdict(lambda: {"금액": 0.0, "전표": 0})
     unreflected_amt = 0.0
     for i in range(len(erp)):
+        r_basis.append(erp_basis.get(i) if i in in_scope_set and not excl[i] else None)
         if excl[i]:
             r_labels.append("")
             r_conf.append(None)
@@ -539,6 +556,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     erp_annotated["처지사정규"] = pd.Series(depts_norm, index=erp.index, dtype="object")
     erp_annotated["매칭사업명"] = pd.Series(r_labels, index=erp.index, dtype="object")
     erp_annotated["매칭확신도"] = pd.Series(r_conf, index=erp.index, dtype="object")
+    erp_annotated["매칭근거"] = pd.Series(r_basis, index=erp.index, dtype="object")
     erp_annotated["구분"] = pd.Series(r_gubun, index=erp.index, dtype="object")
     erp_annotated["매칭행"] = pd.Series(r_rows, index=erp.index, dtype="object")
 

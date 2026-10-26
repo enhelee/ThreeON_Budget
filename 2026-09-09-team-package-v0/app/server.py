@@ -21,6 +21,7 @@ import json
 import mimetypes
 import re
 import threading
+import time
 from urllib.parse import quote
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -35,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db   # noqa: E402
+from budget import alerts as alertm, api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -60,7 +61,9 @@ WEB_DIR = STATIC_DIR
 _PARENT = os.path.dirname(APP_DIR)
 AUTH = authm.AuthConfig()
 
-app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None)
+# openapi_url=None — 스키마(/openapi.json)는 인증 미들웨어(/api/* 만 막음) 밖이라 비로그인에게
+# API 목록 전체가 보였다(QA 2026-09-20 P2). 화면은 스키마를 쓰지 않는다.
+app = FastAPI(title="예산·실적 분석", docs_url=None, redoc_url=None, openapi_url=None)
 
 
 def _conn():
@@ -70,6 +73,34 @@ def _conn():
 def _operator(request: Request):
     """현재 요청의 작업자 이름(감사 로그·이력 표기). 인증 비활성 시 'local'."""
     return getattr(request.state, "operator", None) or "local"
+
+
+# 연도·예산 구분은 모든 화면이 HTML 에 그대로 찍고(연도 선택기·제목·배너), OUT_DIR 아래
+# 폴더 이름도 된다. 서버가 아무 문자열이나 받아 저장하면 로그인한 누구나 한 번의 요청으로
+# 전 사용자 화면에 스크립트를 심을 수 있었다(2026-09-20 QA P1, `?year=<img onerror=…>`)
+# 및 `/api/lock {"year":"../../x"}` 로 OUT_DIR 밖에 폴더가 생겼다. 그래서 들어오는 길목
+# 하나(이 미들웨어)에서 모양을 강제한다 — 저장된 값은 API 로만 들어오므로 화면 출력도 안전해진다.
+_YEAR_KEYS = ("year", "base_year", "from_year", "to_year")
+_YEAR_RE = re.compile(r"\d{4}")
+_BUDGETS = ("손익", "자본")
+_LOCK_PATH_RE = re.compile(r"^/api/lock/([^/]+)$")
+
+
+def _bad_param(path, query, body):
+    """잘못된 연도·예산 구분이면 사람에게 보일 오류 문장, 정상이면 None."""
+    found = [(k, query.get(k)) for k in _YEAR_KEYS + ("budget",) if k in query]
+    if isinstance(body, dict):
+        found += [(k, body[k]) for k in _YEAR_KEYS + ("budget",) if k in body and body[k] is not None]
+    m = _LOCK_PATH_RE.match(path)
+    if m:
+        found.append(("year", m.group(1)))      # url.path 는 이미 디코드된 값
+    for key, val in found:
+        if key == "budget":
+            if str(val) not in _BUDGETS:
+                return "예산 구분은 손익 또는 자본이어야 합니다."
+        elif not _YEAR_RE.fullmatch(str(val)):
+            return f"연도는 4자리 숫자여야 합니다({key})."
+    return None
 
 
 class AuthAuditMiddleware(BaseHTTPMiddleware):
@@ -89,14 +120,20 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
         request.state.operator = operator or ("local" if not AUTH.enabled else None)
 
         body_json = None
+        full_body = None
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
                 and "application/json" in (request.headers.get("content-type") or "")):
             raw = await request.body()           # Starlette가 캐시 → 라우트에서 다시 읽을 수 있다
+            try:
+                full_body = json.loads(raw.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                full_body = None
             if len(raw) <= 65536:
-                try:
-                    body_json = json.loads(raw.decode("utf-8"))
-                except (ValueError, UnicodeDecodeError):
-                    body_json = None
+                body_json = full_body
+        if path.startswith("/api/"):
+            bad = _bad_param(path, request.query_params, full_body)
+            if bad:
+                return JSONResponse({"detail": bad}, status_code=400)
         response = await call_next(request)
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
                 and path not in ("/api/login", "/api/logout")):
@@ -151,6 +188,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 app.add_middleware(SecurityHeadersMiddleware)
 
 
+class ServerTimingMiddleware(BaseHTTPMiddleware):
+    """응답마다 Server-Timing 헤더 — 서버 처리 시간과 그중 DB 연결·질의 몫.
+
+    느린 화면을 만났을 때 «네트워크인가 · 서버 계산인가 · DB 왕복인가»를 브라우저
+    개발자 도구(Network → Timing)에서 바로 가를 수 있게 한다. 2026-10-15 속도 진단에서
+    이것이 없어 질의 수를 코드와 로컬 재현으로 역산해야 했다. 테스트도 이 헤더로
+    API 별 질의 수 상한을 고정한다(tests/test_perf_budget.py).
+    """
+
+    async def dispatch(self, request, call_next):
+        stats = dbcore.begin_request_stats()
+        t = time.perf_counter()
+        response = await call_next(request)
+        total = (time.perf_counter() - t) * 1000
+        response.headers["Server-Timing"] = (
+            f'app;dur={total:.1f}, '
+            f'db;dur={stats["q_ms"]:.1f};desc="queries={stats["q"]}", '
+            f'conn;dur={stats["conn_ms"]:.1f};desc="connections={stats["conn"]}"')
+        return response
+
+
+# 가장 바깥 — 감사 기록(AuthAudit 의 DB 쓰기)까지 요청 시간에 넣는다.
+app.add_middleware(ServerTimingMiddleware)
+
+
 # ── 인증 (공용 비밀번호 + 작업자 이름) ─────────────────────────────────────
 
 class LoginReq(BaseModel):
@@ -193,7 +255,13 @@ def login(req: LoginReq, request: Request):
     name = authm.clean_operator(req.name)
     if not name:
         raise HTTPException(400, "작업자 이름을 입력하세요(수정 이력에 기록됩니다).")
+    key = authm.client_key(request)
+    wait = AUTH.limiter.retry_after(key)
+    if wait:
+        raise HTTPException(429, f"로그인 실패가 많아 잠시 막았습니다 — {wait // 60 + 1}분 뒤 다시 시도하세요.",
+                            headers={"Retry-After": str(wait)})
     if not AUTH.check_password(req.password):
+        AUTH.limiter.fail(key)
         conn = _conn()
         try:
             dbm.add_audit(conn, name, "POST", "/api/login", 401, "비밀번호 불일치")
@@ -202,6 +270,7 @@ def login(req: LoginReq, request: Request):
         raise HTTPException(401, "비밀번호가 맞지 않습니다.")
     secure = AUTH.cookie_secure or request.url.scheme == "https" \
         or request.headers.get("x-forwarded-proto") == "https"
+    AUTH.limiter.success(key)
     resp = JSONResponse({"ok": True, "operator": name, "enabled": True})
     resp.set_cookie(AUTH.cookie_name, AUTH.issue(name), httponly=True, samesite="lax",
                     secure=secure, max_age=int(AUTH.session_hours * 3600), path="/")
@@ -235,6 +304,22 @@ def _guard_unlocked(conn, year, action="변경"):
         raise HTTPException(
             423, f"{year}년은 마감(잠금) 상태입니다 — {action}이(가) 차단됩니다. "
                  "설정 탭에서 잠금을 해제한 뒤 진행하세요.")
+
+
+# id 로 지우는 라우트는 요청에 연도가 없다 — 행의 연도를 찾아 같은 잠금을 건다.
+# 이게 없으면 마감 연도의 재배정·수정·삭제 지시를 «지우는» 것으로 결과를 바꿀 수 있었다.
+_ROW_YEAR_TABLES = {"override", "biz_edit", "biz_delete", "manual_biz"}
+
+
+def _guard_row_unlocked(conn, table, row_id, action):
+    assert table in _ROW_YEAR_TABLES
+    row = conn.execute(f"SELECT year FROM {table} WHERE id=?", (row_id,)).fetchone()
+    if row is not None:
+        _guard_unlocked(conn, row[0], action)
+
+
+# 업로드 상한·압축 폭탄 검사는 budget/uploads.py (전망 가져오기와 같이 쓴다).
+_read_upload = uploads.read_upload
 
 
 # 연도 단위 «무거운 쓰기»(분석·마감·해제·자료 업로드)는 한 번에 하나만. 2026-10-13 라이브에서
@@ -319,7 +404,7 @@ async def _ingest(files: list, year: str, kind: str):
             fd, tmp = tempfile.mkstemp(suffix=".xlsx")
             tmps.append(tmp)
             with os.fdopen(fd, "wb") as f:
-                f.write(await file.read())
+                f.write(await _read_upload(file))
         label = " + ".join(f.filename for f in files)
         with _year_op(year, "자료 업로드"):
             conn = _conn()
@@ -344,6 +429,8 @@ async def _ingest(files: list, year: str, kind: str):
 async def upload_plan(year: str, file: list[UploadFile] = File(...)):
     try:
         return _clean_json(await _ingest(file, year, "plan"))
+    except HTTPException:
+        raise                          # 413·423·409 는 그대로(예전엔 400 으로 뭉개졌다)
     except Exception as e:
         raise HTTPException(400, f"계획 파일 흡수 실패: {e}")
 
@@ -352,6 +439,8 @@ async def upload_plan(year: str, file: list[UploadFile] = File(...)):
 async def upload_erp(year: str, file: UploadFile = File(...)):
     try:
         return _clean_json(await _ingest([file], year, "erp"))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, f"zrfm2 파일 흡수 실패: {e}")
 
@@ -365,10 +454,11 @@ async def upload_master(kind: str, year: str, file: UploadFile = File(...)):
     """
     if kind not in ("item", "dept"):
         raise HTTPException(400, "kind는 item(예산과목) 또는 dept(부서코드)여야 합니다.")
+    data = await _read_upload(file)
     fd, tmp = tempfile.mkstemp(suffix=".xlsx")
     try:
         with os.fdopen(fd, "wb") as f:
-            f.write(await file.read())
+            f.write(data)
         conn = _conn()
         try:
             _guard_unlocked(conn, year, "마스터 갱신")
@@ -732,23 +822,58 @@ def overview():
     """홈 화면용: DB에 있는 모든 연도의 최신 실행 요약(다년도 계획·실적)."""
     conn = _conn()
     try:
-        ds = dbm.list_datasets(conn)
-        years = sorted({d["year"] for d in ds})
-        rows = []
-        for y in years:
-            entry = {"year": y}
-            for budget in ("손익", "자본"):
-                r = dbm.latest_run(conn, y, budget)
-                if r:
-                    s = r["summary"]
-                    entry[budget] = {
-                        "계획": s.get("계획 연예산(천원)", 0),
-                        "실적": s.get("총 실적(천원)", 0),
-                        "집행률": s.get("집행률(%)"),
-                        "실행일시": r["created_at"],
-                    }
-            rows.append(entry)
-        return _clean_json({"years": rows})
+        return _clean_json({"years": _overview_rows(conn)})
+    finally:
+        conn.close()
+
+
+def _overview_rows(conn):
+    ds = dbm.list_datasets(conn)
+    years = sorted({d["year"] for d in ds})
+    rows = []
+    for y in years:
+        entry = {"year": y}
+        for budget in ("손익", "자본"):
+            r = dbm.latest_run(conn, y, budget)
+            if r:
+                s = r["summary"]
+                entry[budget] = {
+                    "계획": s.get("계획 연예산(천원)", 0),
+                    "실적": s.get("총 실적(천원)", 0),
+                    "집행률": s.get("집행률(%)"),
+                    "실행일시": r["created_at"],
+                }
+        rows.append(entry)
+    return rows
+
+
+@app.get("/api/nav-state")
+def nav_state(year: str = None):
+    """화면 전환마다 필요한 공통 3종(연도 목록·미반영 건수·열린 연도)을 연결 하나로.
+
+    따로 부르면 DB 연결 3번 — 운영(Render 싱가포르 ↔ Supabase 서울)에서 연결 한 번이
+    ~0.5초다(2026-10-15 실측). 개별 API(/api/overview·/api/pending·/api/lock-state)는
+    저장 뒤 갱신 등에서 그대로 쓰므로 남겨 둔다.
+
+    year 가 없으면(첫 진입) 화면이 고를 연도 — 자료가 있는 최신 연도 — 로 미반영을 센다.
+    미반영·열린 연도는 예전처럼 실패해도 화면을 막지 않는다(null).
+    """
+    conn = _conn()
+    try:
+        rows = _overview_rows(conn)
+        y = year or (rows[-1]["year"] if rows else None)
+        try:
+            pend = _pending_data(conn, y) if y else None
+        except Exception:
+            conn.rollback()              # PG: 실패한 트랜잭션 위에서는 다음 질의가 못 돈다
+            pend = None
+        try:
+            open_ = dbm.open_years(conn)
+        except Exception:
+            open_ = None
+        # 마감된 연도면 화면이 «분석 반영»을 권하지 않는다 — 눌러도 423 이다(2026-10-18 Aside 검토).
+        locked = dbm.is_locked(conn, y) if y else False
+        return _clean_json({"years": rows, "year": y, "pending": pend, "open": open_, "locked": locked})
     finally:
         conn.close()
 
@@ -779,34 +904,38 @@ def pending(year: str):
     """
     conn = _conn()
     try:
-        runs = _latest_runs(conn, year)
-        # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
-        stamps = [str(r["created_at"]) for r in runs.values()]
-        base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
-        out = {"analyzed_at": base, "counts": {}, "total": 0}
-        tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
-                  ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
-        for tbl, label in tables:
-            if base is None:
-                n = conn.execute(
-                    f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
-            else:
-                n = conn.execute(
-                    f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
-                    (str(year), base)).fetchone()[0]
-            if n:
-                out["counts"][label] = n
-                out["total"] += n
-        # 구성·별칭·마스터 변경도 «결과에 반영되지 않은 변경»이다. 알림을 두 갈래로
-        # 나누면 어느 것을 눌러야 하는지 헷갈리므로 같은 배지에 합친다.
-        n = sum(dbm.config_changes_since(conn, year, base).values())
-        if n:
-            out["counts"]["기준정보"] = n
-            out["total"] += n
-        out["learn_pending"] = dbm.count_learn_pending(conn, year)
-        return _clean_json(out)
+        return _clean_json(_pending_data(conn, year))
     finally:
         conn.close()
+
+
+def _pending_data(conn, year):
+    runs = _latest_runs(conn, year)
+    # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
+    stamps = [str(r["created_at"]) for r in runs.values()]
+    base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
+    out = {"analyzed_at": base, "counts": {}, "total": 0}
+    tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
+              ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
+    for tbl, label in tables:
+        if base is None:
+            n = conn.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
+        else:
+            n = conn.execute(
+                f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
+                (str(year), base)).fetchone()[0]
+        if n:
+            out["counts"][label] = n
+            out["total"] += n
+    # 구성·별칭·마스터 변경도 «결과에 반영되지 않은 변경»이다. 알림을 두 갈래로
+    # 나누면 어느 것을 눌러야 하는지 헷갈리므로 같은 배지에 합친다.
+    n = sum(dbm.config_changes_since(conn, year, base).values())
+    if n:
+        out["counts"]["기준정보"] = n
+        out["total"] += n
+    out["learn_pending"] = dbm.count_learn_pending(conn, year)
+    return out
 
 
 @app.get("/api/learned")
@@ -932,6 +1061,7 @@ def biz_deletes(year: str):
 def restore_biz_delete(del_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "biz_delete", del_id, "사업 삭제 복원")
         dbm.delete_biz_delete(conn, del_id)
         return {"restored": del_id}
     finally:
@@ -951,6 +1081,7 @@ def biz_edits(year: str):
 def delete_biz_edit(edit_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "biz_edit", edit_id, "사업 수정 취소")
         dbm.delete_biz_edit(conn, edit_id)
         return {"deleted": edit_id}
     finally:
@@ -1002,6 +1133,7 @@ def manual_biz_list(year: str):
 def delete_manual_biz(biz_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "manual_biz", biz_id, "추가 사업 삭제")
         dbm.delete_manual_biz(conn, biz_id)
         return {"deleted": biz_id}
     finally:
@@ -1017,8 +1149,7 @@ def _unmapped_detail(conn, runs):
     """미반영(미매핑 처지사) 전표를 원문 지사별로 수집: {raw: [voucher...]}."""
     out = {}
     for budget, r in runs.items():
-        detail = dbm.load_match_detail(conn, r["id"])
-        um = detail[(detail["구분"] == "미반영") & (detail["처지사정규"].isna())]
+        um = dbm.load_match_detail(conn, r["id"], unmapped=True)
         for _, v in um.iterrows():
             raw = str(v["지사원문"] or "(지사명 없음)").strip()
             out.setdefault(raw, []).append({
@@ -1033,6 +1164,47 @@ def _unmapped_detail(conn, runs):
     return out
 
 
+# ── 이상 알림 (규칙 기반, budget/alerts.py) ───────────────────────────────
+
+_ALERT_COLS = ("처지사", "예산과목", "사업명", "연예산", "실적금액", "구분")
+
+
+def _alert_lines(conn, runs):
+    out = []
+    for budget, r in runs.items():
+        df = dbm.load_biz_lines(conn, r["id"])
+        for row in df[list(_ALERT_COLS)].to_dict("records"):
+            row["budget"] = budget
+            out.append(row)
+    return out
+
+
+@app.get("/api/alerts")
+def alerts(year: str):
+    """올해 최신 분석에서 급증(전년 대비)·예산 초과·음수 실적·미매칭 비중을 골라 위험도 순으로.
+
+    분석 결과를 읽기만 한다 — 업로드·분석 뒤 화면이 다시 부르면 그때의 결과가 나온다.
+    """
+    conn = _conn()
+    try:
+        runs = _latest_runs(conn, year)
+        if not runs:
+            return {"alerts": [], "summary": alertm.summarize([]), "prev_year": None}
+        prev_year = str(int(year) - 1)
+        prev_runs = _latest_runs(conn, prev_year)
+        unmapped = {}
+        for budget, r in runs.items():
+            um = dbm.load_match_detail(conn, r["id"], unmapped=True)
+            unmapped[budget] = float(um["금액천원"].fillna(0).sum()) if len(um) else 0.0
+        found = alertm.compute_alerts(_alert_lines(conn, runs),
+                                      _alert_lines(conn, prev_runs) if prev_runs else None,
+                                      unmapped)
+        return _clean_json({"alerts": found, "summary": alertm.summarize(found),
+                            "prev_year": prev_year if prev_runs else None})
+    finally:
+        conn.close()
+
+
 @app.get("/api/branches")
 def branches(year: str):
     """전지사 요약: 지사 × (손익/자본) 계획·실적 + 미매핑 가상 지사."""
@@ -1041,6 +1213,7 @@ def branches(year: str):
         runs = _latest_runs(conn, year)
         if not runs:
             return {"rows": []}
+        notes = dbm.variance_notes(conn, year)
         agg = {}
         for budget, r in runs.items():
             df = dbm.load_biz_lines(conn, r["id"])
@@ -1049,7 +1222,8 @@ def branches(year: str):
                 g = agg.setdefault(dept, {"branch": dept,
                                           "profitPlan": 0, "profitActual": 0,
                                           "capitalPlan": 0, "capitalActual": 0,
-                                          "lowConf": 0, "unmapped": 0})
+                                          "lowConf": 0, "unmapped": 0,
+                                          "variance": 0, "varianceNoted": 0})
                 p = row["연예산"] or 0
                 a = row["실적금액"] or 0
                 if budget == "손익":
@@ -1061,6 +1235,10 @@ def branches(year: str):
                 conf = row["매칭확신도"]
                 if row["구분"] == "계획집행" and conf is not None and conf < 0.8:
                     g["lowConf"] += 1
+                if dbm.is_variance(p, a):
+                    g["variance"] += 1
+                    if (budget, row["예산과목"], row["처지사"], row["사업명"]) in notes:
+                        g["varianceNoted"] += 1
         rows = sorted(agg.values(), key=lambda x: x["branch"])
         # 미매핑 전표는 원문 지사별 가상 행으로 맨 아래에 노출(종합표 미포함 금액)
         for raw, vs in sorted(_unmapped_detail(conn, runs).items()):
@@ -1072,6 +1250,20 @@ def branches(year: str):
         return _clean_json({"rows": rows})
     finally:
         conn.close()
+
+
+def _basis_fallback(conf, gubun):
+    """매칭근거 열이 생기기 전(2026-10-22 이전) 실행은 확신도로 추정한다 — 화면에 «추정»을 붙인다."""
+    if conf is None or (isinstance(conf, float) and conf != conf):
+        return None
+    if str(gubun).startswith("신규"):
+        return "신규(추정)"
+    c = float(conf)
+    if c >= 0.995:
+        return "재배정·규칙·자재류(추정)"
+    if c >= 0.985:
+        return "학습(추정)"
+    return "사업명 유사(추정)" if c >= 0.8 else "유사도 낮음(추정)"
 
 
 @app.get("/api/branch-detail")
@@ -1118,11 +1310,11 @@ def branch_detail(year: str, branch: str):
                                 "biz": biz_out, "unmapped": True})
 
         biz_out = []
+        notes = dbm.variance_notes(conn, year, dept=branch)
         for budget, r in runs.items():
             biz = dbm.load_biz_lines(conn, r["id"])
             biz = biz[biz["처지사"] == branch]
-            detail = dbm.load_match_detail(conn, r["id"])
-            detail = detail[detail["처지사정규"] == branch]
+            detail = dbm.load_match_detail(conn, r["id"], branch=branch)
             # 사업별 전표 묶기: 계획행 = 매칭행(행번호) 우선 — 동명 사업 충돌 방지.
             #   신규(계획행 없음)는 '[신규] 사업명' 라벨로 연결.
             by_row, by_label = {}, {}
@@ -1135,6 +1327,7 @@ def branch_detail(year: str, branch: str):
                     "금액천원": round(v["금액천원"] or 0),
                     "금액원": round(v["금액원"] or 0),
                     "확신도": v["매칭확신도"],
+                    "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"]),
                 }
                 mrow = v["매칭행"]
                 if mrow is not None and not pd.isna(mrow):
@@ -1167,6 +1360,8 @@ def branch_detail(year: str, branch: str):
                     "실적원": actual_won,
                     "구분": b["구분"], "확신도": b["매칭확신도"],
                     "전표": vouchers,
+                    "편차": dbm.is_variance(b["연예산"], b["실적금액"]),
+                    "사유": (notes.get((budget, b["예산과목"], branch, label)) or {}).get("note"),
                 })
         # 과목 → 계획 사업 먼저(신규는 뒤) → 실적 큰 순
         biz_out.sort(key=lambda x: (str(x["예산과목"]),
@@ -1179,6 +1374,32 @@ def branch_detail(year: str, branch: str):
         attrs += sorted(present - set(attrs))     # 혹시 남은 비표준 값 노출(진단용)
         return _clean_json({"branch": branch, "items": items, "attrs": attrs,
                             "biz": biz_out})
+    finally:
+        conn.close()
+
+
+# ── 차이 사유 (집행률 ±20%p, 권장 입력) ─────────────────────────────────
+
+class VarianceNoteReq(BaseModel):
+    year: str
+    budget: str
+    예산과목: str
+    처지사: str
+    사업명: str
+    note: str = ""
+
+
+@app.put("/api/variance-note")
+def put_variance_note(req: VarianceNoteReq, request: Request):
+    """사유 저장(빈 문자열이면 삭제). 숫자를 바꾸지 않는 설명이라 마감 연도에도 받는다 —
+    사유는 보통 마감 뒤 보고 때 쓰인다. 누가 썼는지는 operator·감사 로그에 남는다."""
+    if len((req.note or "").strip()) > dbm.VARIANCE_NOTE_MAX:
+        raise HTTPException(400, f"사유는 {dbm.VARIANCE_NOTE_MAX}자 이내로 적어 주세요.")
+    conn = _conn()
+    try:
+        saved = dbm.set_variance_note(conn, req.year, req.budget, req.예산과목, req.처지사,
+                                      req.사업명, req.note, operator=_operator(request))
+        return {"note": saved}
     finally:
         conn.close()
 
@@ -1207,9 +1428,8 @@ def add_override(req: OverrideReq):
     conn = _conn()
     try:
         _guard_unlocked(conn, req.year, "전표 재배정")
-        for rid in req.erp_row_ids:
-            dbm.add_override(conn, req.year, req.budget, rid, name, req.memo,
-                             target_dept=dept)
+        dbm.add_overrides(conn, req.year, req.budget, req.erp_row_ids, name, req.memo,
+                          target_dept=dept)
         # 학습은 여기서 하지 않는다(사용자 확정) — 설정 탭 [AI 학습] 버튼으로 분리.
         #   수정 중에 학습이 쌓이면 되돌려도 학습에 흔적이 남고, 저장도 느려진다.
         return {"saved": len(req.erp_row_ids),
@@ -1233,6 +1453,7 @@ def overrides(year: str):
 def delete_override(override_id: int):
     conn = _conn()
     try:
+        _guard_row_unlocked(conn, "override", override_id, "재배정 취소")
         dbm.delete_override(conn, override_id)
         return {"deleted": override_id}
     finally:
@@ -1263,9 +1484,15 @@ def stats(year: str):
                 g = by_item.setdefault(it, {"예산과목": it,
                                             "대분류": cat_of.get(it, "기타"),
                                             "계획": 0, "실적": 0, "집행": 0, "신규": 0,
-                                            "사업수": 0, "미시행": 0})
+                                            "사업수": 0, "미시행": 0, "_지사": {}})
                 g["계획"] += row["연예산"] or 0
                 g["실적"] += row["실적금액"] or 0
+                # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
+                br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
+                                           {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
+                br["계획"] += row["연예산"] or 0
+                br["실적"] += row["실적금액"] or 0
+                br["사업수"] += 1
                 g["사업수"] += 1
                 if row["구분"] == "미시행":
                     g["미시행"] += 1
@@ -1277,6 +1504,8 @@ def stats(year: str):
                 gg = by_group.setdefault(grp, {"그룹": grp, "계획": 0, "실적": 0})
                 gg["계획"] += row["연예산"] or 0
                 gg["실적"] += row["실적금액"] or 0
+            for g in by_item.values():
+                g["지사"] = sorted(g.pop("_지사").values(), key=lambda b: -abs(b["실적"]))
             order = ["본사", "중대형CHP", "소형CHP", "DH", "기타"]
             out[budget] = {
                 "items": sorted(by_item.values(), key=lambda x: str(x["예산과목"])),
@@ -1488,7 +1717,7 @@ def training_add(req: ExampleReq, request: Request):
 async def training_import(request: Request, name: str, file: UploadFile = File(...)):
     if name not in ml_registry.MODEL_NAMES:
         raise HTTPException(400, "모델 이름이 올바르지 않습니다.")
-    content = await file.read()
+    content = await _read_upload(file, xlsx=False)
     conn = _conn()
     try:
         try:
