@@ -694,21 +694,25 @@ injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
 $("#headerBrand").innerHTML = renderHeaderBrand();
 
-// 데스크톱 사이드바 접기 — 번호만 남은 좁은 막대로. 고른 상태는 이 브라우저에 기억한다.
-// 접힌 동안은 글자가 안 보이므로 마우스를 올리면 메뉴 이름이 뜨게 title 을 붙인다.
-// (모바일 드로어는 원래대로 — 접기 버튼은 lg 미만에서 숨는다)
+// 데스크톱 사이드바 — 누르지 않아도 마우스를 올리면 펼치고 떼면 접는다(2026-10-26 사용자 요청).
+// 스치기만 해도 펼쳐지지 않게 들어올 때 잠깐 기다리고, 나갈 때도 조금 늦게 접는다.
+// Tab 으로 메뉴에 들어와도 펼친다. 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
+document.documentElement.classList.add("sb-rail");
 function setSidebarCollapsed(on) {
   document.documentElement.classList.toggle("sb-collapsed", on);
-  const btn = $("#sidebarToggle");
-  btn.setAttribute("aria-expanded", on ? "false" : "true");
-  btn.setAttribute("aria-label", on ? "메뉴 펼치기" : "메뉴 접기");
-  btn.title = on ? "메뉴 펼치기" : "";
   $("#sidebar").querySelectorAll(".nav-button[data-label]").forEach(b => { b.title = on ? b.dataset.label : ""; });
-  try { localStorage.setItem("sidebar_collapsed", on ? "1" : "0"); } catch {}
 }
-setSidebarCollapsed((() => { try { return localStorage.getItem("sidebar_collapsed") === "1"; } catch { return false; } })());
-$("#sidebarToggle").addEventListener("click", () =>
-  setSidebarCollapsed(!document.documentElement.classList.contains("sb-collapsed")));
+setSidebarCollapsed(true);
+{
+  const sb = $("#sidebar");
+  let timer = null;
+  const later = (on, ms) => { clearTimeout(timer); timer = setTimeout(() => setSidebarCollapsed(on), ms); };
+  sb.addEventListener("mouseenter", () => later(false, 120));
+  sb.addEventListener("mouseleave", () => later(true, 250));
+  sb.addEventListener("focusin", () => later(false, 0));
+  sb.addEventListener("focusout", e => { if (!sb.contains(e.relatedTarget)) later(true, 0); });
+  sb.addEventListener("click", e => { if (e.target.closest("[data-view]")) later(true, 0); });  // 메뉴를 고르면 바로 접는다
+}
 
 // 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
 window.addEventListener("hashchange", onHashChange);

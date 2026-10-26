@@ -46,7 +46,8 @@ function groupLabel(text) {
 
 /** <aside id="sidebar"> 의 내용. 바깥 껍데기(위치·모바일 토글)는 index.html 이 갖는다.
  *  로고는 CI 매뉴얼의 한글 가로 A타입 시그니처(SVG, 비율 4.33:1 → 184px 폭에 43px).
- *  데스크톱에서는 맨 아래 «메뉴 접기»로 번호만 남은 좁은 막대가 된다(main.js setSidebarCollapsed).
+ *  데스크톱에서는 평소 번호만 남은 좁은 막대(76px)이고, 마우스를 올리거나 Tab 으로 들어오면
+ *  본문 위로 펼쳐진다(main.js 사이드바 펼침). 본문은 밀리지 않는다.
  *  접힌 동안 로고·글자는 숨기고 캐릭터 머리만 남긴다(custom.css .sb-collapsed) — 대신 상단 머리글에
  *  같은 표지(renderHeaderBrand)가 나온다. 표지를 누르면 어디서든 메인으로 간다(button[data-view]). */
 export function renderSidebar() {
@@ -59,12 +60,7 @@ export function renderSidebar() {
 
     <nav class="mt-8 flex-1 space-y-1" aria-label="주요 메뉴">
       ${MENU.map(m => m.group ? groupLabel(m.group) : navButton(m)).join("\n      ")}
-    </nav>
-
-    <button id="sidebarToggle" type="button" class="sb-toggle" aria-controls="sidebar" aria-expanded="true">
-      <svg viewBox="0 0 24 24" class="sb-toggle__icon h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-      <span class="nav-label">메뉴 접기</span>
-    </button>`
+    </nav>`
 }
 
 /** 사이드바를 접었을 때 상단 머리글 왼쪽에 나오는 표지 — 72px 머리글에 맞춰 가로로 낮게.

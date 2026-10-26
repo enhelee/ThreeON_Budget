@@ -20,6 +20,9 @@ import { esc, fmt } from "../util.js"
 // ─────────────────────────────────────────────────────────────
 
 const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+// 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
+const MANAGE_TABS = [["grades", "정비등급 이력", ["grades"]], ["factor", "팩터·고온부품", ["factors", "hot_parts"]],
+                     ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]]]
 const HOT_ITEMS = ["고온부품재생", "신품구매"]
 export const METHODS = ["등급별 평균", "최근실적", "3개년 평균", "5개년 평균"]
 const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
@@ -139,10 +142,16 @@ function manageBody() {
   if (!d) return emptyState("전망 가정을 불러오지 못했습니다.")
   const acct = accountsAll()
   const n = state.fc.dirty.size
+  const mt = state.fc.manageTab || "grades"
+  const tabs = `<div class="flex flex-wrap gap-2" role="tablist" aria-label="기준정보 묶음">${MANAGE_TABS.map(([k, l, keys]) => {
+    const dirty = keys.some(x => state.fc.dirty.has(x))
+    return `<button class="${mt === k ? "btn-primary" : "btn-secondary"} min-h-[36px] px-4 text-xs" role="tab" aria-selected="${mt === k}" data-fcmtab="${k}">${esc(l)}${dirty ? ' <span class="h-1.5 w-1.5 rounded-full bg-warn" title="저장 안 됨"></span>' : ""}</button>`
+  }).join("")}</div>`
   return `
   <div class="space-y-6">
-    ${gradesPanel(d)}
-    ${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
+    ${tabs}
+    ${mt === "grades" ? gradesPanel(d) : ""}
+    ${mt === "factor" ? `${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
       longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"}], d.factors), "factors")}
     ${panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음", `
       <div class="flex flex-wrap gap-2 p-5 pb-0">
@@ -150,11 +159,14 @@ function manageBody() {
         <button class="btn-secondary" data-fcexport="hot-parts">현재값이 채워진 양식 내려받기</button>
       </div>
       ${longTable("hot_parts", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "항목", label: "항목", type: "select", options: HOT_ITEMS}, {f: "금액", label: "금액(천원)", type: "num"}], d.hot_parts, "고온부품 계획이 없습니다.")}`, "hot_parts")}
-    ${hqMasterPanel(d)}
+    ` : ""}
+    ${mt === "hq" ? `${hqMasterPanel(d)}
     ${panel("본사 일시적 사업", "배분비율(계약체결금액)로 지사에 자동 배분",
       longTable("hq_temp", [{f: "사업명", label: "사업명"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "연도", label: "연도", type: "int"}, {f: "금액", label: "금액(천원)", type: "num"}], d.hq_temp, "없음"), "hq_temp")}
-    ${panel("지사별 돌발 사업", "그 해 그 과목에 더함",
+    ` : ""}
+    ${mt === "surprise" ? `${panel("지사별 돌발 사업", "그 해 그 과목에 더함",
       longTable("surprise", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "예산과목", label: "예산과목", type: "select", options: acct}, {f: "금액", label: "금액(천원)", type: "num"}, {f: "사유", label: "사유"}], d.surprise, "없음"), "surprise")}
+    ` : ""}
     <div class="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-card border border-line bg-white/95 p-4 shadow-float backdrop-blur">
       <button class="btn-primary" id="fcSaveBtn" data-action="fc-save" ${n ? "" : "disabled"}>저장${n ? ` (${n}표)` : ""}</button>
       <span class="text-xs text-sub">손댄 표만 ${esc(state.fc.baseYear)}년 기준으로 저장합니다. 표준화·전망 표는 저장 즉시 다시 계산됩니다.</span>

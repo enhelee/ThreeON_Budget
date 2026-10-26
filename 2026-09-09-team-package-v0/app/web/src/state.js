@@ -16,7 +16,7 @@ export const state = {
   // 5번 탭 — 전망 기준연도(base_year)는 헤더 대상연도와 다른 축이다(«어느 해에 세운 가정인가»).
   //   data = 그 기준연도의 가정 9종(/api/forecast/state) · bench = 표준화 결과 · table = 전망 표.
   //   dirty = 손댄 가정 표(저장 버튼에서만 보낸다) · benchEdits = 산출방식·표준금액 편집분.
-  fc: { baseYear: "", baseYears: [], lockedYears: [], tab: "manage",
+  fc: { baseYear: "", baseYears: [], lockedYears: [], tab: "manage", manageTab: "grades",
         data: null, bench: null, table: null, site: "__total__",
         dirty: new Set(), preview: null, benchGroup: "all",
         benchEdits: {methods: {}, overrides: {}} },
