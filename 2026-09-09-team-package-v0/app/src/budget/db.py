@@ -967,18 +967,24 @@ def learn_from_year(conn, year):
                     counts["저확신제외"] += 1
                     continue
             rows.append((r["과목정규"], key, name, src))
-        # 자동확정 먼저, 수동확정 나중(같은 키면 사람 확정이 이긴다)
+        # 자동확정 먼저, 수동확정 나중(같은 키면 사람 확정이 이긴다). 같은 키는 마지막 것만 남기고
+        # 한 번에 쓴다 — 행마다 execute 하면 운영 PG(원격)에서 8천 건이 수 분 걸려 요청이 끊겼다
+        # (2026-10-27 운영 2025 학습). 결과는 행마다 덮어쓰던 것과 같다.
+        now = _now()
         for want in ("자동확정", "수동확정"):
+            last = {}
             for item, key, name, src in rows:
                 if src != want:
                     continue
                 if src == "자동확정" and (item, key) in manual_keys:
                     counts["수동확정보호"] += 1
                     continue
-                cur.execute(
-                    "INSERT OR REPLACE INTO learned_match VALUES(?,?,?,?,?,?)",
-                    (item, key, name, src, str(year), _now()))
+                last[(item, key)] = name
                 counts[src] += 1
+            if last:
+                cur.executemany(
+                    "INSERT OR REPLACE INTO learned_match VALUES(?,?,?,?,?,?)",
+                    [(item, key, name, want, str(year), now) for (item, key), name in last.items()])
     conn.commit()
     return counts
 
