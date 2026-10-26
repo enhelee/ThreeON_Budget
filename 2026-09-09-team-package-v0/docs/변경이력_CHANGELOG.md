@@ -6,6 +6,15 @@
 
 > 2026-10-27 rev33~37 의 한 장 요약은 [개발정리_2026-10-27.md](개발정리_2026-10-27.md), 운영 점검 기록은 [운영점검_2026-10-27.md](운영점검_2026-10-27.md).
 
+## 2026-10-27 · Supabase 일시정지 방지
+
+**대상:** `app/server.py`(`/healthz`)·`.github/workflows/keepalive.yml`. 테스트 `tests/test_healthz_db.py` 4개 추가.
+
+- **`/healthz?db=1`**: DB 에 `SELECT 1` 한 번 → `db_ok: true`, 실패하면 503 + `db_ok: false`(실패 사유는 싣지 않음 — 로그인 없이 열리는 주소). 기본 `/healthz` 는 지금처럼 DB 를 안 건드린다(배포 판별용).
+- **keepalive 워크플로**: 이틀마다(09:17 KST) 운영 앱의 `/healthz?db=1` 을 부른다 — Supabase 무료 «7일 미사용 일시정지» 방지. Render 슬립(첫 응답 30~60초)을 고려해 90초 제한 + 5회 재시도. 비밀값 없음, 주소는 저장소 Variables `APP_URL`(없으면 threeon-budget.onrender.com). Actions 탭에서 수동 실행도 된다.
+
+---
+
 ## 2026-10-27 · 3번 산점도 라벨 — 적정 범위 띠 피하기 · 흰 테두리 (rev37)
 
 **대상:** `app/web/src/views/branches.js`(화면만).
