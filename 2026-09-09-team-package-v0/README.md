@@ -12,9 +12,9 @@
 | | 값 |
 |---|---|
 | 단위 | 천원(집계) · 원(전표·계약 파일) |
-| 검증 연도 | 2023 · 2025 — ERP 전체 = 종합표, 미배정 0 |
-| 테스트 | `app` 전체 1통 (`cd app && py -m pytest -q`) |
-| 배포 | Render + Supabase(검토·실증용) → 최종 사내 서버 |
+| 검증 연도 | 2023 · 2024 · 2025 (모두 마감) — ERP 전체 = 종합표, 미배정 0 |
+| 테스트 | `app` 전체 1통 (`cd app && py -m pytest -q`) — 379 passed (2026-10-26) |
+| 배포 | Render + Supabase(검토·실증용, main 병합 시 자동 배포) → 최종 사내 서버 |
 
 ---
 
@@ -96,7 +96,7 @@ Render는 저장소 루트의 `render.yaml`을 자동 인식합니다. 대시보
 | 1 | [docs/superpowers/specs/2026-09-12-통합웹앱-design.md](docs/superpowers/specs/2026-09-12-통합웹앱-design.md) | 통합 웹앱 설계 — Phase 0~6 전 구간(완료) |
 | 2 | [docs/통합_인수인계_MASTER.md](docs/통합_인수인계_MASTER.md) | 구조·아키텍처·분석 로직 R1~R15·API 명세 |
 | 3 | [docs/DB_스냅샷.md](docs/DB_스냅샷.md) | DB 스키마·현재 데이터·검증 기준치 |
-| 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev20 의사결정 이력 |
+| 4 | [docs/변경이력_CHANGELOG.md](docs/변경이력_CHANGELOG.md) | rev1~rev28 의사결정 이력 |
 | 5 | [docs/연계계약_CONTRACT.md](docs/연계계약_CONTRACT.md) | 앱이 받고 내는 파일·인터페이스 계약(옛 계약 4개 통합본) |
 | 6 | [docs/설계_3-4단계_소요전망_파이프라인.md](docs/설계_3-4단계_소요전망_파이프라인.md) | 표준화·중장기 전망 설계 (Phase 6 근거) |
 | 7 | [docs/팀공유_최종안내.html](docs/팀공유_최종안내.html) | **팀원용 — 무엇을 하는 앱이고 어떻게 쓰나** (Phase 8, 브라우저로 열기) |
