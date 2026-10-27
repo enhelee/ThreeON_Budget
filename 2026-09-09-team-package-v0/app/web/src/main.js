@@ -12,6 +12,7 @@ import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
+import { rqChange, rqClick, rqKey } from "./review_actions.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -35,6 +36,7 @@ async function saveAlias(kind, mapping, msg) {
 document.addEventListener("click", async e => {
   // 5번 탭(전망)의 클릭은 forecast_actions.js 가 맡는다 — 이 파일을 더 키우지 않기 위해서다.
   if (await fcClick(e)) return;
+  if (await rqClick(e)) return;                   // 검토 큐 — review_actions.js
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   // 메인 중장기 전망 패널 → 5번 탭 «한눈에 보기»(전사). 연도가 있으면 그 해 구성으로.
@@ -62,9 +64,12 @@ document.addEventListener("click", async e => {
       const d = state.det;
       d.item = dr.dataset.drillItem || "";
       d.budget = dr.dataset.drillBudget || "all";
-      d.q = ""; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
+      // 검토 큐에서 오면 사업명까지 정해져 있다 — 그 사업만 걸러 전표를 펼친다.
+      const name = dr.dataset.drillName || "";
+      d.q = name; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
       const hit = d.data.biz.map((b, idx) => ({b, key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}))
-        .filter(({b}) => b.예산과목 === d.item && (d.budget === "all" || b.budget === d.budget));
+        .filter(({b}) => b.예산과목 === d.item && (d.budget === "all" || b.budget === d.budget)
+                         && (!name || b.사업명 === name));
       if (hit.length <= 8) hit.forEach(({b, key}) => { if (b.전표.length) d.open.add(key); });
       state.view = "detail"; syncHash(); renderPage();
     } catch (err) { toast(err.message); }
@@ -490,6 +495,7 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   if (await fcChange(e)) return;                 // 5번 탭(전망) 입력 — forecast_actions.js
+  if (rqChange(e)) return;                       // 검토 큐 거르기·옮길 사업 — review_actions.js
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
   // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
   const yc = e.target.closest("[data-yc]");
@@ -670,6 +676,7 @@ new MutationObserver(markClickable).observe($("#page"), {childList: true, subtre
 
 document.addEventListener("keydown", e => {
   if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
+  if (rqKey(e)) { e.preventDefault(); return; }   // 검토 큐 단축키 — review_actions.js
   if (e.key === "Escape" && state.helpOpen) {
     state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
   }

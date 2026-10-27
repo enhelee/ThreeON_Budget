@@ -18,6 +18,7 @@ export const MENU = [
   {view: "collect", tag: "2", label: "실적 집계"},
   {view: "branches", tag: "3", label: "실적 분석"},
   {view: "detail", tag: "3+", label: "실적분석(상세)"},
+  {view: "review", tag: "✓", label: "검토 큐"},
   {view: "stats", tag: "4", label: "통계·내보내기"},
   {view: "forecast", tag: "5", label: "중장기 예측"},
   {group: "관리"},

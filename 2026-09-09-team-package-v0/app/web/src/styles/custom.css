@@ -257,3 +257,48 @@
 .fv-corner-k{font-size:.95rem;font-weight:800;color:#0D0D0D;line-height:1.2}
 .fv-rowcap{grid-column:1/-1;padding:.4rem .5rem .1rem;font-size:.75rem;font-weight:700;color:#5D5D5D;border-top:1px solid #E5E5E5}
 .fv-present .fv-scope-name{font-size:3rem}
+/* ── 검토 큐(2026-10-27, views/review.js) ─────────────────────────────
+   색은 한난 토큰만 쓴다: 잉크(#0D0D0D) 곡선 · ok(#16794A) 진행·덮은 구간 · 선(#E5E5E5) 격자. */
+.rq-big{font-size:1.25em;font-weight:800;color:#0D0D0D;letter-spacing:-.01em}
+.rq-progress{height:10px;border-radius:999px;background:#F2F2F2;overflow:hidden}
+.rq-progress>span{display:block;height:100%;border-radius:999px;background:#16794A;transition:width .45s ease}
+.rq-segs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;border-radius:12px;background:#F2F2F2}
+.rq-seg{padding:.3rem .7rem;border-radius:10px;font-size:.8rem;font-weight:600;color:#5D5D5D}
+.rq-seg:hover{color:#0D0D0D}
+.rq-seg--on{background:#fff;color:#0D0D0D;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.rq-curve{margin:0;min-width:0}
+.rq-curve svg{display:block;width:100%;height:auto;margin-top:.5rem}
+.rq-grid{stroke:#F2F2F2;stroke-width:1}
+.rq-ref{stroke:#C9C9C9;stroke-width:1;stroke-dasharray:4 4}
+.rq-axis{font-size:12px;fill:#767676}
+.rq-axis--strong{fill:#0D0D0D;font-weight:700}
+.rq-area{fill:#EAF5EF}
+.rq-line{fill:none;stroke:#0D0D0D;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.rq-dot{fill:#0D0D0D;stroke:#fff;stroke-width:2}
+.rq-dot--sel{fill:#16794A}
+.rq-hit{fill:transparent}
+.rq-hit:hover{fill:rgba(13,13,13,.05)}
+.rq-card{list-style:none;border:1px solid #E5E5E5;border-radius:16px;background:#fff;padding:1rem 1.25rem;transition:opacity .2s ease,transform .2s ease,box-shadow .18s ease}
+.rq-card:focus,.rq-card--focus{outline:none;box-shadow:0 0 0 2px #0D0D0D}
+.rq-card:focus:not(:focus-visible){box-shadow:none}
+.rq-card--done{background:#F7F7F8}
+.rq-card--leave{opacity:0;transform:translateX(24px)}
+.rq-rank{display:grid;place-items:center;min-width:2.25rem;height:2.25rem;border-radius:12px;background:#F2F2F2;font-weight:800;color:#0D0D0D;font-size:.9rem}
+.rq-card--done .rq-rank{background:#EAF5EF;color:#16794A}
+.rq-bullet{position:relative;height:8px;margin-top:.4rem;max-width:28rem;border-radius:4px;background:#F2F2F2}
+.rq-bullet__bar{position:absolute;inset:0 auto 0 0;border-radius:4px;background:#5D5D5D}
+.rq-bullet__bar--over{background:#B42318}
+.rq-bullet__plan{position:absolute;top:-3px;bottom:-3px;width:2px;background:#0D0D0D}
+.rq-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-top:.85rem;padding-top:.75rem;border-top:1px solid #F2F2F2}
+.rq-btn{padding:.4rem .8rem;font-size:.85rem}
+.rq-chip{padding:.35rem .7rem;border-radius:999px;border:1px solid #C9C9C9;background:#fff;font-size:.8rem;font-weight:600;color:#0D0D0D}
+.rq-chip:hover{border-color:#0D0D0D;background:#F7F7F8}
+.rq-chip--ghost{border-style:dashed;color:#5D5D5D}
+.rq-link{margin-left:auto;font-size:.8rem;font-weight:700;color:#0D0D0D}
+.rq-link:hover{color:#FE0009}
+.rq-noteedit{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}
+.rq-sugg{margin-top:.75rem;padding:1rem;border-radius:12px;background:#F7F7F8}
+@media (prefers-reduced-motion:reduce){.rq-progress>span,.rq-card{transition:none}}
+.rq-voucher{list-style:none;padding:.6rem .75rem;border-radius:12px;background:#fff;border:1px solid #E5E5E5;font-size:.85rem}
+.rq-voucher--rec{border-color:#16794A;box-shadow:inset 3px 0 0 #16794A}
+.rq-rec{display:inline-block;padding:.05rem .45rem;border-radius:999px;background:#EAF5EF;color:#16794A;font-size:.7rem;font-weight:800}
