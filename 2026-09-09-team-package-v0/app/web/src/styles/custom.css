@@ -159,6 +159,40 @@
 }
 @media (prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
+/* ONDO 사이드바 — 남색 바탕 + 아래쪽 민트빛 + 오른쪽 3색 선(매칭이·검토미·예측이). 2026-10-27 grace 결정.
+   데스크톱은 펼침이 기본(html.sb-open, 본문이 288px 비킨다), «메뉴 접기»면 76px 띠(.sb-collapsed). 모바일 드로어도 같은 색 */
+#sidebar{background:radial-gradient(120% 40% at 20% 108%,rgba(62,230,196,.26),transparent 60%),var(--navy);color:#C7CDDA;border-right-color:transparent}
+#sidebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--char-mt),var(--char-gt),var(--char-yc));pointer-events:none}
+#sidebar :focus-visible{outline-color:var(--char-mt)}
+.sb-ci{display:block;background:#fff;border-radius:12px;padding:10px 12px}
+.sb-name{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding:0 .25rem}
+.sb-word{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#fff}
+.sb-word b,.header-brand__word b{font-weight:800;color:var(--char-mt)}
+.header-brand__word b{color:#0F6E56}
+.sb-by{margin-left:auto;font-size:11px;color:#7D859A}
+.sb-desc{display:block;margin-top:.25rem;padding:0 .25rem;font-size:12px;line-height:1.5;color:#8A92A6}
+#sidebar .nav-button{color:#C7CDDA}
+#sidebar .nav-button:hover{background:rgba(255,255,255,.06);color:#fff}
+#sidebar .nav-button-active,#sidebar .nav-button-active:hover{background:rgba(62,230,196,.13);color:#fff;box-shadow:inset 0 0 0 1px rgba(62,230,196,.25)}
+#sidebar .nav-tag{background:rgba(255,255,255,.07);color:#8A92A6;font-weight:700}
+#sidebar .nav-button-active .nav-tag{background:var(--char-mt);color:#04342C}
+#sidebar .nav-group{color:#646C82}
+.nav-dot{flex:none;width:7px;height:7px;border-radius:999px;margin-left:auto}
+.nav-dot--mt{background:var(--char-mt)}.nav-dot--gt{background:var(--char-gt)}.nav-dot--yc{background:var(--char-yc)}
+.sb-fold{display:flex;align-items:center;gap:.625rem;width:100%;margin-top:.75rem;padding:.6rem .75rem;border:0;border-radius:12px;background:none;font-size:13px;color:#8A92A6;cursor:pointer;text-align:left}
+.sb-fold:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-fold__icon{width:1.75rem;text-align:center;font-size:15px;line-height:1}
+@media (max-width:1023px){.sb-fold{display:none}}
+@media (min-width:1024px){
+  .sb-rail.sb-open #appShell{padding-left:288px}
+  .sb-rail.sb-open #sidebar{box-shadow:none}
+  .sb-rail.sb-open .header-brand{display:none}
+  .sb-collapsed #sidebar .sb-name{justify-content:center;margin-top:0;padding:0}
+  .sb-collapsed #sidebar .nav-dot{position:absolute;top:.45rem;right:.85rem;box-shadow:0 0 0 2px var(--navy)}
+  .sb-collapsed #sidebar .sb-fold{justify-content:center;padding-left:0;padding-right:0}
+  .sb-collapsed #sidebar .nav-group{border-top-color:rgba(255,255,255,.12)}
+}
+
 /* 표지(로고·ThreeON) — 누르면 메인. 사이드바 맨 위 + 접혔을 때 상단 머리글 */
 .brand-link{background:none;border:0;cursor:pointer;border-radius:12px}
 .brand-link:hover{opacity:.8}

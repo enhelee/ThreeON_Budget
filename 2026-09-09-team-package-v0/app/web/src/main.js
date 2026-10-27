@@ -742,24 +742,49 @@ injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
 $("#headerBrand").innerHTML = renderHeaderBrand();
 
-// 데스크톱 사이드바 — 누르지 않아도 마우스를 올리면 펼치고 떼면 접는다(2026-10-26 사용자 요청).
-// 스치기만 해도 펼쳐지지 않게 들어올 때 잠깐 기다리고, 나갈 때도 조금 늦게 접는다.
-// Tab 으로 메뉴에 들어와도 펼친다. 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
+// 데스크톱 사이드바 — 펼친 상태가 기본이고 «메뉴 접기»로 번호만 남은 어두운 띠가 된다(2026-10-27 grace 결정).
+// 고른 상태는 사람마다 기억한다(localStorage «ondo.sidebar» — 막힌 브라우저면 늘 펼침으로 시작).
+// 접힌 띠는 예전처럼 마우스를 올리거나 Tab 으로 들어오면 본문 위로 잠깐 펼친다(2026-10-26 요청 유지).
+// 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
+const SB_KEY = "ondo.sidebar";
+const sbStore = {
+  get() { try { return localStorage.getItem(SB_KEY); } catch { return null; } },
+  set(v) { try { localStorage.setItem(SB_KEY, v); } catch { /* 저장 못 해도 화면은 동작 */ } },
+}
 document.documentElement.classList.add("sb-rail");
 function setSidebarCollapsed(on) {
   document.documentElement.classList.toggle("sb-collapsed", on);
   $("#sidebar").querySelectorAll(".nav-button[data-label]").forEach(b => { b.title = on ? b.dataset.label : ""; });
 }
-setSidebarCollapsed(true);
+function setSidebarOpen(open) {
+  document.documentElement.classList.toggle("sb-open", open);
+  setSidebarCollapsed(!open);
+  const fold = $("#sidebar [data-sb-fold]");
+  if (fold) {
+    fold.setAttribute("aria-label", open ? "메뉴 접기" : "메뉴 펼치기");
+    fold.querySelector(".sb-fold__icon").textContent = open ? "«" : "»";
+    fold.querySelector(".sb-fold__text").textContent = open ? "메뉴 접기" : "메뉴 펼치기";
+  }
+}
+setSidebarOpen(!(sbStore.get() === "folded"));
 {
   const sb = $("#sidebar");
+  const pinned = () => document.documentElement.classList.contains("sb-open");
   let timer = null;
   const later = (on, ms) => { clearTimeout(timer); timer = setTimeout(() => setSidebarCollapsed(on), ms); };
-  sb.addEventListener("mouseenter", () => later(false, 120));
-  sb.addEventListener("mouseleave", () => later(true, 250));
-  sb.addEventListener("focusin", () => later(false, 0));
-  sb.addEventListener("focusout", e => { if (!sb.contains(e.relatedTarget)) later(true, 0); });
-  sb.addEventListener("click", e => { if (e.target.closest("[data-view]")) later(true, 0); });  // 메뉴를 고르면 바로 접는다
+  sb.addEventListener("mouseenter", () => { if (!pinned()) later(false, 120); });
+  sb.addEventListener("mouseleave", () => { if (!pinned()) later(true, 250); });
+  sb.addEventListener("focusin", () => { if (!pinned()) later(false, 0); });
+  sb.addEventListener("focusout", e => { if (!pinned() && !sb.contains(e.relatedTarget)) later(true, 0); });
+  sb.addEventListener("click", e => {
+    if (e.target.closest("[data-sb-fold]")) {
+      clearTimeout(timer);
+      const open = !pinned();
+      setSidebarOpen(open); sbStore.set(open ? "open" : "folded");
+      return;
+    }
+    if (!pinned() && e.target.closest("[data-view]")) later(true, 0);   // 접힌 띠에서 메뉴를 고르면 바로 접는다
+  });
 }
 
 // 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
