@@ -1,5 +1,5 @@
-import { state, viewMeta } from "../state.js"
-import { esc } from "../util.js"
+import { state } from "../state.js"
+import { CHAR_IMG } from "./char_images.js"
 
 // ─────────────────────────────────────────────────────────────
 // ThreeON 캐릭터 — 한장이(전표 한 장)·매칭이(사업 찾기)·검토미(사람에게 묻기)·예측이(전망).
@@ -130,7 +130,7 @@ export const HELP = {
          "대상연도는 오른쪽 위에서 바꿔요."],
   budget: ["사업별예산 xlsx(시트 «양식1(월별)»)를 올려요.",
            "올리면 그 해 계획이 DB에 등록돼요.",
-           "계획본(양식1)은 여기서 내려받아요."],
+           "주관부서예산 원본(손익·자본·건설공사)은 한 번에 같이 골라 올려요."],
   collect: ["zrfm2.XLSX 를 올려요. 파일 이름이 zrfm2 여야 해요.",
             "«분석 실행»을 누르면 손익·자본을 한 번에 매칭해요.",
             "확신도가 낮은 전표는 실적분석(상세)에서 확인해요."],
@@ -154,18 +154,13 @@ export const HELP = {
              "모든 변경은 «변경 이력»에 작업자 이름으로 남아요."],
 }
 
+// 2026-10-27: 버튼은 대화 패널(components/chat.js)을 연다 — 위 세 줄은 패널 첫 인사로 옮겨 갔다.
+//   그림은 챗봇과 같은 파일(char_images.js)이라 캐릭터를 바꾸면 버튼도 같이 바뀐다.
 export function helpFabHtml() {
-  const steps = HELP[state.view] || []
-  const title = `${(viewMeta[state.view] || "이 화면")}에서는`
-  const open = !!state.helpOpen && steps.length > 0
+  const open = !!state.chatOpen
   return `<div class="help-fab">
-    ${open ? `<div class="help-bubble" id="helpBubble" role="dialog" aria-label="${esc(title)} 도움말">
-      <p class="help-bubble__title">${esc(title)}</p>
-      <ol>${steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
-      <button class="help-bubble__close" data-action="close-help" aria-label="도움말 닫기">×</button>
-    </div>` : ""}
-    <button class="help-fab__btn" data-action="toggle-help" aria-expanded="${open}" aria-controls="helpBubble" title="이 화면 도움말">
-      <span class="help-fab__pill">? 도움말</span>${charSvg("mt", "help-fab__img")}
+    <button class="help-fab__btn" data-action="toggle-help" aria-expanded="${open}" title="ThreeON 탐험대에게 물어보기">
+      <span class="help-fab__pill">물어보기</span><img class="help-fab__img help-fab__img--3d" src="${CHAR_IMG.mt.full}" alt="매칭이">
     </button>
   </div>`
 }

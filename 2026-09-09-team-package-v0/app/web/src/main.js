@@ -4,6 +4,7 @@ import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { injectCharacterSprite } from "./components/characters.js"
+import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
@@ -137,8 +138,9 @@ document.addEventListener("click", async e => {
 
   const act = e.target.closest("[data-action]")?.dataset.action;
   // 도움말·검토미 배너 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
-  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); syncFabMini(); return; }
-  if (act === "close-help") { state.helpOpen = false; renderPage(); syncFabMini(); $(".help-fab__btn")?.focus(); return; }
+  // 오른쪽 아래 매칭이 → 대화 패널(components/chat.js). 패널 안 클릭은 chat.js 가 따로 받는다.
+  if (act === "toggle-help") { await toggleChat(); renderPage(); syncFabMini(); return; }
+  if (act === "close-help") { closeChat(); renderPage(); syncFabMini(); return; }
   if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
@@ -676,8 +678,11 @@ export function closeMenu() {
 
 // 도움말은 늘 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게. 말풍선을 열 때만 글자도 보인다.
 //   (2026-10-26 사용자 결정: 늘 작게 + 본문 오른쪽 여백)
-const syncFabMini = () => document.body.classList.toggle("fab-mini", !state.helpOpen);
+const syncFabMini = () => document.body.classList.toggle("fab-mini", !chatIsOpen());
 syncFabMini();
+initChat();
+// 화면을 옮기면 패널의 추천 질문을 그 화면 것으로(navigate 가 주소를 맞춘 뒤).
+window.addEventListener("hashchange", () => setTimeout(() => { chatOnViewChange(); syncFabMini(); }, 0));
 
 // 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
 // (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
@@ -690,9 +695,7 @@ new MutationObserver(markClickable).observe($("#page"), {childList: true, subtre
 document.addEventListener("keydown", e => {
   if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
   if (rqKey(e)) { e.preventDefault(); return; }   // 검토 큐 단축키 — review_actions.js
-  if (e.key === "Escape" && state.helpOpen) {
-    state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
-  }
+  if (e.key === "Escape" && chatIsOpen()) { closeChat(); renderPage(); syncFabMini(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(CLICKABLE_ROW)) {
     e.preventDefault(); e.target.click(); return;
   }
