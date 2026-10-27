@@ -1,5 +1,5 @@
 // 챗봇·도움말 버튼이 쓰는 캐릭터 그림 — 한 곳에서만 정한다.
-// 원본: handoff/characters-3d-v2-20261027/assets/*.png(1254px 투명 PNG) → 512px webp, 머리(-head)는 위쪽(매칭이 64%·검토미 66%·예측이 70% — 안테나 길이가 달라서)을 잘라 256px.
+// 원본: handoff/characters-3d-v2-20261027/assets/*.png(1254px 투명 PNG) → 512px webp, 머리(-head)는 heads/*-happy-head.png(머리만 따로 그린 것) → 256px.
 // 그림을 바꾸려면 assets/characters/ 의 webp 를 «같은 이름»으로 갈아 끼우면 된다
 // (Vite 가 빌드 때 파일 내용 해시를 이름에 붙이므로 /assets 영구 캐시에도 새 그림이 바로 보인다).
 import mt from "../assets/characters/mt.webp"
