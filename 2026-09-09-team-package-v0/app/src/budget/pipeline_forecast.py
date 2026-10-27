@@ -158,9 +158,11 @@ def site_groups(conn, base_year):
     return {x["이름"]: x["그룹"] for x in config_store.load_dept_config(conn, base_year)}
 
 
-def default_base_year(conn):
-    """상태가 있는 최신 기준연도 → 없으면 마감 최신연도+1 → 그것도 없으면 v2 기본(2026)."""
-    existing = fs.list_base_years(conn)
+def default_base_year(conn, existing=None):
+    """상태가 있는 최신 기준연도 → 없으면 마감 최신연도+1 → 그것도 없으면 v2 기본(2026).
+    existing: 이미 읽은 fs.list_base_years 결과(같은 요청에서 두 번 읽지 않게)."""
+    if existing is None:
+        existing = fs.list_base_years(conn)
     if existing:
         return existing[-1]
     locked = dbm.locked_years(conn)

@@ -85,7 +85,7 @@ def test_nav_state_without_year_uses_latest_data_year(seeded):
 # 화면 전환에 쓰이는 API 의 질의 수 상한. 지금 값보다 조금 넉넉하게 — 기능이 늘며 한두 개 느는
 # 것은 괜찮지만, 행마다 질의하는 모양(수십~수백)이 들어오면 깨진다.
 QUERY_BUDGET = {
-    "/api/nav-state?year=2023": 30,
+    "/api/nav-state?year=2023": 12,          # 2026-10-27 26 → 8 (최신 실행·미반영·학습 대기 묶음)
     "/api/pending?year=2023": 20,
     "/api/status?year=2023": 20,
     "/api/branches?year=2023": 10,

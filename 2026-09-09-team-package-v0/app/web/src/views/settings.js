@@ -110,6 +110,14 @@ export function renderSettings() {
     ` : ""}
 
     ${tab === "data" ? `
+    <section class="panel p-5"><h3 class="section-title">시스템 정보</h3>
+      <dl class="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
+        <div><dt class="text-xs font-semibold text-tri">배포 커밋</dt><dd class="font-semibold text-ink">${esc(state.health?.commit || "-")}</dd></div>
+        <div><dt class="text-xs font-semibold text-tri">리비전(환경값)</dt><dd class="font-semibold text-ink">${esc(state.health?.rev || "-")}</dd></div>
+        <div><dt class="text-xs font-semibold text-tri">DB</dt><dd class="font-semibold text-ink">${esc(state.health?.db || "-")}</dd></div>
+        <div><dt class="text-xs font-semibold text-tri">로그인</dt><dd class="font-semibold text-ink">${state.health ? (state.health.auth ? "사용" : "끔") : "-"}</dd></div>
+      </dl>
+    </section>
     <section class="panel overflow-hidden"><div class="border-b border-line p-5"><h3 class="section-title">등록 데이터셋</h3></div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">ID</th><th class="px-4 py-3">종류</th><th class="px-4 py-3">연도</th><th class="px-4 py-3">파일</th><th class="px-4 py-3 text-right">행수</th><th class="px-4 py-3">업로드</th></tr></thead>
     <tbody class="divide-y divide-line-subtle">${ds.map(d => `<tr><td class="table-cell">${d.id}</td><td class="table-cell"><span class="badge ${d.kind ==="plan" ? "bg-subtle text-ink" : "bg-ok-bg text-ok"}">${d.kind}</span></td><td class="table-cell">${d.year}</td><td class="table-cell">${esc(d.label)}</td><td class="table-cell text-right">${d.row_count.toLocaleString()}</td><td class="table-cell text-xs text-sub">${esc(d.uploaded_at)}</td></tr>`).join("")}</tbody></table></div></section>

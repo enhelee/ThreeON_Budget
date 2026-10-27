@@ -144,6 +144,8 @@ document.addEventListener("click", async e => {
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
   const stab = e.target.closest("[data-settab]");
   if (stab) { await openSettingsTab(stab.dataset.settab); return; }
+  const gq = e.target.closest("[data-goto-review]");
+  if (gq) { state.rq.reason = gq.dataset.reason || ""; state.rq.show = "open"; state.rq.n = "20"; await navigate("review"); return; }
   const sttab = e.target.closest("[data-stattab]");
   if (sttab) { await openStatsTab(sttab.dataset.stattab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
   if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }

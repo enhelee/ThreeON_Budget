@@ -298,3 +298,8 @@
 
 /* 점진 그리기(2026-10-27) — 화면 밖 카드는 브라우저가 그리기를 미룬다(«전체» 1,400여 장도 가볍게). */
 .rq-card{content-visibility:auto;contain-intrinsic-size:auto 230px}
+
+/* 5번 «계산 중» 자리 표시 — 동작 줄이기 설정이면 돌지 않는다 */
+.fc-spin{width:1rem;height:1rem;border-radius:999px;border:2px solid #E5E5E5;border-top-color:#0D0D0D;animation:fcspin .9s linear infinite;flex:none}
+@keyframes fcspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.fc-spin{animation:none}}

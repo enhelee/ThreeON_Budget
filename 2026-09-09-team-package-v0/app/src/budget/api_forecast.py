@@ -17,7 +17,7 @@ import pandas as pd
 
 from . import config_store, forecast_backtest, forecast_export, forecast_import, forecast_reference
 from . import forecast_store as fs, pipeline_forecast as pf
-from . import benchmark as bm, db as dbm, uploads
+from . import benchmark as bm, db as dbm, uploads, viewcache
 
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -74,36 +74,29 @@ def _frame(rows, cols):
 
 
 # ── 표준화·전망 결과 캐시 ────────────────────────────────────────────────
-# 전망 표는 계산이 무겁다(운영 6초 중 서버 계산 ~3.5초 — Render 무료 CPU). 입력(마감 실적·
-# 전망 가정·구성)이 바뀌지 않았으면 같은 답이므로 저장해 두고 다시 쓴다.
-# «바뀌었는가»의 근거는 audit_log 의 최신 id 다 — 이 앱의 모든 쓰기(POST/PUT/PATCH/DELETE
-# /api/*)는 응답이 나가기 전에 감사 로그를 남기므로(AuthAuditMiddleware), 쓰기가 한 번이라도
-# 있으면 키가 바뀌어 다시 계산된다. 감사 기록이 실패하는 드문 경우를 위해 10분이 지나면
-# 어차피 다시 계산한다. 키는 계산 «전»에 읽는다 — 계산 중 들어온 쓰기는 다음 요청이 반영한다.
-# 프로세스 메모리에만 둔다(재시작·배포 때 비워짐).
-_VIEW_CACHE = {}
-VIEW_CACHE_TTL = 600
-_VIEW_CACHE_MAX = 16
+# 전망 표는 계산이 무겁다(운영 첫 계산 수십 초 — Render 무료 CPU). 입력(마감 실적·전망 가정·구성)이
+# 바뀌지 않았으면 같은 답이므로 저장해 두고 다시 쓴다. 규칙(버전·유효 시간·동시 계산 막기)은 viewcache.py.
+# 키는 계산 «전»에 읽는다 — 계산 중 들어온 쓰기는 다음 요청이 반영한다.
+VIEW_CACHE_TTL = viewcache.TTL
 
 
 def _data_version(conn):
-    return conn.execute("SELECT MAX(id) FROM audit_log").fetchone()[0] or 0
+    return viewcache.data_version(conn)
 
 
 def _cached_view(kind, conn, base_year, compute):
-    # DB 가 바뀌면(테스트의 임시 DB · 지역 이전 후 새 DATABASE_URL) 다른 답이다.
-    db_id = dbm.dbcore.database_url() or dbm.DEFAULT_DB
-    key = (db_id, kind, str(base_year))
-    ver = _data_version(conn)
-    hit = _VIEW_CACHE.get(key)
-    now = time.monotonic()
-    if hit and hit[0] == ver and now - hit[1] < VIEW_CACHE_TTL:
-        return hit[2]
-    out = compute()
-    if len(_VIEW_CACHE) >= _VIEW_CACHE_MAX:
-        _VIEW_CACHE.pop(min(_VIEW_CACHE, key=lambda k: _VIEW_CACHE[k][1]))
-    _VIEW_CACHE[key] = (ver, now, out)
-    return out
+    return viewcache.get_or_compute(("forecast", kind, str(base_year)), _data_version(conn), compute,
+                                    ttl=VIEW_CACHE_TTL)
+
+
+def warm(conn, clean_json):
+    """기본 기준연도의 전망 표·표준화·정기비용 분리를 미리 계산해 캐시에 채운다(이미 있으면 바로 끝).
+    server 의 예열 스레드가 배포 직후와 자료가 바뀐 뒤 부른다 — 사용자가 첫 계산(운영 수십 초)을 맞지 않게."""
+    by = str(pf.default_base_year(conn))
+    for kind, fn in (("table", pf.run_forecast), ("benchmark", pf.run_benchmark),
+                     ("regular", pf.regular_breakdown)):
+        _cached_view(kind, conn, by, lambda fn=fn: clean_json(fn(conn, by)))
+    return by
 
 
 def make_router(conn_factory, clean_json) -> APIRouter:
@@ -143,7 +136,8 @@ def make_router(conn_factory, clean_json) -> APIRouter:
     def base_years():
         conn = conn_factory()
         try:
-            return {"base_years": fs.list_base_years(conn), "default": pf.default_base_year(conn),
+            years = fs.list_base_years(conn)
+            return {"base_years": years, "default": pf.default_base_year(conn, years),
                     "locked_years": sorted(dbm.locked_years(conn))}
         finally:
             conn.close()

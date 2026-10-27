@@ -5,44 +5,36 @@ import { esc, fmt } from "../util.js"
 
 const ALERT_KINDS = ["급증", "예산 초과", "과다 귀속", "음수 실적", "미매칭 비중"];
 
-/** 이상 알림 — 분석이 끝나면 사람이 먼저 볼 곳을 위험도 순으로. 판단은 사람이 한다(알림은 고르기만). */
+/** 이상 알림 — 목록은 검토 큐로 모았다(2026-10-27 사용자 결정: 같은 내용이 두 곳에 있었다).
+ *  여기는 종류별 건수만 두고, 누르면 그 이유로 거른 검토 큐로 간다. 검토 큐에 없는 «미매칭 비중»(예산·지사 단위)만
+ *  이 자리에 그대로 적는다. */
+const ALERT_TO_REASON = {"과다 귀속": "overload", "음수 실적": "negative"};
+
 export function alertsPanelHtml() {
   const data = state.alerts;
   if (!data) return "";
   const sm = data.summary || {total: 0, high: 0, counts: {}};
-  const kind = state.alertKind;
-  const list = (data.alerts || []).filter(a => !kind || a.kind === kind);
-  const shown = state.alertsAll ? list : list.slice(0, 10);
-  const chip = (k, label, n) => `<button class="badge ${kind === k ? "bg-ink text-white" : "bg-subtle text-ink"}" data-alert-kind="${esc(k)}">${esc(label)} ${n}</button>`;
-  const where = a => [a.budget, a.branch, a.item, a.name].filter(Boolean).map(esc).join(" · ");
-  const link = a => a.branch && a.branch !== "(미매핑)"
-    ? (a.item
-      ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-drill="${esc(a.branch)}" data-drill-item="${esc(a.item)}" data-drill-budget="${esc(a.budget)}">전표 보기 →</button>`
-      : `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>`) : "";
+  const unmatched = (data.alerts || []).filter(a => a.kind === "미매칭 비중");
+  const where = a => [a.budget, a.branch].filter(Boolean).map(esc).join(" · ");
+  const chip = k => `<button class="badge bg-subtle text-ink hover:bg-ink hover:text-white" data-goto-review data-reason="${ALERT_TO_REASON[k] || ""}" title="검토 큐에서 보기">${esc(k)} ${sm.counts?.[k] || 0}</button>`;
   return `
       <section class="panel p-6" aria-labelledby="alertsTitle">
-        <div class="flex flex-wrap items-end justify-between gap-3">
-          <div><h3 id="alertsTitle" class="section-title">이상 알림 — ${esc(state.year)}년</h3></div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h3 id="alertsTitle" class="section-title">이상 알림 — ${esc(state.year)}년</h3>
           <div class="flex flex-wrap items-center gap-3">
             <p class="text-sm text-sub">전체 <b class="text-ink">${sm.total}</b>건 · 높음 <b class="text-err">${sm.high}</b>건</p>
-            ${sm.total ? '<button class="btn-secondary" data-view="review">검토 큐에서 처리 →</button>' : ""}
+            ${sm.total ? '<button class="btn-primary" data-goto-review data-reason="">검토 큐에서 처리 →</button>' : ""}
           </div>
         </div>
-        ${sm.total ? `
-        <div class="mt-4 flex flex-wrap gap-2">${chip("", "전체", sm.total)}${ALERT_KINDS.map(k => chip(k, k, sm.counts?.[k] || 0)).join("")}</div>
-        <ul class="mt-4 divide-y divide-line-subtle border-t border-line">
-          ${shown.map(a => `
+        ${sm.total ? `<div class="mt-4 flex flex-wrap gap-2">${ALERT_KINDS.map(chip).join("")}</div>
+        ${unmatched.length ? `<ul class="mt-4 divide-y divide-line-subtle border-t border-line">${unmatched.map(a => `
           <li class="flex flex-wrap items-start gap-x-3 gap-y-1 py-3 text-sm">
             <span class="badge ${a.severity === "높음" ? "bg-err-bg text-err" : "bg-warn-bg text-warn"}">${esc(a.severity)}</span>
-            <span class="badge bg-subtle text-ink">${esc(a.kind)}</span>
-            <span class="min-w-0 flex-1"><span class="font-semibold text-ink">${where(a)}</span>
-              <span class="block text-xs text-sub">${esc(a.text)}</span></span>
-            <span class="text-right font-semibold ${a.amount < 0 ? "text-err" : "text-ink"}">${fmt(a.amount)}<span class="ml-0.5 text-xs text-tri">천원</span></span>
-            ${link(a)}
-          </li>`).join("")}
-        </ul>
-        ${list.length > 10 ? `<button class="btn-secondary mt-4" data-action="toggle-alerts">${state.alertsAll ? "위 10건만" : `${list.length}건 모두 보기`}</button>` : ""}`
-        : `<p class="mt-4 text-sm text-sub">${(data.alerts || []).length === 0 && !Object.keys(state.status?.runs || {}).length ? "분석 결과가 생기면 여기에 알림이 나옵니다." : "규칙에 걸린 항목이 없어요."}</p>`}
+            <span class="badge bg-subtle text-ink">미매칭 비중</span>
+            <span class="min-w-0 flex-1"><span class="font-semibold text-ink">${where(a)}</span><span class="block text-xs text-sub">${esc(a.text)}</span></span>
+            ${a.branch && a.branch !== "(미매핑)" ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>` : ""}
+          </li>`).join("")}</ul>` : ""}`
+        : `<p class="mt-4 text-sm text-sub">${!Object.keys(state.status?.runs || {}).length ? "분석 결과가 생기면 여기에 알림이 나옵니다." : "규칙에 걸린 항목이 없어요."}</p>`}
       </section>`;
 }
 
