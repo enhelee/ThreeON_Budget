@@ -64,10 +64,6 @@ export function isResolved(status) { return RESOLVED.has(status) }
 
 // ── 표시 도우미 ───────────────────────────────────────────────
 
-const eok = v => {
-  const x = Math.abs(v) / 100000
-  return `${v < 0 ? "−" : ""}${x >= 100 ? fmt(x) : x >= 10 ? x.toFixed(1) : x.toFixed(2)}억`
-}
 const pct = (v, d = 0) => `${(v * 100).toFixed(d)}%`
 
 const REASON_CLS = {overload: "bg-err-bg text-err", negative: "bg-err-bg text-err",
@@ -192,7 +188,7 @@ function voucherRow(v, it, locked, mode) {
     const pick = state.rq.pick[v.erp_row_id] || ""
     action = cands.length ? `<select class="control min-w-0 flex-1 sm:max-w-[22rem]" data-rq-pick="${v.erp_row_id}" aria-label="옮길 사업" ${dis}>
         <option value="">옮길 사업 고르기 (잔액 큰 순)</option>
-        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)}</option>`).join("")}
+        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)}천원</option>`).join("")}
       </select>
       <button class="btn-secondary rq-btn" data-rq="move" data-key="${esc(it.key)}" data-id="${v.erp_row_id}" ${dis}>옮기기</button>`
       : '<span class="text-xs text-tri">같은 과목에 옮길 계획 사업이 없어요</span>'
@@ -242,7 +238,7 @@ function cardHtml(it, locked) {
           <p class="mt-1.5 break-keep font-semibold text-ink">${esc(it.name)}</p>
           <p class="text-xs text-sub">${esc(it.branch)} · ${esc(it.budget)} · ${esc(it.item)}</p>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b> → 실적 <b class="text-ink">${fmt(it.actual)}</b>천원</span>
+            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b>천원 → 실적 <b class="text-ink">${fmt(it.actual)}</b>천원</span>
             ${it.rate !== null && it.rate !== undefined ? `<span class="font-bold ${rateCls(it.rate)}">${it.rate.toFixed(1)}%</span>` : ""}
           </div>
           ${bulletHtml(it)}
@@ -254,7 +250,6 @@ function cardHtml(it, locked) {
         <div class="shrink-0 pl-[3.25rem] sm:pl-0 sm:text-right">
           <p class="text-xs font-semibold text-tri">검토 금액</p>
           <p class="text-xl font-bold text-ink">${fmt(it.amount)}<span class="ml-0.5 text-xs font-semibold text-tri">천원</span></p>
-          <p class="text-xs text-tri">${eok(it.amount)}</p>
         </div>
       </div>
       ${actionsHtml(it, locked)}
