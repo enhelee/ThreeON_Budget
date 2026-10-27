@@ -69,7 +69,7 @@ async function resolveWith(key, status, fields, call, okMsg) {
   await leave(key)
   const undo = patch(key, {...fields, status})
   if (state.rq.open === key) state.rq.open = null
-  if (state.rq.noteKey === key) state.rq.noteKey = null
+  if (state.rq.noteKey === key) { state.rq.noteKey = null; state.rq.draft = null }
   state.rq.focus = focusNext
   renderPage(); refocus()
   try {
@@ -113,6 +113,16 @@ async function saveNote(key, note) {
     return
   }
   await resolveWith(key, "noted", {note}, call, `사유 저장 — «${note}»`)
+}
+
+async function loadExpl(key) {
+  const it = byKey(key)
+  if (!it) return
+  try {
+    const q = new URLSearchParams({year: state.year, budget: it.budget, branch: it.branch, item: it.item, name: it.name})
+    state.rq.expl[key] = await api(`/api/review-explain?${q}`)
+  } catch (err) { state.rq.expl[key] = {error: err.message} }
+  if (state.view === "review") renderPage()
 }
 
 async function loadSugg(key) {
@@ -161,8 +171,20 @@ export async function rqClick(e) {
     case "ack": await ack(key, true); return true
     case "unack": await ack(key, false); return true
     case "chip": await saveNote(key, t.dataset.note); return true
-    case "note-edit": r.noteKey = key; renderPage(); $("#rqNoteText")?.focus(); return true
-    case "note-cancel": r.noteKey = null; renderPage(); return true
+    case "note-edit": r.noteKey = key; r.draft = null; renderPage(); $("#rqNoteText")?.focus(); return true
+    case "note-cancel": r.noteKey = null; r.draft = null; renderPage(); return true
+    case "explain":
+      r.explOpen = r.explOpen === key ? null : key
+      renderPage()
+      if (r.explOpen && !r.expl[key]) await loadExpl(key)
+      return true
+    case "draft": {       // 근거 초안을 사유 칸에 — 저장은 사람이 고친 뒤 [저장]
+      r.noteKey = key; r.draft = {key, text: r.expl[key]?.draft || ""}
+      renderPage()
+      const el = $("#rqNoteText")
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) }
+      return true
+    }
     case "note-save": await saveNote(key, $("#rqNoteText")?.value); return true
     case "note-clear": await saveNote(key, ""); return true
     case "expand":
@@ -209,8 +231,8 @@ export function rqKey(e) {
   if (state.view !== "review" || e.ctrlKey || e.metaKey || e.altKey) return false
   const tag = e.target?.tagName
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
-    if (e.key === "Enter" && e.target.id === "rqNoteText") { saveNote(e.target.dataset.key, e.target.value); return true }
-    if (e.key === "Escape" && e.target.id === "rqNoteText") { state.rq.noteKey = null; renderPage(); return true }
+    if (e.key === "Enter" && !e.shiftKey && e.target.id === "rqNoteText") { e.preventDefault(); saveNote(e.target.dataset.key, e.target.value); return true }
+    if (e.key === "Escape" && e.target.id === "rqNoteText") { state.rq.noteKey = null; state.rq.draft = null; renderPage(); return true }
     return false
   }
   const k = e.key.toLowerCase()

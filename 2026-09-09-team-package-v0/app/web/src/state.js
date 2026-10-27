@@ -32,7 +32,8 @@ export const state = {
   // 검토 큐(2026-10-27, views/review.js) — data = /api/review-queue · n = 보기 건수("10"|"20"|"50"|"80"|"all")
   //   show = 미처리|처리됨|전체 · open = 전표를 펼친 줄 · sugg = 줄별 추천 재배정 캐시 · pick = 전표별 고른 사업
   rq: { data: null, n: "20", show: "open", reason: "", branch: "", budget: "all",
-        open: null, noteKey: null, focus: null, sugg: {}, pick: {} },
+        open: null, noteKey: null, focus: null, sugg: {}, pick: {},
+        explOpen: null, expl: {}, draft: null },  // expl·draft = 근거 설명·사유 초안(B)
   rqBrief: null,    // 메인 «다음 할 일»용 요약(/api/review-queue?brief=1)
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
