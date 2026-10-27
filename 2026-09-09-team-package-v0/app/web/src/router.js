@@ -86,19 +86,103 @@ export function renderPage() {
                      branches: renderBranches, detail: renderDetail, review: renderReview, stats: renderStats,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
-  const lb = $("#lockBanner");
-  if (lb) lb.innerHTML = loadErrorBannerHtml();
-  const lk = $("#lockBadge");
-  if (lk) lk.innerHTML = lockBadgeHtml();
   const hf = $("#helpFab");
   if (hf) hf.innerHTML = helpFabHtml();
   $("#pageTitle").textContent = viewMeta[state.view];
   document.querySelectorAll("nav [data-view]").forEach(b =>
     b.classList.toggle("nav-button-active", b.dataset.view === state.view));
+  renderChrome();
+  if (state.view === "home") observeHomeForecast();
+}
+
+/** 본문은 그대로 두고 머리(연도 목록·마감 배지·분석 버튼·불러오기 실패 배너)만 새로 그린다 —
+ *  뒤에서 받은 nav-state 를 반영할 때. 본문을 다시 그리면 입력 중인 칸이 날아갈 수 있다. */
+export function renderChrome() {
+  const lb = $("#lockBanner");
+  if (lb) lb.innerHTML = loadErrorBannerHtml();
+  const lk = $("#lockBadge");
+  if (lk) lk.innerHTML = lockBadgeHtml();
   const ys = $("#yearSelect");
   const years = state.years.length ? state.years : [state.year];
-  ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("");
+  if (ys) ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("");
   syncAnalyzeButton();
+}
+
+/** 뒤에서 도착한 자료로 본문을 다시 그린다. 사용자가 본문 입력칸에 쓰는 중이면 칸을 떠날 때까지 미룬다. */
+let pendingRender = false;
+function renderWhenIdle() {
+  const a = document.activeElement;
+  const typing = a && $("#page")?.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT");
+  if (!typing) { renderPage(); return; }
+  if (pendingRender) return;
+  pendingRender = true;
+  a.addEventListener("blur", () => { pendingRender = false; requestAnimationFrame(renderPage); }, {once: true});
+}
+
+// 메인의 중장기 전망 패널은 화면 중간 아래에 있다 — 전망 계산은 무거워(운영 첫 계산 수십 초) 서버를
+// 붙잡고 다른 화면 요청까지 늦춘다(2026-10-27 실측: 3+ 상세를 여는 동안 33초). 패널이 화면에 들어올 때만 받는다.
+let fcObserver = null;
+function observeHomeForecast() {
+  if (state.fc.table || state.fc.homeLoading) return;
+  const el = document.querySelector("[data-home-forecast]");
+  if (!el || !("IntersectionObserver" in window)) { loadHomeForecast(); return; }
+  fcObserver?.disconnect();
+  fcObserver = new IntersectionObserver(entries => {
+    if (!entries.some(e => e.isIntersecting)) return;
+    fcObserver.disconnect(); fcObserver = null;
+    loadHomeForecast();
+  }, {rootMargin: "200px 0px"});
+  fcObserver.observe(el);
+}
+
+function loadHomeForecast() {
+  if (state.fc.table || state.fc.homeLoading) return;
+  state.fc.homeErr = false; state.fc.homeLoading = true;
+  loadForecastTable().catch(() => { state.fc.homeErr = true; })
+    .finally(() => { state.fc.homeLoading = false; if (state.view === "home") renderWhenIdle(); });
+}
+
+// 설정 탭마다 쓰는 자료 — 열린 탭 것만 받는다(예전엔 4개 탭 자료 13개 API 를 한꺼번에).
+const SETTINGS_JOBS = {
+  year: () => [["현황", loadStatus], ["학습 현황", async () => { state.learned = await api("/api/learned"); }]],
+  master: () => [["현황", loadStatus], ["연도 기준정보", loadYearConfig]],
+  data: () => [["현황", loadStatus], ["모델 목록", async () => { state.models = await api("/api/models"); }]],
+  history: () => [
+    ["감사 로그", async () => { state.audit = (await api("/api/audit?limit=50")).rows; }],
+    ["재배정 이력", async () => { state.overrides = await api(`/api/overrides?year=${state.year}`); }],
+    ["사업 수정 이력", async () => { state.bizEdits = await api(`/api/biz-edits?year=${state.year}`); }],
+    ["수동 추가 사업", async () => { state.manualBiz = await api(`/api/manual-biz?year=${state.year}`); }],
+    ["사업 삭제 이력", async () => { state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`); }]],
+}
+
+// 4번 통계 탭 — 손익·자본은 /api/stats(한 번에 둘 다), 전년 대비는 /api/stats-compare. 받은 연도를 적어 둔다.
+const statsJobs = tab => tab === "compare"
+  ? [["연도 비교", async () => { const y = state.year; state.statsCompare = {...await api(`/api/stats-compare?year=${y}`), _year: y}; }]]
+  : [["통계", async () => { const y = state.year; state.stats = {...await api(`/api/stats?year=${y}`), _year: y}; }]];
+
+/** 통계 탭 전환 — 이미 받은 해의 자료면 다시 받지 않는다(손익↔자본은 같은 자료). */
+export async function openStatsTab(tab) {
+  state.statsTab = tab;
+  const have = tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
+  if (!have) {
+    busy(true, "불러오는 중…");
+    const errs = await settle(statsJobs(tab));
+    busy(false);
+    state.loadErrors = errs;
+    if (errs.length) toast(`${errs.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
+  }
+  if (state.view === "stats") renderPage();
+}
+
+/** 설정 탭 전환 — 그 탭 자료만 받아 그린다. */
+export async function openSettingsTab(tab) {
+  state.settingsTab = tab;
+  busy(true, "불러오는 중…");
+  const errs = await settle((SETTINGS_JOBS[tab] || SETTINGS_JOBS.year)());
+  busy(false);
+  state.loadErrors = errs;
+  if (errs.length) toast(`${errs.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
+  if (state.view === "settings") renderPage();
 }
 
 // 화면 하나를 그리려고 API 를 예닐곱 개 부른다. 이것들을 한 try 로 묶으면
@@ -154,17 +238,23 @@ export async function navigate(view, opts = {}) {
   state.view = view;
   state.helpOpen = false;   // 도움말은 화면마다 내용이 달라 — 옮기면 닫는다
   syncHash();
-  // 공통 3종(연도 목록·미반영 건수·열린 연도)은 /api/nav-state 한 번으로 받는다.
-  // 첫 진입은 아직 연도가 없다 — 나머지 구역이 모두 state.year 를 쓰므로 이것부터 받는다.
-  // 연도가 이미 있으면 다른 구역과 함께 동시에 새로 받는다(예전처럼 매번 갱신).
+  // 점진 로딩(2026-10-27) — 자료를 세 갈래로 나눈다.
+  //   jobs   화면 윗부분에 필요한 것: 다 받으면 바로 그린다(로딩 막이 걷힌다).
+  //   later  화면 아래쪽 구역: 그린 뒤 이어서 받아 그 구역만 채운다(그 전엔 «불러오는 중»/빈 칸).
+  //   공통 nav-state(연도 목록·미반영·열린 연도): 연도를 이미 알면 기다리지 않고 뒤에서 받아 머리만 고친다
+  //     — 운영 실측에서 화면마다 2.5~10초로 가장 느린 요청이었다. 메인은 다년도 패널이 이 자료를 써서 기다린다.
+  //   첫 진입은 아직 연도가 없다 — 나머지 구역이 모두 state.year 를 쓰므로 이것부터 받는다.
+  const seq = ++navSeq;
   const hadYear = !!state.year;
   const firstErrs = hadYear ? [] : await settle([["연도 목록", loadNavState]]);
-  const jobs = hadYear ? [["연도 목록", loadNavState]] : [];
+  const jobs = [], later = [];
+  const navBg = hadYear && view !== "home";
+  if (hadYear && !navBg) jobs.push(["연도 목록", loadNavState]);
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  // 메인 «다음 할 일»은 검토 큐 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27).
-  if (view === "home") jobs.push(["서버 정보", loadHealth], ["검토 큐", loadReviewBrief]);
+  // 메인 «다음 할 일»은 검토 큐 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27) — 화면 아래쪽이라 뒤에서.
+  if (view === "home") later.push(["서버 정보", loadHealth], ["검토 큐", loadReviewBrief]);
   if (view === "review") jobs.push(["현황", loadStatus], ["검토 큐", loadReviewQueue]);
   if (view === "forecast") {
     // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
@@ -175,24 +265,15 @@ export async function navigate(view, opts = {}) {
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
-  if (view === "collect") jobs.push(["이상 알림", loadAlerts]);
-  if (view === "stats") {
-    jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }],
-              ["연도 비교", async () => { state.statsCompare = await api(`/api/stats-compare?year=${state.year}`); }]);
-  }
-  if (view === "settings") {
-    jobs.push(
-      ["현황", loadStatus],
-      ["재배정 이력", async () => { state.overrides = await api(`/api/overrides?year=${state.year}`); }],
-      ["학습 현황", async () => { state.learned = await api("/api/learned"); }],
-      ["감사 로그", async () => { state.audit = (await api("/api/audit?limit=50")).rows; }],
-      ["모델 목록", async () => { state.models = await api("/api/models"); }],
-      ["사업 수정 이력", async () => { state.bizEdits = await api(`/api/biz-edits?year=${state.year}`); }],
-      ["수동 추가 사업", async () => { state.manualBiz = await api(`/api/manual-biz?year=${state.year}`); }],
-      ["사업 삭제 이력", async () => { state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`); }],
-      ["연도 기준정보", loadYearConfig]);
-  }
+  if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래
+  if (view === "stats") jobs.push(...statsJobs(state.statsTab));
+  if (view === "settings") jobs.push(...(SETTINGS_JOBS[state.settingsTab] || SETTINGS_JOBS.year)());
+  // 아래 구역 자료는 옛 연도·옛 화면 것이 잠깐 보이지 않게 비우고 시작한다
+  if (view === "home") state.rqBrief = null;
+  if (view === "collect") state.alerts = null;
+  const navP = navBg ? loadNavState().then(() => true, e => `연도 목록: ${e.message}`) : null;
   state.loadErrors = [...firstErrs, ...await settle(jobs)];
+  if (seq !== navSeq) return;                 // 그 사이 다른 화면으로 옮겼다
   busy(false);
   if (state.loadErrors.length) {
     toast(`${state.loadErrors.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
@@ -200,13 +281,21 @@ export async function navigate(view, opts = {}) {
   renderPage();
   closeMenu();
   window.scrollTo({top: 0, behavior: "smooth"});
-  // 메인의 중장기 전망 패널 — 전망 계산이 무거워(운영 수 초) 메인을 막지 않게 뒤에서 받아 다시 그린다.
-  if (view === "home" && !state.fc.table) {
-    state.fc.homeErr = false;
-    loadForecastTable().catch(() => { state.fc.homeErr = true; })
-      .finally(() => { if (state.view === "home") renderPage(); });
+  if (navP) navP.then(r => {
+    if (seq !== navSeq) return;
+    if (r !== true) state.loadErrors = [...state.loadErrors, r];
+    // 설정 «연도·학습» 탭은 학습 대기 건수를 본문에 쓴다 — 본문까지, 나머지는 머리만.
+    if (view === "settings") renderWhenIdle(); else renderChrome();
+  });
+  if (later.length) {
+    const errs = await settle(later);
+    if (seq !== navSeq) return;
+    if (errs.length) { state.loadErrors = [...state.loadErrors, ...errs]; }
+    renderWhenIdle();
   }
 }
+
+let navSeq = 0;
 
 export async function changeYear(y) {
   state.year = String(y);

@@ -151,14 +151,13 @@ export async function rqClick(e) {
   const key = t.dataset.key
   if (key) r.focus = key
   switch (t.dataset.rq) {
-    case "n": r.n = t.dataset.n; r.show = "open"; renderPage(); return true
     case "more": {
       const cur = rqFiltered().length
       const shown = document.querySelectorAll("[data-rq-card]").length
       r.n = String(Math.min(cur, shown + 50)); renderPage(); return true
     }
-    case "show": r.show = t.dataset.v; renderPage(); return true
-    case "reason": r.reason = t.dataset.code; renderPage(); return true
+    case "show": r.show = t.dataset.v; r.n = "20"; renderPage(); return true
+    case "reason": r.reason = t.dataset.code; r.n = "20"; renderPage(); return true
     case "ack": await ack(key, true); return true
     case "unack": await ack(key, false); return true
     case "chip": await saveNote(key, t.dataset.note); return true
