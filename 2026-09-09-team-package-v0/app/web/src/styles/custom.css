@@ -259,25 +259,10 @@
 .fv-present .fv-scope-name{font-size:3rem}
 /* ── 검토 큐(2026-10-27, views/review.js) ─────────────────────────────
    색은 한난 토큰만 쓴다: 잉크(#0D0D0D) 곡선 · ok(#16794A) 진행·덮은 구간 · 선(#E5E5E5) 격자. */
-.rq-big{font-size:1.25em;font-weight:800;color:#0D0D0D;letter-spacing:-.01em}
-.rq-progress{height:10px;border-radius:999px;background:#F2F2F2;overflow:hidden}
-.rq-progress>span{display:block;height:100%;border-radius:999px;background:#16794A;transition:width .45s ease}
 .rq-segs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;border-radius:12px;background:#F2F2F2}
 .rq-seg{padding:.3rem .7rem;border-radius:10px;font-size:.8rem;font-weight:600;color:#5D5D5D}
 .rq-seg:hover{color:#0D0D0D}
 .rq-seg--on{background:#fff;color:#0D0D0D;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.rq-curve{margin:0;min-width:0}
-.rq-curve svg{display:block;width:100%;height:auto;margin-top:.5rem}
-.rq-grid{stroke:#F2F2F2;stroke-width:1}
-.rq-ref{stroke:#C9C9C9;stroke-width:1;stroke-dasharray:4 4}
-.rq-axis{font-size:12px;fill:#767676}
-.rq-axis--strong{fill:#0D0D0D;font-weight:700}
-.rq-area{fill:#EAF5EF}
-.rq-line{fill:none;stroke:#0D0D0D;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.rq-dot{fill:#0D0D0D;stroke:#fff;stroke-width:2}
-.rq-dot--sel{fill:#16794A}
-.rq-hit{fill:transparent}
-.rq-hit:hover{fill:rgba(13,13,13,.05)}
 .rq-card{list-style:none;border:1px solid #E5E5E5;border-radius:16px;background:#fff;padding:1rem 1.25rem;transition:opacity .2s ease,transform .2s ease,box-shadow .18s ease}
 .rq-card:focus,.rq-card--focus{outline:none;box-shadow:0 0 0 2px #0D0D0D}
 .rq-card:focus:not(:focus-visible){box-shadow:none}
@@ -302,3 +287,14 @@
 .rq-voucher{list-style:none;padding:.6rem .75rem;border-radius:12px;background:#fff;border:1px solid #E5E5E5;font-size:.85rem}
 .rq-voucher--rec{border-color:#16794A;box-shadow:inset 3px 0 0 #16794A}
 .rq-rec{display:inline-block;padding:.05rem .45rem;border-radius:999px;background:#EAF5EF;color:#16794A;font-size:.7rem;font-weight:800}
+
+/* 메인 «최근 N개년» 막대 — 계획 파랑 · 실적 주황(2026-10-27 사용자 요청: 검정·초록보다 잘 보이게).
+   색약 구분·바탕 대비 검증 통과(dataviz validate_palette: CVD ΔE 27.8, 대비 3:1↑). 숫자는 글자색 그대로, 점이 계열을 알린다. */
+.yr-bar--plan{background:#2F6FDB}
+.yr-bar--act{background:#D2601A}
+.yr-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:999px;flex:none}
+.yr-dot--plan{background:#2F6FDB}
+.yr-dot--act{background:#D2601A}
+
+/* 점진 그리기(2026-10-27) — 화면 밖 카드는 브라우저가 그리기를 미룬다(«전체» 1,400여 장도 가볍게). */
+.rq-card{content-visibility:auto;contain-intrinsic-size:auto 230px}

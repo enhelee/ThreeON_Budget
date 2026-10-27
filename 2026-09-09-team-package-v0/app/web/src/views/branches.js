@@ -55,15 +55,25 @@ function brScatterHtml(rows) {
   const pts = rows.filter(r => r.plan > 0).map(r => ({name: r.branch, plan: E(r.plan), act: E(r.actual), rate: rateVal(r.plan, r.actual)}));
   if (!pts.length) return "";
   const W = 1040, H = 460, L = 64, R = 24, T = 20, B = 56;
-  const vals = pts.flatMap(p => [p.plan, p.act]).filter(v => v > 0);
-  const lo = 10 ** Math.floor(Math.log10(Math.min(...vals))), hi = 10 ** Math.ceil(Math.log10(Math.max(...vals)));
+  // 축 범위(2026-10-27 사용자 요청: 점이 가운데 몰리지 않게) — 10배 단위로 넓히지 않고 1·1.5·2·3·5·7 눈금 중
+  //   데이터를 감싸는 가장 좁은 값으로. 아래 끝은 «계획» 최솟값 기준 — 실적 0·소액(안전처 0.45억 등)까지 넣으면
+  //   범위가 10배씩 늘어 나머지가 뭉친다. 그보다 작은 실적은 바닥선에 붙여 그린다(범례에 표시).
+  const NICE = [1, 1.5, 2, 3, 5, 7];
+  const niceDown = v => { const e = 10 ** Math.floor(Math.log10(v)); return e * [...NICE].reverse().find(m => m * e <= v); };
+  const niceUp = v => { const e = 10 ** Math.floor(Math.log10(v)); const m = NICE.find(m => m * e >= v); return m ? m * e : 10 * e; };
+  const plans = pts.map(p => p.plan), acts = pts.map(p => p.act).filter(v => v > 0);
+  const lo = niceDown(Math.min(...plans) * 0.8), hi = niceUp(Math.max(...plans, ...acts) * 1.12);
   const span = Math.log10(hi) - Math.log10(lo);
+  const floored = pts.filter(p => p.act < lo).length;
   const sx = v => L + (Math.log10(Math.max(v, lo)) - Math.log10(lo)) / span * (W - L - R);
   const sy = v => H - B - (Math.log10(Math.max(v, lo)) - Math.log10(lo)) / span * (H - T - B);
-  const num = v => v >= 1 ? fmt(v) : String(v);
+  const num = v => v >= 10 ? fmt(v) : String(+v.toPrecision(2));
   let s = `<defs><clipPath id="scClip"><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/></clipPath></defs>`;
-  for (let g = lo; g <= hi; g *= 10) for (const m of [1, 2, 5]) {
-    const v = g * m; if (v > hi) break;
+  const ticks = [];
+  for (let e = 10 ** Math.floor(Math.log10(lo)); e <= hi; e *= 10) for (const m of [1, 2, 5]) {
+    const v = +(e * m).toPrecision(3); if (v >= lo * 0.999 && v <= hi * 1.001) ticks.push([v, m]);
+  }
+  for (const [v, m] of ticks) {
     s += `<line x1="${sx(v)}" x2="${sx(v)}" y1="${T}" y2="${H - B}" stroke="#E5E5E5" stroke-width="${m === 1 ? 1 : .5}"/><line x1="${L}" x2="${W - R}" y1="${sy(v)}" y2="${sy(v)}" stroke="#E5E5E5" stroke-width="${m === 1 ? 1 : .5}"/>`;
     s += `<text x="${sx(v)}" y="${H - B + 18}" text-anchor="middle" font-size="11" fill="#767676">${num(v)}</text><text x="${L - 8}" y="${sy(v) + 4}" text-anchor="end" font-size="11" fill="#767676">${num(v)}</text>`;
   }
@@ -74,7 +84,7 @@ function brScatterHtml(rows) {
   { const v0 = lo * 10 ** (span * .14), ang = -Math.atan2(sy(lo) - sy(hi), sx(hi) - sx(lo)) * 180 / Math.PI;
     s += `<text transform="translate(${sx(v0)} ${sy(v0 * 1.2) - 6}) rotate(${ang})" font-size="12" font-weight="700" fill="#16794A">적정 범위 ±20% (집행률 80~120%)</text>`; }
   s += `<line x1="${sx(lo)}" y1="${sy(lo)}" x2="${sx(hi)}" y2="${sy(hi)}" stroke="#0D0D0D" stroke-width="1.5" stroke-dasharray="6 4"/>`;
-  s += `<text x="${sx(hi) - 8}" y="${sy(hi * .8) + 22}" text-anchor="end" font-size="12" font-weight="600" fill="#0D0D0D">집행률 100%</text>`;
+  // «집행률 100%»는 차트 안에 쓰면 오른쪽 위 지사 이름과 겹쳤다(2026-10-27) — 범례로 옮긴다.
   s += `<text x="${L + 12}" y="${T + 20}" font-size="13" font-weight="600" fill="${SC_OVER}">▲ 계획보다 더 씀</text>`;
   s += `<text x="${W - R - 12}" y="${H - B - 12}" text-anchor="end" font-size="13" font-weight="600" fill="${SC_UNDER}">▼ 계획보다 덜 씀</text>`;
   s += `<text x="${(L + W - R) / 2}" y="${H - 14}" text-anchor="middle" font-size="12" font-weight="600" fill="#5D5D5D">계획 (억원) →</text>`;
@@ -82,17 +92,22 @@ function brScatterHtml(rows) {
   // 라벨: 대각선에서 먼 6곳 + 계획 큰 4곳만(전부 달면 겹친다). 나머지는 마우스를 올리면 보인다.
   const off = p => Math.abs(Math.log((p.act || lo) / p.plan));
   const labeled = new Set([...pts].sort((a, b) => off(b) - off(a)).slice(0, 6).concat([...pts].sort((a, b) => b.plan - a.plan).slice(0, 4)).map(p => p.name));
-  const placed = [];
+  // 이미 글자가 있는 자리(두 귀퉁이 안내)는 라벨이 피해 간다.
+  const placed = [{x: L + 8, y: T + 6, w: 150, h: 18}, {x: W - R - 160, y: H - B - 28, w: 152, h: 18}];
   for (const p of [...pts].sort((a, b) => b.plan - a.plan)) {
-    const cx = sx(p.plan), cy = sy(p.act);
+    const cx = sx(p.plan), cy = sy(Math.max(p.act, lo));
     s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억 · 실적 ${p.act.toFixed(1)}억 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
     if (!labeled.has(p.name)) continue;
     const txt = `${p.name} ${p.rate.toFixed(0)}%`, tw = txt.length * 10.5, th = 14;
     const cands = [[cx - tw / 2, cy - 12 - th], [cx + 11, cy - th / 2], [cx - 11 - tw, cy - th / 2], [cx - tw / 2, cy + 11],
-                   [cx + 11, cy - th - 9], [cx - 11 - tw, cy - th - 9], [cx + 11, cy + 9], [cx - 11 - tw, cy + 9]];
-    const hit = (bx, by) => placed.some(q => bx < q.x + q.w && bx + tw > q.x && by < q.y + q.h && by + th > q.y)
-      || pts.some(o => { const ox = sx(o.plan), oy = sy(o.act); return ox > bx - 10 && ox < bx + tw + 10 && oy > by - 10 && oy < by + th + 10; });
-    const [bx, by] = cands.find(([a, b]) => !hit(a, b)) || cands[0];
+                   [cx + 11, cy - th - 9], [cx - 11 - tw, cy - th - 9], [cx + 11, cy + 9], [cx - 11 - tw, cy + 9],
+                   // 바닥선처럼 점이 몰린 곳 — 한 칸·두 칸 더 위로
+                   [cx - tw / 2, cy - 30 - th], [cx + 11, cy - th - 27], [cx - 11 - tw, cy - th - 27], [cx - tw / 2, cy - 48 - th]];
+    const hit = (bx, by) => bx < L + 2 || bx + tw > W - R - 2 || by < T + 2 || by + th > H - B - 2 || placed.some(q => bx < q.x + q.w && bx + tw > q.x && by < q.y + q.h && by + th > q.y)
+      || pts.some(o => { const ox = sx(o.plan), oy = sy(Math.max(o.act, lo)); return ox > bx - 10 && ox < bx + tw + 10 && oy > by - 10 && oy < by + th + 10; });
+    const spot = cands.find(([a, b]) => !hit(a, b));
+    if (!spot) continue;                    // 빈 자리가 없으면 겹쳐 쓰지 않는다 — 이름은 마우스를 올리면 보인다
+    const [bx, by] = spot;
     placed.push({x: bx, y: by, w: tw, h: th});
     s += `<text x="${bx}" y="${by + 11}" font-size="12" font-weight="600" fill="#0D0D0D" pointer-events="none">${esc(txt)}</text>`;
   }
@@ -102,7 +117,7 @@ function brScatterHtml(rows) {
         <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">계획 대비 실적 분포</h3><p class="section-help">점을 누르면 해당 지사의 상세 분석 화면으로 이동합니다.</p></div>
         <div class="flex gap-2"><span class="badge bg-err-bg text-err">▲ 120% 초과 ${over}곳</span><span class="badge bg-warn-bg text-warn">▼ 80% 미만 ${under}곳</span></div></div>
         <div class="mt-4 overflow-x-auto"><svg viewBox="0 0 ${W} ${H}" class="mx-auto block w-full min-w-[640px]" style="max-height:68vh" role="img" aria-label="지사별 계획 대비 실적 산점도">${s}</svg></div>
-        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span></div>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span><span class="inline-flex items-center gap-1.5"><svg viewBox="0 0 22 6" class="h-1.5 w-6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="#0D0D0D" stroke-width="2" stroke-dasharray="5 3"/></svg>집행률 100%</span>${floored ? `<span>바닥선 = 실적 ${num(lo)}억 미만(0원 포함) ${floored}곳</span>` : ""}</div>
       </section>`;
 }
 

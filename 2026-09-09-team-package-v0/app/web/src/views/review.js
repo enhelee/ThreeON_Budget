@@ -93,85 +93,19 @@ function bulletHtml(it) {
     </div>`
 }
 
-// ── 머리 카드: 80% 문장 · 진행률 · 커버율 곡선 ─────────────────
+// ── 요약 줄 — 건수·금액만(2026-10-27 사용자 결정: 큰 머리 카드·곡선은 두지 않는다) ──────────
 
-function shownCount(r, sm) {
-  if (r.n === "80") return sm.n80
+function shownCount(r) {
   if (r.n === "all") return Infinity
   return Number(r.n) || 20
 }
 
-/** 남은 검토 금액의 누적 곡선(파레토). 한 계열이라 범례 대신 제목이 이름이다. 칸마다 «상위 k건 → x%» 툴팁. */
-function curveSvg(curve, sm, nShow) {
-  if (!curve.length) return ""
-  const M = Math.min(curve.length, Math.max(Math.ceil(sm.n80 * 1.6), 40))
-  const W = 520, H = 190, L = 40, R = 12, T = 14, B = 30
-  const x = k => L + (k / M) * (W - L - R)                // k = 0..M (건수)
-  const y = v => T + (1 - v) * (H - T - B)
-  const pts = [[0, 0], ...curve.slice(0, M).map((v, i) => [i + 1, v])]
-  const line = pts.map(([k, v]) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ")
-  const nSel = Math.min(Number.isFinite(nShow) ? nShow : M, M)
-  const area = pts.filter(([k]) => k <= nSel)
-  const areaPath = area.length > 1
-    ? `M${x(0)},${y(0)} ` + area.map(([k, v]) => `L${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ") + ` L${x(nSel).toFixed(1)},${y(0)} Z`
-    : ""
-  const selV = nSel > 0 ? curve[nSel - 1] : 0
-  const n80 = Math.min(sm.n80, M)
-  const grid = [0, 0.5, 1].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="rq-grid"/>
-      <text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" class="rq-axis">${v * 100}%</text>`).join("")
-  const step = (W - L - R) / M
-  const hits = curve.slice(0, M).map((v, i) => `<rect x="${(x(i + 1) - step / 2).toFixed(1)}" y="${T}" width="${Math.max(step, 1).toFixed(1)}" height="${H - T - B}" class="rq-hit"><title>상위 ${i + 1}건 → 남은 검토 금액의 ${pct(v, 1)}</title></rect>`).join("")
-  const rest = curve.length - M
-  return `<figure class="rq-curve">
-      <figcaption class="text-sm font-semibold text-ink">상위 N건이 덮는 남은 검토 금액</figcaption>
-      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="상위 ${n80}건이 남은 검토 금액의 80%, 지금 보는 ${nSel}건은 ${pct(selV)}">
-        ${grid}
-        <line x1="${L}" x2="${W - R}" y1="${y(COVER)}" y2="${y(COVER)}" class="rq-ref"/>
-        <text x="${L + 4}" y="${y(COVER) - 5}" class="rq-axis">80% 선</text>
-        ${areaPath ? `<path d="${areaPath}" class="rq-area"/>` : ""}
-        <polyline points="${line}" class="rq-line"/>
-        <line x1="${x(n80)}" x2="${x(n80)}" y1="${y(COVER)}" y2="${y(0)}" class="rq-ref"/>
-        <circle cx="${x(n80)}" cy="${y(curve[n80 - 1])}" r="4.5" class="rq-dot"/>
-        <text x="${x(n80) + 6}" y="${y(0) - 6}" class="rq-axis rq-axis--strong">${fmt(n80)}건</text>
-        ${nSel > 0 && nSel !== n80 ? `<circle cx="${x(nSel)}" cy="${y(selV)}" r="4.5" class="rq-dot rq-dot--sel"/>` : ""}
-        <text x="${L}" y="${H - 8}" class="rq-axis">1건</text>
-        <text x="${W - R}" y="${H - 8}" text-anchor="end" class="rq-axis">${fmt(M)}건${rest > 0 ? ` (이후 ${fmt(rest)}건 = ${pct(1 - curve[M - 1])})` : ""}</text>
-        ${hits}
-      </svg>
-    </figure>`
-}
-
-function heroHtml(sm, r, curve) {
-  const nShow = shownCount(r, sm)
-  const nSel = Math.min(nShow, sm.open)
-  const selV = nSel > 0 ? curve[nSel - 1] : 0
-  const nBtn = (v, label) => `<button class="rq-seg ${String(r.n) === v ? "rq-seg--on" : ""}" data-rq="n" data-n="${v}">${label}</button>`
-  const done = sm.open === 0
-  return `
-    <section class="panel p-6" aria-labelledby="rqHead">
-      <div class="grid gap-6 lg:grid-cols-[1.05fr_1fr]">
-        <div class="min-w-0">
-          <p class="text-sm font-semibold text-sub">남은 검토 ${fmt(sm.open)}건 · ${eok(sm.amount_open)} · 높음 ${fmt(sm.high_open)}건</p>
-          <h3 id="rqHead" class="mt-2 font-hanan text-2xl font-semibold leading-snug text-ink sm:text-[28px]">
-            ${done ? "검토할 줄을 모두 처리했어요"
-              : `상위 <span class="rq-big">${fmt(sm.n80)}</span>건이 남은 검토 금액의 <span class="rq-big">80%</span>`}
-          </h3>
-          <div class="mt-5">
-            <div class="flex items-baseline justify-between gap-3 text-sm">
-              <span class="font-semibold text-ink">처리 진행률(금액)</span>
-              <span class="font-bold text-ink">${pct(sm.progress, 1)}</span>
-            </div>
-            <div class="rq-progress mt-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${(sm.progress * 100).toFixed(1)}" aria-label="처리 진행률"><span style="width:${(sm.progress * 100).toFixed(2)}%"></span></div>
-            <p class="mt-2 text-xs text-sub">${fmt(sm.resolved)} / ${fmt(sm.total)}건 처리 · ${fmt(sm.amount_resolved)} / ${fmt(sm.amount_total)}천원</p>
-          </div>
-          <div class="mt-5 flex flex-wrap items-center gap-2">
-            <span class="text-sm font-semibold text-sub">보기</span>
-            <div class="rq-segs">${nBtn("10", "10건")}${nBtn("20", "20건")}${nBtn("50", "50건")}${nBtn("80", `80%까지 (${fmt(sm.n80)}건)`)}${nBtn("all", "전체")}</div>
-          </div>
-          ${!done && nSel ? `<p class="mt-2 text-sm text-ink">지금 보는 상위 <b>${fmt(nSel)}</b>건 = 남은 검토 금액의 <b>${pct(selV)}</b></p>` : ""}
-        </div>
-        ${curveSvg(curve, sm, nSel)}
-      </div>
+function summaryHtml(sm) {
+  return `<section class="panel flex flex-wrap items-baseline gap-x-6 gap-y-1 px-5 py-3 text-sm text-sub" aria-label="검토 요약">
+      <span>남은 검토 <b class="text-base text-ink">${fmt(sm.open)}</b>건</span>
+      <span>남은 금액 <b class="text-base text-ink">${fmt(sm.amount_open)}</b> 천원</span>
+      <span>처리 <b class="text-base text-ink">${fmt(sm.resolved)}</b>건 · ${fmt(sm.amount_resolved)} 천원</span>
+      <span>위험 높음 <b class="text-base text-err">${fmt(sm.high_open)}</b>건</span>
     </section>`
 }
 
@@ -341,9 +275,8 @@ export function renderReview() {
   }
   const items = d.items || []
   const sm = rqSummarize(items)
-  const curve = rqCurve(items)
   const list = rqFiltered()
-  const n = r.show === "open" ? shownCount(r, sm) : Infinity
+  const n = shownCount(r)
   const shown = list.slice(0, n)
   const rest = list.length - shown.length
   const openList = list.filter(it => !it.resolved)
@@ -353,12 +286,12 @@ export function renderReview() {
   return `
     <div class="space-y-6">
       ${title}
-      ${locked ? lockedSay("재배정은 막히고, 승인과 차이 사유는 그대로 돼요.") : ""}
-      ${heroHtml(sm, r, curve)}
+      ${locked ? lockedSay("재배정은 막혀요. «이상 없음»·사유는 검토 기록으로만 남고 마감된 숫자는 바뀌지 않아요.") : ""}
+      ${summaryHtml(sm)}
       ${filterHtml(sm, items)}
       <section aria-label="검토 목록">
         <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm text-sub">
-          <span>${fmt(shown.length)}건 표시${sub && r.show === "open" && listAmt ? ` · 이 조건 남은 금액의 ${pct(covered / listAmt)}` : ""}</span>
+          <span>${fmt(shown.length)} / ${fmt(list.length)}건 표시${sub && r.show === "open" && listAmt ? ` · 이 조건 남은 금액의 ${pct(covered / listAmt)}` : ""}</span>
           <span class="hidden sm:inline">단축키 J·K 이동 · A 승인 · 1~5 사유 칩 · E 전표</span>
         </div>
         ${shown.length ? `<ol class="space-y-3">${shown.map(it => cardHtml(it, locked)).join("")}</ol>`

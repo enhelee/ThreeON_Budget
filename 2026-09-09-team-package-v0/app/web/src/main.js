@@ -6,11 +6,11 @@ import { busy, toast } from "./components/feedback.js"
 import { injectCharacterSprite } from "./components/characters.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
-import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
+import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
-import { detResultsHtml, unassignedName } from "./views/detail.js"
+import { detResultsHtml, PICK_SORTS, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 import { rqChange, rqClick, rqKey } from "./review_actions.js"
 
@@ -143,9 +143,18 @@ document.addEventListener("click", async e => {
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
   const stab = e.target.closest("[data-settab]");
-  if (stab) { state.settingsTab = stab.dataset.settab; renderPage(); return; }
+  if (stab) { await openSettingsTab(stab.dataset.settab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
   if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
+  // 3+ 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.
+  if (act === "det-back") { await navigate("detail", {branch: ""}); return; }
+  const ps = e.target.closest("[data-pick-sort]");
+  if (ps) {
+    const k = ps.dataset.pickSort, cur = state.det.pickSort;
+    const def = PICK_SORTS.find(x => x[0] === k)?.[2] ?? -1;
+    state.det.pickSort = cur.key === k && k !== "gap" ? {key: k, dir: -cur.dir} : {key: k, dir: def};
+    renderPage(); return;
+  }
   if (act === "analyze") runAnalyze();
   if (act === "logout") { await fetch("/api/logout", {method: "POST"}); location.reload(); return; }
   if (act === "reload-audit") { await navigate("settings"); return; }

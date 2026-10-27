@@ -40,6 +40,7 @@ export const state = {
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",
          hideMissing: false, sortKey: "", sortDir: 1,
+         pickSort: {key: "gap", dir: -1},   // 지사 카드 정렬(views/detail.js PICK_SORTS)
          lowConf: false,
          guideOpen: false,  // «? 표 보는 법» 펼침(표 머리 줄)
          varOnly: false,   // «사유 대상만» — 집행률 ±20%p 를 벗어난 사업만

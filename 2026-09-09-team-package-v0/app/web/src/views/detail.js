@@ -11,7 +11,9 @@ export const DET_COLS = [
   ["연예산원", "연예산(A)·천원"], ["실적원", "실적(B)·천원"], ["집행률", "집행률·사유"],
   ["구분", "상태"], ["확신도", "확신도"],
 ];
-const NCOL = DET_COLS.length + 1;   // + 수정 열
+// 열 수 — 마감 연도는 «수정» 열이 없다. 한 행이라도 열 수가 더 많으면(합계·전표 행) 폭 없는 유령 열이 생겨
+//   표 오른쪽이 텅 빈다(2026-10-27 사용자 지적). 그래서 모든 행이 이 값을 따른다.
+const ncol = () => DET_COLS.length + (state.status?.locked ? 0 : 1);
 
 /** 집행률 칸: 비율 배지 + (±20%p 를 벗어난 사업이면) 사유 버튼. 판정은 서버(db.is_variance).
  *  사유는 숫자를 바꾸지 않는 설명이라 마감 연도에도 연다. */
@@ -27,7 +29,7 @@ function rateCell(b, key) {
 function noteRowHtml(b, key) {
   if (state.det.noteKey !== key) return "";
   return `
-      <tr class="edit-row"><td colspan="${NCOL}" class="p-4">
+      <tr class="edit-row"><td colspan="${ncol()}" class="p-4">
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-2 text-sm font-bold text-ink">차이 사유 — "${esc(b.사업명)}"
             <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)}천원 · 실적 ${fmt(b.실적)}천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
@@ -76,13 +78,37 @@ export function reviewBannerHtml() {
     action: `<button class="btn-secondary" data-action="toggle-lowconf">${d.lowConf ? "전체 보기" : "같이 보기"}</button>`});
 }
 
-/** 지사를 고르기 전 빈 화면 대신 — 집행률이 100%에서 먼 순서로 지사 카드. 누르면 그 지사 상세. */
+// 지사 카드 정렬 — 기본은 «편차 큰 순»(집행률이 100%에서 먼 지사가 먼저, 볼 곳부터). 같은 버튼을 다시 누르면 방향이 바뀐다.
+export const PICK_SORTS = [
+  ["gap", "편차 큰 순", -1], ["rate", "집행률", -1], ["plan", "계획 금액", -1], ["actual", "실적 금액", -1], ["name", "지사명순", 1],
+]
+const pickVal = {
+  gap: r => r.plan > 0 ? Math.abs(r.actual / r.plan * 100 - 100) : Infinity,
+  rate: r => r.plan > 0 ? r.actual / r.plan : -Infinity,
+  plan: r => r.plan, actual: r => r.actual,
+}
+
+function pickSortBar() {
+  const {key, dir} = state.det.pickSort
+  return `<div class="flex flex-wrap items-center gap-2" role="group" aria-label="지사 카드 정렬">
+    <span class="text-sm font-semibold text-sub">정렬</span>
+    <div class="rq-segs">${PICK_SORTS.map(([k, label]) => {
+      const on = k === key
+      const arrow = on && k !== "gap" ? (dir > 0 ? (k === "name" ? " ㄱ→ㅎ" : " ↑") : (k === "name" ? " ㅎ→ㄱ" : " ↓")) : ""
+      return `<button class="rq-seg ${on ? "rq-seg--on" : ""}" data-pick-sort="${k}" aria-pressed="${on}">${label}${arrow}</button>`
+    }).join("")}</div></div>`
+}
+
+/** 지사를 고르기 전 빈 화면 대신 — 지사 카드(정렬 바꿀 수 있음). 누르면 그 지사 상세. */
 function branchPickGrid() {
   const rows = (state.branches || []).map(r => ({...r, plan: (r.profitPlan || 0) + (r.capitalPlan || 0),
     actual: (r.profitActual || 0) + (r.capitalActual || 0)})).filter(r => r.plan > 0 || r.actual)
   if (!rows.length) return ""
-  const gap = r => r.plan > 0 ? Math.abs(r.actual / r.plan * 100 - 100) : Infinity
-  return `<section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${[...rows].sort((a, b) => gap(b) - gap(a)).map(r => `
+  const {key, dir} = state.det.pickSort
+  const sorted = [...rows].sort((a, b) => key === "name"
+    ? String(a.branch).localeCompare(String(b.branch), "ko") * dir
+    : (pickVal[key](a) - pickVal[key](b)) * dir || String(a.branch).localeCompare(String(b.branch), "ko"))
+  return `${pickSortBar()}<section class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${sorted.map(r => `
     <button class="metric-card text-left hover:border-ink" data-branch="${esc(r.branch)}">
       <span class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">${esc(r.branch)}</span>${rateBadge(r.plan, r.actual)}</span>
       <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · 검토 ${r.lowConf}건` : ""}</span></button>`).join("")}</section>`
@@ -106,7 +132,7 @@ export function renderDetail() {
       <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div><p class="text-sm font-semibold text-ink">STAGE 3+ · ${esc(state.year)}년</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(d.branch)} — 사업별 실적 검토</h2></div>
-        <button class="btn-secondary" data-view="branches">← 전체 지사</button>
+        <button class="btn-secondary" data-action="det-back" title="3+ 지사 카드 목록으로">← 지사 목록</button>
       </section>
       ${pendingBarHtml()}
       ${locked ? "" : reviewBannerHtml()}
@@ -239,7 +265,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right text-xs font-bold text-sub">전표금액(원)</td>
         <td></td>
         <td class="table-cell text-right text-xs font-bold text-sub" colspan="2">확신도·매칭 근거</td>
-        <td></td></tr>`;
+        ${locked ? "" : "<td></td>"}</tr>`;
     const vrows = !open ? "" : vhead + b.전표.map(v => `
       <tr class="voucher-row">
         <td class="table-cell pl-6" colspan="2">
@@ -251,10 +277,10 @@ export function detResultsHtml() {
         <td class="table-cell text-right font-medium" title="${fmt(v.금액원)}원">${fmt(v.금액천원)}</td>
         <td></td>
         <td class="table-cell text-right" colspan="2">${v.확신도 !== null && v.확신도 !== undefined ? confBadge(v.확신도) : ""}${v.근거 ? `<span class="ml-1 block text-[11px] text-sub" title="이 전표가 이 사업에 붙은 이유">${esc(v.근거)}</span>` : ""}</td>
-        <td></td></tr>`).join("")
-      + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-tri" colspan="${NCOL}">귀속 전표 없음 (미시행)</td></tr>` : "");
+        ${locked ? "" : "<td></td>"}</tr>`).join("")
+      + (open && b.전표.length === 0 ? `<tr class="voucher-row"><td class="table-cell pl-10 text-xs text-tri" colspan="${ncol()}">귀속 전표 없음 (미시행)</td></tr>` : "");
     const editRow = !editing ? "" : `
-      <tr class="edit-row"><td colspan="${NCOL}" class="p-4">
+      <tr class="edit-row"><td colspan="${ncol()}" class="p-4">
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-3 text-sm font-bold text-ink">사업 내용 수정 <span class="ml-2 text-xs font-medium text-ink">빈칸으로 저장하면 해당 값이 지워집니다. 저장 즉시 반영 + 이후 분석에도 유지.</span></p>
           <div class="edit-grid">
@@ -342,7 +368,7 @@ export function detResultsHtml() {
           ${DET_COLS.map(([k, label], i) => `<th class="clickable ${i >= 4 && i <= 8 ?"text-right" : ""}" data-detsort="${k}"><span class="th-line">${label} <span>${detSortArrow(k)}</span></span></th>`).join("")}
           ${locked ? "" : '<th class="text-center">수정</th>'}</tr></thead>
         <tbody class="divide-y divide-line-subtle">${rows}</tbody>
-        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 천원)</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td colspan="4"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
+        <tfoot class="border-t-2 border-line bg-subtle"><tr><td class="table-cell font-bold" colspan="4">합계 (${biz.length}개 사업, 단위: 천원)</td><td class="table-cell text-right font-bold">${fmt(tot.plan)}</td><td class="table-cell text-right font-bold">${fmt(tot.actual)}</td><td colspan="${ncol() - 6}"></td></tr></tfoot></table></div>` : emptyState("조건에 맞는 사업이 없습니다.")}
       </section>`;
 }
 
