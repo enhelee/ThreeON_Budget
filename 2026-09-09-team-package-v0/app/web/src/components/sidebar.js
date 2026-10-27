@@ -1,5 +1,5 @@
 import { esc } from "../util.js"
-import { charSvg } from "./characters.js"
+import { charImg } from "./characters.js"
 
 // ─────────────────────────────────────────────────────────────
 // 사이드바 — 모든 화면에서 항상 고정. 어느 화면에 있든 클릭 한 번으로 이동한다.
@@ -63,7 +63,7 @@ export function renderSidebar() {
   return `
     <button type="button" class="sb-brand brand-link block w-full text-left" data-view="home" aria-label="메인으로 — 한국지역난방공사 ONDO by ThreeON">
       <span class="sb-full sb-ci"><img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-full"></span>
-      <span class="sb-name">${charSvg("mt", "sidebar-mascot", {head: true})}<span class="sb-full sb-word"><b>ON</b>DO</span><span class="sb-full sb-by">by ThreeON</span></span>
+      <span class="sb-name">${charImg("mt", "sidebar-mascot", {head: true})}<span class="sb-full sb-word"><b>ON</b>DO</span><span class="sb-full sb-by">by ThreeON</span></span>
       <span class="sb-full sb-desc">예산·실적 분석 · 발전플랜트 유지보수</span>
     </button>
 
@@ -80,7 +80,7 @@ export function renderHeaderBrand() {
   return `
     <img src="/assets/kdhc-signature-ko.svg" alt="" width="138" height="32" class="block h-8 w-auto">
     <span class="header-brand__text">
-      <span class="flex items-center gap-1.5 text-[15px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word"><b>ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span>${charSvg("mt", "header-brand__mascot", {head: true})}</span>
+      <span class="flex items-center gap-1.5 text-[15px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word"><b>ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span>${charImg("mt", "header-brand__mascot", {head: true})}</span>
       <span class="block text-[12px] leading-4 text-sub">예산·실적 분석 · 발전플랜트 유지보수</span>
     </span>`
 }

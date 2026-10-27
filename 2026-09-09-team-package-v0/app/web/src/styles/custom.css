@@ -440,3 +440,6 @@
 .stage-card--mt .stage-card__no{color:#0F6E56}.stage-card--mt::after{background:#E1F8F1}
 .stage-card--gt .stage-card__no{color:#B4472A}.stage-card--gt::after{background:#FEECE6}
 .stage-card--yc .stage-card__no{color:#5B3FBF}.stage-card--yc::after{background:#F0EBFF}
+
+/* 입체 캐릭터 그림(components/characters.js charImg) — 자리 크기는 각 클래스가, 비율은 그림이 지킨다 */
+img.char-img{object-fit:contain;display:inline-block}
