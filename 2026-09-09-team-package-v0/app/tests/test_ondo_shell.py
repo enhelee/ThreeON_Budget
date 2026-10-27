@@ -4,8 +4,8 @@
 결정 요약
 - 프로그램 이름은 ONDO(by ThreeON). 팀 이름 ThreeON 은 «by» 로 남긴다.
 - CI 빨강(#FE0009)은 로고에만 — 버튼·포커스·링크 강조는 남색(navy)과 캐릭터 색.
-- 사이드바는 펼친 상태가 기본, «메뉴 접기»를 누르면 어두운 얇은 띠(76px)로 남고
-  고른 상태는 사람마다(localStorage) 기억한다.
+- 사이드바는 어두운 얇은 띠(76px)가 기본이고 마우스를 올리면 잠깐 펼친다(10/26 방식).
+  «메뉴 펼치기»로 펼친 채 고정할 수 있고, 고른 상태는 사람마다(localStorage) 기억한다.
 - 메뉴마다 담당 캐릭터 색 점: 매칭이(예산 계획·실적 집계) · 검토미(분석·상세·검토 큐·통계) · 예측이(중장기).
 """
 import os
@@ -42,12 +42,12 @@ def test_every_work_menu_names_its_character():
     assert "nav-dot" in _read(SRC, "components", "sidebar.js"), "메뉴 버튼에 캐릭터 색 점(.nav-dot)"
 
 
-def test_sidebar_starts_open_and_remembers_fold():
+def test_sidebar_starts_as_rail_and_remembers_pin():
     side = _read(SRC, "components", "sidebar.js")
-    assert "data-sb-fold" in side and "메뉴 접기" in side, "사이드바 아래 «메뉴 접기» 버튼"
+    assert "data-sb-fold" in side, "사이드바 아래 접기·펼치기 버튼"
     js = _read(SRC, "main.js")
     assert '"ondo.sidebar"' in js, "접기 선택은 localStorage «ondo.sidebar» 로 기억"
-    assert re.search(r'===\s*"folded"', js), "저장값이 folded 일 때만 접힌 채로 시작(기본은 펼침)"
+    assert re.search(r'===\s*"open"', js), "저장값이 open 일 때만 펼친 채로 시작(기본은 접힌 띠)"
     assert "sb-open" in js, "펼침 고정 상태 표시(html.sb-open)"
     css = _read(SRC, "styles", "custom.css")
     assert ".sb-open #appShell" in css, "펼침 고정이면 본문이 사이드바 폭만큼 비켜야 합니다"

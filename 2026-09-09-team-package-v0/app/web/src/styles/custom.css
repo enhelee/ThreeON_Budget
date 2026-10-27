@@ -160,7 +160,8 @@
 @media (prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
 /* ONDO 사이드바 — 남색 바탕 + 아래쪽 민트빛 + 오른쪽 3색 선(매칭이·검토미·예측이). 2026-10-27 grace 결정.
-   데스크톱은 펼침이 기본(html.sb-open, 본문이 288px 비킨다), «메뉴 접기»면 76px 띠(.sb-collapsed). 모바일 드로어도 같은 색 */
+   데스크톱은 76px 띠가 기본(.sb-collapsed, 마우스를 올리면 잠깐 펼침), «메뉴 펼치기»로 고정하면 html.sb-open
+   (본문이 288px 비킨다). 모바일 드로어도 같은 색 */
 #sidebar{background:radial-gradient(120% 40% at 20% 108%,rgba(62,230,196,.26),transparent 60%),var(--navy);color:#C7CDDA;border-right-color:transparent}
 #sidebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--char-mt),var(--char-gt),var(--char-yc));pointer-events:none}
 #sidebar :focus-visible{outline-color:var(--char-mt)}

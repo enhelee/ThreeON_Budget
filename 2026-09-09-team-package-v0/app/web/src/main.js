@@ -742,9 +742,9 @@ injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
 $("#headerBrand").innerHTML = renderHeaderBrand();
 
-// 데스크톱 사이드바 — 펼친 상태가 기본이고 «메뉴 접기»로 번호만 남은 어두운 띠가 된다(2026-10-27 grace 결정).
-// 고른 상태는 사람마다 기억한다(localStorage «ondo.sidebar» — 막힌 브라우저면 늘 펼침으로 시작).
-// 접힌 띠는 예전처럼 마우스를 올리거나 Tab 으로 들어오면 본문 위로 잠깐 펼친다(2026-10-26 요청 유지).
+// 데스크톱 사이드바 — 번호만 남은 어두운 띠가 기본이고, 마우스를 올리거나 Tab 으로 들어오면 본문 위로
+// 잠깐 펼친다(2026-10-26 요청). «메뉴 펼치기»로 펼친 채 고정할 수 있다(2026-10-27 grace 결정).
+// 고른 상태는 사람마다 기억한다(localStorage «ondo.sidebar» — 막힌 브라우저면 늘 띠로 시작).
 // 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
 const SB_KEY = "ondo.sidebar";
 const sbStore = {
@@ -766,7 +766,7 @@ function setSidebarOpen(open) {
     fold.querySelector(".sb-fold__text").textContent = open ? "메뉴 접기" : "메뉴 펼치기";
   }
 }
-setSidebarOpen(!(sbStore.get() === "folded"));
+setSidebarOpen(sbStore.get() === "open");
 {
   const sb = $("#sidebar");
   const pinned = () => document.documentElement.classList.contains("sb-open");

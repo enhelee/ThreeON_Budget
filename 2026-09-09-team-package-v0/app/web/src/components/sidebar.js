@@ -54,8 +54,8 @@ function groupLabel(text) {
 /** <aside id="sidebar"> 의 내용. 바깥 껍데기(위치·모바일 토글)는 index.html 이 갖는다.
  *  로고는 CI 매뉴얼의 한글 가로 A타입 시그니처(SVG, 비율 4.33:1 → 184px 폭에 43px). 바탕이 남색이라
  *  로고는 흰 판 위에 둔다(CI 색을 바꾸지 않기 위해). 그 아래 프로그램 이름 ONDO · by ThreeON.
- *  데스크톱은 펼친 상태가 기본이고 «메뉴 접기»로 번호만 남은 어두운 띠(76px)가 된다(main.js).
- *  접힌 띠는 마우스를 올리면 본문 위로 잠깐 펼쳐진다. 접힌 동안 로고·글자는 숨기고 캐릭터 머리만
+ *  데스크톱은 번호만 남은 어두운 띠(76px)가 기본이고 마우스를 올리면 본문 위로 잠깐 펼쳐진다.
+ *  «메뉴 펼치기»로 펼친 채 고정할 수 있다(main.js). 접힌 동안 로고·글자는 숨기고 캐릭터 머리만
  *  남긴다(custom.css .sb-collapsed) — 대신 상단 머리글에 같은 표지(renderHeaderBrand)가 나온다.
  *  표지를 누르면 어디서든 메인으로 간다(button[data-view]). */
 export function renderSidebar() {
