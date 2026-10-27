@@ -94,23 +94,43 @@ function brScatterHtml(rows) {
   const labeled = new Set([...pts].sort((a, b) => off(b) - off(a)).slice(0, 6).concat([...pts].sort((a, b) => b.plan - a.plan).slice(0, 4)).map(p => p.name));
   // 이미 글자가 있는 자리(두 귀퉁이 안내)는 라벨이 피해 간다.
   const placed = [{x: L + 8, y: T + 6, w: 150, h: 18}, {x: W - R - 160, y: H - B - 28, w: 152, h: 18}];
+  // 적정 범위 띠(2026-10-27 사용자 지적: «플랜트기술처 69%»가 띠·점선 위에 얹혀 읽기 어려웠다) — 화면 좌표를
+  //   계획·실적으로 되돌려 실적/계획 비가 BAND_LO~BAND_HI 안이면 «띠 위»로 본다. 점선과 글자가 붙지 않게
+  //   실제 띠(0.8~1.2)보다 조금 넓게 잡는다.
+  const BAND_LO = 0.7, BAND_HI = 1.45;
+  const invX = px => 10 ** (Math.log10(lo) + (px - L) / (W - L - R) * span);
+  const invY = py => 10 ** (Math.log10(lo) + (H - B - py) / (H - T - B) * span);
+  const onBand = (bx, by, tw, th) => {
+    for (const fx of [0, .5, 1]) for (const fy of [0, 1]) {
+      const r = invY(by + fy * th) / invX(bx + fx * tw);
+      if (r > BAND_LO && r < BAND_HI) return true;
+    }
+    return false;
+  };
+  const labels = [];
   for (const p of [...pts].sort((a, b) => b.plan - a.plan)) {
     const cx = sx(p.plan), cy = sy(Math.max(p.act, lo));
     s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억 · 실적 ${p.act.toFixed(1)}억 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
     if (!labeled.has(p.name)) continue;
     const txt = `${p.name} ${p.rate.toFixed(0)}%`, tw = txt.length * 10.5, th = 14;
-    const cands = [[cx - tw / 2, cy - 12 - th], [cx + 11, cy - th / 2], [cx - 11 - tw, cy - th / 2], [cx - tw / 2, cy + 11],
-                   [cx + 11, cy - th - 9], [cx - 11 - tw, cy - th - 9], [cx + 11, cy + 9], [cx - 11 - tw, cy + 9],
-                   // 바닥선처럼 점이 몰린 곳 — 한 칸·두 칸 더 위로
-                   [cx - tw / 2, cy - 30 - th], [cx + 11, cy - th - 27], [cx - 11 - tw, cy - th - 27], [cx - tw / 2, cy - 48 - th]];
+    // 띠 바깥쪽으로 먼저 — 계획보다 더 쓴 지사(대각선 위)는 왼쪽 위, 덜 쓴 지사(아래)는 오른쪽 아래부터 찾는다.
+    const up = [[cx - tw / 2, cy - 12 - th], [cx - 11 - tw, cy - th / 2], [cx - 11 - tw, cy - th - 9],
+                [cx - tw / 2, cy - 30 - th], [cx - 11 - tw, cy - th - 27], [cx - tw - 30, cy - th - 20], [cx - tw / 2, cy - 48 - th]];
+    const down = [[cx - tw / 2, cy + 11], [cx + 11, cy - th / 2], [cx + 11, cy + 9],
+                  [cx - tw / 2, cy + 29], [cx + 11, cy + 27], [cx + 30, cy + 20], [cx - tw / 2, cy + 47]];
+    const rest = [[cx + 11, cy - th - 9], [cx - 11 - tw, cy + 9], [cx + 11, cy - th - 27], [cx - 11 - tw, cy + 27]];
+    const cands = p.act >= p.plan ? [...up, ...down, ...rest] : [...down, ...up, ...rest];
     const hit = (bx, by) => bx < L + 2 || bx + tw > W - R - 2 || by < T + 2 || by + th > H - B - 2 || placed.some(q => bx < q.x + q.w && bx + tw > q.x && by < q.y + q.h && by + th > q.y)
       || pts.some(o => { const ox = sx(o.plan), oy = sy(Math.max(o.act, lo)); return ox > bx - 10 && ox < bx + tw + 10 && oy > by - 10 && oy < by + th + 10; });
-    const spot = cands.find(([a, b]) => !hit(a, b));
-    if (!spot) continue;                    // 빈 자리가 없으면 겹쳐 쓰지 않는다 — 이름은 마우스를 올리면 보인다
+    // 1순위: 띠 밖 빈자리 → 2순위: 띠 위라도 빈자리(흰 테두리로 읽힌다) → 없으면 쓰지 않는다(마우스를 올리면 보인다)
+    const spot = cands.find(([x, y]) => !hit(x, y) && !onBand(x, y, tw, th)) || cands.find(([x, y]) => !hit(x, y));
+    if (!spot) continue;
     const [bx, by] = spot;
     placed.push({x: bx, y: by, w: tw, h: th});
-    s += `<text x="${bx}" y="${by + 11}" font-size="12" font-weight="600" fill="#0D0D0D" pointer-events="none">${esc(txt)}</text>`;
+    labels.push(`<text x="${bx}" y="${by + 11}" font-size="12" font-weight="600" fill="#0D0D0D" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round" paint-order="stroke" pointer-events="none" data-sc-label>${esc(txt)}</text>`);
   }
+  // 라벨은 점을 다 그린 뒤에 — 나중에 그린 점이 글자를 덮지 않게
+  s += labels.join("");
   const over = pts.filter(p => p.rate > 120).length, under = pts.filter(p => p.rate < 80).length;
   return `
       <section class="panel mt-6 p-5 sm:p-6">
