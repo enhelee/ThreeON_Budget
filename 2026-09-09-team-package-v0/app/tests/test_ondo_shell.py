@@ -84,9 +84,6 @@ def test_brand_red_stays_only_in_logo():
 # ── 시안 맞춤: 본문 연회색 바탕 + 메인 남색 배너(2026-10-27 grace 요청) ──────────────
 # 남색 사이드바 옆에 새하얀 본문만 있으면 따로 논다 — 바탕을 연회색으로, 메인 맨 위에 남색 배너를 둬서 잇는다.
 
-CHAR_DIR = os.path.join(WEB, "public", "assets", "characters")
-
-
 def test_page_background_is_soft_gray_and_cards_stay_white():
     cfg = _read(WEB, "tailwind.config.js")
     assert re.search(r'\bpage:\s*"#F4F6FA"', cfg, re.I), "tailwind 토큰 page(연회색 바탕)"
@@ -101,13 +98,43 @@ def test_home_banner_is_navy_with_three_characters():
     strip = home.split("function headerStrip()", 1)[1].split("\n}\n", 1)[0]
     assert "home-hero" in strip, "메인 맨 위 배너는 .home-hero(남색)"
     assert "예산의 온도를 읽다" in strip
-    assert '/assets/characters/${id}.png" alt="${name}"' in strip, "캐릭터 그림은 이름을 대체 텍스트로"
-    for cid, name in (("mt", "매칭이"), ("gt", "검토미"), ("yc", "예측이")):
-        assert f'["{cid}", "{name}"]' in strip, f"배너에 {name}"
-        png = os.path.join(CHAR_DIR, f"{cid}.png")
-        assert os.path.isfile(png), f"{cid}.png 가 없습니다"
-        assert os.path.getsize(png) < 160_000, f"{cid}.png 가 너무 큽니다(배너용은 작게 줄여 넣는다)"
+    assert "CHAR_IMG[id].full" in strip and 'alt="${NAMES[id]}"' in strip, "캐릭터 그림은 챗봇과 같은 char_images.js"
+    assert '["mt", "gt", "yc"]' in strip, "배너에 매칭이·검토미·예측이"
+    assert not os.path.isdir(os.path.join(WEB, "public", "assets", "characters")), "그림은 한 벌(src/assets/characters webp)만"
     css = _read(SRC, "styles", "custom.css")
     hero = css.split(".home-hero{", 1)[1].split("}", 1)[0]
     assert "var(--navy)" in hero
     assert "prefers-reduced-motion" in css.split(".home-hero{", 1)[1], "캐릭터 둥실 움직임은 움직임 줄이기 설정에서 멈춘다"
+
+
+# ── 메인 카드도 시안처럼(2026-10-27 grace: 지금 내용은 그대로, 조화만) ─────────────
+# 그래프의 계획 파랑·실적 주황 기조는 그대로 둔다(grace «빨강·파랑 기조 유지» = 그래프 색).
+
+def test_banner_lists_work_steps_as_links():
+    strip = _read(SRC, "views", "home.js").split("function headerStrip()", 1)[1].split("\n}\n", 1)[0]
+    assert "home-hero__steps" in strip and "data-view" in strip, "배너 안 업무 단계 알약(누르면 이동)"
+
+
+def test_status_cards_carry_their_character_tone():
+    home = _read(SRC, "views", "home.js")
+    assert re.search(r"function card\(title, badge, body, tone\)", home), "card() 가 담당 캐릭터(tone)를 받는다"
+    for fn, tone in (("budgetCard", "mt"), ("prevYearCard", "mt"), ("unmappedCard", "gt")):
+        body = home.split(f"function {fn}(", 1)[1].split("\nfunction ", 1)[0]
+        assert f'"{tone}")' in body, f"{fn} 은 {tone} 색"
+    css = _read(SRC, "styles", "custom.css")
+    for t in ("mt", "gt", "yc"):
+        assert f".metric-card--{t}" in css, f"카드 위 색 선 .metric-card--{t}"
+
+
+def test_stage_cards_show_their_character():
+    home = _read(SRC, "views", "home.js")
+    stage = home.split("function stageCards()", 1)[1].split("\n}\n", 1)[0]
+    assert "CHAR_IMG[" in stage and "stage-card__char" in stage, "업무 단계 카드마다 담당 캐릭터 그림"
+    side = _read(SRC, "components", "sidebar.js")
+    owners = dict(re.findall(r'view: "(\w+)", title:[^}]*?char: "(\w+)"', side.split("export const STAGES", 1)[1]))
+    assert owners == {"budget": "hj", "collect": "mt", "branches": "gt", "review": "gt", "stats": "gt", "forecast": "yc"}, owners
+
+
+def test_chart_plan_blue_and_actual_orange_stay():
+    css = _read(SRC, "styles", "custom.css")
+    assert ".yr-bar--plan{background:#2F6FDB}" in css and ".yr-bar--act{background:#D2601A}" in css

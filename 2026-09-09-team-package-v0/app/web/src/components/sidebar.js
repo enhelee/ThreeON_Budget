@@ -27,19 +27,20 @@ export const MENU = [
 ]
 
 // 업무 흐름 4단계 — 메인 대시보드의 STAGE 카드. 사이드바의 어느 화면으로 가는지가 view.
+// char = 카드에 서는 담당 캐릭터(한장이=계획본 한 장, 매칭이=전표 붙이기, 검토미=분석·검토, 예측이=전망)
 export const STAGES = [
-  {no: "01", view: "budget", title: "예산 계획",
+  {no: "01", view: "budget", title: "예산 계획", char: "hj",
    desc: "계획본(양식1)을 올려 그 해 예산을 DB에 등록합니다."},
-  {no: "02", view: "collect", title: "실적 집계·매칭",
+  {no: "02", view: "collect", title: "실적 집계·매칭", char: "mt",
    desc: "ERP(zrfm2) 전표를 올려 계획 사업에 자동으로 붙입니다."},
-  {no: "03", view: "branches", title: "실적 분석·표준화",
+  {no: "03", view: "branches", title: "실적 분석·표준화", char: "gt",
    desc: "지사별 집행률을 확인하고 재배정·수정으로 근거를 확정합니다."},
   // 사이드바와 같은 순서·표기(2026-10-27 사용자 지적: 04·검토 큐가 빠져 번호가 어긋났다)
-  {no: "03 ✓", view: "review", title: "검토 큐",
+  {no: "03 ✓", view: "review", title: "검토 큐", char: "gt",
    desc: "돈이 많이 걸린 사업부터 승인·사유·재배정으로 확인합니다."},
-  {no: "04", view: "stats", title: "통계·내보내기",
+  {no: "04", view: "stats", title: "통계·내보내기", char: "gt",
    desc: "과목별 계획 대비 실적을 보고 재무팀 양식으로 내려받습니다."},
-  {no: "05", view: "forecast", title: "중장기 전망",
+  {no: "05", view: "forecast", title: "중장기 전망", char: "yc",
    desc: "정비등급별 표준금액으로 10개년 소요를 전망합니다."},
 ]
 
