@@ -23,7 +23,22 @@ function applyOverview(rows) {
 // 연도가 아직 없으면(첫 진입) 서버가 «자료가 있는 최신 연도»로 미반영을 센다. 화면이 고른
 // 연도가 그와 다르면(자료 없는 해) 미반영만 따로 다시 받는다.
 // 미반영·열린 연도는 예전처럼 실패해도 화면을 막지 않는다(null → 배지·배너만 안 뜬다).
+// 화면을 빨리 옮기면 앞 화면의 nav-state 가 끝나기 전에 또 불렀다(운영 실측 2번 겹침).
+//   같은 연도의 요청이 날아가는 중이면 그 결과를 같이 쓰고, 방금(NAV_REUSE_MS 안) 받았고 그 뒤 쓰기가
+//   없었으면 다시 부르지 않는다. 쓰기는 api() 가 state.navFresh 를 0 으로 돌려 재사용을 끊는다.
+const NAV_REUSE_MS = 5000;
+let navInflight = null, navInflightYear = null;
+
 export async function loadNavState() {
+  const key = state.year || "";
+  if (navInflight && navInflightYear === key) return navInflight;
+  if (key && state.navFreshYear === key && Date.now() - (state.navFresh || 0) < NAV_REUSE_MS) return;
+  navInflightYear = key;
+  navInflight = fetchNavState().finally(() => { navInflight = null; });
+  return navInflight;
+}
+
+async function fetchNavState() {
   const q = state.year ? `?year=${encodeURIComponent(state.year)}` : "";
   const d = await api(`/api/nav-state${q}`);
   applyOverview(d.years);
@@ -32,6 +47,7 @@ export async function loadNavState() {
   state.yearLocked = d.year === state.year ? !!d.locked : null;
   if (d.year === state.year) state.pending = d.pending;
   else await loadPending();
+  state.navFresh = Date.now(); state.navFreshYear = state.year || "";
 }
 
 // 메인 대시보드 전용 — 실패해도 화면 전체를 막지 않는다(해당 카드만 '-' 로 뜬다).
@@ -56,7 +72,9 @@ export async function loadReviewQueue() {
 }
 
 export async function loadReviewBrief() {
-  state.rqBrief = await api(`/api/review-queue?year=${state.year}&brief=1`);
+  // 실패를 «아직 안 옴(null)»과 나눠 둔다 — 메인은 오는 중엔 «확인 중», 실패했을 때만 예전 두 줄로 알린다.
+  try { state.rqBrief = await api(`/api/review-queue?year=${state.year}&brief=1`); }
+  catch (e) { state.rqBrief = {failed: true}; throw e; }
 }
 
 export async function loadStatus() {

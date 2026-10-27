@@ -63,9 +63,8 @@ function headerStrip() {
         <p class="text-sm font-semibold text-ink">메인</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지</h2>
       </div>
-      <dl class="grid shrink-0 grid-cols-3 gap-x-6 gap-y-2 text-xs">
+      <dl class="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2 text-xs">
         ${metaItem("기준일", today())}
-        ${metaItem("리비전", esc(state.health?.rev || "-"))}
         ${metaItem("단위", "화면 천원 · 연계 원")}
       </dl>
     </div>
@@ -152,7 +151,7 @@ function statusCards() {
 function stageCards() {
   return `<section>
     <h3 class="section-title">업무 단계</h3>
-    <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       ${STAGES.map(s => `
       <button type="button" data-view="${s.view}" class="metric-card text-left transition hover:border-ink">
         <p class="text-xs font-bold tracking-widest text-ink">STAGE ${esc(s.no)}</p>
@@ -187,20 +186,23 @@ function nextActions() {
   // 검토 큐(2026-10-27) — 이상 알림·차이 사유·저확신 귀속을 «돈이 걸린 순» 한 줄로 묶는다.
   //   «171건·1,405건»처럼 건수만 늘어놓으면 어디서 시작할지 모르고 미완성처럼 읽힌다.
   const rq = state.rqBrief?.analyzed ? state.rqBrief.summary : null
-  if (rq?.open) {
+  const rqWaiting = state.rqBrief === null          // 화면을 먼저 그리고 뒤에서 받는 중
+  if (rqWaiting) {
+    items.push({tone: "info", view: "review", text: "검토 큐 확인 중…"})
+  } else if (rq?.open) {
     items.push({tone: "warn", view: "review",
                 text: `검토 큐 — 남은 ${fmt(rq.open)}건 · ${fmt(rq.amount_open)}천원 (처리 ${fmt(rq.resolved)}건)`})
   } else if (rq?.total) {
     items.push({tone: "info", view: "review", text: `검토 큐 ${fmt(rq.total)}건을 모두 처리했습니다.`})
   }
   // 검토 큐를 못 받았을 때만 예전 두 줄(이상 알림은 실적 집계, 차이 사유는 3+)로 알린다.
-  const al = rq ? null : state.alerts?.summary;
+  const al = rq || rqWaiting ? null : state.alerts?.summary;
   if (al?.high) {
     items.push({tone: "warn", view: "collect",
                 text: `이상 알림 높음 ${al.high}건(전체 ${al.total}건) — 예산 초과·과다 귀속·미매칭 비중을 실적 집계에서 확인하세요.`})
   }
   // 차이 사유(집행률 ±20%p) — 마감 뒤에도 입력할 수 있고 보고 때 쓰인다.
-  const varNeed = rq ? 0 : (state.branches || []).reduce((a, r) => a + Math.max(0, (r.variance || 0) - (r.varianceNoted || 0)), 0)
+  const varNeed = rq || rqWaiting ? 0 : (state.branches || []).reduce((a, r) => a + Math.max(0, (r.variance || 0) - (r.varianceNoted || 0)), 0)
   if (varNeed) {
     items.push({tone: "info", view: "detail",
                 text: `차이 사유 미입력 ${varNeed}건(집행률 ±20%p 사업) — 3+ 상세에서 «사유 입력»으로 적어 두세요.`})

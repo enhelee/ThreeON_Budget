@@ -4,6 +4,8 @@ import { state } from "./state.js"
 import { $ } from "./util.js"
 
 export async function api(path, opts = {}) {
+  // 쓰기(POST/PUT/DELETE…) 뒤에는 공통 nav-state(미반영·마감 상태)를 다시 받아야 한다 — 재사용 창을 닫는다.
+  if (opts.method && opts.method !== "GET") state.navFresh = 0;
   const res = await fetch(path, opts);
   if (!res.ok) {
     let msg = res.statusText;

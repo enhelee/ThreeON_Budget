@@ -36,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import alerts as alertm, api_forecast, review_queue as rqm, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import alerts as alertm, api_forecast, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -842,14 +842,16 @@ def overview():
         conn.close()
 
 
-def _overview_rows(conn):
+def _overview_rows(conn, runs_all=None):
     ds = dbm.list_datasets(conn)
     years = sorted({d["year"] for d in ds})
+    if runs_all is None:
+        runs_all = dbm.latest_runs_all(conn)       # 연도×예산 최신 실행을 한 번에(예전 연도×2 질의)
     rows = []
     for y in years:
         entry = {"year": y}
         for budget in ("손익", "자본"):
-            r = dbm.latest_run(conn, y, budget)
+            r = runs_all.get((str(y), budget))
             if r:
                 s = r["summary"]
                 entry[budget] = {
@@ -875,10 +877,11 @@ def nav_state(year: str = None):
     """
     conn = _conn()
     try:
-        rows = _overview_rows(conn)
+        runs_all = dbm.latest_runs_all(conn)
+        rows = _overview_rows(conn, runs_all)
         y = year or (rows[-1]["year"] if rows else None)
         try:
-            pend = _pending_data(conn, y) if y else None
+            pend = _pending_data(conn, y, {b: r for (yy, b), r in runs_all.items() if yy == str(y)}) if y else None
         except Exception:
             conn.rollback()              # PG: 실패한 트랜잭션 위에서는 다음 질의가 못 돈다
             pend = None
@@ -924,22 +927,26 @@ def pending(year: str):
         conn.close()
 
 
-def _pending_data(conn, year):
-    runs = _latest_runs(conn, year)
+_PENDING_TABLES = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
+                   ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
+
+
+def _pending_data(conn, year, runs=None):
+    if runs is None:
+        runs = _latest_runs(conn, year)
     # 손익·자본 중 더 오래된 실행 시각 기준(둘 다 최신이어야 반영 완료)
     stamps = [str(r["created_at"]) for r in runs.values()]
     base = min(stamps) if len(stamps) == 2 else (stamps[0] if stamps else None)
     out = {"analyzed_at": base, "counts": {}, "total": 0}
-    tables = (("override", "전표 재배정"), ("biz_edit", "사업 수정"),
-              ("biz_delete", "사업 삭제"), ("manual_biz", "사업 추가"))
-    for tbl, label in tables:
-        if base is None:
-            n = conn.execute(
-                f"SELECT COUNT(*) FROM {tbl} WHERE year=?", (str(year),)).fetchone()[0]
-        else:
-            n = conn.execute(
-                f"SELECT COUNT(*) FROM {tbl} WHERE year=? AND created_at > ?",
-                (str(year), base)).fetchone()[0]
+    # 네 표를 한 질의로 센다(예전 4번 — 화면 전환마다 불린다)
+    cond = "year=?" if base is None else "year=? AND created_at > ?"
+    one = (str(year),) if base is None else (str(year), base)
+    # 표 이름은 코드 상수라 글자로 넣는다 — SELECT 목록의 매개변수는 PG 가 형식을 못 정해 오류가 난다.
+    sql = " UNION ALL ".join(f"SELECT '{tbl}', COUNT(*) FROM {tbl} WHERE {cond}" for tbl, _ in _PENDING_TABLES)
+    params = one * len(_PENDING_TABLES)
+    got = {t: n for t, n in conn.execute(sql, params).fetchall()}
+    for tbl, label in _PENDING_TABLES:
+        n = int(got.get(tbl) or 0)
         if n:
             out["counts"][label] = n
             out["total"] += n
@@ -949,7 +956,7 @@ def _pending_data(conn, year):
     if n:
         out["counts"]["기준정보"] = n
         out["total"] += n
-    out["learn_pending"] = dbm.count_learn_pending(conn, year)
+    out["learn_pending"] = dbm.count_learn_pending(conn, year, runs)
     return out
 
 
@@ -1440,24 +1447,76 @@ def _rq_material(conn, year, runs):
     return lines, basis, moved, found
 
 
+def _review_data(conn, year):
+    """검토 큐 계산(질의 15번 안팎 · 운영 1~3초) — 자료가 그대로면 캐시(viewcache)에서.
+    버전에 차이 사유·승인도 넣는다(전망과 달리 큐의 처리 상태가 그것으로 바뀐다). 로그인·로그아웃만 뺀다."""
+    def compute():
+        runs = _latest_runs(conn, year)
+        if not runs:
+            return None
+        lines, basis, moved, found = _rq_material(conn, year, runs)
+        items = rqm.build_items(lines, basis, dbm.variance_notes(conn, year),
+                                dbm.review_acks(conn, year), moved, found)
+        return _clean_json({"items": items, "summary": rqm.summarize(items)})
+    ver = viewcache.data_version(conn, ignore=viewcache.SESSION_PATHS)
+    return viewcache.get_or_compute(("review", str(year)), ver, compute)
+
+
 @app.get("/api/review-queue")
 def review_queue(year: str, brief: bool = False):
     """검토 큐. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
     conn = _conn()
     try:
         locked = dbm.is_locked(conn, year)
-        runs = _latest_runs(conn, year)
-        if not runs:
+        data = _review_data(conn, year)
+        if not data:
             return {"items": [], "summary": rqm.summarize([]), "locked": locked, "analyzed": False}
-        lines, basis, moved, found = _rq_material(conn, year, runs)
-        items = rqm.build_items(lines, basis, dbm.variance_notes(conn, year),
-                                dbm.review_acks(conn, year), moved, found)
-        out = {"summary": rqm.summarize(items), "locked": locked, "analyzed": True,
+        items = data["items"]
+        out = {"summary": data["summary"], "locked": locked, "analyzed": True,
                "weights": rqm.WEIGHTS, "labels": rqm.LABELS}
         out["items"] = [it for it in items if not it["resolved"]][:3] if brief else items
-        return _clean_json(out)
+        return out
     finally:
         conn.close()
+
+
+# ── 캐시 예열(운영 PostgreSQL 에서만) ─────────────────────────────────
+# 전망 표 첫 계산이 운영에서 28초였다(2026-10-27) — 배포·재시작 뒤 첫 사용자가 그걸 맞았다.
+# 서버가 뜨면 뒤에서 한 번 계산해 두고, 이후 WARM_INTERVAL 마다 «자료가 바뀌었으면» 다시 채운다
+# (캐시가 그대로면 get_or_compute 가 바로 돌아오므로 평소 비용은 질의 몇 개).
+WARM_INTERVAL = 120
+
+
+def _warm_once():
+    conn = _conn()
+    try:
+        api_forecast.warm(conn, _clean_json)
+        rows = _overview_rows(conn)
+        if rows:
+            _review_data(conn, rows[-1]["year"])
+    finally:
+        conn.close()
+
+
+def _warm_loop():
+    import logging
+    log = logging.getLogger("warm")
+    time.sleep(3)                     # 첫 요청(헬스 체크)이 먼저 지나가게
+    while True:
+        try:
+            _warm_once()
+        except Exception as e:        # 예열 실패는 화면에 영향이 없다 — 요청 때 계산하면 된다
+            log.warning("cache warm failed: %s", e)
+        time.sleep(WARM_INTERVAL)
+
+
+@app.on_event("startup")
+def _start_warmer():
+    if os.environ.get("CACHE_WARM", "").strip() == "0":
+        return
+    if not (dbcore.is_postgres_url(dbcore.database_url()) or os.environ.get("CACHE_WARM", "").strip() == "1"):
+        return                        # 로컬 SQLite·테스트에서는 돌리지 않는다
+    threading.Thread(target=_warm_loop, name="cache-warm", daemon=True).start()
 
 
 class ReviewAckReq(BaseModel):

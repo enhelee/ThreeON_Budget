@@ -33,12 +33,19 @@ const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [
 // 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
 const FC_TABS = ["manage", "bench", "table"];
+// 4번 통계·설정 탭도 주소에 담는다(#/stats/compare · #/settings/history) — 새로고침·링크 공유에 그 탭이 남게.
+//   첫 탭(손익·연도·학습)은 주소를 짧게 두려고 생략한다. 통계 탭 이름은 주소용 영문으로 바꿔 적는다.
+const STATS_HASH = {손익: "", 자본: "capital", compare: "compare"};
+const HASH_STATS = {"": "손익", capital: "자본", compare: "compare"};
+const SETTINGS_TABS = ["year", "master", "data", "history"];
 
 /** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
 export function viewHash(view, branch) {
   const h = VIEW_HASH[view] || "home";
   if (h === "detail" && branch) return `#/detail/${encodeURIComponent(branch)}`;
   if (h === "forecast" && state.fc.tab && state.fc.tab !== "manage") return `#/forecast/${state.fc.tab}`;
+  if (h === "stats" && STATS_HASH[state.statsTab]) return `#/stats/${STATS_HASH[state.statsTab]}`;
+  if (h === "settings" && state.settingsTab && state.settingsTab !== "year") return `#/settings/${state.settingsTab}`;
   return `#/${h}`;
 }
 
@@ -52,7 +59,10 @@ export function parseHash(hash = location.hash) {
   if (view === "detail" && m[2]) {
     try { branch = decodeURIComponent(m[2]); } catch { branch = m[2]; }
   }
-  const tab = view === "forecast" && FC_TABS.includes(m[2]) ? m[2] : "";
+  let tab = "";
+  if (view === "forecast" && FC_TABS.includes(m[2])) tab = m[2];
+  if (view === "stats") tab = HASH_STATS[m[2]] || "손익";
+  if (view === "settings") tab = SETTINGS_TABS.includes(m[2]) ? m[2] : "year";
   return {view, branch, tab};
 }
 
@@ -70,7 +80,9 @@ export function onHashChange() {
   if (!t) { syncHash({replace: true}); return; }   // 모르는 주소는 지금 화면으로 되돌린다
   const same = t.view === state.view &&
                (t.view !== "detail" || t.branch === state.det.branch) &&
-               (t.view !== "forecast" || (t.tab || "manage") === (state.fc.tab || "manage"));
+               (t.view !== "forecast" || (t.tab || "manage") === (state.fc.tab || "manage")) &&
+               (t.view !== "stats" || t.tab === (state.statsTab || "손익")) &&
+               (t.view !== "settings" || t.tab === (state.settingsTab || "year"));
   if (same) return;                               // navigate() 가 방금 맞춘 주소 — 할 일 없음
   navigate(t.view, {branch: t.branch, tab: t.tab});
 }
@@ -146,7 +158,7 @@ function loadHomeForecast() {
 const SETTINGS_JOBS = {
   year: () => [["현황", loadStatus], ["학습 현황", async () => { state.learned = await api("/api/learned"); }]],
   master: () => [["현황", loadStatus], ["연도 기준정보", loadYearConfig]],
-  data: () => [["현황", loadStatus], ["모델 목록", async () => { state.models = await api("/api/models"); }]],
+  data: () => [["현황", loadStatus], ["모델 목록", async () => { state.models = await api("/api/models"); }], ["시스템 정보", loadHealth]],
   history: () => [
     ["감사 로그", async () => { state.audit = (await api("/api/audit?limit=50")).rows; }],
     ["재배정 이력", async () => { state.overrides = await api(`/api/overrides?year=${state.year}`); }],
@@ -163,6 +175,7 @@ const statsJobs = tab => tab === "compare"
 /** 통계 탭 전환 — 이미 받은 해의 자료면 다시 받지 않는다(손익↔자본은 같은 자료). */
 export async function openStatsTab(tab) {
   state.statsTab = tab;
+  syncHash();
   const have = tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
   if (!have) {
     busy(true, "불러오는 중…");
@@ -177,6 +190,7 @@ export async function openStatsTab(tab) {
 /** 설정 탭 전환 — 그 탭 자료만 받아 그린다. */
 export async function openSettingsTab(tab) {
   state.settingsTab = tab;
+  syncHash();
   busy(true, "불러오는 중…");
   const errs = await settle((SETTINGS_JOBS[tab] || SETTINGS_JOBS.year)());
   busy(false);
@@ -232,6 +246,8 @@ export async function navigate(view, opts = {}) {
                    selBudget: null, editKey: null, delKey: null};
     }
   }
+  if (view === "stats" && opts.tab && opts.tab in STATS_HASH) state.statsTab = opts.tab;
+  if (view === "settings" && opts.tab && SETTINGS_TABS.includes(opts.tab)) state.settingsTab = opts.tab;
   if (view === "forecast" && opts.tab && FC_TABS.includes(opts.tab) && opts.tab !== state.fc.tab) {
     state.fc.tab = opts.tab; state.fc.preview = null;   // 주소에서 온 하위 탭 — 미리보기는 탭마다 다르니 비운다
   }
@@ -260,7 +276,13 @@ export async function navigate(view, opts = {}) {
     // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
-    if (state.fc.tab === "bench") jobs.push(["표준화 결과", loadForecastBench], ["정기비용 분리", loadForecastRegular]);
+    // 표준화 결과·정기비용 분리는 무겁다(운영 첫 계산 수 초~수십 초) — 위를 먼저 그리고 그 칸만 «계산 중».
+    if (state.fc.tab === "bench") {
+      state.fc.bench = null; state.fc.regular = null;
+      state.fc.benchLoading = true; state.fc.regularLoading = true;
+      later.push(["표준화 결과", () => loadForecastBench().finally(() => { state.fc.benchLoading = false; })],
+                 ["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
+    }
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }

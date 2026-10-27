@@ -341,7 +341,7 @@ function rulesBody(d) {
 
 function regularBreakdownBody(d) {
   const g = state.fc.regular
-  if (!g) return emptyState("정기비용 분리 현황을 불러오지 못했습니다.")
+  if (!g) return state.fc.regularLoading ? computingHtml("정기비용 분리를 계산하는 중…") : emptyState("정기비용 분리 현황을 불러오지 못했습니다.")
   const tags = {}
   d.actual_tag.forEach(r => { tags[`${r.사업장}|${r.연도}|${r.예산과목}|${r.사업명}`] = r.유형 })
   const types = opts().tag_types || Object.keys(TAG_LABEL)
@@ -367,6 +367,11 @@ function regularBreakdownBody(d) {
     ${saveBar()}</div>`
 }
 
+/** 무거운 계산이 끝나기 전 자리 — 화면 위(기준연도·탭)는 먼저 보이고 이 칸만 기다린다. */
+function computingHtml(text) {
+  return `<section class="panel flex items-center gap-3 p-6 text-sm text-sub" aria-busy="true"><span class="fc-spin" aria-hidden="true"></span>${esc(text)}</section>`
+}
+
 function benchBody() {
   const bv = state.fc.benchView || "std"
   const views = `<div class="flex flex-wrap gap-2">${BENCH_VIEWS.map(([k, l]) => `<button class="${bv === k ? "btn-primary" : "btn-secondary"} min-h-[36px] px-4 text-xs" data-fcbview="${k}">${esc(l)}</button>`).join("")}</div>`
@@ -377,7 +382,7 @@ function benchBody() {
 
 function benchStd() {
   const b = state.fc.bench
-  if (!b) return emptyState("표준화 결과를 불러오지 못했습니다.")
+  if (!b) return state.fc.benchLoading ? computingHtml("표준화 결과를 계산하는 중… 처음 계산은 시간이 걸려요") : emptyState("표준화 결과를 불러오지 못했습니다.")
   const groups = state.fc.data?.site_groups || {}
   const g = state.fc.benchGroup || "all"
   const rows = b.rows.filter(r => g === "all" || groups[r.사업장] === g)

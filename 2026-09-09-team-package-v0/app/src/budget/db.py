@@ -859,24 +859,26 @@ def config_changes_since(conn, year, since=None):
 
     거부된 요청(4xx)은 «바뀐 것»이 아니므로 세지 않는다.
     """
-    def count(where, params):
-        q = "SELECT COUNT(*) FROM audit_log WHERE status < 400 AND " + where
-        if since is not None:
-            q += " AND at >= ?"
-            params = params + (since,)
-        return conn.execute(q, params).fetchone()[0]
-
-    out = {}
+    # 세 갈래를 한 질의로 센다(예전 3번 — 화면 전환마다 불린다). LIKE 무늬는 매개변수로(PG «%» 함정).
     ph = ",".join("?" for _ in _CONFIG_PATHS)
-    n = count(f"path IN ({ph}) AND detail LIKE ?", _CONFIG_PATHS + (f"%{year}%",))
-    if n:
-        out["구성"] = n
-    n = count("path = '/api/config/alias'", ())
-    if n:
-        out["별칭"] = n                     # 별칭은 연도 축이 없다 — 전 연도에 걸린다
-    n = count("path = '/api/upload/master' AND detail LIKE ?", (f"%{year}%",))
-    if n:
-        out["마스터"] = n
+    like = f"%{year}%"
+    q = ("SELECT"
+         f" SUM(CASE WHEN path IN ({ph}) AND detail LIKE ? THEN 1 ELSE 0 END),"
+         " SUM(CASE WHEN path = ? THEN 1 ELSE 0 END),"
+         " SUM(CASE WHEN path = ? AND detail LIKE ? THEN 1 ELSE 0 END)"
+         " FROM audit_log WHERE status < 400")
+    params = _CONFIG_PATHS + (like, "/api/config/alias", "/api/upload/master", like)
+    if since is not None:
+        q += " AND at >= ?"
+        params = params + (since,)
+    n_cfg, n_alias, n_master = (int(v or 0) for v in conn.execute(q, params).fetchone())
+    out = {}
+    if n_cfg:
+        out["구성"] = n_cfg
+    if n_alias:
+        out["별칭"] = n_alias               # 별칭은 연도 축이 없다 — 전 연도에 걸린다
+    if n_master:
+        out["마스터"] = n_master
     return out
 
 
@@ -1041,47 +1043,62 @@ def learned_stats(conn):
     return out
 
 
-def count_learn_pending(conn, year):
+def count_learn_pending(conn, year, runs=None):
     """아직 학습되지 않은 '사람 확정 재배정' 건수.
 
     재배정 저장 시 자동 학습을 떼어냈으므로(설정 탭 [AI 학습] 버튼으로 분리),
     학습 대기 = override 중 (과목, 텍스트정규)가 learned_match에 없는 것.
 
-    ⚠ 이 값은 /api/pending 을 거쳐 «모든 화면 전환»마다 계산된다. 재배정 1건마다
+    ⚠ 이 값은 /api/nav-state 를 거쳐 «모든 화면 전환»마다 계산된다. 재배정 1건마다
       match_line·learned_match 를 따로 묻던 옛 구현은 운영 PG(질의당 ~75ms 왕복)에서
-      재배정 193건에 30초가 걸렸다(2026-10-15 실측). 그래서 예산별로 묶어서 읽는다.
+      재배정 193건에 30초가 걸렸다(2026-10-15 실측). 두 예산을 한 질의로 묶고(재배정 + 그 전표의
+      최신 분석 과목), 학습표도 한 번만 읽는다 — 질의 3번(2026-10-27, 예전 예산별 4번).
+    runs: {budget: run} — 호출한 쪽이 이미 읽은 최신 실행(없으면 여기서 읽는다).
     """
-    n = 0
-    for budget in ("손익", "자본"):
-        rows = conn.execute(
-            "SELECT o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
-            " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
-            " WHERE o.year=? AND o.budget=?", (str(year), budget)).fetchall()
-        if not rows:
-            continue
-        run = latest_run(conn, year, budget)
-        item_of = {}
-        if run:
-            for rid, item in conn.execute(
-                    "SELECT erp_row_id, 과목정규 FROM match_line WHERE run_id=? AND erp_row_id IN"
-                    " (SELECT erp_row_id FROM override WHERE year=? AND budget=?)",
-                    (run["id"], str(year), budget)):
-                item_of.setdefault(int(rid), item)
-        cands = []
-        for rid, target, item_raw, text in rows:
-            item = item_of.get(int(rid)) or item_raw
-            key = norm_text(text)
-            if item and key:          # 텍스트 없는 전표는 학습 대상 아님
-                cands.append((item, key, target))
-        if not cands:
-            continue
-        items = sorted({c[0] for c in cands})
-        ph = ",".join("?" for _ in items)
-        learned = {(a, b): c for a, b, c in conn.execute(
-            f"SELECT 과목, 텍스트정규, 사업명 FROM learned_match WHERE 과목 IN ({ph})",
-            tuple(items))}
-        n += sum(1 for item, key, target in cands if learned.get((item, key)) != target)
-    return n
+    if runs is None:
+        runs = {b: r for b in ("손익", "자본") if (r := latest_run(conn, year, b))}
+    run_of = {b: (runs.get(b) or {}).get("id") for b in ("손익", "자본")}
+    rows = conn.execute(
+        "SELECT o.budget, o.erp_row_id, o.target_name, e.예산과목원문, e.사업명"
+        " FROM override o JOIN erp_row e ON e.id = o.erp_row_id"
+        " WHERE o.year=? AND o.budget IN ('손익','자본')", (str(year),)).fetchall()
+    if not rows:
+        return 0
+    # 그 전표들의 최신 분석 과목 — 실행 색인으로 실행 하나를 훑으며 재배정 전표만 고른다.
+    #   (재배정 행마다 결합하면 SQLite 가 행마다 실행 전체를 다시 훑어 3초가 걸렸다.)
+    rids = [r for r in run_of.values() if r]
+    item_of = {}
+    if rids:
+        ph = ",".join("?" for _ in rids)
+        for run_id, erp_id, item in conn.execute(
+                f"SELECT run_id, erp_row_id, 과목정규 FROM match_line WHERE run_id IN ({ph}) AND erp_row_id IN"
+                " (SELECT erp_row_id FROM override WHERE year=?)", tuple(rids) + (str(year),)):
+            item_of.setdefault((int(run_id), int(erp_id)), item)
+    cands = []
+    for budget, erp_id, target, item_raw, text in rows:
+        item = item_of.get((run_of.get(budget) or -1, int(erp_id))) or item_raw
+        key = norm_text(text)
+        if item and key:              # 텍스트 없는 전표는 학습 대상 아님
+            cands.append((item, key, target))
+    if not cands:
+        return 0
+    items = sorted({c[0] for c in cands})
+    ph = ",".join("?" for _ in items)
+    learned = {(a, b): c for a, b, c in conn.execute(
+        f"SELECT 과목, 텍스트정규, 사업명 FROM learned_match WHERE 과목 IN ({ph})", tuple(items))}
+    return sum(1 for item, key, target in cands if learned.get((item, key)) != target)
+
+
+def latest_runs_all(conn):
+    """{(year, budget): {"id", "created_at", "summary"}} — 연도·예산마다 최신 실행을 한 질의로.
+    (latest_run 을 연도×예산만큼 부르면 질의도 그만큼 — 화면 전환마다 6번이었다.)"""
+    out = {}
+    for rid, year, budget, at, summ in conn.execute(
+            "SELECT id, year, budget, created_at, summary_json FROM run"
+            " WHERE id IN (SELECT MAX(id) FROM run GROUP BY year, budget)"):
+        out[(str(year), budget)] = {"id": rid, "created_at": at,
+                                    "summary": json.loads(summ) if summ else {}}
+    return out
 
 
 def clear_learned(conn):

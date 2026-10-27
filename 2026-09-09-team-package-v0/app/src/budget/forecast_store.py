@@ -433,11 +433,13 @@ def learning_window(conn, base_year) -> int:
 
 
 def list_base_years(conn) -> list:
-    """상태가 하나라도 있는 기준연도들(정렬)."""
-    years = set()
-    for t in TABLES:
-        years.update(r[0] for r in conn.execute(f"SELECT DISTINCT base_year FROM {t}"))
-    return sorted(years)
+    """상태가 하나라도 있는 기준연도들(정렬).
+
+    표 20여 개를 표마다 따로 물으면 질의도 그만큼이다 — 운영(앱 싱가포르 ↔ DB 서울) 질의 하나가
+    ~70ms 라 5번 탭에 들어갈 때마다 2.9초가 걸렸다(2026-10-27 실측, 질의 41번). UNION 한 번으로.
+    """
+    sql = " UNION ".join(f"SELECT DISTINCT base_year FROM {t}" for t in TABLES)
+    return sorted({str(r[0]) for r in conn.execute(sql) if r[0] is not None})
 
 
 def base_year_is_untouched(conn, base_year) -> bool:
