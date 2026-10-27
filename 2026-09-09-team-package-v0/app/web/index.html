@@ -51,6 +51,8 @@
     <!-- 오른쪽 아래 도움말(매칭이) — appShell 안에 둬서 로그인 게이트에서는 같이 숨는다.
          내용은 components/characters.js helpFabHtml() 을 router.renderPage() 가 채운다. -->
     <div id="helpFab"></div>
+    <!-- 대화 패널(components/chat.js) — #page 밖이라 화면을 옮겨도 대화가 남는다. 넓은 화면에선 오른쪽 열. -->
+    <div id="chatHost" class="chat-host"></div>
   </div>
 
   <!-- 로그인 게이트 — 비로그인 시 appShell 을 대신해 화면 전체를 차지한다.
