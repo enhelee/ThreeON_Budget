@@ -79,3 +79,35 @@ def test_brand_red_stays_only_in_logo():
                 src += _read(root, f)
     left = sorted(set(re.findall(r"\b(?:hover:)?(?:bg|text|border|accent)-brand\b", src)))
     assert not left, f"화면 코드에 CI 빨강 유틸리티가 남았습니다: {left}"
+
+
+# ── 시안 맞춤: 본문 연회색 바탕 + 메인 남색 배너(2026-10-27 grace 요청) ──────────────
+# 남색 사이드바 옆에 새하얀 본문만 있으면 따로 논다 — 바탕을 연회색으로, 메인 맨 위에 남색 배너를 둬서 잇는다.
+
+CHAR_DIR = os.path.join(WEB, "public", "assets", "characters")
+
+
+def test_page_background_is_soft_gray_and_cards_stay_white():
+    cfg = _read(WEB, "tailwind.config.js")
+    assert re.search(r'\bpage:\s*"#F4F6FA"', cfg, re.I), "tailwind 토큰 page(연회색 바탕)"
+    app = _read(SRC, "styles", "app.css")
+    body = app.split("body {", 1)[1].split("}", 1)[0]
+    assert "bg-page" in body and "bg-base" not in body, "본문 바탕은 연회색, 카드(.panel)는 흰색 그대로"
+    assert "bg-base" in app.split(".panel {", 1)[1].split("}", 1)[0]
+
+
+def test_home_banner_is_navy_with_three_characters():
+    home = _read(SRC, "views", "home.js")
+    strip = home.split("function headerStrip()", 1)[1].split("\n}\n", 1)[0]
+    assert "home-hero" in strip, "메인 맨 위 배너는 .home-hero(남색)"
+    assert "예산의 온도를 읽다" in strip
+    assert '/assets/characters/${id}.png" alt="${name}"' in strip, "캐릭터 그림은 이름을 대체 텍스트로"
+    for cid, name in (("mt", "매칭이"), ("gt", "검토미"), ("yc", "예측이")):
+        assert f'["{cid}", "{name}"]' in strip, f"배너에 {name}"
+        png = os.path.join(CHAR_DIR, f"{cid}.png")
+        assert os.path.isfile(png), f"{cid}.png 가 없습니다"
+        assert os.path.getsize(png) < 160_000, f"{cid}.png 가 너무 큽니다(배너용은 작게 줄여 넣는다)"
+    css = _read(SRC, "styles", "custom.css")
+    hero = css.split(".home-hero{", 1)[1].split("}", 1)[0]
+    assert "var(--navy)" in hero
+    assert "prefers-reduced-motion" in css.split(".home-hero{", 1)[1], "캐릭터 둥실 움직임은 움직임 줄이기 설정에서 멈춘다"

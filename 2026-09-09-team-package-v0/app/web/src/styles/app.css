@@ -22,7 +22,7 @@
 :root {
   --ink: #0D0D0D; --sub: #5D5D5D; --tri: #767676; --dis: #A6A6A6;
   --line: #E5E5E5; --line-strong: #C9C9C9; --line-subtle: #F2F2F2;
-  --base: #FFFFFF; --subtle: #F7F7F8; --overlay: rgba(13,13,13,0.56);
+  --base: #FFFFFF; --subtle: #F7F7F8; --page: #F4F6FA; --overlay: rgba(13,13,13,0.56);
   --brand: #FE0009; --brand-ink: #000000;   /* CI 빨강 — 로고 전용 */
   --navy: #0B1020; --navy-2: #121A30;
   --char-mt: #3EE6C4; --char-gt: #FF8A6E; --char-yc: #A98BFF;   /* 캐릭터 색(어두운 바탕용) */
@@ -39,7 +39,7 @@
     overflow-wrap: break-word;
   }
   body {
-    @apply bg-base text-ink antialiased;
+    @apply bg-page text-ink antialiased;
     font-size: 15px;
     line-height: 1.6;
   }

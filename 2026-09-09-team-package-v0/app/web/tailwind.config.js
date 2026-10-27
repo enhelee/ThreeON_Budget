@@ -18,6 +18,7 @@ export default {
         line: { DEFAULT: "#E5E5E5", strong: "#C9C9C9", subtle: "#F2F2F2" },
         base: "#FFFFFF",
         subtle: "#F7F7F8",
+        page: "#F4F6FA",          // 본문 바탕(연회색) — 흰 카드가 떠 보이고 남색 사이드바와 이어진다(2026-10-27)
         overlay: "rgba(13,13,13,0.56)",
         brand: { DEFAULT: "#FE0009", ink: "#000000" },   // CI 빨강 — 2026-10-27부터 로고에만(화면 강조는 navy)
         navy: { DEFAULT: "#0B1020", hover: "#1C2540" },   // ONDO 강조색 — 주 버튼·포커스·사이드바 바탕

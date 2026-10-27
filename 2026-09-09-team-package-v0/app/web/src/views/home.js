@@ -44,16 +44,21 @@ function unmappedTotals() {
 
 // ── ① 헤더 스트립 ────────────────────────────────────────────
 // 기준일·단위 칸은 뺐다(2026-10-27 사용자 요청) — 기준일은 설정 › 데이터 «시스템 정보»로, 여기엔 오늘 날짜만.
+// 남색 배너 + 오른쪽 캐릭터 셋(2026-10-27 grace 요청 — 남색 사이드바와 흰 본문이 따로 놀지 않게).
+// 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터는 3D PNG(/assets/characters, 320px로 줄인 것).
 
 function headerStrip() {
+  const cast = [["mt", "매칭이"], ["gt", "검토미"], ["yc", "예측이"]]
   return `
-  <section class="panel p-5 sm:p-6">
-    <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-      <div class="min-w-0">
-        <p class="text-sm font-semibold text-ink">메인</p>
-        <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지</h2>
-      </div>
-      <p class="shrink-0 text-sm font-semibold text-sub">오늘 <time class="ml-1 font-bold text-ink" datetime="${today()}">${todayLong()}</time></p>
+  <section class="home-hero">
+    <div class="home-hero__text">
+      <p class="home-hero__kicker">ONDO · <span>예산의 온도를 읽다</span></p>
+      <h2 class="home-hero__title font-hanan">발전플랜트 유지보수 예산,<br><em>계획에서 10개년 전망까지</em></h2>
+      <p class="home-hero__desc">예산 계획과 ERP 전표를 자동으로 맞춰 보고, 차이를 살피고, 정비등급별 표준금액으로 10년 뒤를 예보합니다.</p>
+      <p class="home-hero__date">오늘 <time datetime="${today()}">${todayLong()}</time></p>
+    </div>
+    <div class="home-hero__cast">
+      ${cast.map(([id, name]) => `<img class="home-hero__char home-hero__char--${id}" src="/assets/characters/${id}.png" alt="${name}" width="160" height="160" loading="lazy">`).join("")}
     </div>
   </section>`
 }
