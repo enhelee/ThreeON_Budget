@@ -111,7 +111,7 @@ function branchPickGrid() {
   return `${pickSortBar()}<section class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${sorted.map(r => `
     <button class="metric-card text-left hover:border-ink" data-branch="${esc(r.branch)}">
       <span class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">${esc(r.branch)}</span>${rateBadge(r.plan, r.actual)}</span>
-      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
+      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)}천원 · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
 }
 
 export function renderDetail() {

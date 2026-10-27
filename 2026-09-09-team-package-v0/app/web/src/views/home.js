@@ -4,13 +4,13 @@ import { STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { fvModel } from "./forecast_viz.js"
-import { esc, fmt, fmtRate } from "../util.js"
+import { esc, fmt, fmtRate, today, todayLong } from "../util.js"
 
 // ─────────────────────────────────────────────────────────────
 // 메인 대시보드 (#/home)
 //
 // 위에서 아래로 다섯 덩어리다.
-//   ① 헤더 스트립      제목·단계·기준일·리비전·단위         — 설명이므로 고정 문구
+//   ① 헤더 스트립      제목·오늘 날짜                       — 설명이므로 고정 문구
 //   ② 다년도 패널      최근 개년 막대 + 연도별 요약표
 //   ③ 중장기 전망      전사 10개년 막대 + 상위 과목 — 표는 늦게 받아 따로 그린다(router.js)
 //   ④ 현황 카드        계획/실적/집행률·미배정·DB·최근분석   — 전부 DB 실측치
@@ -24,12 +24,6 @@ import { esc, fmt, fmtRate } from "../util.js"
 // ─────────────────────────────────────────────────────────────
 
 const dash = '<span class="text-tri">-</span>'
-
-function today() {
-  const d = new Date()
-  const p2 = n => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
-}
 
 function curRow() {
   return (state.overview || []).find(r => String(r.year) === String(state.year))
@@ -49,11 +43,7 @@ function unmappedTotals() {
 }
 
 // ── ① 헤더 스트립 ────────────────────────────────────────────
-
-
-function metaItem(label, value) {
-  return `<div><dt class="font-semibold text-tri">${esc(label)}</dt><dd class="mt-0.5 font-bold text-ink">${value}</dd></div>`
-}
+// 기준일·단위 칸은 뺐다(2026-10-27 사용자 요청) — 기준일은 설정 › 데이터 «시스템 정보»로, 여기엔 오늘 날짜만.
 
 function headerStrip() {
   return `
@@ -63,10 +53,7 @@ function headerStrip() {
         <p class="text-sm font-semibold text-ink">메인</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지</h2>
       </div>
-      <dl class="grid shrink-0 grid-cols-2 gap-x-6 gap-y-2 text-xs">
-        ${metaItem("기준일", today())}
-        ${metaItem("단위", "화면 천원 · 연계 원")}
-      </dl>
+      <p class="shrink-0 text-sm font-semibold text-sub">오늘 <time class="ml-1 font-bold text-ink" datetime="${today()}">${todayLong()}</time></p>
     </div>
   </section>`
 }
@@ -90,7 +77,7 @@ function budgetCard(budget) {
   const s = curRow()?.[budget]
   const body = s
     ? `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(s.실적)} <span class="text-sm font-semibold text-tri">천원</span></p>
-       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
+       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)}천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
     : `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
        <p class="mt-2 text-sm text-sub">이 연도의 ${esc(budget)}예산 분석 이력이 없습니다.</p>`
   return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body)
@@ -107,7 +94,7 @@ function prevYearCard() {
   const a = (prev["손익"]?.실적 || 0) + (prev["자본"]?.실적 || 0)
   return card(`${prev.year}년 집계 (손익+자본)`, badgeOk("분석 완료"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span></p>
-     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)} · 집행률 ${rateBadge(p, a)}
+     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)}천원 · 집행률 ${rateBadge(p, a)}
      <button class="ml-1 font-semibold text-ink hover:text-brand" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
 }
 

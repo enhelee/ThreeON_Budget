@@ -1,6 +1,6 @@
 import { api } from "../api.js"
 import { state } from "../state.js"
-import { esc, fmt } from "../util.js"
+import { esc, fmt, today } from "../util.js"
 import { renderYearConfig } from "./yearconfig.js"
 
 function settingsExtraParts() {
@@ -111,7 +111,8 @@ export function renderSettings() {
 
     ${tab === "data" ? `
     <section class="panel p-5"><h3 class="section-title">시스템 정보</h3>
-      <dl class="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-4">
+      <dl class="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-5">
+        <div><dt class="text-xs font-semibold text-tri">기준일</dt><dd class="font-semibold text-ink">${today()}</dd></div>
         <div><dt class="text-xs font-semibold text-tri">배포 커밋</dt><dd class="font-semibold text-ink">${esc(state.health?.commit || "-")}</dd></div>
         <div><dt class="text-xs font-semibold text-tri">리비전(환경값)</dt><dd class="font-semibold text-ink">${esc(state.health?.rev || "-")}</dd></div>
         <div><dt class="text-xs font-semibold text-tri">DB</dt><dd class="font-semibold text-ink">${esc(state.health?.db || "-")}</dd></div>
