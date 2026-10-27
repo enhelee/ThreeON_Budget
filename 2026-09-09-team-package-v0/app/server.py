@@ -1622,18 +1622,13 @@ def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
 
     nominate   이 줄의 큰 전표 _RQ_VOUCHER_MAX 건 — 같은 지사·과목의 다른 계획 사업 중 전표 글자를 더 닮은 곳
     incoming   (덜 집행된 줄) 같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표 — «이리로 가져오기»
+    pairs      상쇄 짝 추천(rqm.pair_moves) — 이 줄이 보내거나 받는 전표만(더 쓴 줄 → 덜 쓴 줄)
     candidates 고를 수 있는 같은 과목 계획 사업 전부(잔액 포함)
     """
     conn = _conn()
     try:
         rows, by_line = _rq_line_vouchers(conn, year, budget, branch, item)
-        plans = {}
-        for r in rows:
-            if str(r.get("구분") or "").startswith("신규"):
-                continue
-            c = plans.setdefault(r["사업명"], {"name": r["사업명"], "plan": 0.0, "actual": 0.0})
-            c["plan"] += float(r["연예산"] or 0)
-            c["actual"] += float(r["실적금액"] or 0)
+        plans = rqm.plan_totals(rows)
         candidates = [c for n, c in plans.items() if n != name]
         mine = sorted(by_line.get(name, []), key=lambda v: -abs(v["금액천원"]))
         nominate = rqm.suggest(mine[:_RQ_VOUCHER_MAX], name, candidates)
@@ -1645,7 +1640,8 @@ def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
         cands = sorted(({**c, "plan": round(c["plan"]), "actual": round(c["actual"]),
                          "remain": round(c["plan"] - c["actual"])} for c in candidates),
                        key=lambda c: -c["remain"])
-        return _clean_json({"nominate": nominate, "incoming": incoming, "candidates": cands,
+        pairs = [m for m in rqm.pair_moves(plans, by_line) if name in (m["from"], m["target"])]
+        return _clean_json({"nominate": nominate, "incoming": incoming, "candidates": cands, "pairs": pairs,
                             "voucher_total": len(mine), "locked": dbm.is_locked(conn, year)})
     finally:
         conn.close()

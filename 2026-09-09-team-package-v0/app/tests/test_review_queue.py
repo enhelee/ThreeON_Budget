@@ -147,6 +147,98 @@ def test_suggest_incoming_for_under_executed_line():
     assert [v["erp_row_id"] for v in got] == [9]
 
 
+# ── 상쇄 짝(더 쓴 줄 ↔ 덜 쓴 줄) ─────────────────────────────────────────
+
+def _by(items):
+    return {it["name"]: it for it in items}
+
+
+def test_offset_pair_marks_both_lines_when_group_total_is_normal():
+    """같은 지사×과목에서 한쪽은 더, 한쪽은 덜 — 총액은 계획대로면 전표가 섞였을 가능성이 크다."""
+    items = _by(rqm.build_items([_line("A", 100_000, 160_000), _line("B", 100_000, 40_000),
+                                 _line("정상", 50_000, 50_000)]))
+    a, b = items["A"]["pair"], items["B"]["pair"]
+    assert a["kind"] == "상쇄형" and b["kind"] == "상쇄형"
+    assert [p["name"] for p in a["partners"]] == ["B"] and a["partners"][0]["gap"] == 60_000
+    assert [p["name"] for p in b["partners"]] == ["A"]
+    assert a["offset"] == 60_000 and b["offset"] == 60_000
+    assert "정상" not in items
+
+
+def test_offset_pair_is_mixed_when_group_total_also_differs():
+    items = _by(rqm.build_items([_line("A", 100_000, 200_000), _line("B", 100_000, 70_000)]))
+    assert items["A"]["pair"]["kind"] == "혼합"
+    assert items["A"]["pair"]["offset"] == 30_000 and items["B"]["pair"]["offset"] == 30_000
+
+
+def test_no_pair_without_opposite_line_or_across_groups():
+    items = _by(rqm.build_items([_line("A", 100_000, 160_000), _line("B", 100_000, 100_000),
+                                 _line("C", 100_000, 40_000, dept="파주지사")]))
+    assert items["A"]["pair"] is None and items["C"]["pair"] is None
+
+
+def test_summary_counts_open_pairs():
+    items = rqm.build_items([_line("A", 100_000, 160_000), _line("B", 100_000, 40_000),
+                             _line("D", 100_000, 0, dept="파주지사")])
+    assert rqm.summarize(items)["pair_open"] == 2
+
+
+def _pl(**kw):
+    return {n: {"plan": p, "actual": a} for n, (p, a) in kw.items()}
+
+
+def test_pair_moves_exact_shortfall_amount():
+    """덜 쓴 줄의 부족분과 금액이 딱 맞는 전표 — 글자가 지금 줄을 더 닮지 않았으면 추천한다."""
+    lines = _pl(A=(100_000, 160_000), B=(100_000, 40_000))
+    by = {"A": [{"erp_row_id": 1, "텍스트": "", "금액천원": 60_000},
+                {"erp_row_id": 2, "텍스트": "", "금액천원": 100_000}]}
+    got = rqm.pair_moves(lines, by)
+    assert [(m["erp_row_id"], m["from"], m["target"]) for m in got] == [(1, "A", "B")]
+    assert got[0]["exact"] is True and "금액 일치" in got[0]["why"]
+
+
+def test_pair_moves_by_text_within_shortfall():
+    lines = _pl(**{"보일러 정비": (100_000, 160_000), "급수펌프 베어링 교체공사": (100_000, 40_000)})
+    by = {"보일러 정비": [{"erp_row_id": 7, "텍스트": "급수펌프 베어링 교체", "금액천원": 20_000},
+                        {"erp_row_id": 8, "텍스트": "보일러 튜브 정비", "금액천원": 20_000}]}
+    got = rqm.pair_moves(lines, by)
+    assert [m["erp_row_id"] for m in got] == [7]
+    assert got[0]["target"] == "급수펌프 베어링 교체공사" and "유사도" in got[0]["why"]
+
+
+def test_pair_moves_respect_shortfall_and_excess_caps():
+    lines = _pl(A=(100_000, 130_000), **{"배관 보수": (100_000, 10_000)})   # 초과 30,000 · 부족 90,000
+    by = {"A": [{"erp_row_id": i, "텍스트": "배관 보수", "금액천원": 20_000} for i in (1, 2, 3)]
+          + [{"erp_row_id": 9, "텍스트": "배관 보수", "금액천원": 95_000}]}           # 부족분보다 큼
+    got = rqm.pair_moves(lines, by)
+    assert len(got) == 1 and got[0]["erp_row_id"] in (1, 2, 3)        # 두 장이면 초과분(30,000)을 넘는다
+
+
+def test_pair_moves_never_cross_year_or_against_text():
+    lines = _pl(**{"2025년 판교 정기점검": (100_000, 160_000), "2024년 판교 정기점검": (100_000, 40_000)})
+    by = {"2025년 판교 정기점검": [{"erp_row_id": 1, "텍스트": "2025년 판교 정기점검 기성", "금액천원": 60_000}]}
+    assert rqm.pair_moves(lines, by) == []                             # 연도 충돌 + 글자도 지금 줄
+    lines = _pl(A=(100_000, 160_000), B=(100_000, 40_000))
+    by = {"A": [{"erp_row_id": 1, "텍스트": "A", "금액천원": 60_000}]}
+    assert rqm.pair_moves(lines, by) == []                             # 금액은 맞아도 글자가 지금 줄
+
+
+def test_pair_moves_need_a_variance_on_both_sides():
+    lines = _pl(A=(100_000, 160_000), B=(100_000, 90_000))            # B 는 90% — 차이 아님
+    by = {"A": [{"erp_row_id": 1, "텍스트": "", "금액천원": 10_000}]}
+    assert rqm.pair_moves(lines, by) == []
+
+
+def test_plan_totals_skip_new_and_treat_blank_as_zero():
+    """분석 결과의 빈 실적(NaN)이 추천 API 를 500 으로 만들었다(로컬 실데이터, 2026-10-27) — 0 으로 본다."""
+    nan = float("nan")
+    rows = [_line("A", 100_000, nan), _line("A", 50_000, 10_000), _line("B", nan, 5_000),
+            _line("신규건", 0, 7_000, gubun="신규")]
+    got = rqm.plan_totals(rows)
+    assert got == {"A": {"name": "A", "plan": 150_000, "actual": 10_000},
+                   "B": {"name": "B", "plan": 0.0, "actual": 5_000}}
+
+
 def test_no_literal_percent_in_sql_for_postgres():
     """PG(psycopg)는 매개변수가 있는 SQL 의 «%» 를 자리표시자로 읽는다 — LIKE 무늬는 매개변수로 넘긴다."""
     import inspect
@@ -255,3 +347,12 @@ def test_suggest_api_shape(srv):
     assert d["voucher_total"] == len(b["전표"]) and d["locked"] is False
     assert all("suggest" in v for v in d["nominate"])
     assert all(c["name"] != b["사업명"] for c in d["candidates"])
+    assert isinstance(d["pairs"], list)
+    assert all(b["사업명"] in (m["from"], m["target"]) for m in d["pairs"])
+
+
+def test_queue_items_carry_pair_field(srv):
+    _, client, _ = srv
+    _analyzed(client)
+    d = _queue(client)
+    assert all("pair" in it for it in d["items"]) and "pair_open" in d["summary"]
