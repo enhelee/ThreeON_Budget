@@ -221,9 +221,24 @@ class LoginReq(BaseModel):
 
 
 @app.api_route("/healthz", methods=["GET", "HEAD"])
-def healthz():
-    return {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "commit": APP_COMMIT,
+def healthz(db: str = None):
+    body = {"ok": True, "auth": AUTH.enabled, "rev": APP_REV, "commit": APP_COMMIT,
             "db": "postgresql" if dbcore.is_postgres_url(dbcore.database_url()) else "sqlite"}
+    # ?db=1 — DB 에 SELECT 1 한 번. 기본 /healthz 는 DB 를 안 건드려서, 주기 호출로는 Supabase 무료
+    # 프로젝트의 «7일 미사용 일시정지»를 못 막는다(.github/workflows/keepalive.yml 이 이 주소를 부른다).
+    # 로그인 없이 열리는 주소라 실패 사유(연결 문자열·호스트)는 응답에 싣지 않는다.
+    if db:
+        try:
+            conn = _conn()
+            try:
+                conn.execute("SELECT 1").fetchone()
+            finally:
+                conn.close()
+            body["db_ok"] = True
+        except Exception:
+            body.update(ok=False, db_ok=False)
+            return JSONResponse(body, status_code=503)
+    return body
 
 
 @app.get("/api/auth/status")
