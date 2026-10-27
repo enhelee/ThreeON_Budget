@@ -103,3 +103,19 @@ def test_warm_fills_forecast_and_review_caches(seeded):
         assert viewcache.cached(("review", "2023"), rver) is not None
     finally:
         conn.close()
+
+
+def test_forecast_state_is_cached_and_refreshed_after_save(client):
+    """5번 «기준정보(가정)» — 질의 ~25번이라 캐시. 가정을 저장하면(감사 로그) 바로 새 값을 읽는다."""
+    viewcache.clear()
+    first = client.get("/api/forecast/state?base_year=2026")
+    assert first.status_code == 200
+    again = client.get("/api/forecast/state?base_year=2026")
+    q = int(re.search(r'queries=(\d+)', again.headers["Server-Timing"]).group(1))
+    assert again.json() == first.json() and q <= 3, f"캐시 적중인데 질의 {q}회"
+    rows = first.json()["factors"]
+    rows[0]["연간비율"] = 0.033
+    assert client.put("/api/forecast/state/factors", json={"base_year": "2026", "rows": rows}).status_code == 200
+    after = client.get("/api/forecast/state?base_year=2026").json()
+    assert after["factors"][0]["연간비율"] == 0.033
+    assert set(after["reference"]) == {"reference_actual", "reference_standard"}

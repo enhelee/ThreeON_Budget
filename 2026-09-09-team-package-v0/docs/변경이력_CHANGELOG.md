@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-10-27 · 5번 «기준정보(가정)» 캐시 (rev36)
+
+**대상:** `app/src/budget/api_forecast.py` · 테스트 `test_viewcache.py` 1개. 근거: rev35 운영 재측정에서 `/api/forecast/state` 가 질의 25번·DB 1.75초로 남은 가장 느린 요청(5번 탭 세 화면이 모두 기다린다).
+
+- 가정 한 벌은 상태 표 20여 개·구성·지사 목록을 읽는다 — 표마다 열 모양이 달라 한 질의로 합칠 수 없어, 다른 무거운 계산처럼 **계산 캐시**(`viewcache`, 숫자를 바꾸는 쓰기 기준)를 씌웠다. 가정·구성·업로드를 저장하면(감사 로그) 다음 요청이 새로 읽는다. 운영 예열 대상에도 넣었다(전망 표·표준화·정기비용과 함께).
+- 참고 엑셀 건수 두 개(`reference_actual`·`reference_standard`)는 한 질의로.
+- 운영 사본: 캐시 전 질의 25번 → 캐시 적중 **2번**(기준연도 확인 1 + 버전 확인 1).
+- `build_state` 를 라우터 밖(모듈)으로 꺼냈다 — 예열이 부를 수 있게.
+
+---
+
 ## 2026-10-27 · 속도(질의 묶기·계산 캐시·예열) · 화면 정리 후속 (rev35)
 
 **대상:** `app/src/budget/`(viewcache 새 · api_forecast · forecast_store · pipeline_forecast · db) · `server.py`(nav-state·pending·검토 큐 캐시·예열) · `app/web/`(router·data·api·main·views home·collect·detail·settings·forecast·sidebar·custom.css) · 테스트 `test_viewcache.py` 6개, `test_perf_budget` nav-state 상한 30 → 12. 근거는 rev34 배포 후 Aside 운영 점검(`운영점검_rev34_2026-10-27.md`, 저장소 밖).
