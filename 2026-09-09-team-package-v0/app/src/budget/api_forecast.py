@@ -89,11 +89,45 @@ def _cached_view(kind, conn, base_year, compute):
                                     ttl=VIEW_CACHE_TTL)
 
 
+def build_state(conn, base_year):
+    """5번 «기준정보(가정)» 한 벌 — 상태 표 20여 개·구성·지사 목록. 표마다 모양이 달라 한 질의로 못 합친다(질의 ~25번,
+    운영 DB 1.75초 · 2026-10-27). 그래서 화면은 캐시(get_state)로 받고, 참고 엑셀 건수 둘만 한 질의로 묶었다."""
+    master = fs.load_hq_master(conn, base_year)
+    accounts = {}
+    for b in ("손익", "자본"):
+        accounts[b] = [x["과목"] for x in config_store.load_item_config(conn, base_year, b)
+                       if config_store.to_bool(x.get("포함"), True)]
+    return {
+        "base_year": str(base_year),
+        "sites": pf.forecast_sites(conn, base_year),
+        "site_groups": pf.site_groups(conn, base_year),
+        "accounts": accounts,
+        "grades": pf.records(fs.load_grade_history(conn, base_year)),
+        "methods": pf.records(fs.load_method_map(conn, base_year)),
+        "overrides": pf.records(fs.load_overrides(conn, base_year)),
+        "factors": pf.records(fs.load_factors(conn, base_year)),
+        "hot_parts": pf.records(fs.load_hot_parts(conn, base_year)),
+        "hq_master": {"columns": [str(c) for c in master.columns], "rows": pf.records(master)},
+        "hq_ratio": pf.records(fs.load_hq_ratio(conn, base_year)),
+        "hq_temp": pf.records(fs.load_hq_temp_projects(conn, base_year)),
+        "surprise": pf.records(fs.load_surprise_projects(conn, base_year)),
+        **{name: pf.records(fs.load_table(conn, base_year, name)) for name in SPEC_TABLES.values()},
+        "reference": dict(zip(("reference_actual", "reference_standard"), (int(v or 0) for v in conn.execute(
+            "SELECT (SELECT COUNT(*) FROM reference_actual WHERE base_year=?),"
+            " (SELECT COUNT(*) FROM reference_standard WHERE base_year=?)",
+            (str(base_year), str(base_year))).fetchone()))),
+        "settings": fs.load_settings(conn, base_year),
+        "options": {"rule_methods": bm.RULE_METHODS, "event_types": fs.EVENT_TYPES,
+                    "tag_types": fs.TAG_TYPES, "contract_items": fs.CONTRACT_ITEMS,
+                    "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"]},
+    }
+
+
 def warm(conn, clean_json):
     """기본 기준연도의 전망 표·표준화·정기비용 분리를 미리 계산해 캐시에 채운다(이미 있으면 바로 끝).
     server 의 예열 스레드가 배포 직후와 자료가 바뀐 뒤 부른다 — 사용자가 첫 계산(운영 수십 초)을 맞지 않게."""
     by = str(pf.default_base_year(conn))
-    for kind, fn in (("table", pf.run_forecast), ("benchmark", pf.run_benchmark),
+    for kind, fn in (("state", build_state), ("table", pf.run_forecast), ("benchmark", pf.run_benchmark),
                      ("regular", pf.regular_breakdown)):
         _cached_view(kind, conn, by, lambda fn=fn: clean_json(fn(conn, by)))
     return by
@@ -102,35 +136,7 @@ def warm(conn, clean_json):
 def make_router(conn_factory, clean_json) -> APIRouter:
     router = APIRouter(prefix="/api/forecast")
 
-    def _state(conn, base_year):
-        master = fs.load_hq_master(conn, base_year)
-        accounts = {}
-        for b in ("손익", "자본"):
-            accounts[b] = [x["과목"] for x in config_store.load_item_config(conn, base_year, b)
-                           if config_store.to_bool(x.get("포함"), True)]
-        return {
-            "base_year": str(base_year),
-            "sites": pf.forecast_sites(conn, base_year),
-            "site_groups": pf.site_groups(conn, base_year),
-            "accounts": accounts,
-            "grades": pf.records(fs.load_grade_history(conn, base_year)),
-            "methods": pf.records(fs.load_method_map(conn, base_year)),
-            "overrides": pf.records(fs.load_overrides(conn, base_year)),
-            "factors": pf.records(fs.load_factors(conn, base_year)),
-            "hot_parts": pf.records(fs.load_hot_parts(conn, base_year)),
-            "hq_master": {"columns": [str(c) for c in master.columns], "rows": pf.records(master)},
-            "hq_ratio": pf.records(fs.load_hq_ratio(conn, base_year)),
-            "hq_temp": pf.records(fs.load_hq_temp_projects(conn, base_year)),
-            "surprise": pf.records(fs.load_surprise_projects(conn, base_year)),
-            **{name: pf.records(fs.load_table(conn, base_year, name)) for name in SPEC_TABLES.values()},
-            "reference": {name: int(conn.execute(f"SELECT COUNT(*) FROM {name} WHERE base_year=?",
-                                                 (str(base_year),)).fetchone()[0])
-                          for name in ("reference_actual", "reference_standard")},
-            "settings": fs.load_settings(conn, base_year),
-            "options": {"rule_methods": bm.RULE_METHODS, "event_types": fs.EVENT_TYPES,
-                        "tag_types": fs.TAG_TYPES, "contract_items": fs.CONTRACT_ITEMS,
-                        "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"]},
-        }
+    _state = build_state
 
     @router.get("/base-years")
     def base_years():
@@ -170,7 +176,10 @@ def make_router(conn_factory, clean_json) -> APIRouter:
     def get_state(base_year: str = None):
         conn = conn_factory()
         try:
-            return clean_json(_state(conn, _base(conn, base_year)))
+            by = _base(conn, base_year)
+            # 가정 한 벌은 질의 ~25번이라 캐시한다 — 가정·구성·업로드 저장(감사 로그)이 있으면 다시 읽는다.
+            #   (읽기가 팩터 시드를 심는 첫 회는 캐시 전 계산에서 한 번만 일어난다.)
+            return _cached_view("state", conn, by, lambda: clean_json(_state(conn, by)))
         finally:
             conn.close()
 
