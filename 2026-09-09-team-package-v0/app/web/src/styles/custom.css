@@ -303,3 +303,58 @@
 .fc-spin{width:1rem;height:1rem;border-radius:999px;border:2px solid #E5E5E5;border-top-color:#0D0D0D;animation:fcspin .9s linear infinite;flex:none}
 @keyframes fcspin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.fc-spin{animation:none}}
+
+/* ── 대화 패널(components/chat.js, 2026-10-27) ──────────────────────────────
+   넓은 화면(≥1280px)에서는 appShell 의 오른쪽 열(본문이 줄어든다), 그보다 좁으면 오른쪽에서 덮는다.
+   캐릭터 고유색은 characters.js 와 같다(청록=매칭이, 산호=검토미, 보라=예측이). */
+.chat-host:empty{display:none}
+.chat-host{position:fixed;inset:0 0 0 auto;width:min(380px,100vw);z-index:50}
+@media (min-width:1280px){.chat-host{position:sticky;top:0;height:100vh;flex:none;z-index:25}}
+.chat-panel{height:100%;display:flex;flex-direction:column;background:var(--base);border-left:1px solid var(--line);box-shadow:var(--shadow-float)}
+@media (min-width:1280px){.chat-panel{box-shadow:none}}
+.chat-head{display:flex;align-items:center;gap:.6rem;padding:.85rem 1rem;border-bottom:1px solid var(--line)}
+.chat-head img{width:2.5rem;height:2.5rem;object-fit:contain}
+.chat-title{margin:0;font-weight:800;color:var(--ink)}
+.chat-sub{margin:0;font-size:.75rem;color:var(--sub)}
+.chat-x{margin-left:auto;width:2rem;height:2rem;border:0;background:none;font-size:1.3rem;color:var(--sub);cursor:pointer;border-radius:999px}
+.chat-x:hover{background:var(--subtle)}
+.chat-cast{display:flex;flex-wrap:wrap;gap:.3rem;padding:.5rem 1rem;border-bottom:1px solid var(--line)}
+.chat-cast__item{display:flex;align-items:center;gap:.2rem;font-size:.6875rem;color:var(--sub);background:var(--subtle);border-radius:999px;padding:.1rem .45rem .1rem .15rem}
+.chat-cast__item img{width:1.15rem;height:1.15rem;object-fit:contain}
+.chat-log{flex:1;overflow:auto;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.8rem}
+.chat-me{align-self:flex-end;max-width:82%;background:var(--ink);color:#fff;border-radius:14px 14px 4px 14px;padding:.55rem .75rem;font-size:.875rem}
+.chat-bot{display:flex;gap:.5rem;align-items:flex-start}
+.chat-av{width:2.1rem;height:2.1rem;flex:none;object-fit:contain}
+.chat-bub{flex:1;min-width:0;border-radius:4px 14px 14px 14px;padding:.6rem .75rem;font-size:.875rem;line-height:1.55;background:var(--subtle)}
+.chat-bot--mt .chat-bub{background:#E3F6F3}.chat-bot--gt .chat-bub{background:#FDEBE8}.chat-bot--yc .chat-bub{background:#EFEBFD}
+.chat-who{margin:0 0 .1rem;font-size:.6875rem;font-weight:800;color:var(--sub)}
+.chat-bot--mt .chat-who{color:#0F7E71}.chat-bot--gt .chat-who{color:#C23B2B}.chat-bot--yc .chat-who{color:#5E45BF}
+.chat-ctx{margin:0 0 .2rem;font-size:.6875rem;color:var(--sub)}
+.chat-text{margin:0;color:var(--ink);white-space:pre-line}
+.chat-lines{margin:.35rem 0 0 1.1rem;padding:0}
+.chat-table{width:100%;margin:.45rem 0;border-collapse:collapse;background:var(--base);border-radius:8px;overflow:hidden;font-size:.75rem}
+.chat-table th,.chat-table td{padding:.3rem .5rem;border-bottom:1px solid var(--line-subtle);text-align:left}
+.chat-table th{color:var(--sub);font-weight:600}
+.chat-links,.chat-ask{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
+.chat-go{font-size:.75rem;font-weight:700;color:var(--ink);background:var(--base);border:1px solid var(--line-strong);border-radius:8px;padding:.25rem .55rem;cursor:pointer}
+.chat-go:hover{border-color:var(--ink)}
+.chat-src{margin:.4rem 0 0;font-size:.6875rem;color:var(--sub)}
+.chat-sugg{display:flex;flex-wrap:wrap;gap:.3rem;padding:.5rem 1rem;border-top:1px solid var(--line)}
+.chat-chip{font-size:.75rem;color:var(--ink);background:var(--base);border:1px solid var(--line);border-radius:999px;padding:.25rem .65rem;cursor:pointer}
+.chat-chip:hover{border-color:var(--ink)}
+.chat-go:focus-visible,.chat-chip:focus-visible,.chat-x:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.chat-form{display:flex;gap:.5rem;padding:.75rem 1rem;border-top:1px solid var(--line)}
+.chat-form input{flex:1;min-width:0}
+.chat-think{display:inline-flex;gap:.25rem;padding:.2rem 0}
+.chat-think i{width:.375rem;height:.375rem;border-radius:999px;background:#17A090;opacity:.45;animation:chatDot 1s infinite}
+.chat-think i:nth-child(2){animation-delay:.15s}.chat-think i:nth-child(3){animation-delay:.3s}
+@keyframes chatDot{50%{opacity:1;transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){.chat-think i{animation:none}}
+@media print{.chat-host{display:none}}
+.help-fab__img--3d{object-fit:contain}
+.chat-open .help-fab{display:none}
+
+/* 챗봇이 «여기를 누르세요» 짚어 주는 반짝임(components/chat.js spotlight) — 4.5초 뒤 사라진다 */
+.chat-spot{outline:3px solid #17A090!important;outline-offset:3px;border-radius:10px;animation:chatSpot 1.1s ease-in-out 3}
+@keyframes chatSpot{50%{outline-color:rgba(23,160,144,.25);box-shadow:0 0 0 8px rgba(23,160,144,.18)}}
+@media (prefers-reduced-motion:reduce){.chat-spot{animation:none}}

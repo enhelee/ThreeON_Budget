@@ -36,6 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
+from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
@@ -135,8 +136,10 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
             if bad:
                 return JSONResponse({"detail": bad}, status_code=400)
         response = await call_next(request)
+        # /api/chat 은 POST 지만 읽기만 한다 — 감사 로그에 남기면 질문 원문이 저장되고, 감사 로그 id 가
+        # 계산 캐시(viewcache) 버전이라 질문할 때마다 전망 계산이 다시 돈다.
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
-                and path not in ("/api/login", "/api/logout")):
+                and path not in ("/api/login", "/api/logout", "/api/chat")):
             if body_json and "password" in body_json:
                 body_json = {k: v for k, v in body_json.items() if k != "password"}
             try:
@@ -1847,6 +1850,57 @@ def _ensure_actual_outputs(conn, year, budget):
         pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
                                   make_files=True, record_run=False)
     return True
+
+
+# ── 캐릭터 챗봇(2026-10-27, 1단계) — 규칙 엔진, 읽기만 ─────────────────────
+#   질문을 규칙으로 알아듣고(사용법·화면 이동·진행 상황), 숫자는 DB 에서 읽은 값만 쓴다.
+#   외부로 나가는 데이터는 없다. 대화 원문은 저장하지 않는다(감사 로그에도 남기지 않는 GET 성격의 POST).
+#   설계: docs/설계_캐릭터챗봇.md
+
+class ChatReq(BaseModel):
+    question: str
+    context: dict = {}
+
+
+_CHAT_VIEWS = set(chatm.kb.SUGGEST)
+
+
+def _chat_status(year):
+    """진행 상황 답에 쓸 값 — 데이터셋·최신 분석·미반영·마감. year 가 없으면 자료가 있는 최신 연도."""
+    conn = _conn()
+    try:
+        if not year:
+            years = sorted({str(d["year"]) for d in dbm.list_datasets(conn)})
+            year = years[-1] if years else None
+        if not year:
+            return None
+        runs = _latest_runs(conn, year)
+        try:
+            pend = _pending_data(conn, year, runs)
+        except Exception:
+            conn.rollback()
+            pend = None
+        return {"year": year, "datasets": dbm.list_datasets(conn, year),
+                "runs": {b: r["created_at"] for b, r in runs.items()},
+                "pending": pend, "locked": dbm.is_locked(conn, year)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/chat")
+def chat(req: ChatReq):
+    if len(req.question or "") > chatm.engine.MAX_LEN:
+        raise HTTPException(400, f"질문은 {chatm.engine.MAX_LEN}자까지예요.")
+    # context 는 본문 안쪽이라 연도 검증 미들웨어가 보지 않는다 — 여기서 모양을 강제한다.
+    raw = req.context or {}
+    ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
+           "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None}
+    return _clean_json(chatm.RuleEngine(status_provider=_chat_status).answer(req.question, ctx))
+
+
+@app.get("/api/chat/suggestions")
+def chat_suggestions(view: str = "home"):
+    return {"suggestions": chatm.suggestions_for(view if view in _CHAT_VIEWS else "home")}
 
 
 @app.get("/api/export")
