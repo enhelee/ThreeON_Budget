@@ -6,7 +6,7 @@ import { busy, toast } from "./components/feedback.js"
 import { injectCharacterSprite } from "./components/characters.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
-import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
+import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
 import { brResultsHtml } from "./views/branches.js"
@@ -143,7 +143,9 @@ document.addEventListener("click", async e => {
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
   const stab = e.target.closest("[data-settab]");
-  if (stab) { await openSettingsTab(stab.dataset.settab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
+  if (stab) { await openSettingsTab(stab.dataset.settab); return; }
+  const sttab = e.target.closest("[data-stattab]");
+  if (sttab) { await openStatsTab(sttab.dataset.stattab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
   if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
   // 3+ 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.

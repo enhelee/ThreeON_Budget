@@ -36,6 +36,7 @@ export const state = {
   rqBrief: null,    // 메인 «다음 할 일»용 요약(/api/review-queue?brief=1)
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
+  statsTab: "손익",       // 4번 통계 탭(손익 | 자본 | compare) — 연 탭 자료만 받는다
   settingsTab: "year",   // 설정 화면 탭(연도·학습 | 기준정보 | 데이터셋·모델 | 이력)
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
   det: { branch: "", data: null, item: "", attr: "", q: "", budget: "all",

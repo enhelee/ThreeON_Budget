@@ -155,6 +155,25 @@ const SETTINGS_JOBS = {
     ["사업 삭제 이력", async () => { state.bizDeletes = await api(`/api/biz-deletes?year=${state.year}`); }]],
 }
 
+// 4번 통계 탭 — 손익·자본은 /api/stats(한 번에 둘 다), 전년 대비는 /api/stats-compare. 받은 연도를 적어 둔다.
+const statsJobs = tab => tab === "compare"
+  ? [["연도 비교", async () => { const y = state.year; state.statsCompare = {...await api(`/api/stats-compare?year=${y}`), _year: y}; }]]
+  : [["통계", async () => { const y = state.year; state.stats = {...await api(`/api/stats?year=${y}`), _year: y}; }]];
+
+/** 통계 탭 전환 — 이미 받은 해의 자료면 다시 받지 않는다(손익↔자본은 같은 자료). */
+export async function openStatsTab(tab) {
+  state.statsTab = tab;
+  const have = tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
+  if (!have) {
+    busy(true, "불러오는 중…");
+    const errs = await settle(statsJobs(tab));
+    busy(false);
+    state.loadErrors = errs;
+    if (errs.length) toast(`${errs.length}개 구역을 불러오지 못했습니다 — 화면 위 안내를 보세요.`);
+  }
+  if (state.view === "stats") renderPage();
+}
+
 /** 설정 탭 전환 — 그 탭 자료만 받아 그린다. */
 export async function openSettingsTab(tab) {
   state.settingsTab = tab;
@@ -247,15 +266,11 @@ export async function navigate(view, opts = {}) {
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래
-  if (view === "stats") {
-    jobs.push(["통계", async () => { state.stats = await api(`/api/stats?year=${state.year}`); }]);
-    later.push(["연도 비교", async () => { state.statsCompare = await api(`/api/stats-compare?year=${state.year}`); }]);  // 맨 아래 표
-  }
+  if (view === "stats") jobs.push(...statsJobs(state.statsTab));
   if (view === "settings") jobs.push(...(SETTINGS_JOBS[state.settingsTab] || SETTINGS_JOBS.year)());
   // 아래 구역 자료는 옛 연도·옛 화면 것이 잠깐 보이지 않게 비우고 시작한다
   if (view === "home") state.rqBrief = null;
   if (view === "collect") state.alerts = null;
-  if (view === "stats") state.statsCompare = null;
   const navP = navBg ? loadNavState().then(() => true, e => `연도 목록: ${e.message}`) : null;
   state.loadErrors = [...firstErrs, ...await settle(jobs)];
   if (seq !== navSeq) return;                 // 그 사이 다른 화면으로 옮겼다
