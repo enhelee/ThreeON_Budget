@@ -3,6 +3,7 @@ import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
 import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
+import { scenarioBody } from "./forecast_scenario.js"
 
 // ─────────────────────────────────────────────────────────────
 // 5번 탭 — 예산 표준화(3단계) · 중장기 전망(4단계)  (#/forecast)
@@ -20,7 +21,7 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 //   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"], ["scenario", "시나리오 비교"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급 이력", ["grades", "site_grade_eq"]],
                      ["learn", "학습 기간·백테스트", ["settings"]],
@@ -491,7 +492,7 @@ function refYears(used) {
 
 export function renderForecast() {
   const tab = state.fc.tab || "manage"
-  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : manageBody()
+  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : tab === "scenario" ? scenarioBody() : manageBody()
   return `
   <div class="space-y-6">
     ${header()}

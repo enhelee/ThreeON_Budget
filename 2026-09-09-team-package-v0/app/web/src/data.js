@@ -186,6 +186,22 @@ export async function loadForecastTable() {
   adoptBase(state.fc.table);
 }
 
+// 시나리오 비교 — 손잡이 값이 그대로면 다시 부르지 않는다(기준연도가 바뀌면 다시).
+export async function loadForecastScenarios(force = false) {
+  const sc = state.fc.sc;
+  const key = JSON.stringify([state.fc.baseYear, sc.specs]);
+  if (!force && sc.data && sc.dataKey === key) return;
+  sc.loading = true; sc.error = "";
+  try {
+    const q = new URLSearchParams({specs: JSON.stringify(sc.specs)});
+    if (state.fc.baseYear) q.set("base_year", state.fc.baseYear);
+    sc.data = await api(`/api/forecast/scenarios?${q}`);
+    sc.dataKey = key;
+    adoptBase(sc.data);
+  } catch (err) { sc.error = err.message; sc.data = null; }
+  finally { sc.loading = false; }
+}
+
 export async function loadForecastCompare() {
   state.fc.compare = await api(`/api/forecast/compare${fcQuery()}`);
 }
