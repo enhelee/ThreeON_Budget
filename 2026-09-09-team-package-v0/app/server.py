@@ -36,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import alerts as alertm, api_forecast, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -1568,6 +1568,54 @@ def put_review_ack(req: ReviewAckReq, request: Request):
 _RQ_VOUCHER_MAX = 12
 
 
+def _rq_line_vouchers(conn, year, budget, branch, item):
+    """최신 분석에서 한 지사·과목의 사업 줄과 줄별 전표 {사업명: [전표]} — 추천·근거 설명이 같이 쓴다."""
+    run = dbm.latest_run(conn, year, budget)
+    if not run:
+        raise HTTPException(404, "분석 실행 이력이 없습니다.")
+    biz = dbm.load_biz_lines(conn, run["id"])
+    biz = biz[(biz["처지사"] == branch) & (biz["예산과목"] == item)]
+    rows = biz[list(_RQ_COLS)].to_dict("records")
+    resolve = dbm._line_resolver(rows)
+    detail = dbm.load_match_detail(conn, run["id"], branch=branch)
+    detail = detail[detail["과목정규"] == item]
+    by_line = {}
+    for _, v in detail.iterrows():
+        line = resolve(v["처지사정규"], v["과목정규"], v["매칭행"], v["매칭사업명"])
+        by_line.setdefault(line, []).append({
+            "erp_row_id": int(v["erp_row_id"]), "전표번호": v["전표번호"], "전기일": v["전기일"],
+            "텍스트": v["전표텍스트"], "금액천원": round(v["금액천원"] or 0),
+            "확신도": v["매칭확신도"],
+            "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"])})
+    return rows, by_line
+
+
+@app.get("/api/review-explain")
+def review_explain(year: str, budget: str, branch: str, item: str, name: str):
+    """검토 큐 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
+    전년 같은 사업은 같은 예산·지사의 전년 최신 분석에서 이름(연도 글자 제외)으로 찾는다."""
+    conn = _conn()
+    try:
+        rows, by_line = _rq_line_vouchers(conn, year, budget, branch, item)
+        mine = [r for r in rows if r["사업명"] == name]
+        if not mine:
+            raise HTTPException(404, "그 사업 줄을 최신 분석에서 찾지 못했습니다 — 화면을 새로 고치세요.")
+        plan = sum(float(r["연예산"] or 0) for r in mine)
+        actual = sum(float(r["실적금액"] or 0) for r in mine)
+        prev = None
+        prev_run = dbm.latest_run(conn, str(int(year) - 1), budget)
+        if prev_run:
+            pb = dbm.load_biz_lines(conn, prev_run["id"])
+            pb = pb[pb["처지사"] == branch][["사업명", "실적금액", "연예산"]].to_dict("records")
+            prev = explainm.prev_match(name, pb)
+        out = explainm.build({"plan": plan, "actual": actual, "name": name},
+                             by_line.get(name, []), prev)
+        out["prev"] = prev
+        return _clean_json(out)
+    finally:
+        conn.close()
+
+
 @app.get("/api/review-suggest")
 def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
     """검토 큐 한 줄의 전표와 «추천 재배정».
@@ -1578,23 +1626,7 @@ def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
     """
     conn = _conn()
     try:
-        run = dbm.latest_run(conn, year, budget)
-        if not run:
-            raise HTTPException(404, "분석 실행 이력이 없습니다.")
-        biz = dbm.load_biz_lines(conn, run["id"])
-        biz = biz[(biz["처지사"] == branch) & (biz["예산과목"] == item)]
-        rows = biz[list(_RQ_COLS)].to_dict("records")
-        resolve = dbm._line_resolver(rows)
-        detail = dbm.load_match_detail(conn, run["id"], branch=branch)
-        detail = detail[detail["과목정규"] == item]
-        by_line = {}
-        for _, v in detail.iterrows():
-            line = resolve(v["처지사정규"], v["과목정규"], v["매칭행"], v["매칭사업명"])
-            by_line.setdefault(line, []).append({
-                "erp_row_id": int(v["erp_row_id"]), "전표번호": v["전표번호"], "전기일": v["전기일"],
-                "텍스트": v["전표텍스트"], "금액천원": round(v["금액천원"] or 0),
-                "확신도": v["매칭확신도"],
-                "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"])})
+        rows, by_line = _rq_line_vouchers(conn, year, budget, branch, item)
         plans = {}
         for r in rows:
             if str(r.get("구분") or "").startswith("신규"):

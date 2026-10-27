@@ -156,15 +156,33 @@ function actionsHtml(it, locked) {
       <button class="btn-primary rq-btn" data-rq="ack" data-key="${k}" title="이상 없음 — 단축키 A">✓ 이상 없음</button>
       ${chips.map((c, i) => `<button class="rq-chip" data-rq="chip" data-key="${k}" data-note="${esc(c)}" title="사유로 저장 — 단축키 ${i + 1}">${esc(c)}</button>`).join("")}
       ${it.needsNote ? `<button class="rq-chip rq-chip--ghost" data-rq="note-edit" data-key="${k}">직접 입력…</button>` : ""}
+      <button class="btn-secondary rq-btn" data-rq="explain" data-key="${k}" aria-expanded="${r.explOpen === it.key}">${r.explOpen === it.key ? "근거 닫기 ▲" : "근거·초안 ▾"}</button>
       ${canMove ? `<button class="btn-secondary rq-btn" data-rq="expand" data-key="${k}" aria-expanded="${r.open === it.key}" title="단축키 E">${r.open === it.key ? "전표 닫기 ▲" : "전표·재배정 ▾"}</button>` : ""}
       ${detailBtn(it)}
     </div>
     ${editing ? `<div class="rq-noteedit">
-        <input id="rqNoteText" class="control flex-1" maxlength="500" placeholder="차이 사유 (500자 이내)" value="${esc(it.note || "")}" data-key="${k}">
+        <textarea id="rqNoteText" class="control flex-1" rows="${r.draft?.key === it.key ? 4 : 1}" maxlength="500" placeholder="차이 사유 (500자 이내 · Enter 저장, Shift+Enter 줄바꿈)" data-key="${k}">${esc(r.draft?.key === it.key ? r.draft.text : (it.note || ""))}</textarea>
         <button class="btn-primary rq-btn" data-rq="note-save" data-key="${k}">저장</button>
         <button class="btn-secondary rq-btn" data-rq="note-cancel">취소</button>
       </div>` : ""}
+    ${r.explOpen === it.key ? explainHtml(it) : ""}
     ${r.open === it.key ? suggestHtml(it, locked) : ""}`
+}
+
+// 근거 설명(B) — 분석 결과에 있는 사실만 문장으로. 원인은 «추정»으로만, 사유 저장은 사람이 고친 뒤.
+function explainHtml(it) {
+  const ex = state.rq.expl[it.key]
+  if (!ex) return `<div class="rq-sugg"><p class="text-sm text-sub">근거를 모으는 중…</p></div>`
+  if (ex.error) return `<div class="rq-sugg"><p class="text-sm text-err">${esc(ex.error)}</p></div>`
+  return `<div class="rq-sugg">
+      <h4 class="text-sm font-semibold text-ink">근거</h4>
+      <ul class="mt-1.5 space-y-1 text-sm text-ink">${ex.facts.map(f => `<li>· ${esc(f)}</li>`).join("")}</ul>
+      ${ex.hints.length ? `<h4 class="mt-3 text-sm font-semibold text-ink">추정 원인 <span class="text-xs font-normal text-tri">전표 글자·귀속 모양으로 짐작 — 확인 필요</span></h4>
+        <ul class="mt-1.5 space-y-1 text-sm text-sub">${ex.hints.map(h => `<li>· ${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${it.needsNote && !it.resolved ? `<div class="mt-3 flex flex-wrap items-center gap-2">
+          <button class="btn-primary rq-btn" data-rq="draft" data-key="${esc(it.key)}">초안을 사유 칸에 넣기</button>
+          <span class="text-xs text-tri">넣은 뒤 고치고 [저장] — 바로 저장되지 않아요</span></div>` : ""}
+    </div>`
 }
 
 function detailBtn(it) {
