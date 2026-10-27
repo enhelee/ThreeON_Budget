@@ -29,6 +29,11 @@ export const state = {
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   statOpen: null,   // 통계 과목 표에서 펼친 행(«예산|과목») — 지사별 드릴다운
   alerts: null,     // /api/alerts — {alerts, summary, prev_year}
+  // 검토 큐(2026-10-27, views/review.js) — data = /api/review-queue · n = 보기 건수("10"|"20"|"50"|"80"|"all")
+  //   show = 미처리|처리됨|전체 · open = 전표를 펼친 줄 · sugg = 줄별 추천 재배정 캐시 · pick = 전표별 고른 사업
+  rq: { data: null, n: "20", show: "open", reason: "", branch: "", budget: "all",
+        open: null, noteKey: null, focus: null, sugg: {}, pick: {} },
+  rqBrief: null,    // 메인 «다음 할 일»용 요약(/api/review-queue?brief=1)
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
   settingsTab: "year",   // 설정 화면 탭(연도·학습 | 기준정보 | 데이터셋·모델 | 이력)
@@ -51,6 +56,7 @@ export const viewMeta = {
   collect: "실적 집계",
   branches: "실적 분석",
   detail: "실적분석(상세)",
+  review: "검토 큐",
   stats: "통계·내보내기",
   forecast: "중장기 예측",
   settings: "설정",

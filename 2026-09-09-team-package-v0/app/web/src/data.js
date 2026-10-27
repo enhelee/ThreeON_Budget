@@ -46,6 +46,19 @@ export async function loadAlerts() {
   state.alerts = await api(`/api/alerts?year=${state.year}`);
 }
 
+// 검토 큐 — 사업 한 줄마다 이유를 모아 검토 금액 × 위험 가중으로 세운 목록(views/review.js).
+//   연도가 바뀌면 줄별 추천 캐시는 버린다(같은 키라도 다른 해의 전표다).
+export async function loadReviewQueue() {
+  const year = state.year;
+  const data = await api(`/api/review-queue?year=${year}`);
+  if (state.rq.data && state.rq.dataYear !== year) { state.rq.sugg = {}; state.rq.pick = {}; state.rq.open = null; }
+  state.rq.data = data; state.rq.dataYear = year;
+}
+
+export async function loadReviewBrief() {
+  state.rqBrief = await api(`/api/review-queue?year=${state.year}&brief=1`);
+}
+
 export async function loadStatus() {
   state.status = await api(`/api/status?year=${state.year}`);
 }

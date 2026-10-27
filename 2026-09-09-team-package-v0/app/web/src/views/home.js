@@ -184,13 +184,23 @@ function nextActions() {
     items.push({tone: "warn", view: null,
                 text: `저장된 변경 ${pending}건이 분석에 반영되지 않았습니다 — 상단 분석 반영을 누르세요.`})
   }
-  const al = state.alerts?.summary;
+  // 검토 큐(2026-10-27) — 이상 알림·차이 사유·저확신 귀속을 «돈이 걸린 순» 한 줄로 묶는다.
+  //   «171건·1,405건»처럼 건수만 늘어놓으면 어디서 시작할지 모르고 미완성처럼 읽힌다.
+  const rq = state.rqBrief?.analyzed ? state.rqBrief.summary : null
+  if (rq?.open) {
+    items.push({tone: "warn", view: "review",
+                text: `검토 큐 — 남은 ${fmt(rq.open)}건 중 상위 ${fmt(rq.n80)}건이 남은 검토 금액의 80% · 처리 ${(rq.progress * 100).toFixed(1)}%`})
+  } else if (rq?.total) {
+    items.push({tone: "info", view: "review", text: `검토 큐 ${fmt(rq.total)}건을 모두 처리했습니다.`})
+  }
+  // 검토 큐를 못 받았을 때만 예전 두 줄(이상 알림은 실적 집계, 차이 사유는 3+)로 알린다.
+  const al = rq ? null : state.alerts?.summary;
   if (al?.high) {
     items.push({tone: "warn", view: "collect",
                 text: `이상 알림 높음 ${al.high}건(전체 ${al.total}건) — 예산 초과·과다 귀속·미매칭 비중을 실적 집계에서 확인하세요.`})
   }
   // 차이 사유(집행률 ±20%p) — 마감 뒤에도 입력할 수 있고 보고 때 쓰인다.
-  const varNeed = (state.branches || []).reduce((a, r) => a + Math.max(0, (r.variance || 0) - (r.varianceNoted || 0)), 0)
+  const varNeed = rq ? 0 : (state.branches || []).reduce((a, r) => a + Math.max(0, (r.variance || 0) - (r.varianceNoted || 0)), 0)
   if (varNeed) {
     items.push({tone: "info", view: "detail",
                 text: `차이 사유 미입력 ${varNeed}건(집행률 ±20%p 사업) — 3+ 상세에서 «사유 입력»으로 적어 두세요.`})

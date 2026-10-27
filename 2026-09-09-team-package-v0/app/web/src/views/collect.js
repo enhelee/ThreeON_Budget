@@ -23,7 +23,10 @@ export function alertsPanelHtml() {
       <section class="panel p-6" aria-labelledby="alertsTitle">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div><h3 id="alertsTitle" class="section-title">이상 알림 — ${esc(state.year)}년</h3></div>
-          <p class="text-sm text-sub">전체 <b class="text-ink">${sm.total}</b>건 · 높음 <b class="text-err">${sm.high}</b>건</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-sm text-sub">전체 <b class="text-ink">${sm.total}</b>건 · 높음 <b class="text-err">${sm.high}</b>건</p>
+            ${sm.total ? '<button class="btn-secondary" data-view="review">검토 큐에서 처리 →</button>' : ""}
+          </div>
         </div>
         ${sm.total ? `
         <div class="mt-4 flex flex-wrap gap-2">${chip("", "전체", sm.total)}${ALERT_KINDS.map(k => chip(k, k, sm.counts?.[k] || 0)).join("")}</div>

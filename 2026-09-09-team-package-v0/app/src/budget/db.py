@@ -353,6 +353,13 @@ def init_db(conn):
         예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
         note TEXT NOT NULL, operator TEXT, updated_at TEXT NOT NULL,
         PRIMARY KEY (year, budget, 예산과목, 처지사, 사업명))""")
+    # 검토 큐 승인(2026-10-27) — «이 줄은 봤고 이상 없다». 승인 때 실적(천원)을 같이 적어 두고,
+    #   재분석으로 실적이 바뀌면 승인을 무효로 본다(review_queue.ACK_TOL). 숫자를 바꾸지 않아 마감 연도에도 쓴다.
+    cur.execute("""CREATE TABLE IF NOT EXISTS review_ack(
+        year TEXT NOT NULL, budget TEXT NOT NULL,
+        예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
+        actual REAL, operator TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY (year, budget, 예산과목, 처지사, 사업명))""")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_plan_ds ON plan_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_erp_ds ON erp_row(dataset_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS ix_ml_run ON match_line(run_id)")
@@ -1186,6 +1193,99 @@ def variance_notes(conn, year, dept=None):
             for r in conn.execute(sql, tuple(params)).fetchall()}
 
 
+def set_review_ack(conn, year, budget, item, dept, name, actual, operator=None, ack=True):
+    """검토 큐 승인 저장(ack=False 면 취소). actual = 승인 시점 실적(천원)."""
+    key = (str(year), budget, item, dept, name)
+    if not ack:
+        conn.execute("DELETE FROM review_ack WHERE year=? AND budget=? AND 예산과목=?"
+                     " AND 처지사=? AND 사업명=?", key)
+        conn.commit()
+        return None
+    now = _now()
+    conn.execute("INSERT OR REPLACE INTO review_ack VALUES(?,?,?,?,?,?,?,?)",
+                 key + (float(actual or 0), operator, now))
+    conn.commit()
+    return {"actual": float(actual or 0), "operator": operator, "updated_at": now}
+
+
+def review_acks(conn, year):
+    """{(budget, 예산과목, 처지사, 사업명): {"actual", "operator", "updated_at"}}."""
+    rows = conn.execute("SELECT budget, 예산과목, 처지사, 사업명, actual, operator, updated_at"
+                        " FROM review_ack WHERE year=?", (str(year),)).fetchall()
+    return {(r[0], r[1], r[2], r[3]): {"actual": r[4], "operator": r[5], "updated_at": r[6]}
+            for r in rows}
+
+
+def _line_resolver(biz_rows):
+    """match_line 의 (처지사정규, 과목정규, 매칭행, 매칭사업명) → 사업 줄 이름.
+
+    branch-detail 과 같은 규칙: 계획행은 매칭행(=biz_line.src_row)으로, 신규는 이름(«[신규] » 뗀 것)으로.
+    """
+    by_row = {}
+    for r in biz_rows:
+        src = r.get("src_row")
+        if src is not None and src == src:
+            by_row[(r.get("처지사"), r.get("예산과목"), int(src))] = r.get("사업명")
+
+    def resolve(dept, item, mrow, mname):
+        if mrow is not None and mrow == mrow:
+            hit = by_row.get((dept, item, int(mrow)))
+            if hit is not None:
+                return hit
+        name = str(mname or "")
+        return name[len("[신규] "):] if name.startswith("[신규] ") else (name or None)
+    return resolve
+
+
+def basis_by_line(conn, run_id, budget, biz_rows, threshold=LEARN_MIN_CONF):
+    """사업 줄별 전표 금액 묶음(천원) — SQL 에서 묶어 줄 수만큼만 받는다.
+
+    {line_key: {"total": 귀속 전표 합, "lowconf": 확신도 threshold 미만 합, "manual": 사람이 재배정한 전표 합}}
+    manual 은 매칭근거가 «재배정…»인 전표 — 과다 귀속이라도 사람이 일부러 붙였으면 검토자가 바로 안다.
+    """
+    resolve = _line_resolver(biz_rows)
+    rows = conn.execute(
+        "SELECT m.처지사정규, m.과목정규, m.매칭행, m.매칭사업명, SUM(e.금액천원),"
+        " SUM(CASE WHEN m.매칭확신도 < ? THEN e.금액천원 ELSE 0 END),"
+        " SUM(CASE WHEN m.매칭근거 LIKE ? THEN e.금액천원 ELSE 0 END)"
+        " FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id"
+        " WHERE m.run_id=? AND m.처지사정규 IS NOT NULL"
+        " GROUP BY m.처지사정규, m.과목정규, m.매칭행, m.매칭사업명",
+        (threshold, "재배정%", run_id)).fetchall()   # ⚠ «%» 를 SQL 글자로 쓰면 PG(psycopg)가 자리표시자로 읽는다
+    out = {}
+    for dept, item, mrow, mname, tot, low, man in rows:
+        name = resolve(dept, item, mrow, mname)
+        if name is None:
+            continue
+        k = (budget, item or "", dept or "", name)
+        g = out.setdefault(k, {"total": 0.0, "lowconf": 0.0, "manual": 0.0})
+        g["total"] += float(tot or 0)
+        g["lowconf"] += float(low or 0)
+        g["manual"] += float(man or 0)
+    return out
+
+
+def moved_lines(conn, year, budget, run, biz_rows):
+    """이 실행 뒤에 재배정을 저장해 둔(아직 분석 반영 전) 사업 줄 키 집합 — 전표가 떠난 줄과 받을 줄 둘 다.
+
+    시각 비교는 «미반영» 배지(server._pending_data)와 같은 «초과»(>)다. 두 표시가 어긋나지 않게.
+    """
+    resolve = _line_resolver(biz_rows)
+    rows = conn.execute(
+        "SELECT m.처지사정규, m.과목정규, m.매칭행, m.매칭사업명, o.target_name, o.target_dept"
+        " FROM override o JOIN match_line m ON m.erp_row_id = o.erp_row_id AND m.run_id=?"
+        " WHERE o.year=? AND o.budget=? AND o.created_at > ?",
+        (run["id"], str(year), budget, run["created_at"])).fetchall()
+    out = set()
+    for dept, item, mrow, mname, tname, tdept in rows:
+        name = resolve(dept, item, mrow, mname)
+        if name is not None:
+            out.add((budget, item or "", dept or "", name))
+        if tname:
+            out.add((budget, item or "", (tdept or dept) or "", tname))
+    return out
+
+
 def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
     """사업명 변경 시 그 사업을 '이름으로' 가리키는 기록을 함께 옮긴다.
 
@@ -1200,6 +1300,9 @@ def rename_biz_references(conn, year, budget, item, dept, old_name, new_name):
         return {"override": 0, "learned": 0}
     # 차이 사유도 이름으로 붙어 있다 — 옮기지 않으면 이름을 고치는 순간 사유가 사라진다.
     conn.execute("UPDATE variance_note SET 사업명=? WHERE year=? AND budget=? AND 예산과목=?"
+                 " AND 처지사=? AND 사업명=?",
+                 (new_name, str(year), budget, item, dept, old_name))
+    conn.execute("UPDATE review_ack SET 사업명=? WHERE year=? AND budget=? AND 예산과목=?"
                  " AND 처지사=? AND 사업명=?",
                  (new_name, str(year), budget, item, dept, old_name))
     run = latest_run(conn, year, budget)

@@ -36,7 +36,7 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import alerts as alertm, api_forecast, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import alerts as alertm, api_forecast, review_queue as rqm, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -1415,6 +1415,132 @@ def put_variance_note(req: VarianceNoteReq, request: Request):
         saved = dbm.set_variance_note(conn, req.year, req.budget, req.예산과목, req.처지사,
                                       req.사업명, req.note, operator=_operator(request))
         return {"note": saved}
+    finally:
+        conn.close()
+
+
+# ── 검토 큐 (2026-10-27) ──────────────────────────────────────────────
+#   사업 한 줄 = 검토 단위. 이유(차이·과다 귀속·음수·저확신)를 모으고 검토 금액 × 위험 가중으로 세운다.
+#   계산은 review_queue.py, 여기서는 DB 에서 재료를 모아 넘기기만 한다(분석 결과를 읽기만 한다).
+
+_RQ_COLS = ("처지사", "예산과목", "사업명", "연예산", "실적금액", "구분", "src_row")
+
+
+def _rq_material(conn, year, runs):
+    lines, basis, moved = [], {}, set()
+    for budget, r in runs.items():
+        rows = dbm.load_biz_lines(conn, r["id"])[list(_RQ_COLS)].to_dict("records")
+        for row in rows:
+            row["budget"] = budget
+        lines.extend(rows)
+        basis.update(dbm.basis_by_line(conn, r["id"], budget, rows))
+        moved |= dbm.moved_lines(conn, year, budget, r, rows)
+    prev_runs = _latest_runs(conn, str(int(year) - 1))
+    found = alertm.compute_alerts(lines, _alert_lines(conn, prev_runs) if prev_runs else None, None)
+    return lines, basis, moved, found
+
+
+@app.get("/api/review-queue")
+def review_queue(year: str, brief: bool = False):
+    """검토 큐. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
+    conn = _conn()
+    try:
+        locked = dbm.is_locked(conn, year)
+        runs = _latest_runs(conn, year)
+        if not runs:
+            return {"items": [], "summary": rqm.summarize([]), "locked": locked, "analyzed": False}
+        lines, basis, moved, found = _rq_material(conn, year, runs)
+        items = rqm.build_items(lines, basis, dbm.variance_notes(conn, year),
+                                dbm.review_acks(conn, year), moved, found)
+        out = {"summary": rqm.summarize(items), "locked": locked, "analyzed": True,
+               "weights": rqm.WEIGHTS, "labels": rqm.LABELS}
+        out["items"] = [it for it in items if not it["resolved"]][:3] if brief else items
+        return _clean_json(out)
+    finally:
+        conn.close()
+
+
+class ReviewAckReq(BaseModel):
+    year: str
+    budget: str
+    예산과목: str
+    처지사: str
+    사업명: str
+    ack: bool = True
+
+
+@app.put("/api/review-ack")
+def put_review_ack(req: ReviewAckReq, request: Request):
+    """검토 큐 «승인(이상 없음)». 숫자를 바꾸지 않아 마감 연도에도 받는다(차이 사유와 같은 이유).
+    승인 시점 실적을 서버가 최신 분석에서 읽어 적는다 — 재분석으로 실적이 바뀌면 큐가 다시 연다."""
+    conn = _conn()
+    try:
+        run = dbm.latest_run(conn, req.year, req.budget)
+        if not run:
+            raise HTTPException(404, "분석 실행 이력이 없습니다.")
+        biz = dbm.load_biz_lines(conn, run["id"])
+        hit = biz[(biz["처지사"] == req.처지사) & (biz["예산과목"] == req.예산과목)
+                  & (biz["사업명"] == req.사업명)]
+        if hit.empty:
+            raise HTTPException(404, "그 사업 줄을 최신 분석에서 찾지 못했습니다 — 화면을 새로 고치세요.")
+        actual = float(hit["실적금액"].fillna(0).sum())
+        saved = dbm.set_review_ack(conn, req.year, req.budget, req.예산과목, req.처지사, req.사업명,
+                                   actual, operator=_operator(request), ack=req.ack)
+        return {"ack": saved}
+    finally:
+        conn.close()
+
+
+_RQ_VOUCHER_MAX = 12
+
+
+@app.get("/api/review-suggest")
+def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
+    """검토 큐 한 줄의 전표와 «추천 재배정».
+
+    nominate   이 줄의 큰 전표 _RQ_VOUCHER_MAX 건 — 같은 지사·과목의 다른 계획 사업 중 전표 글자를 더 닮은 곳
+    incoming   (덜 집행된 줄) 같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표 — «이리로 가져오기»
+    candidates 고를 수 있는 같은 과목 계획 사업 전부(잔액 포함)
+    """
+    conn = _conn()
+    try:
+        run = dbm.latest_run(conn, year, budget)
+        if not run:
+            raise HTTPException(404, "분석 실행 이력이 없습니다.")
+        biz = dbm.load_biz_lines(conn, run["id"])
+        biz = biz[(biz["처지사"] == branch) & (biz["예산과목"] == item)]
+        rows = biz[list(_RQ_COLS)].to_dict("records")
+        resolve = dbm._line_resolver(rows)
+        detail = dbm.load_match_detail(conn, run["id"], branch=branch)
+        detail = detail[detail["과목정규"] == item]
+        by_line = {}
+        for _, v in detail.iterrows():
+            line = resolve(v["처지사정규"], v["과목정규"], v["매칭행"], v["매칭사업명"])
+            by_line.setdefault(line, []).append({
+                "erp_row_id": int(v["erp_row_id"]), "전표번호": v["전표번호"], "전기일": v["전기일"],
+                "텍스트": v["전표텍스트"], "금액천원": round(v["금액천원"] or 0),
+                "확신도": v["매칭확신도"],
+                "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"])})
+        plans = {}
+        for r in rows:
+            if str(r.get("구분") or "").startswith("신규"):
+                continue
+            c = plans.setdefault(r["사업명"], {"name": r["사업명"], "plan": 0.0, "actual": 0.0})
+            c["plan"] += float(r["연예산"] or 0)
+            c["actual"] += float(r["실적금액"] or 0)
+        candidates = [c for n, c in plans.items() if n != name]
+        mine = sorted(by_line.get(name, []), key=lambda v: -abs(v["금액천원"]))
+        nominate = rqm.suggest(mine[:_RQ_VOUCHER_MAX], name, candidates)
+        cur = plans.get(name)
+        incoming = []
+        if cur and cur["actual"] < cur["plan"]:
+            sib = [{**v, "from": line} for line, vs in by_line.items() if line != name for v in vs]
+            incoming = rqm.suggest_incoming(name, sib)[:_RQ_VOUCHER_MAX]
+        cands = sorted(({**c, "plan": round(c["plan"]), "actual": round(c["actual"]),
+                         "remain": round(c["plan"] - c["actual"])} for c in candidates),
+                       key=lambda c: -c["remain"])
+        return _clean_json({"nominate": nominate, "incoming": incoming, "candidates": cands,
+                            "voucher_total": len(mine), "locked": dbm.is_locked(conn, year)})
     finally:
         conn.close()
 

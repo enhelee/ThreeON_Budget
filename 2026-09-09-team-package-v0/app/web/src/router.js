@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadBranches, loadDetail, loadForecastBench, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -10,6 +10,7 @@ import { lockBadgeHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
+import { renderReview } from "./views/review.js"
 import { renderForecast } from "./views/forecast.js"
 import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
@@ -27,7 +28,7 @@ import { renderStats } from "./views/stats.js"
 // 플래그를 두지 않는 이유가 이것이다.
 
 const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "branches",
-                   detail: "detail", stats: "stats", forecast: "forecast", settings: "settings"};
+                   detail: "detail", review: "review", stats: "stats", forecast: "forecast", settings: "settings"};
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
 // 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
@@ -82,7 +83,7 @@ export function bootRoute() {
 
 export function renderPage() {
   const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
-                     branches: renderBranches, detail: renderDetail, stats: renderStats,
+                     branches: renderBranches, detail: renderDetail, review: renderReview, stats: renderStats,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
   const lb = $("#lockBanner");
@@ -162,7 +163,9 @@ export async function navigate(view, opts = {}) {
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  if (view === "home") jobs.push(["서버 정보", loadHealth], ["이상 알림", loadAlerts]);
+  // 메인 «다음 할 일»은 검토 큐 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27).
+  if (view === "home") jobs.push(["서버 정보", loadHealth], ["검토 큐", loadReviewBrief]);
+  if (view === "review") jobs.push(["현황", loadStatus], ["검토 큐", loadReviewQueue]);
   if (view === "forecast") {
     // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
