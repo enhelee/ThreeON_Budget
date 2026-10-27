@@ -32,7 +32,7 @@ function noteRowHtml(b, key) {
       <tr class="edit-row"><td colspan="${ncol()}" class="p-4">
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-2 text-sm font-bold text-ink">차이 사유 — "${esc(b.사업명)}"
-            <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)}천원 · 실적 ${fmt(b.실적)}천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
+            <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)} 천원 · 실적 ${fmt(b.실적)} 천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
           <textarea id="vnText" class="control min-h-20 w-full" maxlength="500" aria-label="차이 사유" placeholder="예: 정기점검 일정이 내년 3월로 이월 / 긴급 보수로 추가 집행">${esc(b.사유 || "")}</textarea>
           <div class="mt-3 flex gap-2">
             <button class="btn-primary" data-action="save-note" data-ekey="${esc(key)}">사유 저장</button>
@@ -111,7 +111,7 @@ function branchPickGrid() {
   return `${pickSortBar()}<section class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${sorted.map(r => `
     <button class="metric-card text-left hover:border-ink" data-branch="${esc(r.branch)}">
       <span class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">${esc(r.branch)}</span>${rateBadge(r.plan, r.actual)}</span>
-      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)}천원 · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
+      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} 천원 · 실적 ${fmt(r.actual)} 천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
 }
 
 export function renderDetail() {
@@ -210,7 +210,7 @@ export function deleteBoxHtml(b, key) {
           ${others.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}
           <option value="__unassigned__" ${others.length ? "" : "selected"}>— 미지정 항목으로 이동 (${esc(unassignedName(b))}) —</option>
         </select></label>` : `
-      <p class="danger-text">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)}천원</b>)이 이후 분석에서 제외됩니다.</p>`}
+      <p class="danger-text">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)} 천원</b>)이 이후 분석에서 제외됩니다.</p>`}
       ${hasPlan ? `<p class="danger-text">원본 계획 자료는 지우지 않습니다 — 설정 탭 <b>'사업 삭제 이력'</b>에서 되돌릴 수 있습니다.</p>` : `<p class="danger-text">되돌리려면 설정 탭 <b>'수동 재배정 이력'</b>에서 해당 이동 기록을 지우면 됩니다.</p>`}
       <div class="mt-3 flex gap-2">
         <button class="btn-danger" data-action="confirm-delete" data-ekey="${esc(key)}">${!hasPlan ? "전표 옮기고 정리" : (n ? "옮기고 삭제" : "삭제")}</button>

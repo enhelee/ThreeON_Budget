@@ -38,7 +38,7 @@ def money(v):
         return f"{sign}{a / 100_000:,.1f}억 원"
     if a >= 1_000:
         return f"{sign}{a / 1_000:,.0f}백만 원"
-    return f"{sign}{a:,.0f}천원"
+    return f"{sign}{a:,.0f} 천원"
 
 
 def _text(v):

@@ -237,7 +237,7 @@ function refBody(d) {
   const LABEL = {reference_actual: "참고 실적", reference_standard: "표준금액(대조 기준)", site_grade_eq: "설비별 등급",
                  site_grade: "대표 등급", benchmark_rule: "산정 규칙", site_history: "지사 연혁", cri_rule: "CRI 규칙",
                  regular_contract: "LTSA 계약 초안"}
-  const sum = x => x ? `${x.same.toLocaleString()} / ${x.rows.toLocaleString()}건 일치 · 앱 ${fmt(x.app_total)} · 엑셀 ${fmt(x.excel_total)}천원` : ""
+  const sum = x => x ? `${x.same.toLocaleString()} / ${x.rows.toLocaleString()}건 일치 · 앱 ${fmt(x.app_total)} · 엑셀 ${fmt(x.excel_total)} 천원` : ""
   return `
   ${panel("참고 엑셀 (예산표준화 양식)", `지사 시트의 실적·정비등급·표준화 표를 읽고, 표준화 표의 수식을 산정 규칙으로 바꿉니다 · 지금 ${esc(state.fc.baseYear)}년 기준: 참고 실적 ${(ref.reference_actual || 0).toLocaleString()}행 · 표준금액 ${(ref.reference_standard || 0).toLocaleString()}행`, `
     <div class="flex flex-wrap gap-2 p-5">
@@ -389,7 +389,7 @@ function benchStd() {
   const ed = state.fc.benchEdits
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
-    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)}천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
+    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)} 천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
     : '<span class="text-warn">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
   return `
   <article class="panel overflow-hidden">

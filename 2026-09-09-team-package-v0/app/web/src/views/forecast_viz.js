@@ -75,7 +75,7 @@ function kpis(m, scope) {
   const tot = sum(m.yearTot)
   const card = (k, val, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-xl font-bold text-ink">${val}</p><p class="text-xs text-tri">${sub}</p></div>`
   return `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]} 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)}천원`)}
+    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]} 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)} 천원`)}
     ${card("연평균 증감", cagr === null ? "-" : pctTxt(cagr), `${m.years[0]} ${eok(first)}억 → ${m.years[n - 1]} ${eok(last)}억`)}
     ${card("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
     ${card(`${esc(scope)} 가장 큰 과목`, top ? esc(top.key) : "-", top ? `10년 ${eok(top.total)}억 · ${(top.total / tot * 100).toFixed(0)}%` : "")}
@@ -93,7 +93,7 @@ function mapView(v, m, isTotal, scope) {
   const cols = `grid-template-columns:minmax(8rem,12rem) repeat(${m.years.length},minmax(3.6rem,1fr)) 5.5rem`
   // 왼쪽 위 칸 = 위 막대가 무엇의 합계인지(전사 합계 / ○○지사 합계)와 단위
   const corner = `<div class="fv-corner"><span class="fv-corner-k">${isTotal ? "전사 합계" : `${esc(scope)} 합계`}</span><span class="text-[11px] font-semibold text-sub">연도별 · 억원 →</span></div>`
-  const head = `${corner}${m.years.map((y, i) => `<button class="fv-colhead" data-fvlevel="year" data-fvyear="${y}" title="${isTotal ? "전사" : esc(scope)} ${y}년 합계 ${fmt(m.yearTot[i])}천원 — 눌러서 과목 구성 보기">
+  const head = `${corner}${m.years.map((y, i) => `<button class="fv-colhead" data-fvlevel="year" data-fvyear="${y}" title="${isTotal ? "전사" : esc(scope)} ${y}년 합계 ${fmt(m.yearTot[i])} 천원 — 눌러서 과목 구성 보기">
       <span class="fv-colbar"><span style="height:${maxY ? m.yearTot[i] / maxY * 100 : 0}%"></span></span>
       <span class="text-[11px] font-semibold text-sub">${eok(m.yearTot[i])}억</span><span class="text-xs font-bold text-ink">${y}</span></button>`).join("")}
     <div class="self-end pb-1 text-right text-xs font-bold leading-tight text-ink">10년 합계<br><span class="text-[11px] font-semibold text-sub">(억원)</span></div>
@@ -110,7 +110,7 @@ function mapView(v, m, isTotal, scope) {
                          : `data-fvlevel="acct" data-fvacct="${esc(r.key)}" data-fvyear="${m.years[i]}"`
       const txt = v.mode === "chg" && i > 0 ? (isFinite(p) ? `${p >= 0 ? "+" : ""}${p.toFixed(0)}%` : "신규") : eok(val)
       return `<button class="fv-cell" ${go} style="background:${c.bg};color:${c.dark ? "#FFFFFF" : "#0D0D0D"}"
-        title="${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)}천원${i ? ` · ${m.years[0]}년 대비 ${pctTxt(p)}` : ""}">${txt}</button>`
+        title="${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)} 천원${i ? ` · ${m.years[0]}년 대비 ${pctTxt(p)}` : ""}">${txt}</button>`
     }).join("")
     return `${label}${cells}<div class="self-center pr-1 text-right text-xs font-semibold text-ink">${eok(r.total)}</div>`
   }).join("")
@@ -148,7 +148,7 @@ function yearView(v, m, isTotal, scope) {
     <div class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-1"><p class="font-hanan text-3xl font-semibold text-ink"><span class="text-sub">${esc(scope)} ${v.year}년 합계</span> ${eok(tot)}<span class="ml-1 text-base text-sub">억원</span></p><p class="text-sm font-semibold">${delta}</p><p class="ml-auto text-xs font-semibold text-sub">단위 억원 · 비중 · 전년 대비</p></div>
     <div class="mt-4 space-y-1.5">${rows.length ? rows.map(r => {
       const p = r.prev === null ? null : pct(r.val, r.prev)
-      return `<button class="fv-barrow" data-fvlevel="acct" data-fvacct="${esc(r.key)}" title="${esc(r.key)} · ${fmt(r.val)}천원 — 눌러서 10년 추이">
+      return `<button class="fv-barrow" data-fvlevel="acct" data-fvacct="${esc(r.key)}" title="${esc(r.key)} · ${fmt(r.val)} 천원 — 눌러서 10년 추이">
         <span class="truncate text-left text-sm font-semibold text-ink">${esc(r.key)}</span>
         <span class="fv-bartrack"><span style="width:${r.val / max * 100}%;background:${BAR}"></span></span>
         <span class="text-right text-sm font-bold text-ink">${eok(r.val)}억</span>
@@ -171,7 +171,7 @@ function acctView(v, m, t, isTotal, scope) {
   r.vals.forEach((val, i) => {
     const h = val / max * (H - T - B), x = L + i * bw + bw * .18, w = bw * .64, y = H - B - h
     const fill = i === sel ? BAR_HI : i === 0 ? BAR_SOFT : BAR
-    s += `<g class="clickable" data-fvlevel="year" data-fvyear="${m.years[i]}"><title>${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)}천원${i ? ` · 전년 대비 ${pctTxt(pct(val, r.vals[i - 1]))}` : " · 기준연도"} (클릭: 그 해 구성)</title>
+    s += `<g class="clickable" data-fvlevel="year" data-fvyear="${m.years[i]}"><title>${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)} 천원${i ? ` · 전년 대비 ${pctTxt(pct(val, r.vals[i - 1]))}` : " · 기준연도"} (클릭: 그 해 구성)</title>
       <rect x="${L + i * bw}" y="${T - 20}" width="${bw}" height="${H - T - B + 20}" fill="transparent"/>
       ${h > 0 ? `<path d="M${x},${H - B} V${y + Math.min(4, h)} q0,-4 4,-4 h${w - 8} q4,0 4,4 V${H - B} Z" fill="${fill}"/>` : ""}
       ${show.has(i) ? `<text x="${x + w / 2}" y="${y - 8}" text-anchor="middle" font-size="13" font-weight="700" fill="#0D0D0D">${eok(val)}억</text>` : ""}
@@ -188,7 +188,7 @@ function acctView(v, m, t, isTotal, scope) {
     }).filter(x => x.total > 0).sort((a, b) => b.total - a.total)
     const top = list.slice(0, 8), rest = list.slice(8), mx = top[0]?.total || 1
     bySite = `<div class="mt-6"><h4 class="text-sm font-bold text-ink">${esc(r.key)} · 지사별 10년 누계 <span class="font-semibold text-sub">(억원) — 누르면 그 지사로 확대</span></h4>
-      <div class="mt-2 space-y-1.5">${top.map(x => `<button class="fv-barrow fv-barrow-site" data-fvsite="${esc(x.site)}" data-fvlevel="acct" title="${esc(x.site)} · ${fmt(x.total)}천원">
+      <div class="mt-2 space-y-1.5">${top.map(x => `<button class="fv-barrow fv-barrow-site" data-fvsite="${esc(x.site)}" data-fvlevel="acct" title="${esc(x.site)} · ${fmt(x.total)} 천원">
         <span class="truncate text-left text-sm font-semibold text-ink">${esc(x.site)}</span><span class="fv-bartrack"><span style="width:${x.total / mx * 100}%;background:${BAR}"></span></span>
         <span class="text-right text-sm font-bold text-ink">${eok(x.total)}억</span><span class="text-right text-xs text-sub">${(x.total / r.total * 100).toFixed(1)}%</span></button>`).join("")}
       ${rest.length ? `<p class="text-xs text-tri">외 ${rest.length}곳 ${eok(sum(rest.map(x => x.total)))}억원</p>` : ""}</div></div>`

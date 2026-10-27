@@ -287,21 +287,21 @@ def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
         ])
         if g["계획"] and actual == 0:
             warnings.append(
-                f"[{it}] 계획 {round(g['계획']):,}천원인데 ERP 실적 0 — "
+                f"[{it}] 계획 {round(g['계획']):,} 천원인데 ERP 실적 0 — "
                 "해당 예산과목의 ERP 계정이 없거나 다른 과목으로 집행되었을 수 있음"
                 "(과목 구성의 '실적반영' 해제 검토)")
         elif g["계획"] and g["신규"] > g["계획"]:
             warnings.append(
-                f"[{it}] 신규 {round(g['신규']):,}천원 > 계획 {round(g['계획']):,}천원 — "
+                f"[{it}] 신규 {round(g['신규']):,} 천원 > 계획 {round(g['계획']):,} 천원 — "
                 "계획은 본사·총괄 단위, 실적은 지사 단위로 잡힌 과목일 수 있음"
                 "(계획행이 없는 (과목×지사)는 전부 신규로 분류됨)")
         elif not g["계획"] and actual:
             warnings.append(
-                f"[{it}] 계획 없음 / 실적 {round(actual):,}천원 — 전액 신규")
+                f"[{it}] 계획 없음 / 실적 {round(actual):,} 천원 — 전액 신규")
     if ambiguous_cnt and exec_total:
         share = ambiguous_amt / exec_total * 100.0
         warnings.append(
-            f"계획집행 실적 중 {ambiguous_amt:,}천원({share:.0f}%)은 (과목×지사) 그룹에 "
+            f"계획집행 실적 중 {ambiguous_amt:,} 천원({share:.0f}%)은 (과목×지사) 그룹에 "
             f"계획행이 여럿인데 사업명 유사도가 임계값 미만인 전표 {ambiguous_cnt:,}건을 "
             "포함한다 — 지사·과목 단위 집계(종합표)는 정확하나 개별 사업 행의 금액은 "
             "참고용으로 볼 것(양식1 비고의 '임의귀속' 표시 참조)")

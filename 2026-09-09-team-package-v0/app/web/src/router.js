@@ -373,7 +373,7 @@ export async function runAnalyze(silent) {
     const p = res["손익"]["요약"], c = res["자본"]["요약"];
     const sec = ((Date.now() - t0) / 1000).toFixed(1);
     if (!silent) {
-      toast(`분석 완료 (${sec}초) — 손익 ${fmt(p["총 실적(천원)"])}천원 / 자본 ${fmt(c["총 실적(천원)"])}천원`);
+      toast(`분석 완료 (${sec}초) — 손익 ${fmt(p["총 실적(천원)"])} 천원 / 자본 ${fmt(c["총 실적(천원)"])} 천원`);
     }
     if (state.det.branch) await loadDetail(state.det.branch);
     await navigate(state.view);

@@ -77,7 +77,7 @@ function budgetCard(budget) {
   const s = curRow()?.[budget]
   const body = s
     ? `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(s.실적)} <span class="text-sm font-semibold text-tri">천원</span></p>
-       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)}천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
+       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} 천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
     : `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
        <p class="mt-2 text-sm text-sub">이 연도의 ${esc(budget)}예산 분석 이력이 없습니다.</p>`
   return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body)
@@ -94,7 +94,7 @@ function prevYearCard() {
   const a = (prev["손익"]?.실적 || 0) + (prev["자본"]?.실적 || 0)
   return card(`${prev.year}년 집계 (손익+자본)`, badgeOk("분석 완료"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span></p>
-     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)}천원 · 집행률 ${rateBadge(p, a)}
+     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)} 천원 · 집행률 ${rateBadge(p, a)}
      <button class="ml-1 font-semibold text-ink hover:text-brand" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
 }
 
@@ -108,7 +108,7 @@ function unmappedCard() {
       : '<b class="text-warn">미마감</b> — 검토·수정 가능'
   return card("미배정 전표 · 연도 마감", n ? badgeWarn(`${n}건`) : badgeOk("없음"),
     `<p class="mt-4 text-2xl font-bold tracking-tight ${n ?"text-warn" : "text-ink"}">${fmt(n)} <span class="text-sm font-semibold text-tri">건</span></p>
-     <p class="mt-2 text-sm text-sub">${n ? `금액 ${fmt(amt)}천원 · 종합표 미포함` : "모든 전표가 지사에 배정되었습니다."}</p>
+     <p class="mt-2 text-sm text-sub">${n ? `금액 ${fmt(amt)} 천원 · 종합표 미포함` : "모든 전표가 지사에 배정되었습니다."}</p>
      <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`)
 }
 
@@ -178,7 +178,7 @@ function nextActions() {
     items.push({tone: "info", view: "review", text: "검토 큐 확인 중…"})
   } else if (rq?.open) {
     items.push({tone: "warn", view: "review",
-                text: `검토 큐 — 남은 ${fmt(rq.open)}건 · ${fmt(rq.amount_open)}천원 (처리 ${fmt(rq.resolved)}건)`})
+                text: `검토 큐 — 남은 ${fmt(rq.open)}건 · ${fmt(rq.amount_open)} 천원 (처리 ${fmt(rq.resolved)}건)`})
   } else if (rq?.total) {
     items.push({tone: "info", view: "review", text: `검토 큐 ${fmt(rq.total)}건을 모두 처리했습니다.`})
   }
@@ -249,8 +249,8 @@ function multiYearPanels() {
           const a = tot(r, "실적")
           return `<div><div class="mb-2 flex items-end justify-between gap-3"><div><span class="font-bold text-ink clickable" data-goyear="${r.year}">${r.year}</span><span class="ml-2 text-xs text-sub">집행률 ${fmtRate(p, a)}</span></div>
           <div class="flex items-center gap-2 text-right text-xs text-sub"><span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--plan"></span><span class="font-semibold text-ink">${fmt(p)}</span></span><span>/</span><span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--act"></span><span class="font-semibold text-ink">${fmt(a)}</span></span></div></div>
-          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(p)}천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${p / maxV * 100}%"></div></div>
-          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(a)}천원 · 집행률 ${fmtRate(p, a)}"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${a / maxV * 100}%"></div></div></div></div>`
+          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(p)} 천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${p / maxV * 100}%"></div></div>
+          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(a)} 천원 · 집행률 ${fmtRate(p, a)}"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${a / maxV * 100}%"></div></div></div></div>`
         }).join("")}
       </div>
       <p class="mt-6 flex items-center gap-2 text-xs text-sub"><span class="h-2 w-2 rounded-full bg-line-strong"></span>연도를 클릭하면 해당 연도로 전환됩니다.</p>
@@ -284,7 +284,7 @@ function forecastPanel() {
   let s = `<text x="${W - R}" y="12" text-anchor="end" font-size="12" font-weight="600" fill="#5D5D5D">단위: 억원</text><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#C9C9C9"/>`
   m.yearTot.forEach((v, i) => {
     const h = v / max * (H - T - B), x = L + i * bw + bw * .2, w = bw * .6, y = H - B - h
-    s += `<g class="clickable" data-homefc="${m.years[i]}"><title>전사 ${m.years[i]}년 ${fmt(v)}천원${i ? ` · 전년 대비 ${((v / m.yearTot[i - 1] - 1) * 100).toFixed(1)}%` : " · 기준연도"} (클릭: 그 해 과목 구성)</title>
+    s += `<g class="clickable" data-homefc="${m.years[i]}"><title>전사 ${m.years[i]}년 ${fmt(v)} 천원${i ? ` · 전년 대비 ${((v / m.yearTot[i - 1] - 1) * 100).toFixed(1)}%` : " · 기준연도"} (클릭: 그 해 과목 구성)</title>
       <rect x="${L + i * bw}" y="${T - 22}" width="${bw}" height="${H - T - B + 22}" fill="transparent"/>
       ${h > 0 ? `<path d="M${x},${H - B} V${y + Math.min(4, h)} q0,-4 4,-4 h${w - 8} q4,0 4,4 V${H - B} Z" fill="${i === 0 ? "#9ec5f4" : i === peak ? "#184f95" : "#256abf"}"/>` : ""}
       <text x="${x + w / 2}" y="${y - 7}" text-anchor="middle" font-size="12" font-weight="700" fill="#0D0D0D">${eok(v)}</text>
@@ -297,7 +297,7 @@ function forecastPanel() {
   <section class="panel p-5 sm:p-6" data-home-forecast>
     ${head(`<span class="badge bg-subtle px-3 py-1 text-sm font-bold text-ink">기준 ${esc(t.base_year)}년</span>`)}
     <div class="mt-5 grid gap-3 sm:grid-cols-3">
-      ${kpi("10년 누계", `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)}천원`)}
+      ${kpi("10년 누계", `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)} 천원`)}
       ${kpi("연평균 증감", cagr === null ? "-" : `${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%`, `${m.years[0]} ${eok(m.yearTot[0])}억 → ${m.years[n - 1]} ${eok(m.yearTot[n - 1])}억`)}
       ${kpi("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
     </div>
