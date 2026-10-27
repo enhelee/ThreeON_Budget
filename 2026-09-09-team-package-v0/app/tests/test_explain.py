@@ -18,7 +18,7 @@ def _v(text, amt, conf=0.9, basis="사업명 유사"):
 def test_money_units():
     assert E.money(339_400) == "3.4억 원"
     assert E.money(87_000) == "87백만 원"
-    assert E.money(75) == "75천원"
+    assert E.money(75) == "75 천원"
     assert E.money(-164_000) == "−1.6억 원"
 
 

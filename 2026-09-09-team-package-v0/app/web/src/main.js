@@ -347,7 +347,7 @@ document.addEventListener("click", async e => {
       if (hasPlan && moveTo === b.사업명) { toast("같은 이름의 사업으로는 옮길 수 없습니다."); return; }
       const tail = hasPlan ? `\n그 뒤 "${b.사업명}" 사업을 삭제합니다.` : "";
       if (!confirm(`귀속 전표 ${vouchers.length}건(${fmt(b.실적원)}원)을 "${moveTo}"(으)로 옮깁니다.${tail}\n\n계속할까요?`)) return;
-    } else if (!confirm(`"${b.사업명}" 사업을 삭제합니다. (연예산 ${fmt(b.연예산)}천원, 귀속 전표 없음)\n설정 탭 이력에서 되돌릴 수 있습니다.\n\n계속할까요?`)) {
+    } else if (!confirm(`"${b.사업명}" 사업을 삭제합니다. (연예산 ${fmt(b.연예산)} 천원, 귀속 전표 없음)\n설정 탭 이력에서 되돌릴 수 있습니다.\n\n계속할까요?`)) {
       return;
     }
     busy(true, hasPlan ? "사업 삭제 중..." : "전표 이동 중...");

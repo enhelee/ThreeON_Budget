@@ -55,8 +55,8 @@ export function renderStats() {
         <div class="border-t border-line p-5 sm:p-6"><div class="flex flex-wrap items-center justify-between gap-3"><h4 class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold text-ink">지사그룹별
             <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-sub"><span class="yr-dot yr-dot--plan"></span>계획</span><span class="inline-flex items-center gap-1.5 text-xs font-semibold text-sub"><span class="yr-dot yr-dot--act"></span>실적</span></h4>${UNIT}</div>
           <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-ink">${esc(g.그룹)}</span><span class="flex items-center gap-2 text-xs text-sub"><span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--plan"></span><span class="font-semibold text-ink">${fmt(g.계획)}</span></span>/<span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--act"></span><span class="font-semibold text-ink">${fmt(g.실적)}</span></span> · ${fmtRate(g.계획, g.실적)}</span></div>
-          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(g.계획)}천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${g.계획 / maxA * 100}%"></div></div>
-          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(g.실적)}천원"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
+          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(g.계획)} 천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${g.계획 / maxA * 100}%"></div></div>
+          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(g.실적)} 천원"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
       </section>`;
   }).join("");
   return `<div class="space-y-6">${title}${sections || emptyState(`${esc(tab)}예산 분석 결과가 없습니다.`)}</div>`;

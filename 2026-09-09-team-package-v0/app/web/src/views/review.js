@@ -206,7 +206,7 @@ function voucherRow(v, it, locked, mode) {
     const pick = state.rq.pick[v.erp_row_id] || ""
     action = cands.length ? `<select class="control min-w-0 flex-1 sm:max-w-[22rem]" data-rq-pick="${v.erp_row_id}" aria-label="옮길 사업" ${dis}>
         <option value="">옮길 사업 고르기 (잔액 큰 순)</option>
-        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)}천원</option>`).join("")}
+        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)} 천원</option>`).join("")}
       </select>
       <button class="btn-secondary rq-btn" data-rq="move" data-key="${esc(it.key)}" data-id="${v.erp_row_id}" ${dis}>옮기기</button>`
       : '<span class="text-xs text-tri">같은 과목에 옮길 계획 사업이 없어요</span>'
@@ -256,14 +256,14 @@ function cardHtml(it, locked) {
           <p class="mt-1.5 break-keep font-semibold text-ink">${esc(it.name)}</p>
           <p class="text-xs text-sub">${esc(it.branch)} · ${esc(it.budget)} · ${esc(it.item)}</p>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b>천원 → 실적 <b class="text-ink">${fmt(it.actual)}</b>천원</span>
+            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b> 천원 → 실적 <b class="text-ink">${fmt(it.actual)}</b> 천원</span>
             ${it.rate !== null && it.rate !== undefined ? `<span class="font-bold ${rateCls(it.rate)}">${it.rate.toFixed(1)}%</span>` : ""}
           </div>
           ${bulletHtml(it)}
           <ul class="mt-2 space-y-0.5 text-sm text-ink">${it.reasons.map(x => `<li>${esc(x.text)}</li>`).join("")}</ul>
           ${it.ctx?.length ? `<ul class="mt-1 space-y-0.5 text-xs text-sub">${it.ctx.map(c => `<li>· ${esc(c)}</li>`).join("")}</ul>` : ""}
           ${it.note ? `<p class="mt-2 text-sm"><span class="font-semibold text-ink">사유</span> <span class="text-sub">${esc(it.note)}</span></p>` : ""}
-          ${it.ack && it.status !== "approved" ? `<p class="mt-1 text-xs text-warn">승인 ${esc(it.ack.operator || "")} ${esc(it.ack.updated_at || "")} — 그때 실적 ${fmt(it.ack.actual)}천원</p>` : ""}
+          ${it.ack && it.status !== "approved" ? `<p class="mt-1 text-xs text-warn">승인 ${esc(it.ack.operator || "")} ${esc(it.ack.updated_at || "")} — 그때 실적 ${fmt(it.ack.actual)} 천원</p>` : ""}
         </div>
         <div class="shrink-0 pl-[3.25rem] sm:pl-0 sm:text-right">
           <p class="text-xs font-semibold text-tri">검토 금액</p>
