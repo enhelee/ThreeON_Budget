@@ -27,6 +27,7 @@ import re
 from rapidfuzz import fuzz
 
 from .alerts import HIGH_AMT, NEG_MIN
+from . import normalize
 from .db import is_variance, norm_text
 
 LOW_CONF = 0.8                 # 학습 자동확정 기준(LEARN_MIN_CONF)과 같은 선 — 그 아래는 사람이 본다
@@ -52,7 +53,8 @@ EQUIP_WORDS = {
 #   짝이 있다는 사실 자체가 근거라 글자 기준은 SUGGEST_MIN 보다 낮게 둔다.
 PAIR_MIN = 0.60                # 덜 쓴 줄 이름과 전표 글자 유사도가 이 이상이고
 PAIR_MARGIN = 0.05             #   지금 줄보다 이만큼 더 닮았을 때(금액이 부족분과 딱 맞으면 «덜 닮지 않음»이면 된다)
-PAIR_PARTNERS = 3              # 화면에 보일 짝 수
+PAIR_PARTNERS = 3
+COMBO_MAX_N = 12               # 묶음 합 찾기에 쓰는 묶음당 전표 수(큰 금액 순) — 2^12 조합까지만 본다              # 화면에 보일 짝 수
 _RE_YEAR = re.compile(r"(?<!\d)(?:20(\d{2})년?|'(\d{2})년?|(\d{2})년)")
 
 
@@ -370,17 +372,61 @@ def suggest_incoming(name, sibling_vouchers):
     return out
 
 
+def _combo_pick(vs, target):
+    """묶음 전표 중 합이 target(±ACK_TOL)인 2건 이상 조합 — 딱 하나일 때만 돌려준다(여럿이면 고를 근거가 없다)."""
+    vs = vs[:COMBO_MAX_N]
+    hits = []
+    for mask in range(1, 1 << len(vs)):
+        if mask & (mask - 1) == 0:          # 1건은 단건 금액 일치가 맡는다
+            continue
+        pick = [v for i, v in enumerate(vs) if mask >> i & 1]
+        if abs(sum(_num(v.get("금액천원")) for v in pick) - target) <= ACK_TOL:
+            hits.append(pick)
+            if len(hits) > 1:
+                return None
+    return hits[0] if hits else None
+
+
+def _combos(over, under, by_line, used):
+    """월별·분납 묶음(learn_key 같음 — 회차·월·연도만 다른 글자) 안에서 합이 부족분과 같은 조합.
+    yield (src, dst, [전표], sim, cur). 서로 다른 묶음은 섞지 않는다 — 우연히 합이 맞는 것을 막는다."""
+    for src in sorted(over):
+        series = {}
+        for v in by_line.get(src) or []:
+            k = normalize.learn_key(v.get("텍스트"))
+            if k and _num(v.get("금액천원")) > 0 and int(v.get("erp_row_id") or 0) not in used:
+                series.setdefault(k, []).append(v)
+        for vs in series.values():
+            if len(vs) < 2:
+                continue
+            text = vs[0].get("텍스트")
+            cur = _sim(text, src)
+            for dst in sorted(under, key=lambda d: (-under[d], d)):
+                if conflicts(text, dst):
+                    continue
+                s = _sim(text, dst)
+                if s < cur:
+                    continue
+                pick = _combo_pick(sorted(vs, key=lambda v: (-_num(v.get("금액천원")), int(v.get("erp_row_id") or 0))),
+                                   under[dst])
+                if pick:
+                    yield src, dst, pick, s, cur
+                    break
+
+
 def pair_moves(lines, by_line):
-    """한 지사×과목 안에서 «더 쓴 줄의 전표 → 덜 쓴 줄» 이동 추천.
+    """한 지사·과목 안에서 «더 쓴 줄의 전표 → 덜 쓴 줄» 이동 추천.
 
     lines   {사업명: {"plan", "actual"}} (천원, 계획 사업만)
     by_line {사업명: [{erp_row_id, 텍스트, 금액천원, ...}]}
     전표가 옮겨 갈 수 있는 조건 — 둘 다 차이 줄이고, 설비·연도가 충돌하지 않고,
-      금액이 받을 줄의 남은 부족분과 보낼 줄의 남은 초과분 안이며, 다음 중 하나:
+      금액이 받을 줄의 남은 부족분과 보낼 줄의 남은 초과분 안이며, 다음 중 하나(이 순서로 채운다):
       ① 금액 일치: 남은 부족분과 금액이 같고(ACK_TOL), 글자가 지금 줄을 더 닮지 않았다
-      ② 글자: 받을 줄 이름 유사도 PAIR_MIN 이상, 지금 줄보다 PAIR_MARGIN 이상 더 닮았다
-    금액 일치 먼저, 그다음 유사도 큰 순으로 하나씩 채운다(한 전표는 한 번만).
-    반환: [{erp_row_id, from, target, 금액천원, 텍스트, 전기일, sim, cur_sim, exact, why}]
+      ② 묶음 합: 월별·분납 묶음 안에서 합이 남은 부족분과 같은 조합이 딱 하나(글자 조건은 ①과 같다)
+      ③ 글자: 받을 줄 이름 유사도 PAIR_MIN 이상, 지금 줄보다 PAIR_MARGIN 이상 더 닮았다
+    한 전표는 한 번만. 같은 단계 안에서는 유사도 큰 순.
+    반환: [{erp_row_id, from, target, 금액천원, 텍스트, 전기일, sim, cur_sim, exact, combo, why}]
+          combo = 묶음 번호(1부터, 같은 번호는 함께 옮길 전표) | None
     """
     over, under = _gaps(lines)
     if not over or not under:
@@ -402,17 +448,34 @@ def pair_moves(lines, by_line):
                     cands.append((not exact, -s, -amt, int(v.get("erp_row_id") or 0), src, dst, v, s, cur, exact))
     cands.sort(key=lambda c: c[:4])
     left_over, left_under, used, out = dict(over), dict(under), set(), []
-    for _, _, _, rid, src, dst, v, s, cur, exact in cands:
+
+    def take(v, src, dst, s, cur, exact, combo, why):
         amt = _num(v.get("금액천원"))
-        if rid in used or amt > left_over[src] + ACK_TOL or amt > left_under[dst] + ACK_TOL:
-            continue
+        rid = int(v.get("erp_row_id") or 0)
         used.add(rid)
         left_over[src] -= amt
         left_under[dst] -= amt
-        why = (f"«{dst}» 부족분 {under[dst]:,.0f} 천원과 금액 일치" if exact
-               else f"전표 글자 유사도 {s:.2f} (지금 줄 {cur:.2f})")
-        why += f" · «{src}» 초과 {over[src]:,.0f} 천원"
         out.append({"erp_row_id": rid, "from": src, "target": dst, "금액천원": round(amt),
                     "텍스트": v.get("텍스트"), "전기일": v.get("전기일"),
-                    "sim": round(s, 2), "cur_sim": round(cur, 2), "exact": exact, "why": why})
+                    "sim": round(s, 2), "cur_sim": round(cur, 2), "exact": exact, "combo": combo,
+                    "why": why + f" · «{src}» 초과 {over[src]:,.0f} 천원"})
+
+    def fits(amt, src, dst):
+        return amt <= left_over[src] + ACK_TOL and amt <= left_under[dst] + ACK_TOL
+
+    for _, _, _, rid, src, dst, v, s, cur, exact in cands:          # ① 금액 일치
+        if exact and rid not in used and fits(_num(v.get("금액천원")), src, dst):
+            take(v, src, dst, s, cur, True, None, f"«{dst}» 부족분 {under[dst]:,.0f} 천원과 금액 일치")
+    n = 0
+    for src, dst, pick, s, cur in _combos(over, left_under, by_line, used):   # ② 묶음 합
+        total = sum(_num(v.get("금액천원")) for v in pick)
+        if any(int(v.get("erp_row_id") or 0) in used for v in pick) or not fits(total, src, dst):
+            continue
+        n += 1
+        for v in pick:
+            take(v, src, dst, s, cur, False, n,
+                 f"같은 계약 월별·분납 {len(pick)}건 합 {total:,.0f} 천원 = «{dst}» 부족분")
+    for _, _, _, rid, src, dst, v, s, cur, exact in cands:          # ③ 글자
+        if not exact and rid not in used and fits(_num(v.get("금액천원")), src, dst):
+            take(v, src, dst, s, cur, False, None, f"전표 글자 유사도 {s:.2f} (지금 줄 {cur:.2f})")
     return out

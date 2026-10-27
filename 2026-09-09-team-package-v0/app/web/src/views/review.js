@@ -240,7 +240,7 @@ function suggestHtml(it, locked) {
         + list(nominate, "out") : ""}
       ${sg.incoming.length ? `<div class="${nominate.length ? "mt-4" : ""}">${head("같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표")}${list(sg.incoming, "in")}</div>` : ""}
       ${!nominate.length && !sg.incoming.length && !(sg.pairs || []).length ? '<p class="text-sm text-sub">옮길 만한 전표가 없어요.</p>' : ""}
-      <p class="mt-3 text-xs text-tri">추천 = 전표 글자가 다른 계획 사업 이름과 분명히 더 닮았을 때만(유사도 0.75↑, 설비·연도가 같을 때). 짝 추천 = 같은 과목의 덜 쓴 줄 부족분과 금액이 맞거나 그 이름을 더 닮은 전표(부족분·초과분 안에서만). 옮긴 전표는 상단 «분석 반영» 때 결과에 들어가요.</p>
+      <p class="mt-3 text-xs text-tri">추천 = 전표 글자가 다른 계획 사업 이름과 분명히 더 닮았을 때만(유사도 0.75↑, 설비·연도가 같을 때). 짝 추천 = 같은 과목의 덜 쓴 줄 부족분과 금액이 맞거나(한 장, 또는 같은 계약 월별·분납 묶음의 합) 그 이름을 더 닮은 전표(부족분·초과분 안에서만). 옮긴 전표는 상단 «분석 반영» 때 결과에 들어가요.</p>
     </div>`
 }
 
@@ -274,7 +274,7 @@ function pairListHtml(it, sg, locked) {
           <span class="font-semibold text-ink">${fmt(m.금액천원)}<span class="ml-0.5 text-xs text-tri">천원</span></span>
         </div>
         <div class="mt-1.5 flex flex-wrap items-center gap-2">
-          <span class="min-w-0 flex-1"><span class="rq-rec">${m.exact ? "금액 일치" : "짝 추천"}</span>
+          <span class="min-w-0 flex-1"><span class="rq-rec">${m.exact ? "금액 일치" : m.combo ? `묶음 합 ${m.combo}` : "짝 추천"}</span>
             <span class="font-semibold text-ink">«${esc(m.from)}» → «${esc(m.target)}»</span>
             <span class="block text-xs text-sub">${esc(m.why)}</span></span>
           ${btn}

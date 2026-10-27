@@ -229,6 +229,45 @@ def test_pair_moves_need_a_variance_on_both_sides():
     assert rqm.pair_moves(lines, by) == []
 
 
+def _v(i, text, amt):
+    return {"erp_row_id": i, "텍스트": text, "금액천원": amt}
+
+
+def test_pair_combo_whole_installment_series_matches_shortfall():
+    """월별·분납 전표(회차·월만 다름) 묶음의 합이 덜 쓴 줄 부족분과 같으면 묶음째 옮기자고 한다."""
+    lines = _pl(A=(100_000, 160_000), B=(100_000, 40_000))
+    by = {"A": [_v(1, "냉각탑 보수공사 1월", 20_000), _v(2, "냉각탑 보수공사 2월", 20_000),
+                _v(3, "냉각탑 보수공사 3월", 20_000), _v(4, "기타 자재", 15_000)]}
+    got = rqm.pair_moves(lines, by)
+    assert sorted(m["erp_row_id"] for m in got) == [1, 2, 3]
+    assert all(m["combo"] and m["target"] == "B" and "3건 합" in m["why"] for m in got)
+    assert len({m["combo"] for m in got}) == 1
+
+
+def test_pair_combo_unique_subset_within_series():
+    lines = _pl(A=(100_000, 180_000), B=(100_000, 50_000))           # 초과 80,000 · 부족 50,000
+    by = {"A": [_v(1, "계량기 검침 1회", 10_000), _v(2, "계량기 검침 2회", 20_000),
+                _v(3, "계량기 검침 3회", 30_000), _v(4, "계량기 검침 4회", 45_000)]}
+    assert sorted(m["erp_row_id"] for m in rqm.pair_moves(lines, by)) == [2, 3]
+
+
+def test_pair_combo_skips_ambiguous_subsets():
+    lines = _pl(A=(100_000, 200_000), B=(100_000, 50_000))
+    by = {"A": [_v(i, f"계량기 검침 {i}회", a) for i, a in ((1, 10_000), (2, 20_000), (3, 30_000), (4, 40_000))]}
+    assert rqm.pair_moves(lines, by) == []                             # {10,40} 과 {20,30} — 고를 수 없다
+
+
+@pytest.mark.parametrize("vouchers,excess_actual", [
+    ([_v(1, "보수공사 1월", 30_000), _v(2, "도장 1월", 30_000)], 160_000),     # 다른 묶음끼리는 섞지 않는다
+    ([_v(1, "A 1월", 30_000), _v(2, "A 2월", 30_000)], 160_000),               # 글자가 지금 줄(A) 이름
+    ([_v(1, "", 30_000), _v(2, "", 30_000)], 160_000),                         # 글자 없는 전표는 묶음이 아니다
+    ([_v(1, "보수공사 1월", 30_000), _v(2, "보수공사 2월", 30_000)], 150_000),  # 합 60,000 > 초과 50,000
+])
+def test_pair_combo_guards(vouchers, excess_actual):
+    lines = _pl(A=(100_000, excess_actual), B=(100_000, 40_000))
+    assert rqm.pair_moves(lines, {"A": vouchers}) == []
+
+
 def test_plan_totals_skip_new_and_treat_blank_as_zero():
     """분석 결과의 빈 실적(NaN)이 추천 API 를 500 으로 만들었다(로컬 실데이터, 2026-10-27) — 0 으로 본다."""
     nan = float("nan")
