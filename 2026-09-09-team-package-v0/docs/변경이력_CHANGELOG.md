@@ -4,6 +4,8 @@
 
 ---
 
+> 2026-10-27 rev33~37 의 한 장 요약은 [개발정리_2026-10-27.md](개발정리_2026-10-27.md), 운영 점검 기록은 [운영점검_2026-10-27.md](운영점검_2026-10-27.md).
+
 ## 2026-10-27 · 3번 산점도 라벨 — 적정 범위 띠 피하기 · 흰 테두리 (rev37)
 
 **대상:** `app/web/src/views/branches.js`(화면만).
@@ -28,7 +30,7 @@
 
 ## 2026-10-27 · 속도(질의 묶기·계산 캐시·예열) · 화면 정리 후속 (rev35)
 
-**대상:** `app/src/budget/`(viewcache 새 · api_forecast · forecast_store · pipeline_forecast · db) · `server.py`(nav-state·pending·검토 큐 캐시·예열) · `app/web/`(router·data·api·main·views home·collect·detail·settings·forecast·sidebar·custom.css) · 테스트 `test_viewcache.py` 6개, `test_perf_budget` nav-state 상한 30 → 12. 근거는 rev34 배포 후 Aside 운영 점검(`운영점검_rev34_2026-10-27.md`, 저장소 밖).
+**대상:** `app/src/budget/`(viewcache 새 · api_forecast · forecast_store · pipeline_forecast · db) · `server.py`(nav-state·pending·검토 큐 캐시·예열) · `app/web/`(router·data·api·main·views home·collect·detail·settings·forecast·sidebar·custom.css) · 테스트 `test_viewcache.py` 6개, `test_perf_budget` nav-state 상한 30 → 12. 근거는 rev34 배포 후 Aside 운영 점검([운영점검_2026-10-27.md](운영점검_2026-10-27.md)).
 
 - **5번 공통 «기준연도 목록»** `/api/forecast/base-years`: 상태 표 20개를 표마다 `DISTINCT` 하고 기본 기준연도를 구하며 한 번 더 — 질의 41번(운영 DB 2.9초) → `UNION` 한 번(`forecast_store.list_base_years`), 기본 기준연도는 읽은 목록을 넘겨 받는다 → **질의 2번**.
 - **공통 nav-state**: 질의 26번 → **8번**. 연도×예산 최신 실행을 한 질의로(`db.latest_runs_all`), 미반영 4종을 `UNION ALL` 한 번, 기준정보 변경 3종을 `SUM(CASE…)` 한 번, 학습 대기는 두 예산을 묶어 3번(`count_learn_pending` — 결합 대신 «재배정 전표 목록 안에서» 실행 색인으로 찾아 SQLite 3.3초 → 0.05초, 값은 예전과 같음: 운영 사본 2023·2024·2025 = 330·271·78).
