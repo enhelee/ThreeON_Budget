@@ -17,7 +17,7 @@ function drillRows(budget, x) {
       <td class="table-cell text-right text-sm font-semibold">${fmt(b.실적)}</td>
       <td class="table-cell" colspan="2"></td>
       <td class="table-cell text-right">${b.계획 > 0 ? rateBadge(b.계획, b.실적) : '<span class="text-xs text-tri">계획 없음</span>'}</td>
-      <td class="table-cell text-right" colspan="2">${b.처지사 === "(미매핑)" ? "" : `<button class="text-xs font-semibold text-ink hover:text-brand" data-drill="${esc(b.처지사)}" data-drill-item="${esc(x.예산과목)}" data-drill-budget="${esc(budget)}">전표 보기 →</button>`}</td>
+      <td class="table-cell text-right" colspan="2">${b.처지사 === "(미매핑)" ? "" : `<button class="text-xs font-semibold text-ink hover:text-mint-ink" data-drill="${esc(b.처지사)}" data-drill-item="${esc(x.예산과목)}" data-drill-budget="${esc(budget)}">전표 보기 →</button>`}</td>
     </tr>`).join("");
 }
 

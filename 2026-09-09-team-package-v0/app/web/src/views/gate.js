@@ -31,7 +31,7 @@ export function renderGate() {
     <div class="panel w-full max-w-md p-7 sm:p-9">
 
       <img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-[184px]">
-      <p class="mt-2.5 flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-ink"><span class="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true"></span>ThreeON</p>
+      <p class="mt-2.5 flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-ink"><span><b class="text-mint-ink">ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span></p>
       <p class="mt-0.5 text-[13px] text-sub">예산·실적 분석 · 발전플랜트 유지보수</p>
 
       <h1 class="mt-7 font-hanan text-[28px] font-semibold leading-snug tracking-tight text-ink">

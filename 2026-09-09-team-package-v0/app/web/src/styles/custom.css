@@ -159,6 +159,41 @@
 }
 @media (prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
+/* ONDO 사이드바 — 남색 바탕 + 아래쪽 민트빛 + 오른쪽 3색 선(매칭이·검토미·예측이). 2026-10-27 grace 결정.
+   데스크톱은 76px 띠가 기본(.sb-collapsed, 마우스를 올리면 잠깐 펼침), «메뉴 펼치기»로 고정하면 html.sb-open
+   (본문이 288px 비킨다). 모바일 드로어도 같은 색 */
+#sidebar{background:radial-gradient(120% 40% at 20% 108%,rgba(62,230,196,.26),transparent 60%),var(--navy);color:#C7CDDA;border-right-color:transparent}
+#sidebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--char-mt),var(--char-gt),var(--char-yc));pointer-events:none}
+#sidebar :focus-visible{outline-color:var(--char-mt)}
+.sb-ci{display:block;background:#fff;border-radius:12px;padding:10px 12px}
+.sb-name{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding:0 .25rem}
+.sb-word{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#fff}
+.sb-word b,.header-brand__word b{font-weight:800;color:var(--char-mt)}
+.header-brand__word b{color:#0F6E56}
+.sb-by{margin-left:auto;font-size:11px;color:#7D859A}
+.sb-desc{display:block;margin-top:.25rem;padding:0 .25rem;font-size:12px;line-height:1.5;color:#8A92A6}
+#sidebar .nav-button{color:#C7CDDA}
+#sidebar .nav-button:hover{background:rgba(255,255,255,.06);color:#fff}
+#sidebar .nav-button-active,#sidebar .nav-button-active:hover{background:rgba(62,230,196,.13);color:#fff;box-shadow:inset 0 0 0 1px rgba(62,230,196,.25)}
+#sidebar .nav-tag{background:rgba(255,255,255,.07);color:#8A92A6;font-weight:700}
+#sidebar .nav-button-active .nav-tag{background:var(--char-mt);color:#04342C}
+#sidebar .nav-group{color:#646C82}
+.nav-dot{flex:none;width:7px;height:7px;border-radius:999px;margin-left:auto}
+.nav-dot--mt{background:var(--char-mt)}.nav-dot--gt{background:var(--char-gt)}.nav-dot--yc{background:var(--char-yc)}
+.sb-fold{display:flex;align-items:center;gap:.625rem;width:100%;margin-top:.75rem;padding:.6rem .75rem;border:0;border-radius:12px;background:none;font-size:13px;color:#8A92A6;cursor:pointer;text-align:left}
+.sb-fold:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-fold__icon{width:1.75rem;text-align:center;font-size:15px;line-height:1}
+@media (max-width:1023px){.sb-fold{display:none}}
+@media (min-width:1024px){
+  .sb-rail.sb-open #appShell{padding-left:288px}
+  .sb-rail.sb-open #sidebar{box-shadow:none}
+  .sb-rail.sb-open .header-brand{display:none}
+  .sb-collapsed #sidebar .sb-name{justify-content:center;margin-top:0;padding:0}
+  .sb-collapsed #sidebar .nav-dot{position:absolute;top:.45rem;right:.85rem;box-shadow:0 0 0 2px var(--navy)}
+  .sb-collapsed #sidebar .sb-fold{justify-content:center;padding-left:0;padding-right:0}
+  .sb-collapsed #sidebar .nav-group{border-top-color:rgba(255,255,255,.12)}
+}
+
 /* 표지(로고·ThreeON) — 누르면 메인. 사이드바 맨 위 + 접혔을 때 상단 머리글 */
 .brand-link{background:none;border:0;cursor:pointer;border-radius:12px}
 .brand-link:hover{opacity:.8}
@@ -358,3 +393,24 @@
 .chat-spot{outline:3px solid #17A090!important;outline-offset:3px;border-radius:10px;animation:chatSpot 1.1s ease-in-out 3}
 @keyframes chatSpot{50%{outline-color:rgba(23,160,144,.25);box-shadow:0 0 0 8px rgba(23,160,144,.18)}}
 @media (prefers-reduced-motion:reduce){.chat-spot{animation:none}}
+
+/* 메인 남색 배너(views/home.js headerStrip) — 사이드바와 같은 남색 + 캐릭터 색 빛 번짐.
+   글자 칸과 캐릭터 칸을 나눠 화면 폭이 바뀌어도 캐릭터가 글자를 가리지 않는다 */
+.home-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,34%,420px);gap:1.5rem;align-items:end;border-radius:20px;padding:1.75rem 2rem;color:#fff;
+  background:radial-gradient(40% 70% at 66% 95%,rgba(62,230,196,.40),transparent 70%),radial-gradient(30% 60% at 80% 8%,rgba(255,138,110,.38),transparent 70%),radial-gradient(35% 70% at 96% 85%,rgba(169,139,255,.45),transparent 70%),var(--navy)}
+.home-hero__text{position:relative;z-index:1;min-width:0}
+.home-hero__kicker{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--char-mt)}
+.home-hero__kicker span{color:#FFB37A}
+.home-hero__title{margin-top:.6rem;font-size:clamp(22px,2.4vw,30px);font-weight:600;line-height:1.3;letter-spacing:-.02em;color:#fff}
+.home-hero__title em{font-style:normal;background:linear-gradient(90deg,var(--char-mt),var(--char-gt) 55%,var(--char-yc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.home-hero__desc{margin-top:.6rem;max-width:34rem;font-size:14px;line-height:1.6;color:#C3C9D6}
+.home-hero__date{margin-top:1rem;font-size:13px;color:#8A92A6}
+.home-hero__date time{margin-left:.35rem;font-weight:700;color:#fff}
+.home-hero__cast{position:relative;width:100%;aspect-ratio:420/220;margin-bottom:-1.25rem}
+.home-hero__char{position:absolute;width:33%;height:auto;filter:drop-shadow(0 14px 18px rgba(0,0,0,.45));animation:heroBob 4s ease-in-out infinite}
+.home-hero__char--mt{left:0;bottom:6%}
+.home-hero__char--gt{left:32%;bottom:24%;width:36%;animation-delay:-1.3s}
+.home-hero__char--yc{left:67%;bottom:6%;animation-delay:-2.6s}
+@keyframes heroBob{50%{transform:translateY(-6px)}}
+@media (max-width:767px){.home-hero{grid-template-columns:1fr;padding:1.5rem}.home-hero__cast{max-width:320px;justify-self:end}}
+@media (prefers-reduced-motion:reduce){.home-hero__char{animation:none}}

@@ -44,16 +44,21 @@ function unmappedTotals() {
 
 // ── ① 헤더 스트립 ────────────────────────────────────────────
 // 기준일·단위 칸은 뺐다(2026-10-27 사용자 요청) — 기준일은 설정 › 데이터 «시스템 정보»로, 여기엔 오늘 날짜만.
+// 남색 배너 + 오른쪽 캐릭터 셋(2026-10-27 grace 요청 — 남색 사이드바와 흰 본문이 따로 놀지 않게).
+// 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터는 3D PNG(/assets/characters, 320px로 줄인 것).
 
 function headerStrip() {
+  const cast = [["mt", "매칭이"], ["gt", "검토미"], ["yc", "예측이"]]
   return `
-  <section class="panel p-5 sm:p-6">
-    <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-      <div class="min-w-0">
-        <p class="text-sm font-semibold text-ink">메인</p>
-        <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">발전플랜트 유지보수 예산 — 계획에서 10개년 전망까지</h2>
-      </div>
-      <p class="shrink-0 text-sm font-semibold text-sub">오늘 <time class="ml-1 font-bold text-ink" datetime="${today()}">${todayLong()}</time></p>
+  <section class="home-hero">
+    <div class="home-hero__text">
+      <p class="home-hero__kicker">ONDO · <span>예산의 온도를 읽다</span></p>
+      <h2 class="home-hero__title font-hanan">발전플랜트 유지보수 예산,<br><em>계획에서 10개년 전망까지</em></h2>
+      <p class="home-hero__desc">예산 계획과 ERP 전표를 자동으로 맞춰 보고, 차이를 살피고, 정비등급별 표준금액으로 10년 뒤를 예보합니다.</p>
+      <p class="home-hero__date">오늘 <time datetime="${today()}">${todayLong()}</time></p>
+    </div>
+    <div class="home-hero__cast">
+      ${cast.map(([id, name]) => `<img class="home-hero__char home-hero__char--${id}" src="/assets/characters/${id}.png" alt="${name}" width="160" height="160" loading="lazy">`).join("")}
     </div>
   </section>`
 }
@@ -95,7 +100,7 @@ function prevYearCard() {
   return card(`${prev.year}년 집계 (손익+자본)`, badgeOk("분석 완료"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span></p>
      <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)} 천원 · 집행률 ${rateBadge(p, a)}
-     <button class="ml-1 font-semibold text-ink hover:text-brand" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
+     <button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
 }
 
 function unmappedCard() {
@@ -220,7 +225,7 @@ function nextActions() {
       <li class="flex items-start gap-2.5 text-sm">
         <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot[it.tone]}"></span>
         <span class="text-sub">${esc(it.text)}
-        ${it.view ? `<button class="ml-1 font-semibold text-ink hover:text-brand" data-view="${it.view}">바로가기 →</button>` : ""}</span>
+        ${it.view ? `<button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-view="${it.view}">바로가기 →</button>` : ""}</span>
       </li>`).join("")}
     </ul>
   </article>`
@@ -256,7 +261,7 @@ function multiYearPanels() {
       <p class="mt-6 flex items-center gap-2 text-xs text-sub"><span class="h-2 w-2 rounded-full bg-line-strong"></span>연도를 클릭하면 해당 연도로 전환됩니다.</p>
     </article>
     <article class="panel overflow-hidden">
-      <div class="flex items-start justify-between gap-3 border-b border-line p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">각 연도의 최신 분석 기준</p></div><div class="flex flex-col items-end gap-1.5"><button class="text-sm font-semibold text-ink hover:text-brand" data-view="branches">전체 지사 →</button><span class="text-xs font-semibold text-tri">단위: 천원</span></div></div>
+      <div class="flex items-start justify-between gap-3 border-b border-line p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">각 연도의 최신 분석 기준</p></div><div class="flex flex-col items-end gap-1.5"><button class="text-sm font-semibold text-ink hover:text-mint-ink" data-view="branches">전체 지사 →</button><span class="text-xs font-semibold text-tri">단위: 천원</span></div></div>
       <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">연도</th><th class="px-4 py-3">구분</th><th class="px-4 py-3 text-right">계획</th><th class="px-4 py-3 text-right">실적</th><th class="px-4 py-3 text-right">집행률</th></tr></thead>
       <tbody class="divide-y divide-line-subtle">${analyzed.slice().reverse().flatMap(r => ["손익", "자본"].filter(b => r[b]).map(b => `<tr class="hover:bg-subtle clickable" data-goyear="${r.year}"><td class="table-cell font-semibold text-ink">${r.year}</td><td class="table-cell">${b}</td><td class="table-cell text-right">${fmt(r[b].계획)}</td><td class="table-cell text-right">${fmt(r[b].실적)}</td><td class="table-cell text-right">${rateBadge(r[b].계획, r[b].실적)}</td></tr>`)).join("")}</tbody></table></div>
     </article>
@@ -272,7 +277,7 @@ function forecastPanel() {
   const t = state.fc.table
   // 머리(2026-10-27 사용자 결정): 제목 옆에 «전사 합계», 부제(단위·기준연도 규칙)는 없앤다 — 단위는 차트 오른쪽 위.
   const head = (badge) => `<div class="flex flex-wrap items-center justify-between gap-3"><h3 class="section-title">중장기 소요 전망 ${t ? `${t.years[0]}~${t.years[t.years.length - 1]}` : "10개년"} <span class="ml-1 align-middle text-base font-semibold text-sub">· 전사 합계</span></h3>
-      <div class="flex items-center gap-3">${badge}<button class="text-sm font-semibold text-ink hover:text-brand" data-homefc="">전망 자세히 →</button></div></div>`
+      <div class="flex items-center gap-3">${badge}<button class="text-sm font-semibold text-ink hover:text-mint-ink" data-homefc="">전망 자세히 →</button></div></div>`
   if (!t) return `<section class="panel p-5 sm:p-6" data-home-forecast>${head("")}<p class="mt-6 text-sm text-tri">${state.fc.homeErr ? "전망을 불러오지 못했습니다 — 5번 탭에서 확인하세요." : "전망을 불러오는 중…"}</p></section>`
   const m = fvModel(t, "", true)
   if (!m.years.length || !m.yearTot.some(v => v > 0)) return `<section class="panel p-5 sm:p-6" data-home-forecast>${head("")}<p class="mt-6 text-sm text-tri">아직 전망 금액이 없습니다 — 연도를 마감하면 5번 탭에서 전망을 만들 수 있습니다.</p></section>`
