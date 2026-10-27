@@ -167,6 +167,17 @@ def init_db(conn):
         source_year TEXT,
         created_at TEXT,
         PRIMARY KEY (과목, 텍스트정규))""")
+    # 보정 규칙(담당자 보정사전) — 학습처럼 연도 축이 없다(한 번 맞춘 규칙을 매년 다시 쓴다).
+    # 처지사 '' = 모든 지사. 동작 '배정'(사업명=계획 사업명) | '제외'(사업명 NULL).
+    cur.execute("""CREATE TABLE IF NOT EXISTS corr_rule(
+        처지사 TEXT NOT NULL,
+        과목 TEXT NOT NULL,
+        텍스트키 TEXT NOT NULL,           -- normalize.corr_key(전표텍스트)
+        동작 TEXT NOT NULL,
+        사업명 TEXT,
+        원사업명 TEXT,                    -- 담당자가 적은 이름(대응표로 바꾸기 전)
+        created_at TEXT,
+        PRIMARY KEY (처지사, 과목, 텍스트키))""")
     # ── 연도별 기준정보 ──────────────────────────────────────────────
     # 연도마다 «완전한 한 벌»을 둔다. 2023년 분석을 다시 돌릴 때 그 해 기준이
     # 그대로 남아 있어야 하기 때문이다(설계 2026-09-15 §3.2).
@@ -1099,6 +1110,44 @@ def latest_runs_all(conn):
         out[(str(year), budget)] = {"id": rid, "created_at": at,
                                     "summary": json.loads(summ) if summ else {}}
     return out
+
+
+def replace_corr_rules(conn, rules):
+    """보정 규칙을 통째로 갈아끼운다(파일 한 벌 = 규칙 한 벌). 반환: 저장 건수."""
+    now = _now()
+    conn.execute("DELETE FROM corr_rule")
+    conn.executemany(
+        "INSERT INTO corr_rule VALUES(?,?,?,?,?,?,?)",
+        [(r["처지사"] or "", r["과목"], r["텍스트키"], r["동작"], r.get("사업명"),
+          r.get("원사업명"), now) for r in rules])
+    conn.commit()
+    return len(rules)
+
+
+def list_corr_rules(conn):
+    cur = conn.execute("SELECT 처지사, 과목, 텍스트키, 동작, 사업명 FROM corr_rule")
+    return [{"처지사": a, "과목": b, "텍스트키": c, "동작": d, "사업명": e}
+            for a, b, c, d, e in cur.fetchall()]
+
+
+def load_corr_rules(conn):
+    """{(처지사, 과목, 텍스트키) -> {"동작", "사업명"}} — 표기 정규화 전 원본 키."""
+    return {(r["처지사"], r["과목"], r["텍스트키"]): {"동작": r["동작"], "사업명": r["사업명"]}
+            for r in list_corr_rules(conn)}
+
+
+def corr_rule_stats(conn):
+    """건수만(사업명·텍스트는 내보내지 않는다)."""
+    out = {"배정": 0, "제외": 0}
+    for action, n in conn.execute("SELECT 동작, COUNT(*) FROM corr_rule GROUP BY 동작"):
+        out[action] = int(n)
+    out["총계"] = sum(out.values())
+    return out
+
+
+def clear_corr_rules(conn):
+    conn.execute("DELETE FROM corr_rule")
+    conn.commit()
 
 
 def clear_learned(conn):

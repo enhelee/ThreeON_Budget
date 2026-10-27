@@ -106,11 +106,15 @@ def _sim(a, b):
     return fuzz.WRatio(str(a), str(b))
 
 
+# 보정 규칙 «제외»로 뺀 전표의 제외사유(합계행·타연도와 같이 어떤 집계에도 넣지 않는다).
+EXCL_RULE = "제외(보정규칙)"
+
+
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                   threshold=80, new_policy="group", small_threshold=2000,
                   selected_depts=None, budget_all=None, other_budget_all=None,
                   overrides=None, learned=None, hq_alloc_items=HQ_ALLOC_ITEMS,
-                  hq_dept=HQ_DEPT):
+                  hq_dept=HQ_DEPT, corr_rules=None):
     """계획행별 실적금액 산출 + 신규사업 집계 + 미반영 분류.
 
     plan_df: 계획본 양식1(월별) 로드 결과(loaders.PLAN_COLUMNS + _row).
@@ -133,6 +137,10 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
     learned: {(과목정규, 텍스트정규) -> 사업명} — 과년도 확정 결과 학습 맵.
         대표 텍스트가 학습 키와 일치하면 유사도보다 우선 적용(확신도 0.99).
         같은 그룹에 그 이름의 계획행이 있으면 그 행으로, 신규 클러스터엔 이름 부여.
+    corr_rules: {(처지사정규|"", 과목정규, normalize.corr_key(텍스트)) -> {"동작", "사업명"}}
+        — 담당자 보정사전. 처지사 ""는 모든 지사. 재배정 다음·학습보다 먼저 적용.
+        «배정»은 후보 계획행에 그 이름이 있을 때만(없으면 건너뛰고 원래 매칭),
+        «제외»는 전표를 집계에서 뺀다(제외사유 EXCL_RULE). 재배정된 전표는 제외하지 않는다.
     hq_alloc_items, hq_dept: 본사 배정·지사 집행 과목. 지사(과목×지사)에 계획행이 없으면
         hq_dept 의 같은 과목 계획행을 후보로 쓴다(근거 앞에 «본사 배분»).
 
@@ -174,6 +182,24 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             ov = overrides.get(int(k))
             if ov and ov.get("처지사"):
                 depts_norm[i] = ov["처지사"]
+
+    corr_rules = corr_rules or {}
+
+    def _rule_for(dept, item, text):
+        k = normalize.corr_key(text)
+        if not k:
+            return None
+        return corr_rules.get((dept or "", item, k)) or corr_rules.get(("", item, k))
+
+    # 보정 규칙 «제외»: 매칭 전에 제외사유를 붙인다(사람이 재배정한 전표는 사람 판단 우선).
+    if corr_rules:
+        for i in range(len(erp)):
+            k = _clean_na(erp["_erp_row"].iloc[i]) if has_key_col else None
+            if excl[i] or (k is not None and int(k) in overrides):
+                continue
+            r = _rule_for(depts_norm[i], items_norm[i], _clean_na(erp["사업명"].iloc[i]))
+            if r and r.get("동작") == "제외":
+                excl[i] = EXCL_RULE
 
     def _dept_ok(d):
         return True if selected_depts is None else (d in selected_depts)
@@ -231,6 +257,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
 
     manual_cnt = 0    # 수동지정(오버라이드) 전표수
     learned_cnt = 0   # 학습 맵으로 확정된 전표수
+    rule_cnt = 0      # 보정 규칙으로 확정된 전표수
     hq_alloc_cnt = 0  # 본사 배정 계획에 붙은 지사 전표수
     hq_alloc_amt = 0.0
 
@@ -284,6 +311,22 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     vg["강제신규명"] = target
                     unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
+            # ── 보정 규칙(담당자 보정사전): 같은 지사·과목·텍스트면 지정 계획 사업으로.
+            rule = _rule_for(key[1], key[0], rep_name)
+            if rule and rule.get("동작") == "배정":
+                prec = next((p for p in candidates
+                             if _same_name(p.get("사업명"), rule.get("사업명"))), None)
+                if prec is not None:
+                    rule_cnt += len(vg["rows"])
+                    for i in vg["rows"]:
+                        erp_score[i] = 100.0
+                        erp_basis[i] = "보정 규칙"
+                        prec["실적금액"] += _amt(i)
+                        prec["매칭전표수"] += 1
+                        prec["_점수합"] += 100.0
+                        attributed[i] = prec
+                        erp_match_name[i] = prec.get("사업명")
+                    continue
             # ── 학습 맵: 과년도 확정 결과와 텍스트가 일치하면 유사도보다 우선.
             #    learn_key = 회차·월·연도 마커 제거 → 반복 기성·월별이 한 번 확정되면 매년 자동확정.
             lname = learned.get((key[0], normalize.learn_key(rep_name)))
@@ -606,6 +649,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
         "excluded_by_reason": dict(excluded_by_reason),
         "manual_cnt": manual_cnt,
         "learned_cnt": learned_cnt,
+        "rule_cnt": rule_cnt,
         "hq_alloc_cnt": hq_alloc_cnt,
         "hq_alloc_amt": round(hq_alloc_amt),
     }

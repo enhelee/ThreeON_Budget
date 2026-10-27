@@ -20,7 +20,7 @@ from budget import db as dbm, dbcore        # noqa: E402
 
 TABLES = ["dataset", "plan_row", "erp_row", "override", "run", "match_line", "biz_line", "learned_match",
           "item_master", "dept_master", "year_lock", "manual_biz", "biz_delete", "biz_edit", "audit_log",
-          "model_registry", "training_example", "training_snapshot", "variance_note", "review_ack"]
+          "model_registry", "training_example", "training_snapshot", "variance_note", "review_ack", "corr_rule"]
 
 
 def check(conn):

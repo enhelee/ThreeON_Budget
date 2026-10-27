@@ -156,7 +156,8 @@ function loadHomeForecast() {
 
 // 설정 탭마다 쓰는 자료 — 열린 탭 것만 받는다(예전엔 4개 탭 자료 13개 API 를 한꺼번에).
 const SETTINGS_JOBS = {
-  year: () => [["현황", loadStatus], ["학습 현황", async () => { state.learned = await api("/api/learned"); }]],
+  year: () => [["현황", loadStatus], ["학습 현황", async () => { state.learned = await api("/api/learned"); }],
+    ["보정 규칙", async () => { state.corrRules = (await api("/api/corr-rules")).stats; }]],
   master: () => [["현황", loadStatus], ["연도 기준정보", loadYearConfig]],
   data: () => [["현황", loadStatus], ["모델 목록", async () => { state.models = await api("/api/models"); }], ["시스템 정보", loadHealth]],
   history: () => [

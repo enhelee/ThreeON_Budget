@@ -34,6 +34,7 @@ def run_actual_db(conn, out_dir, year, budget, new_policy="group",
 
     overrides = dbm.override_map(conn, year, budget)
     learned = dbm.load_learned(conn)
+    corr_rules = dbm.list_corr_rules(conn)                 # 담당자 보정 규칙(연도 무관)
     biz_edits = dbm.list_biz_edits(conn, year, budget)
     attr_map = dbm.load_item_attr_map(conn, year)          # 마스터: 과목→속성(4종)
     code_to_item = dbm.load_code_to_item(conn, year)       # 마스터: 계정코드→과목명
@@ -46,6 +47,7 @@ def run_actual_db(conn, out_dir, year, budget, new_policy="group",
         learned=learned, biz_edits=biz_edits,
         attr_map=attr_map, code_to_item=code_to_item, deptcode_map=deptcode_map,
         manual_biz=manual_biz, biz_deletes=biz_deletes, make_files=make_files,
+        corr_rules=corr_rules,
     )
     if record_run:
         # run·match_line·biz_line 은 한 트랜잭션. 나눠 commit 하면 biz_line 저장이 실패했을 때
