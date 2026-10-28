@@ -73,12 +73,12 @@ function kpis(m, scope) {
   const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
   const top = m.acctRows[0]
   const tot = sum(m.yearTot)
-  const card = (k, val, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-xl font-bold text-ink">${val}</p><p class="text-xs text-tri">${sub}</p></div>`
+  const card = (k, val, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-xl font-bold text-ink">${val}</p>${sub ? `<p class="text-xs text-tri">${sub}</p>` : ""}</div>`
   return `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]} 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)} 천원`)}
-    ${card("연평균 증감", cagr === null ? "-" : pctTxt(cagr), `${m.years[0]} ${eok(first)}억 → ${m.years[n - 1]} ${eok(last)}억`)}
+    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]}년 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, "")}
+    ${card("연평균 증감", cagr === null ? "-" : pctTxt(cagr), `${m.years[0]}년 ${eok(first)}억 → ${m.years[n - 1]}년 ${eok(last)}억`)}
     ${card("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
-    ${card(`${esc(scope)} 가장 큰 과목`, top ? esc(top.key) : "-", top ? `10년 ${eok(top.total)}억 · ${(top.total / tot * 100).toFixed(0)}%` : "")}
+    ${card(`${esc(scope)} 가장 큰 과목`, top ? esc(top.key) : "-", top ? `${m.years[0]}~${m.years[n - 1]}년 ${eok(top.total)}억 · ${(top.total / tot * 100).toFixed(0)}%` : "")}
   </div>`
 }
 
@@ -125,7 +125,7 @@ function mapView(v, m, isTotal, scope) {
         <button class="fv-step ${v.mode === "chg" ? "fv-step-on" : ""}" data-fvmode="chg">${m.years[0]}년 대비 증감</button>
       </div>
     </div>
-    <div class="mt-4 overflow-x-auto"><div class="fv-grid" style="${cols};min-width:${12 * 16 + m.years.length * 62 + 90}px">${head}${body}</div></div>
+    <div class="mt-2 overflow-x-auto px-1.5 py-2"><div class="fv-grid" style="${cols};min-width:${12 * 16 + m.years.length * 62 + 90}px">${head}${body}</div></div>
     <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-sub">${legend}<span class="ml-3 text-tri">단위 억원 · 칸에 마우스를 올리면 천원</span></div>`
 }
 
@@ -219,7 +219,7 @@ export function fcVizHtml(t, site, isTotal) {
       <div class="fv-scope ${isTotal ? "fv-scope-total" : ""}">
         <p class="text-xs font-semibold text-sub">한눈에 보기 · 지금 보는 범위</p>
         <p class="fv-scope-name font-hanan">${isTotal ? `전사 합계<span class="fv-scope-sub">${t.sites.length}개 지사</span>` : `${esc(site)}${group ? `<span class="fv-scope-sub">${esc(group)}</span>` : ""}`}</p>
-        <p class="text-xs font-semibold text-sub">${m.years[0]}~${m.years[m.years.length - 1]} · 단위 <b class="text-ink">억원</b> (1억원 = 100,000천원)</p>
+        <p class="text-xs font-semibold text-sub">${m.years[0]}~${m.years[m.years.length - 1]}년 · 단위 <b class="text-ink">억원</b></p>
       </div>
       <div class="flex flex-wrap gap-2">
         ${!isTotal ? `<button class="btn-secondary min-h-[36px] px-4 text-xs" data-fvsite="__total__" data-fvlevel="map">↖ 전사로</button>` : ""}
