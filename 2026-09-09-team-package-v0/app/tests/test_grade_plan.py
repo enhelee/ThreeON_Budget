@@ -103,12 +103,14 @@ def test_screen_edit_of_second_unit_changes_only_that_unit():
     assert _pivot(g2)[("동탄지사", 2027)] == "간이"            # 대표 = #1 Block 줄(GT 어휘 첫 줄)
 
 
-def test_screen_grid_carries_excel_cell_colors():
-    """사용자 양식은 CI 를 칸마다 다르게 칠한다(삼송 #2 GT 2026 파랑, 동탄 #1 Block 2029 없음) — 화면도 그대로."""
+
+def test_download_recolors_only_changed_cells():
+    """엑셀 내보내기 — 안 바뀐 칸은 양식 색 그대로(CI 칸마다 다름), 바뀐 칸만 등급 색. 화면은 색 없음(2026-10-28)."""
     grades, units = fi.grade_plan_from_workbook(_template_bytes(), SITES)
-    grid = fe.grade_plan_grid(grades, SITES, 2026, units=units)
-    by = {(ln["site"], ln["unit"]): ln for ln in grid["lines"]}
-    assert by[("삼송지사", "#2 GT")]["colors"]["2026"] == "#00B0F0"
-    assert by[("동탄지사", "#1 Block")]["colors"]["2029"] == ""
-    assert by[("동탄지사", "#1 Block")]["colors"]["2028"] == "#FFFF00"
-    assert by[("수원사업소", "")]["colors"]["2026"]                 # «-» 연한 주황(테마 색)
+    units = units.copy()
+    m = (units["사업장"] == "동탄지사") & (units["설비"] == "#2 Block") & (units["연도"] == 2027)
+    units.loc[m, "등급"] = "HGPI"
+    ws = load_workbook(io.BytesIO(fe.build_grade_plan_download(grades, SITES, 2026, units=units))).active
+    assert ws["E10"].value == "HGPI" and ws["E10"].fill.fgColor.rgb == "FF00B0F0"     # 바뀐 칸 → 파랑
+    assert ws["G9"].value == "CI" and ws["G9"].fill.fill_type is None                  # 안 바뀐 CI(양식에 색 없음) 그대로
+    assert ws["D8"].value == "CI" and ws["D8"].fill.fgColor.rgb == "FF00B0F0"         # 안 바뀐 CI(양식에 파랑) 그대로

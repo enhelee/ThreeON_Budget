@@ -152,8 +152,6 @@ function longTable(key, cols, rows, empty) {
 }
 
 // 정비등급 — 기준연도~10년은 사용자 엑셀 양식(발전설비·DH, 지사·설비 줄) 그대로(2026-10-28), 과거는 지사 한 줄 이력
-const GRADE_COLOR = {TI: "#00B0F0", HGPI: "#00B0F0", CI: "#00B0F0", MI: "#FFFF00"}
-const gradeStyle = v => GRADE_COLOR[v] ? `background:${GRADE_COLOR[v]};` : ""
 
 function gradePlanTable() {
   const gp = state.fc.gradePlan
@@ -167,14 +165,13 @@ function gradePlanTable() {
     const name = `${first ? `<b class="text-ink">${esc(ln.label)}</b>` : '<span class="text-tri">〃</span>'}${ln.unit ? ` <span class="text-xs text-sub">${esc(ln.unit)}</span>` : ""}`
     return `${sep}<tr><td class="fc-stick table-cell bg-white">${name}</td>${gp.years.map(y => {
       const v = ln.values[String(y)] || ""
-      // 색은 엑셀 칸 색 그대로(양식에서 CI 는 칸마다 다름), 화면에서 고친 칸만 등급 색
-      const bg = ln.edited?.[String(y)] ? gradeStyle(v) : (ln.colors?.[String(y)] ? `background:${ln.colors[String(y)]};` : "")
-      return `<td class="px-1 py-1"><input class="control fc-grade text-center" style="${bg}" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
+      // 화면은 색 없이(2026-10-28 사용자 결정) — 색은 엑셀 내보내기에서만(바뀐 칸은 등급 색)
+      return `<td class="px-1 py-1"><input class="control fc-grade text-center" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
     }).join("")}</tr>`
   }).join("")
   return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">지사 · 설비</th>${gp.years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
     <tbody class="divide-y divide-line-subtle">${body}</tbody></table>
-    <p class="mt-2 text-xs text-sub"><span class="mr-1 inline-block h-3 w-5 rounded-sm align-middle" style="background:#00B0F0"></span>TI·HGPI·CI <span class="ml-3 mr-1 inline-block h-3 w-5 rounded-sm align-middle" style="background:#FFFF00"></span>MI · «-»·«준공»은 등급 아님</p></div>`
+    <p class="mt-2 text-xs text-sub">* «-»·«준공»은 등급 아님 · 엑셀로 내려받으면 양식 색 그대로, 바뀐 칸은 등급 색(TI·HGPI·CI 파랑, MI 노랑)</p></div>`
 }
 
 function gradesPanel(d) {
