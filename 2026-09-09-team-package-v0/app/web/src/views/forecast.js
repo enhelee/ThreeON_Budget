@@ -23,7 +23,7 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급 이력", ["grades", "site_grade_eq"]],
-                     ["factor", "고온부품", ["hot_parts", "factors"]],
+                     ["factor", "고온부품", ["hot_parts", "hot_parts_contract", "factors"]],
                      ["capacity", "설비용량·신규표준", ["site_capacity", "capacity_rule"]],
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
                      ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan"]],
@@ -55,13 +55,17 @@ function exportNote() {
   return `<p class="mt-2 text-xs text-sub">ℹ️ 내장 양식은 2026년 기준 참고 양식입니다. ${esc(by)}년 기준으로 내려받으면 «26년 본사 원가분배»→«${esc(by.slice(2))}년 본사 원가분배»처럼 시트명·연도 헤더·수식 참조를 ${esc(by)}년 기준으로 옮겨 채웁니다. 전년 실측치 같은 참고 블록은 양식 그대로입니다.</p>`
 }
 
+/** 접기 단추 — 오른쪽 위. 접으면 제목 한 줄만 남는다(2026-10-28 사용자 요청: 아래로 긴 내용은 한 줄로). */
+const foldBtn = (attr, open, what) => `<button class="btn-secondary min-h-[32px] shrink-0 px-3 text-xs" ${attr} aria-expanded="${open}" title="${open ? `${what} 한 줄로 접기` : `${what} 펼치기`}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`
+
 function panel(title, help, body, key) {
   const dirty = key && state.fc.dirty.has(key)
+  const open = !(state.fc.closedPanels || new Set()).has(title)
   return `<article class="panel overflow-hidden">
-    <div class="border-b border-line p-5 sm:p-6">
-      <h3 class="section-title">${esc(title)} ${dirty ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h3>
-      <p class="section-help leading-6">${help}</p>
-    </div>${body}</article>`
+    <div class="flex items-start justify-between gap-3 ${open ? "border-b border-line p-5 sm:p-6" : "px-5 py-3 sm:px-6"}">
+      <div class="min-w-0"><h3 class="section-title">${esc(title)}${help ? ` <span class="cursor-help align-middle text-sm font-normal text-tri" title="${esc(String(help).replace(/<[^>]+>/g, ""))}" aria-label="설명">ⓘ</span>` : ""} ${dirty ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h3></div>
+      ${foldBtn(`data-fcpanel="${esc(title)}"`, open, "이 표")}
+    </div>${open ? body : ""}</article>`
 }
 
 // ── 헤더: 기준연도 · 탭 ──────────────────────────────────────
@@ -101,11 +105,48 @@ function cellInput(key, i, c, v) {
   return `<input class="control" ${a} value="${esc(num(v))}">`
 }
 
+// 줄이 많은 표는 «지사(+항목·설비)» 묶음으로 — 묶음마다 오른쪽 ▾ 로 한 줄 요약 ↔ 펼침. 4줄 이상 묶음은 처음엔 접힌다.
+const GROUP_MIN_ROWS = 7, GROUP_FOLD_AT = 4
+function groupKeyOf(cols) {
+  const fs = cols.map(c => c.f)
+  if (!fs.includes("사업장")) return null
+  return ["사업장", ...["항목", "설비"].filter(f => fs.includes(f)).slice(0, 1)]
+}
+
 /** 긴 표 편집기 — 행 추가·삭제·셀 편집. cols: [{f, label, type, options}] */
 function longTable(key, cols, rows, empty) {
   const head = cols.map(c => `<th class="px-3 py-2 ${c.type ==="num" ? "text-right" : ""}">${esc(c.label)}</th>`).join("") + '<th class="w-16"></th>'
-  const body = rows.map((r, i) => `<tr>${cols.map(c => `<td class="px-2 py-1">${cellInput(key, i, c, r[c.f])}</td>`).join("")}
-      <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="${key}" data-idx="${i}">삭제</button></td></tr>`).join("")
+  const line = (r, i) => `<tr>${cols.map(c => `<td class="px-2 py-1">${cellInput(key, i, c, r[c.f])}</td>`).join("")}
+      <td class="px-2 py-1 text-right"><button class="btn-secondary" data-fcdel="${key}" data-idx="${i}">삭제</button></td></tr>`
+  const gk = rows.length >= GROUP_MIN_ROWS ? groupKeyOf(cols) : null
+  let body
+  if (!gk) body = rows.map(line).join("")
+  else {
+    const groupBy = fs => {
+      const m = new Map()
+      rows.forEach((r, i) => {
+        const k = fs.map(f => r[f] ?? "").join(" · ")
+        if (!m.has(k)) m.set(k, [])
+        m.get(k).push(i)
+      })
+      return m
+    }
+    // 지사+설비가 줄마다 다르면(설비 현황) 지사로만 묶는다
+    let groups = groupBy(gk)
+    if (gk.length > 1 && Math.max(...[...groups.values()].map(v => v.length)) < 2) groups = groupBy(["사업장"])
+    const opened = state.fc.groupOpen || {}
+    const money = cols.find(c => c.f === "금액")
+    body = [...groups].map(([k, idx]) => {
+      if (idx.length < 2) return idx.map(i => line(rows[i], i)).join("")
+      const id = `${key}|${k}`
+      const open = opened[id] ?? idx.length < GROUP_FOLD_AT
+      const years = idx.map(i => Number(rows[i].연도)).filter(Boolean)
+      const span = years.length ? ` · ${Math.min(...years)}~${Math.max(...years)}` : ""
+      const total = money ? ` · 금액 합계 ${fmt(idx.reduce((s, i) => s + Number(rows[i].금액 || 0), 0))}` : ""
+      return `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="${cols.length}"><b class="text-ink">${esc(k)}</b><span class="text-sub"> · ${idx.length}줄${span}${total}</span></td>
+        <td class="px-2 py-1 text-right">${foldBtn(`data-fcgrp="${esc(id)}" data-open="${open}"`, open, "이 묶음")}</td></tr>${open ? idx.map(i => line(rows[i], i)).join("") : ""}`
+    }).join("")
+  }
   return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${head}</tr></thead>
     <tbody class="divide-y divide-line-subtle">${body || `<tr><td class="table-cell text-tri" colspan="${cols.length + 1}">${esc(empty || "없음")}</td></tr>`}</tbody></table>
     <button class="btn-secondary mt-3" data-fcadd="${key}">＋ 행 추가</button></div>`
@@ -210,6 +251,47 @@ function capacityBody(d) {
       {f: "준공연도", label: "준공연도", type: "int"}, {f: "비고", label: "비고"}], d.site_capacity || [], "설비가 없습니다."), "site_capacity")}`
 }
 
+// ── 고온부품 계획(2026-10-28) — 사용자 양식 «26~35년 전지사 고온부품» 모양 그대로: 지사 × (재생·신품) × 연도 ──
+const HOT_LINES = [["고온부품재생", "기계장치", "고온부품재생"], ["신품구매", "건설중인자산", "신품구매"]]
+
+function hotPartsPanel(d) {
+  const by = Number(state.fc.baseYear)
+  const years = Array.from({length: 10}, (_, i) => by + i)
+  const contracts = d.hot_parts_contract || []
+  const sites = [...new Set([...contracts.map(r => r.사업장), ...d.hot_parts.map(r => r.사업장)])]
+  const amt = {}
+  d.hot_parts.forEach(r => { amt[`${r.사업장}|${r.항목}|${Number(r.연도)}`] = Number(r.금액 || 0) })
+  const colSum = Object.fromEntries(years.map(y => [y, 0]))
+  const body = sites.map(s => {
+    const ci = contracts.findIndex(r => r.사업장 === s)
+    const c = ci >= 0 ? contracts[ci] : null
+    return HOT_LINES.map(([item, acct, label], li) => {
+      let rowSum = 0
+      const cells = years.map(y => {
+        const v = amt[`${s}|${item}|${y}`] || 0
+        rowSum += v; colSum[y] += v
+        return `<td class="px-1 py-1"><input class="control min-w-[6.5rem] text-right" inputmode="numeric" data-fc="hot-cell" data-site="${esc(s)}" data-item="${item}" data-year="${y}" value="${v ? Math.round(v) : ""}" placeholder="0"></td>`
+      }).join("")
+      const head = li === 0 ? `<td class="fc-stick table-cell bg-white align-top" rowspan="2"><b class="text-ink">${esc(s)}</b>
+          ${c ? `<div class="mt-1 space-y-1">${cellInput("hot_parts_contract", ci, {f: "계약방식"}, c.계약방식)}${cellInput("hot_parts_contract", ci, {f: "계약기간"}, c.계약기간)}</div>` : ""}</td>` : ""
+      return `<tr class="${li ? "" : "border-t-2 border-line"}">${head}<td class="table-cell text-xs text-sub">${acct}<br><span class="font-semibold text-ink">${label}</span></td>${cells}<td class="table-cell text-right font-semibold">${fmt(Math.round(rowSum))}</td></tr>`
+    }).join("")
+  }).join("")
+  const total = Object.values(colSum).reduce((a, b) => a + b, 0)
+  const notes = (d.options?.hot_parts_notes || []).map(n => `<li>${esc(n)}</li>`).join("")
+  const addable = sitesOpt(d).filter(s => !sites.includes(s))
+  return panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음 · 기계장치 = 고온부품재생, 건설중인자산 = 신품구매(재생고온부품) · 단위 천원", `
+    <div class="flex flex-wrap items-end gap-2 p-5 pb-0">
+      <button class="btn-secondary" data-fcimport="hot-parts">고온부품 엑셀에서 가져오기</button>
+      <button class="btn-secondary" data-fcexport="hot-parts" title="«26~35년 전지사 고온부품» 양식 그대로, 금액·계약 칸만 지금 저장된 값">고온부품 양식으로 내려받기 (xlsx)</button>
+      ${addable.length ? `<label class="ml-auto flex items-center gap-2 text-xs text-sub">지사 추가 ${sel(["", ...addable], "", 'data-fc="hot-add-site"', {"": "(고르기)"})}</label>` : ""}
+    </div>
+    <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">지사 · 계약</th><th class="px-3 py-2">예산과목</th>${years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}<th class="px-3 py-2 text-right">합계</th></tr></thead>
+      <tbody>${body || `<tr><td class="table-cell text-tri" colspan="${years.length + 3}">고온부품 계획이 없습니다 — 엑셀에서 가져오거나 지사를 추가하세요.</td></tr>`}
+      ${body ? `<tr class="border-t-2 border-line bg-subtle font-bold"><td class="fc-stick table-cell bg-subtle text-ink">합계</td><td></td>${years.map(y => `<td class="table-cell text-right">${fmt(Math.round(colSum[y]))}</td>`).join("")}<td class="table-cell text-right">${fmt(Math.round(total))}</td></tr>` : ""}</tbody></table></div>
+    ${notes ? `<div class="border-t border-line px-5 py-4"><h4 class="text-sm font-bold text-ink">작성 기준</h4><ul class="mt-2 list-none space-y-1 text-xs leading-5 text-sub">${notes}</ul></div>` : ""}`, "hot_parts")
+}
+
 function historyBody(d) {
   return `${panel("지사 연혁", "연도별 그룹·설비 구성 · 종료연도 빈 칸 = 현재까지",
     longTable("site_history", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "시작연도", label: "시작연도", type: "int"},
@@ -252,6 +334,9 @@ const WINDOWS = [["2", "최근 2개년"], ["3", "최근 3개년 (권장)"], ["5"
 function learnBody(d) {
   const win = String(d.settings?.학습기간 ?? "3")
   const bt = state.fc.backtest
+  // 재학습 뒤 — 고른 기간의 백테스트 값을 학습 기간 칸 옆에 바로(2026-10-28 사용자 요청)
+  const chosen = bt?.runs?.find(r => String(r.window) === win)
+  const best = bt?.runs?.length ? bt.runs.reduce((a, r) => (r.account ?? 9) < (a.account ?? 9) ? r : a) : null
   const btBody = bt ? `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>
       <th class="px-3 py-2">학습 기간</th><th class="px-3 py-2 text-right">과목 합계 오차</th><th class="px-3 py-2 text-right">지사 3년 누적 오차</th><th class="px-3 py-2 text-right">칸별 오차 (참고)</th></tr></thead>
       <tbody class="divide-y divide-line-subtle">${bt.runs.map(r => `<tr class="${String(r.window) === String(bt.window) ? "bg-subtle font-semibold" : ""}">
@@ -264,6 +349,8 @@ function learnBody(d) {
     ${panel("학습 기간", "산정 규칙이 없는 칸(사용자지정·자동추천)이 쓰는 최근 실적 해 수 · 규칙은 엑셀처럼 연도를 직접 가리킴 · 백테스트로 비교해 고르세요", `
       <div class="flex flex-wrap items-end gap-3 p-5">
         <label class="block"><span class="field-label">학습 기간</span>${sel(WINDOWS.map(w => w[0]), win, 'data-fcsetting="학습기간"', Object.fromEntries(WINDOWS))}</label>
+        ${state.fc.dirty.has("settings") ? '<button class="btn-primary" data-action="fc-relearn" title="학습 기간을 저장하고 표준금액·전망을 다시 계산한 뒤 백테스트로 그 기간의 오차를 보여 줍니다">재학습</button>' : ""}
+        ${chosen ? `<p class="pb-2 text-sm text-sub">최근 ${esc(win)}개년 백테스트 · 과목 합계 오차 <b class="text-ink">${pct(chosen.account)}</b> · 지사 3년 누적 <b class="text-ink">${pct(chosen.site3)}</b>${best && String(best.window) !== win ? ` · 가장 작은 기간 = 최근 ${esc(best.window)}개년 (${pct(best.account)})` : ""}</p>` : ""}
       </div>`, "settings")}
     ${panel("백테스트", "평가 단위 = 과목 합계 · 지사 3년 누적 (칸 하나는 사람 연예산도 44~64% 틀림) · 마감 실적 + 참고 엑셀 실적", `
       <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-action="fc-backtest">백테스트 실행</button></div>${btBody}`)}`
@@ -326,12 +413,7 @@ function manageBody() {
     ${mt === "learn" ? learnBody(d) : ""}
     ${mt === "regular" ? regularBody(d) : ""}
     ${mt === "capacity" ? capacityBody(d) : ""}
-    ${mt === "factor" ? `${panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음", `
-      <div class="flex flex-wrap gap-2 p-5 pb-0">
-        <button class="btn-secondary" data-fcimport="hot-parts">고온부품 엑셀에서 가져오기</button>
-        <button class="btn-secondary" data-fcexport="hot-parts">현재값이 채워진 양식 내려받기</button>
-      </div>
-      ${longTable("hot_parts", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "항목", label: "항목", type: "select", options: HOT_ITEMS}, {f: "금액", label: "금액(천원)", type: "num"}], d.hot_parts, "고온부품 계획이 없습니다.")}`, "hot_parts")}
+    ${mt === "factor" ? `${hotPartsPanel(d)}
     ${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
       longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"},
         {f: "적용구분", label: "적용구분", type: "select", options: opts().factor_scopes || ["전체", "손익", "자본"]}], d.factors), "factors")}
@@ -430,12 +512,35 @@ function benchBody() {
   return `<div class="space-y-6">${views}${benchStd()}</div>`
 }
 
+/** 표준금액 표의 지사 묶음 — 지사마다 한 줄 요약(줄 수·표준금액 합) + 펼치기. 거르기·검색 중이면 다 펼친다. */
+function benchSiteGroups(rows, filtered) {
+  const by = new Map()
+  rows.forEach(r => { if (!by.has(r.사업장)) by.set(r.사업장, []); by.get(r.사업장).push(r) })
+  const opened = state.fc.benchOpen || {}
+  return [...by].map(([site, list]) => {
+    const open = filtered || opened[site] === true
+    const total = list.reduce((s, r) => s + Number(r.표준금액 || 0), 0)
+    const warn = list.filter(r => r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3).length
+    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="8"><b class="text-ink">${esc(site)}</b><span class="text-sub"> · ${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></td>
+      <td class="px-2 py-1 text-right">${filtered ? "" : `<button class="btn-secondary min-h-[32px] px-3 text-xs" data-fcbopen="${esc(site)}" aria-expanded="${open}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`}</td></tr>`
+    return {head, list: open ? list : []}
+  })
+}
+
 function benchStd() {
   const b = state.fc.bench
   if (!b) return state.fc.benchLoading ? computingHtml("표준화 결과를 계산하는 중… 처음 계산은 시간이 걸려요") : emptyState("표준화 결과를 불러오지 못했습니다.")
   const groups = state.fc.data?.site_groups || {}
   const g = state.fc.benchGroup || "all"
-  const rows = b.rows.filter(r => g === "all" || groups[r.사업장] === g)
+  const f = state.fc.benchFilter || {}
+  const base = b.rows.filter(r => g === "all" || groups[r.사업장] === g)
+  const siteList = [...new Set(base.map(r => r.사업장))]
+  const acctList = [...new Set(base.map(r => r.예산과목))].sort()
+  const gradeList = [...new Set(base.map(r => r.등급))].sort()
+  const q = (f.q || "").trim().toLowerCase()
+  const rows = base.filter(r => (!f.site || r.사업장 === f.site) && (!f.account || r.예산과목 === f.account) && (!f.grade || r.등급 === f.grade)
+    && (!q || [r.사업장, r.예산과목, r.등급, r.산출방식, r.방식출처, r.추천사유, r.근거, r.비고].some(x => String(x ?? "").toLowerCase().includes(q))))
+  const filtered = !!(f.site || f.account || f.grade || q)
   const ed = state.fc.benchEdits
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
@@ -444,13 +549,15 @@ function benchStd() {
   return `
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
-      <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급)</h3>
-      <p class="section-help leading-6">${info}</p>
-      <p class="section-help">학습 기간 ${b.window ? `최근 ${esc(b.window)}개년` : "전체"}(규칙 없는 칸) · 재무팀(참고 엑셀) 대비 ±30% 밖은 노랑</p>
-      <p class="section-help">산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정»으로 고정 · «규칙» 행은 «산정 규칙»에서 고침${b.has_ltsa ? "" : " ℹ️ 정기비용 유형이 없어 기계장치에서 LTSA·CRI·고온부품을 분리하지 못하고 총액을 씁니다."}</p>
+      <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급) <span class="cursor-help align-middle text-sm font-normal text-tri" title="${esc(`${info.replace(/<[^>]+>/g, "")} · 학습 기간 ${b.window ? `최근 ${b.window}개년` : "전체"}(규칙 없는 칸) · 재무팀(참고 엑셀) 대비 ±30% 밖은 노랑 · 산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정» · 방식출처·추천사유는 예측이에게 «○○지사 ○○ 표준금액 근거»로 물어보세요`)}" aria-label="설명">ⓘ</span></h3>
+      ${b.years_used.length ? "" : `<p class="section-help">${info}</p>`}${b.has_ltsa ? "" : '<p class="section-help">ℹ️ 정기비용 유형이 없어 기계장치에서 LTSA·CRI·고온부품을 분리하지 못하고 총액을 씁니다.</p>'}
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <label class="block"><span class="field-label">지사그룹</span>
           ${sel(["all", ...GROUPS], g, "data-fcgroup", {all: "전체"})}</label>
+        <label class="block"><span class="field-label">지사</span>${sel(["", ...siteList], f.site || "", 'data-fcbf="site"', {"": "전체"})}</label>
+        <label class="block"><span class="field-label">예산과목</span>${sel(["", ...acctList], f.account || "", 'data-fcbf="account"', {"": "전체"})}</label>
+        <label class="block"><span class="field-label">등급</span>${sel(["", ...gradeList], f.grade || "", 'data-fcbf="grade"', {"": "전체"})}</label>
+        <label class="block"><span class="field-label">검색</span><input class="control w-44" type="search" placeholder="지사·과목·방식·근거" value="${esc(f.q || "")}" data-fcbf="q"></label>
         <button class="btn-primary" data-action="fc-save-bench" ${nEdits ? "" : "disabled"}>변경 저장${nEdits ? ` (${nEdits}건)` : ""}</button>
         <button class="btn-secondary" data-fcexport="standardization" title="재무팀 표준화 참고 양식(25시트)에 실적·정비등급·표준금액을 채워 내려받습니다">표준화 양식으로 내보내기 (xlsx)</button>
       </div>
@@ -458,25 +565,51 @@ function benchStd() {
     </div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr>
       <th class="px-3 py-2">지사</th><th class="px-3 py-2">구분</th><th class="px-3 py-2">예산과목</th><th class="px-3 py-2">등급</th>
-      <th class="px-3 py-2">산출방식</th><th class="px-3 py-2">방식출처</th><th class="px-3 py-2">추천사유</th>
+      <th class="px-3 py-2">산출방식</th>
       <th class="px-3 py-2 text-right">표준금액(천원)</th><th class="px-3 py-2 text-right">재무팀(천원)</th><th class="px-3 py-2 text-right">재무팀 대비</th><th class="px-3 py-2">근거</th></tr></thead>
-      <tbody class="divide-y divide-line-subtle">${rows.length ? rows.map(r => {
+      <tbody class="divide-y divide-line-subtle">${rows.length ? benchSiteGroups(rows, filtered).map(({head, list}) => head + list.map(r => {
         const mk = `${r.사업장}|${r.예산과목}`, ak = `${mk}|${r.등급}`
         const mch = mk in ed.methods, ach = ak in ed.overrides
         return `<tr>
           <td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
           <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
           <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
-          <td class="table-cell text-sub">${esc(r.방식출처)}</td><td class="table-cell text-xs text-sub">${esc(r.추천사유 || "")}</td>
           <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
           <td class="table-cell text-right text-sub">${r.재무팀금액 == null ? "—" : fmt(r.재무팀금액)}</td>
           <td class="table-cell text-right ${r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3 ? "bg-warn-bg text-warn" : "text-sub"}">${sgn(r.재무팀대비)}</td>
           <td class="table-cell text-xs text-sub">${esc(r.근거 || r.비고 || "")}</td></tr>`
-      }).join("") : '<tr><td class="table-cell text-tri" colspan="11">표준화 대상 실적이 없습니다.</td></tr>'}</tbody></table></div>
+      }).join("")).join("") : `<tr><td class="table-cell text-tri" colspan="9">${filtered ? "조건에 맞는 줄이 없습니다." : "표준화 대상 실적이 없습니다."}</td></tr>`}</tbody></table></div>
   </article>`
 }
 
 // ── 중장기 전망(4단계) 탭 ────────────────────────────────────
+
+// 상세 표 묶음(2026-10-28 사용자 요청) — 합친 금액 한 줄 + ▾ 를 누르면 세부 줄. 묶음은 첫 세부 줄 자리에 선다.
+const DETAIL_GROUPS = [
+  ["수선유지비-열원정기유지보수", ["수선유지비-열원정기유지보수", "수선유지비-열원정기유지보수_LTSA"]],
+  ["기계장치", ["기계장치_고온부품재생", "기계장치_기타기계장치", "기계장치_LTSA", "기계장치_CRI"]],
+]
+
+/** [{row, kind: "row"|"group"|"child", key}] — 묶음 줄은 세부 줄 합계, 펼친 묶음만 세부 줄이 따라 나온다. */
+function detailLines(rows, years) {
+  const byLabel = Object.fromEntries(rows.map(r => [r.예산과목, r]))
+  const groupOf = {}
+  DETAIL_GROUPS.forEach(([g, kids]) => kids.forEach(k => { groupOf[k] = g }))
+  const open = state.fc.openGroups || new Set()
+  const out = [], done = new Set()
+  for (const r of rows) {
+    const g = groupOf[r.예산과목]
+    if (!g) { out.push({row: r, kind: "row"}); continue }
+    if (done.has(g)) continue
+    done.add(g)
+    const kids = DETAIL_GROUPS.find(([x]) => x === g)[1].map(k => byLabel[k]).filter(Boolean)
+    const sum = {예산과목: g}
+    years.forEach(y => { sum[String(y)] = kids.reduce((s, k) => s + (k[String(y)] || 0), 0) })
+    out.push({row: sum, kind: "group", key: g, open: open.has(g), n: kids.length})
+    if (open.has(g)) kids.forEach(k => out.push({row: k, kind: "child"}))
+  }
+  return out
+}
 
 function tableBody() {
   const t = state.fc.table
@@ -515,7 +648,11 @@ function tableBody() {
   <article class="panel overflow-hidden">
     <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line px-5 py-3"><h3 class="section-title">10개년 상세 표 · ${site === TOTAL ? "전사 합계" : esc(site)}</h3><p class="text-right text-xs text-tri"><span class="hidden sm:inline">Shift + 마우스 휠 = 좌우 이동 · </span>단위 <b class="font-semibold text-sub">천원</b></p></div>
     <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="fc-stick table-cell bg-white font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
+      <tbody class="divide-y divide-line-subtle">${detailLines(rows, t.years).map(({row: r, kind, key, open, n}) => kind === "group"
+        ? `<tr><td class="fc-stick table-cell bg-white font-semibold text-ink"><button class="inline-flex items-center gap-1.5 text-left" data-fcdgrp="${esc(key)}" aria-expanded="${open}" title="${open ? "세부 내역 접기" : `세부 내역 ${n}개 보기`}">${esc(r.예산과목)}<span class="text-xs text-sub" aria-hidden="true">${open ? "▴" : "▾"}</span></button></td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`
+        : kind === "child"
+          ? `<tr class="bg-subtle/60"><td class="fc-stick table-cell bg-subtle pl-8 text-sm text-sub">└ ${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`
+          : `<tr><td class="fc-stick table-cell bg-white font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
       <tr class="bg-subtle font-bold"><td class="fc-stick table-cell bg-subtle text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
   </article>
   ${criPanel(t, site)}`

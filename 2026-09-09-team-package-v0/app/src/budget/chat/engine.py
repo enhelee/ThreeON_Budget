@@ -17,6 +17,7 @@
   intent · score · engine("rule")
 """
 import re
+from urllib.parse import urlencode
 
 from . import kb
 
@@ -26,6 +27,10 @@ MAX_LEN = 300
 NAV_CUES = ("열어", "가자", "가줘", "이동", "보여줘", "보여줄래", "띄워", "켜줘", "으로가", "로가", "들어가")
 HOWTO_CUES = ("어떻게", "방법", "하려면", "뭐야", "뭔가요", "뭐예요", "어디서", "언제", "왜", "알려", "하나요", "해야")
 STATUS_CUES = ("어디까지", "진행상황", "진행상태", "다음할일", "뭐해야", "뭘해야", "남은일", "얼마나했", "다했")
+# 표준금액이 어떻게 나왔는지 — 5번 표에서 뺀 «방식출처·추천사유·근거»를 예측이가 대신 말한다(2026-10-28)
+STD_CUES = ("표준금액", "산출방식", "방식출처", "추천사유", "근거", "어떻게나왔", "왜이금액", "왜이렇게", "계산방식", "용량환산")
+GRADE_TOKENS = ("hgpi", "mi", "ti", "ci", "bsi", "간이", "정비제외")
+STD_TABLE_ROWS = 12
 
 STEP_LINK = {"plan": ("예산 계획으로", "#/plan", '[data-action="pick-plan"]'),
              "erp": ("실적 집계로", "#/collect", '[data-action="pick-erp"]'),
@@ -120,10 +125,12 @@ class ChatEngine:
 class RuleEngine(ChatEngine):
     name = ENGINE_NAME
 
-    def __init__(self, status_provider=None):
+    def __init__(self, status_provider=None, std_provider=None):
         # status_provider(year) → {"year", "datasets", "runs", "pending", "locked"} | None
         #   서버가 넘긴다(DB 읽기만). 테스트는 가짜를 넘긴다.
+        # std_provider() → {"base_year", "rows": [표준금액 행 dict…]} | None — 표준금액 근거 답에 쓴다.
         self.status_provider = status_provider
+        self.std_provider = std_provider
 
     def answer(self, question, context=None):
         ctx = context or {}
@@ -141,7 +148,10 @@ class RuleEngine(ChatEngine):
         status_cue = any(c in n for c in STATUS_CUES)
         bare_screen = any(n == k for _, _, keys in kb.SCREENS for k in keys)   # «검토 큐»처럼 화면 이름만
 
-        if status_cue:
+        std_card = self._standard(q, n) if self.std_provider and any(c in n for c in STD_CUES) else None
+        if std_card:
+            card = std_card
+        elif status_cue:
             card = self._status(q, ctx)
         elif faq and howto_cue:
             card = self._help(faq, faq_score)
@@ -175,6 +185,44 @@ class RuleEngine(ChatEngine):
         card = _card("mt", text, "fallback", 0, mood="wow")
         card["links"] = []
         card["ask"] = [t for t, _ in links]          # 누르면 그 질문을 다시 보낸다
+        return card
+
+    def _standard(self, q, n):
+        """«강남지사 열원경상정비 MI 표준금액 어떻게 나왔어?» → 지사·과목·등급으로 표준금액 행을 찾아 근거까지.
+        지사도 과목도 못 찾으면 None(다른 답으로 넘긴다). 행이 많으면 표는 앞 12줄, 엑셀은 전부."""
+        data = self.std_provider()
+        if not data or not data.get("rows"):
+            return None
+        rows = data["rows"]
+        sites = sorted({r["사업장"] for r in rows}, key=len, reverse=True)
+        site = next((s for s in sites if normalize(s) in n or normalize(s.replace("지사", "").replace("사업소", "")) in n), None)
+        accounts = sorted({r["예산과목"] for r in rows}, key=len, reverse=True)
+
+        def acc_hit(a):
+            full, tail = normalize(a), normalize(a.split("-", 1)[-1])
+            return full in n or (len(tail) >= 3 and tail in n)
+        account = next((a for a in accounts if acc_hit(a)), None)
+        if not site and not account:
+            return None
+        grade = next((g for g in GRADE_TOKENS if re.search(rf"(?<![a-z]){g}(?![a-z])", n)), None)
+        hit = [r for r in rows if (not site or r["사업장"] == site) and (not account or r["예산과목"] == account)
+               and (not grade or normalize(r["등급"]) == grade)]
+        what = " · ".join(x for x in (site, account, grade.upper() if grade and grade.isascii() else grade) if x)
+        by = data.get("base_year")
+        if not hit:
+            return _card("yc", f"«{what}» 표준금액 줄이 없어요. 지사·예산과목 이름을 다시 확인해 주세요.", "std.basis", 1,
+                         [("표준화로", "#/forecast/bench")], ctx=f"{by}년 기준으로 봤어요")
+        table = [["지사", "예산과목", "등급", "표준금액(천원)", "산출방식", "방식출처", "추천사유·근거"]]
+        for r in hit[:STD_TABLE_ROWS]:
+            why = " / ".join(x for x in (str(r.get("추천사유") or "").strip(), str(r.get("근거") or r.get("비고") or "").strip()) if x)
+            table.append([r["사업장"], r["예산과목"], r["등급"], f"{round(float(r['표준금액'] or 0)):,}",
+                          r.get("산출방식") or "", r.get("방식출처") or "", why])
+        more = f" 표는 앞 {STD_TABLE_ROWS}줄이고 나머지는 엑셀로 받아 보세요." if len(hit) > STD_TABLE_ROWS else ""
+        card = _card("yc", f"«{what}» 표준금액 {len(hit):,}줄의 산출 근거예요.{more}", "std.basis", 1,
+                     [("표준화로", "#/forecast/bench")], ctx=f"{by}년 기준으로 봤어요", table=table,
+                     source="근거: 표준화(3단계) 계산 결과 — 산출방식·방식출처·추천사유·근거")
+        params = urlencode([(k, v) for k, v in (("base_year", by), ("site", site), ("account", account), ("grade", grade)) if v])
+        card["download"] = {"label": "엑셀로 받기", "url": f"/api/forecast/standard.xlsx?{params}"}
         return card
 
     def _status(self, q, ctx):
@@ -233,4 +281,6 @@ def _faq_title(item):
         "lock": "마감은 어떻게 해?", "unlock": "마감 해제는 어떻게 해?", "export": "실적 집계표 어디서 받아?",
         "forecast_setup": "전망은 어떻게 해?", "forecast_empty": "표준화 결과가 비어", "plan_template": "계획 양식 받을 수 있어?", "year_config": "새 연도는 어떻게 만들어?", "login": "작업자 이름은 왜 넣어?",
         "history": "변경 이력은 어디서 봐?",
+        "forecast_learn": "학습 기간은 뭐야?", "forecast_std_read": "표준금액 표는 어떻게 읽어?",
+        "forecast_capacity": "용량 환산은 어떻게 해?", "forecast_hot": "고온부품은 어떻게 반영돼?",
     }.get(item["id"], item["id"])

@@ -29,7 +29,7 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl.styles import PatternFill
 
 from . import benchmark, forecast_calc
-from .forecast_import import grade_plan_layout, is_grade_plan_sheet, site_sheet_map
+from .forecast_import import HOT_TEMPLATE, grade_plan_layout, is_grade_plan_sheet, site_sheet_map
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEMPLATE_DIR = os.path.join(APP_DIR, "templates")
@@ -372,8 +372,10 @@ def fill_schedule_sheet(ws, grade_hist, site_names, base_year: int = forecast_ca
                 set_cell(ws, target, col, grade)
 
 
-def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
-    """'고온부품(NN)' 시트에 현재 계획을 되돌려 쓴다. 천원 그대로."""
+def fill_hot_parts_sheet(ws, hot_parts_df, site_names, contracts=None):
+    """'고온부품(NN)' 시트에 현재 계획을 되돌려 쓴다. 천원 그대로.
+    양식에 있는 지사 줄은 저장값이 없는 해를 0 으로 — 옛 양식 숫자가 «현재값»처럼 남지 않게.
+    contracts(계약방식·계약기간)가 있으면 B·C열도."""
     header_row, year_by_col = None, {}
     for r in range(1, 8):
         found = {}
@@ -389,6 +391,8 @@ def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
         return
     short_to_full = site_sheet_map(site_names)
     lookup = {(r["사업장"], int(r["연도"]), r["항목"]): float(r["금액"]) for _, r in hot_parts_df.iterrows()}
+    contract = {} if contracts is None or contracts.empty else \
+        {r["사업장"]: (str(r["계약방식"] or "").strip(), str(r["계약기간"] or "").strip()) for _, r in contracts.iterrows()}
     current, blank = None, 0
     r = header_row + 1
     while r <= ws.max_row:
@@ -404,9 +408,13 @@ def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
             continue
         blank = 0
         for col, year in year_by_col.items():
-            amount = lookup.get((current, year, str(item).strip()))
-            if amount is not None:
-                set_cell(ws, r, col, round(amount, 3))
+            set_cell(ws, r, col, round(lookup.get((current, year, str(item).strip()), 0.0), 3))
+        if site_label and current in contract:
+            way, period = contract[current]
+            if way:
+                set_cell(ws, r, 2, way)
+            if period:
+                set_cell(ws, r, 3, period)
         r += 1
 
 
@@ -458,7 +466,7 @@ _SITE_ROW_LABELS = {
     ("", "기타기계장치"): "기계장치_기타기계장치",
     ("건가-외주비", "MI 및 A급 정비"): "외주비-열원정기점검",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("건설중인자산", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("건설중인자산", "재생고온부품"): "건설중인자산-재생고온부품",
     ("", "자산화예비품"): "건설중인자산-자산화예비품",
     ("자산", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -516,7 +524,7 @@ _TOTAL_COST_ROW_LABELS = {
     ("기계장치", "기타기계장치"): "기계장치_기타기계장치",
     ("건가-외주비", "MI 및 A급 정비"): "외주비-열원정기점검",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("건설중인자산", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("건설중인자산", "재생고온부품"): "건설중인자산-재생고온부품",
     ("건설중인자산", "자산화예비품"): "건설중인자산-자산화예비품",
     ("자산", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -580,7 +588,7 @@ _SUMMARY_ROW_LABELS = {
     ("기계장치", "고온부품재생+LTSA"): "기계장치_고온부품재생",
     ("", "기타기계장치"): "기계장치_기타기계장치",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("예비품", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("예비품", "재생고온부품"): "건설중인자산-재생고온부품",
     ("", "자산화예비품"): "건설중인자산-자산화예비품",
     ("", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -713,12 +721,13 @@ def build_schedule_download(grade_hist, site_names, base_year: int = forecast_ca
 
 
 def build_hot_parts_download(hot_parts_df, site_names, base_year: int = forecast_calc.BASE_YEAR,
-                             template_path: str = LT_TEMPLATE) -> bytes:
+                             template_path: str = HOT_TEMPLATE, contracts=None) -> bytes:
+    """«현재값이 채워진 고온부품 양식» — 사용자 양식(26~35년 전지사 고온부품) 그대로, 금액·계약 칸만 저장값."""
     wb = load_workbook(template_path)
     rebase_workbook_years(wb, base_year)
     name = _sheet_like(wb, lambda n: n.strip().startswith("고온부품"))
     if name:
-        fill_hot_parts_sheet(wb[name], hot_parts_df, site_names)
+        fill_hot_parts_sheet(wb[name], hot_parts_df, site_names, contracts)
     return _bytes(wb)
 
 

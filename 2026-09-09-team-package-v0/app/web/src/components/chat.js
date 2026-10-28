@@ -37,6 +37,7 @@ function botHtml(card) {
   const links = (card.links || []).map(l =>
     `<button class="chat-go" data-chat-go="${esc(l.hash)}" data-chat-focus="${esc(l.focus || "")}">${esc(l.label)}</button>`).join("")
   const ask = (card.ask || []).map(q => `<button class="chat-chip" data-chat-q="${esc(q)}">${esc(q)}</button>`).join("")
+  const dl = card.download ? `<a class="chat-go" href="${esc(card.download.url)}" download>${esc(card.download.label)} ⤓</a>` : ""
   const lines = (card.lines || []).length
     ? `<ol class="chat-lines">${card.lines.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""
   return `<div class="chat-bot chat-bot--${who}">
@@ -45,7 +46,7 @@ function botHtml(card) {
       <p class="chat-who">${esc(NAMES[who] || "")}</p>
       ${card.ctx ? `<p class="chat-ctx">${esc(card.ctx)}</p>` : ""}
       <p class="chat-text">${esc(card.text || "")}</p>${lines}${table}
-      ${links ? `<div class="chat-links">${links}</div>` : ""}
+      ${links || dl ? `<div class="chat-links">${links}${dl}</div>` : ""}
       ${ask ? `<div class="chat-ask">${ask}</div>` : ""}
       ${card.source ? `<p class="chat-src">${esc(card.source)}</p>` : ""}
     </div></div>`
