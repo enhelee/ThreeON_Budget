@@ -324,13 +324,14 @@
 .rq-voucher--rec{border-color:#16794A;box-shadow:inset 3px 0 0 #16794A}
 .rq-rec{display:inline-block;padding:.05rem .45rem;border-radius:999px;background:#EAF5EF;color:#16794A;font-size:.7rem;font-weight:800}
 
-/* 메인 «최근 N개년» 막대 — 계획 파랑 · 실적 주황(2026-10-27 사용자 요청: 검정·초록보다 잘 보이게).
-   색약 구분·바탕 대비 검증 통과(dataviz validate_palette: CVD ΔE 27.8, 대비 3:1↑). 숫자는 글자색 그대로, 점이 계열을 알린다. */
-.yr-bar--plan{background:#2F6FDB}
-.yr-bar--act{background:#D2601A}
+/* 메인 «최근 N개년» 막대 — 계획 연한 남색 · 실적 차분한 산호(2026-10-28 grace·팀: 쨍한 파랑·주황이 남색 배너 옆에서 튀었다).
+   색약 구분 통과(dataviz validate_palette: CVD ΔE 15.9). 계획은 일부러 옅게 둔 기준선이라 바탕 대비가 낮다 —
+   막대마다 숫자와 범례 점이 붙어 있어 글자로도 읽힌다. 숫자는 글자색 그대로. */
+.yr-bar--plan{background:#B8C4DD}
+.yr-bar--act{background:#D9826B}
 .yr-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:999px;flex:none}
-.yr-dot--plan{background:#2F6FDB}
-.yr-dot--act{background:#D2601A}
+.yr-dot--plan{background:#B8C4DD}
+.yr-dot--act{background:#D9826B}
 
 /* 점진 그리기(2026-10-27) — 화면 밖 카드는 브라우저가 그리기를 미룬다(«전체» 1,400여 장도 가볍게). */
 .rq-card{content-visibility:auto;contain-intrinsic-size:auto 230px}

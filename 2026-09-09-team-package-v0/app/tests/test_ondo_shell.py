@@ -108,7 +108,8 @@ def test_home_banner_is_navy_with_three_characters():
 
 
 # ── 메인 카드도 시안처럼(2026-10-27 grace: 지금 내용은 그대로, 조화만) ─────────────
-# 그래프의 계획 파랑·실적 주황 기조는 그대로 둔다(grace «빨강·파랑 기조 유지» = 그래프 색).
+# 그래프 모양은 그대로, 색만 차분하게(2026-10-28 grace·팀: 쨍한 파랑·주황이 남색 배너·캐릭터 색 옆에서 튀었다).
+#   계획 = 연한 남색(배경처럼 물러난 기준), 실적 = 차분한 산호(검토미 산호 계열). 막대마다 숫자·범례가 붙어 있어 구별은 글자로도 된다.
 
 def test_banner_lists_work_steps_as_links():
     strip = _read(SRC, "views", "home.js").split("function headerStrip()", 1)[1].split("\n}\n", 1)[0]
@@ -135,6 +136,8 @@ def test_stage_cards_show_their_character():
     assert owners == {"budget": "hj", "collect": "mt", "branches": "gt", "review": "gt", "stats": "gt", "forecast": "yc"}, owners
 
 
-def test_chart_plan_blue_and_actual_orange_stay():
+def test_chart_plan_light_navy_and_actual_soft_coral():
     css = _read(SRC, "styles", "custom.css")
-    assert ".yr-bar--plan{background:#2F6FDB}" in css and ".yr-bar--act{background:#D2601A}" in css
+    for k, v in (("plan", "#B8C4DD"), ("act", "#D9826B")):
+        assert f".yr-bar--{k}{{background:{v}}}" in css and f".yr-dot--{k}{{background:{v}}}" in css, f"{k} 막대·점은 {v}"
+    assert "#2F6FDB" not in css and "#D2601A" not in css, "예전 쨍한 파랑·주황이 남아 있습니다"
