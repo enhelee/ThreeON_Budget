@@ -89,3 +89,10 @@ def test_on_of_ondo_is_ci_red_everywhere():
     assert "RED" in intro and "? RED" in intro, "인트로 점 글자의 ON 도 빨강"
     left = intro.split("function logoTargets", 1)[1].split("\n  }", 1)[0]
     assert "W * 0.3" in left or "cx" in left, "B안: 글자는 카드 왼쪽 빈 곳 가운데"
+
+
+def test_favicon_is_thermometer_svg():
+    html = _read(APP, "web", "index.html")
+    assert 'rel="icon"' in html and "favicon.svg" in html, "탭 아이콘(온도계, 2026-10-28 grace 3번)"
+    svg = _read(SRC, "assets", "favicon.svg")
+    assert "#FE0009" in svg and "#0B1020" in svg
