@@ -2,7 +2,7 @@ export const state = {
   view: "home", year: "", years: [],
   type: "all", search: "", sort: "rateDesc",
   brTableOpen: true,   // 3번 탭 지사 표 펼침 — 접으면 아래 계획–실적 분포 차트가 바로 보인다
-  status: null, branches: null, stats: null, overview: null,
+  status: null, branches: null, stats: null, overview: null, report: null, reportKind: "perf",
   health: null,        // GET /healthz — DB 종류·인증 여부·리비전 (메인 헤더/카드)
   returnHash: null,  // 401 로 게이트에 튕기기 직전 보던 주소 — 로그인 후 여기로 돌아간다
   learned: null, overrides: null, bizEdits: null,
@@ -37,7 +37,7 @@ export const state = {
   rqBrief: null,    // 메인 «다음 할 일»용 요약(/api/review-queue?brief=1)
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
-  statsTab: "손익",       // 4번 통계 탭(손익 | 자본 | compare) — 연 탭 자료만 받는다
+  statsTab: "손익",       // 4번 통계 탭(손익 | 자본 | compare | report) — 연 탭 자료만 받는다
   settingsTab: "year",   // 설정 화면 탭(연도·학습 | 기준정보 | 데이터셋·모델 | 이력)
   chatOpen: false,  // 오른쪽 대화 패널(components/chat.js) — 화면을 옮겨도 열린 채로 둔다
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다

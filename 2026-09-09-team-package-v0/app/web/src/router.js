@@ -16,6 +16,7 @@ import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
 import { renderStats } from "./views/stats.js"
+import { loadReport } from "./views/report.js"
 
 // ───────────────────────── 해시 라우팅 ─────────────────────────
 // 주소의 «#/...» 조각이 "지금 어느 화면인가"의 단일 근거다.
@@ -35,8 +36,8 @@ const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [
 const FC_TABS = ["manage", "bench", "table"];
 // 4번 통계·설정 탭도 주소에 담는다(#/stats/compare · #/settings/history) — 새로고침·링크 공유에 그 탭이 남게.
 //   첫 탭(손익·연도·학습)은 주소를 짧게 두려고 생략한다. 통계 탭 이름은 주소용 영문으로 바꿔 적는다.
-const STATS_HASH = {손익: "", 자본: "capital", compare: "compare"};
-const HASH_STATS = {"": "손익", capital: "자본", compare: "compare"};
+const STATS_HASH = {손익: "", 자본: "capital", compare: "compare", report: "report"};
+const HASH_STATS = {"": "손익", capital: "자본", compare: "compare", report: "report"};
 const SETTINGS_TABS = ["year", "master", "data", "history"];
 
 /** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
@@ -168,7 +169,9 @@ const SETTINGS_JOBS = {
 }
 
 // 4번 통계 탭 — 손익·자본은 /api/stats(한 번에 둘 다), 전년 대비는 /api/stats-compare. 받은 연도를 적어 둔다.
-const statsJobs = tab => tab === "compare"
+const statsJobs = tab => tab === "report"
+  ? [["한글 보고서", loadReport]]
+  : tab === "compare"
   ? [["연도 비교", async () => { const y = state.year; state.statsCompare = {...await api(`/api/stats-compare?year=${y}`), _year: y}; }]]
   : [["통계", async () => { const y = state.year; state.stats = {...await api(`/api/stats?year=${y}`), _year: y}; }]];
 
@@ -176,7 +179,8 @@ const statsJobs = tab => tab === "compare"
 export async function openStatsTab(tab) {
   state.statsTab = tab;
   syncHash();
-  const have = tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
+  const have = tab === "report" ? state.report?._year === state.year && state.report?.kind === (state.reportKind || "perf")
+    : tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
   if (!have) {
     busy(true, "불러오는 중…");
     const errs = await settle(statsJobs(tab));
