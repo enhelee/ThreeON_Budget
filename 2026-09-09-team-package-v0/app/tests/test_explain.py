@@ -16,10 +16,10 @@ def _v(text, amt, conf=0.9, basis="사업명 유사"):
 
 
 def test_money_units():
-    assert E.money(339_400) == "3.4억 원"
+    assert E.money(339_400) == "3.4억원"
     assert E.money(87_000) == "87백만 원"
-    assert E.money(75) == "75천원"
-    assert E.money(-164_000) == "−1.6억 원"
+    assert E.money(75) == "75 천원"
+    assert E.money(-164_000) == "−1.6억원"
 
 
 def test_over_executed_line_facts_and_draft():
@@ -27,7 +27,7 @@ def test_over_executed_line_facts_and_draft():
           _v("소모품", 30_000), _v(float("nan"), 9_000, conf=None, basis=None)]
     prev = {"name": "2024년 정기점검", "actual": 150_000.0, "plan": 0.0, "sim": 0.9}
     r = E.build({"plan": 100_000, "actual": 339_000}, vs, prev)
-    assert r["facts"][0] == "계획 1.0억 원 대비 3.4억 원 집행(339%, 2.4억 원 초과)."
+    assert r["facts"][0] == "계획 1.0억원 대비 3.4억원 집행(339%, 2.4억원 초과)."
     assert "전표 4건 중 상위 3건" in r["facts"][1] and "nan" not in r["facts"][1]
     assert "실적의 97%" in r["facts"][1]
     assert "대비 2.3배" in r["facts"][2]

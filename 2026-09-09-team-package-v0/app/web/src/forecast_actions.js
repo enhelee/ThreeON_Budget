@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastCompare, loadForecastRegular, loadForecastScenarios, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastRegular, loadForecastScenarios, loadForecastState } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -20,11 +20,12 @@ const TABLE_URL = {grades: "grades", hot_parts: "hot-parts", factors: "factors",
                    // 표준화 방향 반영(2026-10-26)
                    site_history: "site-history", site_event: "site-event", site_grade_eq: "site-grade-eq",
                    benchmark_rule: "benchmark-rule", actual_tag: "actual-tag", regular_contract: "regular-contract",
-                   cri_rule: "cri-rule", investment_plan: "investment-plan"}
-const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도"])
+                   cri_rule: "cri-rule", investment_plan: "investment-plan",
+                   site_capacity: "site-capacity", capacity_rule: "capacity-rule", hot_parts_contract: "hot-parts-contract"}
+const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도", "적용시작연도", "준공연도"])
 const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가"])
 // 비우면 «없음»(null)인 칸 — 0 과 뜻이 다르다(보정률 0 ≠ 보정 없음)
-const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도"])
+const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도", "용량MW"])
 
 const firstSite = () => state.fc.data?.sites?.[0] || ""
 const firstAccount = () => (state.fc.data?.accounts?.["손익"] || [])[0] || ""
@@ -44,6 +45,8 @@ const NEW_ROW = {
                             예산과목: "수선유지비-열원정기유지보수", 금액: 0, 비고: ""}),
   cri_rule: () => ({사업장: firstSite(), 짝지사: "", 지급시차: 2, 기준단가: 0, 단가기준연도: Number(state.fc.baseYear) - 1, 활성: true, 비고: ""}),
   investment_plan: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear) + 1, 금액: 0, 비고: ""}),
+  site_capacity: () => ({사업장: firstSite(), 설비: "", 구분: "발전설비", 용량MW: null, 준공연도: null, 비고: ""}),
+  capacity_rule: () => ({사업장: firstSite(), 역할: "대상", 적용시작연도: Number(state.fc.baseYear), 용량MW: null, 정비제외연도: "", 비고: ""}),
 }
 
 const json = body => ({method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
@@ -67,6 +70,7 @@ async function reload(withBench) {
   await loadForecastState()
   if (withBench || state.fc.tab === "bench") await Promise.all([loadForecastBench(), loadForecastRegular()])
   if (state.fc.compare || state.fc.manageTab === "ref") await loadForecastCompare()
+  if (state.fc.manageTab === "capacity") await loadForecastCapacity()
   renderPage()
 }
 
@@ -178,12 +182,28 @@ async function applyPreview(mode) {
   try {
     if (p.kind === "grades" || p.kind === "schedule") {
       const have = new Set(d.grades.map(r => `${r.사업장}|${r.연도}`))
-      const rows = mode === "merge" ? [...d.grades, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}`))] : p.rows
+      // 정비등급 양식(미래 일정)의 «전체 교체»는 그 파일의 해만 바꾼다 — 2016~ 과거 이력까지 지우지 않게
+      const first = Math.min(...p.rows.map(r => Number(r.연도)))
+      const past = p.kind === "schedule" ? d.grades.filter(r => Number(r.연도) < first) : []
+      const rows = mode === "merge" ? [...d.grades, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}`))] : [...past, ...p.rows]
       await put("grades", {rows})
+      // 정비등급 양식이면 설비별 등급(삼송 #1·#2 GT 등)도 — 지난 해 줄은 두고, 가져온 지사·설비의 같은 해만 바꾼다
+      if (p.eq_rows?.length) {
+        const key = r => `${r.사업장}|${r.설비}|${r.연도}`
+        const got = new Set(p.eq_rows.map(key))
+        const keep = mode === "merge" ? d.site_grade_eq : d.site_grade_eq.filter(r => !got.has(key(r)))
+        const add = mode === "merge" ? p.eq_rows.filter(r => !new Set(d.site_grade_eq.map(key)).has(key(r))) : p.eq_rows
+        await put("site-grade-eq", {rows: [...keep, ...add]})
+      }
     } else if (p.kind === "hot-parts") {
       const have = new Set(d.hot_parts.map(r => `${r.사업장}|${r.연도}|${r.항목}`))
       const rows = mode === "merge" ? [...d.hot_parts, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}|${r.항목}`))] : p.rows
       await put("hot-parts", {rows})
+      // 계약방식·계약기간 — 파일에 있는 지사만 바꾸고 나머지는 둔다
+      if (p.contract_rows?.length) {
+        const got = new Set(p.contract_rows.map(r => r.사업장))
+        await put("hot-parts-contract", {rows: [...(d.hot_parts_contract || []).filter(r => !got.has(r.사업장)), ...p.contract_rows]})
+      }
     } else if (p.kind === "hq-master") {
       await put("hq-master", {columns: p.columns, rows: p.rows, ratio_rows: p.ratio_rows})
     }
@@ -192,6 +212,20 @@ async function applyPreview(mode) {
   state.fc.preview = null
   await reload()
   toast("가져온 자료를 저장했습니다.")
+}
+
+/** 재학습 — 학습 기간 저장 → 표준금액·전망 다시 계산(저장하면 캐시가 풀린다) → 백테스트로 그 기간 값을 보인다. */
+async function relearn() {
+  busy(true, "학습 기간 저장 후 다시 학습하는 중...")
+  try {
+    await api("/api/forecast/settings", json({base_year: state.fc.baseYear, values: state.fc.data.settings}))
+    state.fc.dirty.delete("settings")
+    state.fc.bench = null; state.fc.table = null; state.fc.capacity = null
+    await loadForecastState()
+  } catch (err) { toast(`재학습 실패: ${err.message}`); return }
+  finally { busy(false) }
+  await runBacktest()
+  toast(`최근 ${state.fc.data?.settings?.학습기간}개년으로 다시 학습했습니다.`)
 }
 
 async function runBacktest() {
@@ -289,6 +323,36 @@ export async function fcClick(e) {
       busy(true, "참고 엑셀과 대조 중...")
       try { await loadForecastCompare() } catch (err) { toast(err.message) } finally { busy(false) }
     }
+    if (state.fc.manageTab === "capacity" && !state.fc.capacity) {
+      busy(true, "용량 규칙 계산 중...")
+      try { await loadForecastCapacity() } catch (err) { toast(err.message) } finally { busy(false) }
+    }
+    renderPage(); return true
+  }
+  const pnl = e.target.closest("[data-fcpanel]")
+  if (pnl) {
+    const closed = state.fc.closedPanels || (state.fc.closedPanels = new Set())
+    const k = pnl.dataset.fcpanel
+    closed.has(k) ? closed.delete(k) : closed.add(k)
+    renderPage(); return true
+  }
+  const tg = e.target.closest("[data-fcgrp]")
+  if (tg) {
+    const opened = state.fc.groupOpen || (state.fc.groupOpen = {})
+    opened[tg.dataset.fcgrp] = tg.dataset.open !== "true"
+    renderPage(); return true
+  }
+  const bo = e.target.closest("[data-fcbopen]")
+  if (bo) {
+    const o = state.fc.benchOpen || (state.fc.benchOpen = {})
+    o[bo.dataset.fcbopen] = !o[bo.dataset.fcbopen]
+    renderPage(); return true
+  }
+  const grp = e.target.closest("[data-fcdgrp]")
+  if (grp) {
+    const open = state.fc.openGroups || (state.fc.openGroups = new Set())
+    const k = grp.dataset.fcdgrp
+    open.has(k) ? open.delete(k) : open.add(k)
     renderPage(); return true
   }
   if (e.target.closest("[data-sc=run]")) {           // 시나리오 비교 — 손잡이 값으로 다시 계산
@@ -336,6 +400,7 @@ export async function fcClick(e) {
   if (act === "fc-cancel-preview") { state.fc.preview = null; renderPage(); return true }
   if (act === "fc-ref-apply") { if (state.fc.refFile) await referenceUpload(state.fc.refFile, true); return true }
   if (act === "fc-backtest") { await runBacktest(); return true }
+  if (act === "fc-relearn") { await relearn(); return true }
   if (act === "fc-ref-cancel") { state.fc.refPreview = null; state.fc.refFile = null; renderPage(); return true }
   return false
 }
@@ -365,7 +430,7 @@ export async function fcChange(e) {
   if (t.matches("[data-fcrange]")) { state.fc.showRange = t.checked; renderPage(); return true }
   if (t.matches("[data-fcsetting]")) {
     state.fc.data.settings = {...(state.fc.data.settings || {}), [t.dataset.fcsetting]: t.value}
-    markDirty("settings"); return true
+    markDirty("settings"); renderPage(); return true
   }
   if (t.matches("[data-fccmpdiff]")) { state.fc.cmpOnlyDiff = t.checked; renderPage(); return true }
   if (t.dataset.fctag) {
@@ -381,6 +446,11 @@ export async function fcChange(e) {
     return true
   }
   if (t.matches("[data-fcgroup]")) { state.fc.benchGroup = t.value; renderPage(); return true }
+  if (t.matches("[data-fcbf]")) {
+    // 표준금액 표 거르기 — 지사·예산과목·등급·검색(검색은 Enter·칸 벗어날 때)
+    state.fc.benchFilter = {...(state.fc.benchFilter || {}), [t.dataset.fcbf]: t.value}
+    renderPage(); return true
+  }
   if (t.matches("[data-fcsite]")) { state.fc.site = t.value || TOTAL; fvGo({anim: "fade"}); return true }
   if (t.matches("[data-fvacctsel]")) { state.fc.viz.acct = t.value; fvGo({anim: "fade"}); return true }
   const bench = t.dataset.fcbench
@@ -396,6 +466,25 @@ export async function fcChange(e) {
   }
   const fc = t.dataset.fc
   if (!fc) return false
+  if (fc === "hot-cell") {
+    // 고온부품 넓은 표의 칸 = 긴 표(사업장·연도·항목·금액)의 행. 비우거나 0 이면 그 행을 지운다.
+    const site = t.dataset.site, item = t.dataset.item, year = Number(t.dataset.year)
+    const v = Number(String(t.value).replace(/,/g, "")) || 0
+    const rows = state.fc.data.hot_parts
+    const i = rows.findIndex(r => r.사업장 === site && r.항목 === item && Number(r.연도) === year)
+    if (!v) { if (i >= 0) rows.splice(i, 1) }
+    else if (i >= 0) rows[i].금액 = v
+    else rows.push({사업장: site, 연도: year, 항목: item, 금액: v})
+    markDirty("hot_parts")
+    return true
+  }
+  if (fc === "hot-add-site") {
+    if (!t.value) return true
+    state.fc.data.hot_parts_contract = [...(state.fc.data.hot_parts_contract || []), {사업장: t.value, 계약방식: "", 계약기간: "", 비고: ""}]
+    markDirty("hot_parts_contract")
+    renderPage()
+    return true
+  }
   if (fc === "grade-cell") {
     // 넓은 표의 칸 하나 = 긴 표의 행 하나. 비우면 그 (지사,연도) 이력을 지운다.
     const site = t.dataset.site, year = Number(t.dataset.year), v = t.value.trim()

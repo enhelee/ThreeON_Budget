@@ -63,10 +63,11 @@ def test_shared_css_uses_tokens_not_legacy_palette():
 
 
 def test_primary_button_follows_sample_rule():
-    """검정 바탕 + 흰 글자 + 브랜드 빨강 테두리 + 캡슐 + 44px. 빨강 바탕은 금지."""
+    """남색 바탕 + 흰 글자 + 캡슐 + 44px. 빨강 바탕은 금지.
+    (2026-10-27 grace 결정: CI 빨강은 로고에만 — 예전 «검정+빨간 테두리»에서 바뀜. test_ondo_shell 참고)"""
     css = _read(WEB, "src", "styles", "app.css")
     block = css.split(".btn-primary {", 1)[1].split("}", 1)[0]          # 단독 블록(색·테두리)
-    assert "bg-ink" in block and "text-white" in block and "border-brand" in block
+    assert "bg-navy" in block and "text-white" in block
     shared = css.split(".btn-primary,", 1)[1].split("}", 1)[0]           # 공유 블록(형태)
     assert "rounded-full" in shared and "min-h-[44px]" in shared
     assert "bg-brand" not in block, "브랜드 빨강을 버튼 바탕으로 쓰면 흰 글자 대비가 4.5 미만입니다"

@@ -206,6 +206,10 @@ export async function loadForecastCompare() {
   state.fc.compare = await api(`/api/forecast/compare${fcQuery()}`);
 }
 
+export async function loadForecastCapacity() {
+  state.fc.capacity = await api(`/api/forecast/capacity${fcQuery()}`);
+}
+
 export async function loadForecastRegular() {
   state.fc.regular = await api(`/api/forecast/regular${fcQuery()}`);
 }

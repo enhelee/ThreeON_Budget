@@ -43,7 +43,9 @@ EMPTY_COLS = {
 # 가져오기로만 채운다(손으로 고치는 값이 아니라 대조 기준이라서).
 SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site-grade-eq": "site_grade_eq",
                "benchmark-rule": "benchmark_rule", "actual-tag": "actual_tag",
-               "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan"}
+               "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan",
+               "site-capacity": "site_capacity", "capacity-rule": "capacity_rule",
+               "hot-parts-contract": "hot_parts_contract"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,
@@ -90,6 +92,49 @@ def _cached_view(kind, conn, base_year, compute):
                                     ttl=VIEW_CACHE_TTL)
 
 
+def standard_rows(conn, base_year=None) -> dict:
+    """표준화 결과(화면과 같은 캐시) — 챗봇 근거 답·엑셀이 쓴다."""
+    by = base_year or pf.default_base_year(conn)
+    out = _cached_view("benchmark", conn, by, lambda: clean_json(pf.run_benchmark(conn, by)))
+    return {"base_year": str(by), "rows": out.get("rows") or []}
+
+
+STANDARD_XLSX_COLS = ["사업장", "구분", "예산과목", "등급", "표준금액", "산출방식", "방식출처", "추천사유", "비고", "근거",
+                      "재무팀금액", "재무팀대비"]
+
+
+def standard_xlsx(rows) -> bytes:
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "표준금액 근거"
+    ws.append([c if c != "표준금액" else "표준금액(천원)" for c in STANDARD_XLSX_COLS])
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for r in rows:
+        ws.append([r.get(c) for c in STANDARD_XLSX_COLS])
+    for col, w in zip("ABCDEFGHIJKL", (12, 6, 28, 8, 14, 14, 10, 40, 30, 40, 14, 10)):
+        ws.column_dimensions[col].width = w
+    for row in ws.iter_rows(min_row=2, min_col=5, max_col=5):
+        row[0].number_format = "#,##0"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+_HOT_NOTES = None
+
+
+def _hot_notes():
+    """내장 고온부품 양식의 «(작성 기준)» — 계약단가·물가·관세·운전시간 가정(한 번 읽어 둔다)."""
+    global _HOT_NOTES
+    if _HOT_NOTES is None:
+        _HOT_NOTES = forecast_import.hot_parts_notes(open(forecast_import.HOT_TEMPLATE, "rb").read())
+    return _HOT_NOTES
+
+
 def build_state(conn, base_year):
     """5번 «기준정보(가정)» 한 벌 — 상태 표 20여 개·구성·지사 목록. 표마다 모양이 달라 한 질의로 못 합친다(질의 ~25번,
     운영 DB 1.75초 · 2026-10-27). 그래서 화면은 캐시(get_state)로 받고, 참고 엑셀 건수 둘만 한 질의로 묶었다."""
@@ -120,7 +165,8 @@ def build_state(conn, base_year):
         "settings": fs.load_settings(conn, base_year),
         "options": {"rule_methods": bm.RULE_METHODS, "event_types": fs.EVENT_TYPES,
                     "tag_types": fs.TAG_TYPES, "contract_items": fs.CONTRACT_ITEMS,
-                    "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"]},
+                    "factor_scopes": fs.FACTOR_SCOPES, "groups": ["중대형CHP", "소형CHP", "DH", "본사"],
+                    "hot_parts_notes": _hot_notes()},
     }
 
 
@@ -236,7 +282,17 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 master, ratio = forecast_import.hq_master_from_workbook(data, sites, int(base_year))
                 return clean_json({"kind": kind, "columns": [str(c) for c in master.columns],
                                    "rows": pf.records(master), "ratio_rows": pf.records(ratio)})
+            if kind == "schedule":
+                # 정비등급 양식(한 해 한 열)이면 설비별 등급도 같이 — 화면이 site_grade_eq 의 미래 줄로 넣는다
+                df, units = forecast_import.grade_plan_from_workbook(data, sites)
+                if df.empty:
+                    df = IMPORTERS[kind](data, sites)
+                return clean_json({"kind": kind, "rows": pf.records(df), "eq_rows": pf.records(units)})
             df = IMPORTERS[kind](data, sites)
+            if kind == "hot-parts":
+                # 계약방식·계약기간도 같이 — 화면이 고온부품 표 지사 칸에 그대로 보인다
+                return clean_json({"kind": kind, "rows": pf.records(df),
+                                   "contract_rows": pf.records(forecast_import.hot_parts_contracts_from_workbook(data, sites))})
             return clean_json({"kind": kind, "rows": pf.records(df)})
         except HTTPException:
             raise
@@ -315,6 +371,31 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         finally:
             conn.close()
 
+    @router.get("/standard.xlsx")
+    def standard_download(base_year: str = None, site: str = None, account: str = None, grade: str = None):
+        """표준금액 근거 엑셀 — 챗봇 «엑셀로 받기». 지사·과목·등급으로 거른다(빈 칸 = 전부)."""
+        conn = conn_factory()
+        try:
+            data = standard_rows(conn, base_year)
+        finally:
+            conn.close()
+        g = (grade or "").lower()
+        rows = [r for r in data["rows"] if (not site or r["사업장"] == site) and (not account or r["예산과목"] == account)
+                and (not g or str(r["등급"]).lower() == g)]
+        name = f"표준금액_근거_{data['base_year']}년{'_' + site if site else ''}.xlsx"
+        return Response(standard_xlsx(rows), media_type=XLSX,
+                        headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
+
+    @router.get("/capacity")
+    def capacity_model(base_year: str = None):
+        """설비용량·신규표준 — 용량 규칙(고정분·등급별 MW당 단가·LOO 오차)과 대상 지사 등급별 표준 합계."""
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return _cached_view("capacity", conn, by, lambda: clean_json(pf.capacity_view(conn, by)))
+        finally:
+            conn.close()
+
     @router.get("/regular")
     def regular(base_year: str = None):
         conn = conn_factory()
@@ -379,13 +460,15 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 data = forecast_export.fill_longterm_workbook(f["tables"], f["grade"], f["hq_master"], f["sites"], by)
                 name = f"중장기예산_{by}-{by + 9}년_결과.xlsx"
             elif kind == "schedule":
-                data = forecast_export.build_schedule_download(
-                    fs.load_grade_history(conn, base_year), pf.forecast_sites(conn, base_year), by)
-                name = f"정기점검보수공사_일정_{by}년기준_현재값.xlsx"
+                data = forecast_export.build_grade_plan_download(
+                    fs.load_grade_history(conn, base_year), pf.forecast_sites(conn, base_year), by,
+                    units=fs.load_table(conn, base_year, "site_grade_eq"))
+                name = f"전지사_정비등급_{by}-{by + 9}년_현재값.xlsx"
             elif kind == "hot-parts":
                 data = forecast_export.build_hot_parts_download(
-                    fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year), by)
-                name = f"고온부품_계획_{by}년기준_현재값.xlsx"
+                    fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year), by,
+                    contracts=fs.load_table(conn, base_year, "hot_parts_contract"))
+                name = f"전지사_고온부품_{by}-{by + 9}년_현재값.xlsx"
             elif kind == "hq-master":
                 data = forecast_export.build_hq_master_download(
                     fs.load_hq_master(conn, base_year), pf.forecast_sites(conn, base_year), by)

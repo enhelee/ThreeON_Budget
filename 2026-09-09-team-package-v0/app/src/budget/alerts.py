@@ -76,7 +76,7 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
         if g["plan"] > 0 and over >= OVER_MIN:
             alerts.append({"kind": "예산 초과", "severity": _sev(over), "budget": budget,
                            "branch": branch, "item": item, "name": None, "amount": round(over),
-                           "text": f"계획 {g['plan']:,.0f}천원 → 실적 {g['actual']:,.0f}천원 "
+                           "text": f"계획 {g['plan']:,.0f} 천원 → 실적 {g['actual']:,.0f} 천원 "
                                    f"({g['actual'] / g['plan'] * 100:,.1f}%)"})
 
     # 급증(전년 대비)
@@ -90,8 +90,8 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
             if before > 0 and g["actual"] < before * SPIKE_RATIO:
                 continue
             budget, branch, item = k
-            why = (f"전년 {before:,.0f}천원 → 올해 {g['actual']:,.0f}천원 ({g['actual'] / before:,.1f}배)"
-                   if before > 0 else f"전년 실적 없음 → 올해 {g['actual']:,.0f}천원")
+            why = (f"전년 {before:,.0f} 천원 → 올해 {g['actual']:,.0f} 천원 ({g['actual'] / before:,.1f}배)"
+                   if before > 0 else f"전년 실적 없음 → 올해 {g['actual']:,.0f} 천원")
             alerts.append({"kind": "급증", "severity": _sev(inc), "budget": budget,
                            "branch": branch, "item": item, "name": None, "amount": round(inc),
                            "text": why})
@@ -112,7 +112,7 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
             alerts.append({"kind": "과다 귀속", "severity": _sev(a - p), "budget": r["budget"],
                            "branch": r.get("처지사") or "(미매핑)", "item": r.get("예산과목"),
                            "name": r.get("사업명"), "amount": round(a - p),
-                           "text": f"계획 {p:,.0f}천원 → 실적 {a:,.0f}천원 ({a / p * 100:,.0f}%) — "
+                           "text": f"계획 {p:,.0f} 천원 → 실적 {a:,.0f} 천원 ({a / p * 100:,.0f}%) — "
                                    "다른 사업 전표가 붙었는지 전표를 확인하세요"})
 
     # 음수 실적(사업 행)
@@ -122,7 +122,7 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
             alerts.append({"kind": "음수 실적", "severity": _sev(a), "budget": r["budget"],
                            "branch": r.get("처지사") or "(미매핑)", "item": r.get("예산과목"),
                            "name": r.get("사업명"), "amount": round(a),
-                           "text": f"실적 {a:,.0f}천원 — 대체·취소 전표가 붙었는지 전표를 확인하세요"})
+                           "text": f"실적 {a:,.0f} 천원 — 대체·취소 전표가 붙었는지 전표를 확인하세요"})
 
     # 미매칭 비중 — 예산별
     unmapped = unmapped or {}
@@ -146,7 +146,7 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
                            "budget": budget, "branch": None, "item": None, "name": None,
                            "amount": round(miss),
                            "text": f"계획에 못 붙은 실적 {share * 100:,.1f}% "
-                                   f"(신규 {b['new']:,.0f} + 미매핑 {um:,.0f} / 전체 {total:,.0f}천원)"})
+                                   f"(신규 {b['new']:,.0f} + 미매핑 {um:,.0f} / 전체 {total:,.0f} 천원)"})
 
     # 미매칭 비중 — 지사별(큰 것만)
     by_branch = {}
@@ -162,7 +162,7 @@ def compute_alerts(cur_lines, prev_lines=None, unmapped=None):
             alerts.append({"kind": "미매칭 비중", "severity": "보통", "budget": budget,
                            "branch": branch, "item": None, "name": None, "amount": round(g["new"]),
                            "text": f"신규(계획 외) 실적 {g['new'] / g['total'] * 100:,.1f}% "
-                                   f"({g['new']:,.0f} / {g['total']:,.0f}천원)"})
+                                   f"({g['new']:,.0f} / {g['total']:,.0f} 천원)"})
 
     alerts.sort(key=lambda x: (x["severity"] != "높음", -abs(x["amount"])))
     return alerts
