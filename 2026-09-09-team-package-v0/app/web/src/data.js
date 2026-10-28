@@ -190,6 +190,10 @@ export async function loadForecastCompare() {
   state.fc.compare = await api(`/api/forecast/compare${fcQuery()}`);
 }
 
+export async function loadForecastGradePlan() {
+  state.fc.gradePlan = await api(`/api/forecast/grade-plan${fcQuery()}`);
+}
+
 export async function loadForecastCapacity() {
   state.fc.capacity = await api(`/api/forecast/capacity${fcQuery()}`);
 }

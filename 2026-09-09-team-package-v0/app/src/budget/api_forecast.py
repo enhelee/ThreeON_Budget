@@ -53,6 +53,11 @@ IMPORTERS = {
 }
 
 
+class GradePlanReq(BaseModel):
+    base_year: str
+    cells: list = []
+
+
 class CopyReq(BaseModel):
     from_year: str
     to_year: str
@@ -371,6 +376,37 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         name = f"표준금액_근거_{data['base_year']}년{'_' + site if site else ''}.xlsx"
         return Response(standard_xlsx(rows), media_type=XLSX,
                         headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
+
+    @router.get("/grade-plan")
+    def grade_plan(base_year: str = None):
+        """정비등급 화면 — 엑셀 양식(발전설비·DH, 지사·설비 줄) 그대로의 기준연도~ 10년 표."""
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return clean_json(forecast_export.grade_plan_grid(
+                fs.load_grade_history(conn, by), pf.forecast_sites(conn, by), int(by),
+                units=fs.load_table(conn, by, "site_grade_eq")))
+        finally:
+            conn.close()
+
+    @router.put("/grade-plan")
+    def put_grade_plan(req: GradePlanReq):
+        """화면 칸 → 엑셀 가져오기와 같은 규칙으로 대표·설비별 등급. 기준연도 앞 이력·양식에 없는 설비 줄은 그대로."""
+        conn = conn_factory()
+        try:
+            by = int(req.base_year)
+            sites = pf.forecast_sites(conn, req.base_year)
+            grades, units, multi = forecast_export.grade_plan_from_cells(req.cells, sites, by)
+            old = fs.load_grade_history(conn, req.base_year)
+            fs.save_grade_history(conn, req.base_year, pd.concat([old[old["연도"].astype(int) < by], grades], ignore_index=True))
+            eq = fs.load_table(conn, req.base_year, "site_grade_eq")
+            # 양식에 줄이 둘 이상인 지사의 기준연도~ 설비 줄은 화면 값으로 통째로(지운 칸이 남지 않게)
+            keep = eq[~(eq["사업장"].isin(multi) & (eq["연도"].astype(int) >= by))] if not eq.empty else eq
+            fs.save_table(conn, req.base_year, "site_grade_eq", pd.concat([keep, units], ignore_index=True))
+            return clean_json(forecast_export.grade_plan_grid(
+                fs.load_grade_history(conn, req.base_year), sites, by, units=fs.load_table(conn, req.base_year, "site_grade_eq")))
+        finally:
+            conn.close()
 
     @router.get("/capacity")
     def capacity_model(base_year: str = None):

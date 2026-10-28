@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastRegular, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastRegular, loadForecastState } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -71,6 +71,7 @@ async function reload(withBench) {
   if (withBench || state.fc.tab === "bench") await Promise.all([loadForecastBench(), loadForecastRegular()])
   if (state.fc.compare || state.fc.manageTab === "ref") await loadForecastCompare()
   if (state.fc.manageTab === "capacity") await loadForecastCapacity()
+  if ((state.fc.manageTab || "grades") === "grades") await loadForecastGradePlan()
   renderPage()
 }
 
@@ -102,6 +103,11 @@ async function saveDirty() {
   busy(true, `${state.fc.baseYear}년 기준 전망 가정 저장 중...`)
   try {
     for (const key of keys) {
+      if (key === "grade_plan") {
+        const cells = state.fc.gradePlan.lines.flatMap(ln => Object.entries(ln.values).map(([year, grade]) => ({row: ln.row, year: Number(year), grade})))
+        state.fc.gradePlan = await api("/api/forecast/grade-plan", json({base_year: state.fc.baseYear, cells}))
+        continue
+      }
       if (key === "settings") {
         await api("/api/forecast/settings", json({base_year: state.fc.baseYear, values: state.fc.data.settings}))
         continue
@@ -323,6 +329,9 @@ export async function fcClick(e) {
       busy(true, "참고 엑셀과 대조 중...")
       try { await loadForecastCompare() } catch (err) { toast(err.message) } finally { busy(false) }
     }
+    if (state.fc.manageTab === "grades" && !state.fc.gradePlan) {
+      try { await loadForecastGradePlan() } catch (err) { toast(err.message) }
+    }
     if (state.fc.manageTab === "capacity" && !state.fc.capacity) {
       busy(true, "용량 규칙 계산 중...")
       try { await loadForecastCapacity() } catch (err) { toast(err.message) } finally { busy(false) }
@@ -451,6 +460,17 @@ export async function fcChange(e) {
   }
   const fc = t.dataset.fc
   if (!fc) return false
+  if (fc === "gp-cell") {
+    // 엑셀 양식 칸 — 저장할 때 서버가 양식에 써서 엑셀 가져오기와 같은 규칙으로 읽는다
+    const ln = state.fc.gradePlan?.lines?.[Number(t.dataset.idx)]
+    if (!ln) return true
+    const raw = t.value.trim(), v = /^[a-z]+$/i.test(raw) ? raw.toUpperCase() : raw   // mi → MI, 한글(간이·준공)은 그대로
+    ln.values[t.dataset.year] = v
+    t.value = v
+    t.style.background = {TI: "#00B0F0", HGPI: "#00B0F0", CI: "#00B0F0", MI: "#FFFF00"}[v] || ""   // 다시 그리지 않고 색만(다음 칸 포커스 유지)
+    markDirty("grade_plan")
+    return true
+  }
   if (fc === "hot-cell") {
     // 고온부품 넓은 표의 칸 = 긴 표(사업장·연도·항목·금액)의 행. 비우거나 0 이면 그 행을 지운다.
     const site = t.dataset.site, item = t.dataset.item, year = Number(t.dataset.year)

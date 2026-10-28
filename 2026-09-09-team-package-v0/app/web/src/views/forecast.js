@@ -22,7 +22,7 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 
 const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
-const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급 이력", ["grades", "site_grade_eq"]],
+const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급", ["grade_plan", "grades", "site_grade_eq"]],
                      ["factor", "고온부품", ["hot_parts", "hot_parts_contract", "factors"]],
                      ["capacity", "설비용량·신규표준", ["site_capacity", "capacity_rule"]],
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
@@ -151,21 +151,47 @@ function longTable(key, cols, rows, empty) {
     <button class="btn-secondary mt-3" data-fcadd="${key}">＋ 행 추가</button></div>`
 }
 
+// 정비등급 — 기준연도~10년은 사용자 엑셀 양식(발전설비·DH, 지사·설비 줄) 그대로(2026-10-28), 과거는 지사 한 줄 이력
+const GRADE_COLOR = {TI: "#00B0F0", HGPI: "#00B0F0", CI: "#00B0F0", MI: "#FFFF00"}
+const gradeStyle = v => GRADE_COLOR[v] ? `background:${GRADE_COLOR[v]};` : ""
+
+function gradePlanTable() {
+  const gp = state.fc.gradePlan
+  if (!gp) return '<p class="p-5 text-sm text-tri">정비등급 양식을 불러오는 중입니다.</p>'
+  let group = null, label = null
+  const body = gp.lines.map((ln, i) => {
+    const sep = ln.group !== group ? `<tr class="bg-subtle"><td class="fc-stick bg-subtle px-3 py-1.5 text-xs font-bold text-sub" colspan="${gp.years.length + 1}">${esc(ln.group || "")}</td></tr>` : ""
+    group = ln.group
+    const first = ln.label !== label
+    label = ln.label
+    const name = `${first ? `<b class="text-ink">${esc(ln.label)}</b>` : '<span class="text-tri">〃</span>'}${ln.unit ? ` <span class="text-xs text-sub">${esc(ln.unit)}</span>` : ""}`
+    return `${sep}<tr><td class="fc-stick table-cell bg-white">${name}</td>${gp.years.map(y => {
+      const v = ln.values[String(y)] || ""
+      return `<td class="px-1 py-1"><input class="control fc-grade text-center" style="${gradeStyle(v)}" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
+    }).join("")}</tr>`
+  }).join("")
+  return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">지사 · 설비</th>${gp.years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
+    <tbody class="divide-y divide-line-subtle">${body}</tbody></table>
+    <p class="mt-2 text-xs text-sub"><span class="mr-1 inline-block h-3 w-5 rounded-sm align-middle" style="background:#00B0F0"></span>TI·HGPI·CI <span class="ml-3 mr-1 inline-block h-3 w-5 rounded-sm align-middle" style="background:#FFFF00"></span>MI · «-»·«준공»은 등급 아님</p></div>`
+}
+
 function gradesPanel(d) {
   const by = Number(state.fc.baseYear)
-  const years = [...new Set([...d.grades.map(r => Number(r.연도)), ...Array.from({length: 10}, (_, i) => by + i)])].sort()
-  const sites = [...new Set([...d.sites, ...d.grades.map(r => r.사업장)])]
+  const years = [...new Set(d.grades.map(r => Number(r.연도)))].filter(y => y < by).sort()
+  const sites = [...new Set([...d.sites, ...d.grades.filter(r => Number(r.연도) < by).map(r => r.사업장)])]
   const cell = {}
   d.grades.forEach(r => { cell[`${r.사업장}|${r.연도}`] = r.등급 })
-  return panel("정비등급 이력", "빈 칸 = 그 해 이력 없음 · 이력이 없는 지사는 «표준» 한 종으로 계산", `
+  const plan = panel(`정비등급 ${by}~${by + 9} (엑셀 양식 그대로)`, "«26~35년 전지사 정비등급» 양식과 같은 줄 — 화면에서 고친 값·올린 엑셀·내려받는 엑셀이 같은 규칙으로 읽힘 · 줄이 둘 이상인 지사(삼송·동탄·대구·강남)는 설비별로 저장되고 대표 등급은 GT 어휘 줄", `
     <div class="flex flex-wrap gap-2 p-5 pb-0">
-      <button class="btn-secondary" data-fcimport="grades">표준화 참고 엑셀에서 가져오기</button>
       <button class="btn-secondary" data-fcimport="schedule" title="전지사 정비등급 양식(한 해 한 열) 또는 중장기예산 양식의 정기점검보수공사 일정 시트">정비등급 양식에서 가져오기</button>
       <button class="btn-secondary" data-fcexport="schedule" title="전지사 정비등급 양식 그대로, 등급 칸만 지금 저장된 값 — 고쳐서 다시 올릴 수 있습니다">정비등급 양식으로 내려받기 (xlsx)</button>
-    </div>
-    <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th>${years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-line-subtle">${sites.map(s => `<tr><td class="table-cell font-semibold text-ink">${esc(s)}</td>${years.map(y =>
-        `<td class="px-1 py-1 text-center"><input class="control fc-grade" data-fc="grade-cell" data-site="${esc(s)}" data-year="${y}" value="${esc(cell[`${s}|${y}`] || "")}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`, "grades")
+    </div>${gradePlanTable()}`, "grade_plan")
+  const past = years.length ? panel(`정비등급 이력 (~${by - 1})`, "지난 해의 대표 등급(표준화 참고 엑셀) — 표준금액을 등급별로 나누는 데 씀 · 빈 칸 = 그 해 이력 없음", `
+    <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-fcimport="grades">표준화 참고 엑셀에서 가져오기</button></div>
+    <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">지사</th>${years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-line-subtle">${sites.map(s => `<tr><td class="fc-stick table-cell bg-white font-semibold text-ink">${esc(s)}</td>${years.map(y =>
+        `<td class="px-1 py-1 text-center"><input class="control fc-grade" data-fc="grade-cell" data-site="${esc(s)}" data-year="${y}" value="${esc(cell[`${s}|${y}`] || "")}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`, "grades") : ""
+  return plan + past
 }
 
 function hqMasterPanel(d) {

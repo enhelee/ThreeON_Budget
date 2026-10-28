@@ -701,6 +701,51 @@ def fill_grade_plan_sheet(ws, grade_hist, site_names, base_year: int = forecast_
                     cell.fill = PatternFill("solid", fgColor=color) if color else PatternFill(fill_type=None)
 
 
+def _merged_text(ws, r, c):
+    from .forecast_import import _merged_value
+    return str(_merged_value(ws, r, c) or "").strip()
+
+
+def grade_plan_grid(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR, units=None,
+                    template_path: str = GRADE_TEMPLATE) -> dict:
+    """화면용 정비등급 표 — 엑셀 양식(사용자 확정) 줄 그대로. 양식에 저장값을 채운 뒤 줄마다 읽는다.
+    {"years": [...], "lines": [{row, group, label, unit, site, values: {연도: 글자}}]} — «-»·«준공»도 그대로 보인다."""
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    fill_grade_plan_sheet(ws, grade_hist, site_names, base_year, units)
+    lines = grade_plan_layout(ws, site_names)
+    years = sorted({y for ln in lines for y in ln["years"].values()})
+    out = []
+    for ln in lines:
+        out.append({"row": ln["row"], "group": ln["group"], "label": _merged_text(ws, ln["row"], 2) or _merged_text(ws, ln["row"], 1),
+                    "unit": str(ws.cell(row=ln["row"], column=3).value or "").strip(), "site": ln["site"],
+                    "values": {str(y): str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()}})
+    return {"years": years, "lines": out}
+
+
+def grade_plan_from_cells(cells, site_names, base_year: int = forecast_calc.BASE_YEAR, template_path: str = GRADE_TEMPLATE):
+    """화면 칸 [{row, year, grade}] → 양식에 써서 엑셀 가져오기와 같은 규칙으로 읽는다 → (대표 등급, 설비별 등급).
+    화면·올리기·내려받기가 한 양식·한 규칙을 쓰게(2026-10-28 사용자 요청)."""
+    from .forecast_import import grade_plan_from_workbook
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    layout = grade_plan_layout(ws, site_names)                       # 비우기 전에 — 빈 줄은 줄 목록에서 빠진다
+    by = int(base_year)
+    col_by_row = {ln["row"]: {by + i: c for i, c in enumerate(sorted(ln["years"]))} for ln in layout}
+    empty = pd.DataFrame(columns=["사업장", "연도", "등급"])
+    fill_grade_plan_sheet(ws, empty, site_names, base_year)          # 연도 머리를 기준연도로 · 옛 등급 비움
+    for cell in cells or []:
+        row, year = int(cell["row"]), int(cell["year"])
+        col = col_by_row.get(row, {}).get(year)
+        if col:
+            set_cell(ws, row, col, str(cell.get("grade") or "").strip() or None)
+    grades, units = grade_plan_from_workbook(_bytes(wb), site_names)
+    n = {}
+    for ln in layout:
+        n[ln["site"]] = n.get(ln["site"], 0) + 1
+    return grades, units, {s for s, k in n.items() if k > 1}
+
+
 def build_grade_plan_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,
                               units=None, template_path: str = GRADE_TEMPLATE) -> bytes:
     """«현재값이 채워진 정비등급 양식» — 사용자가 정한 양식 그대로, 등급 칸만 저장값으로."""
