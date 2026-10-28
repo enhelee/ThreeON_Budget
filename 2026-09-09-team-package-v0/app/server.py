@@ -38,6 +38,7 @@ authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (D
 
 from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import report_hwpx, report_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -1931,6 +1932,72 @@ def export(year: str, budget: str, kind: str = "actual"):
     media = mimetypes.guess_type(names[kind])[0] or "application/octet-stream"
     return Response(body, media_type=media, headers={
         "Content-Disposition": f"attachment; filename*=utf-8''{quote(names[kind])}"})
+
+
+# ── 한글(hwpx) 보고서 (report_hwpx.py) ───────────────────────────────────────
+# 화면이 입력값을 받아 고치고(투자비·원인 문장 등) → 그 입력값으로 문장 초안을 다시 쓰거나 → hwpx 로 받는다.
+# 서버는 고친 값을 저장하지 않는다 — 보고서는 내려받은 파일이 원본이고, 다시 열면 분석 결과로 새로 채운다.
+
+# 보고서 종류 — 2월용 집행성과분석(perf) · 5월용 붙임2 실적 및 계획(plan). 같은 다섯 단계를 종류별 함수로.
+REPORTS = {
+    "perf": dict(template="report_perf_template.hwpx", build=report_hwpx.build_perf_inputs,
+                 normalize=report_hwpx.normalize_inputs, texts=report_hwpx.auto_texts,
+                 preview=report_hwpx.preview_perf_html, render=report_hwpx.render_perf_hwpx,
+                 name=lambda y: f"{y % 100}년 열원 유지보수예산 집행성과분석.hwpx"),
+    "plan": dict(template="report_plan_template.hwpx", build=report_plan.build_plan_inputs,
+                 normalize=report_plan.normalize_inputs, texts=report_plan.auto_texts,
+                 preview=report_plan.preview_plan_html, render=report_plan.render_plan_hwpx,
+                 name=lambda y: f"[붙임2] {y % 100}년~{(y + 1) % 100}년 열원시설 유지보수예산 집행실적 및 계획.hwpx"),
+}
+
+
+class ReportReq(BaseModel):
+    year: str
+    inputs: dict
+
+
+def _report(kind):
+    if kind not in REPORTS:
+        raise HTTPException(404, "보고서 종류는 perf(2월 집행성과분석) 또는 plan(5월 붙임2)입니다.")
+    return REPORTS[kind]
+
+
+def _report_template(rep):
+    with open(os.path.join(APP_DIR, "templates", rep["template"]), "rb") as f:
+        return f.read()
+
+
+@app.get("/api/report/{kind}")
+def report_inputs(kind: str, year: str):
+    rep = _report(kind)
+    conn = _conn()
+    try:
+        return _clean_json(rep["build"](conn, year))
+    finally:
+        conn.close()
+
+
+@app.post("/api/report/{kind}/texts")
+def report_texts(kind: str, req: ReportReq):
+    """고친 숫자로 문장 초안(◈·□·○)을 다시 — 원인 칸은 비워 둔 채."""
+    rep = _report(kind)
+    return _clean_json(rep["texts"](rep["normalize"](req.inputs, req.year)))
+
+
+@app.post("/api/report/{kind}/preview")
+def report_preview(kind: str, req: ReportReq):
+    """화면용 — 양식을 채운 결과를 종이 모양 HTML 로(고칠 칸 표시 포함). 내려받는 hwpx 와 같은 채우기를 지난다."""
+    rep = _report(kind)
+    inputs = rep["normalize"](req.inputs, req.year)
+    return {"html": rep["preview"](_report_template(rep), inputs), "inputs": _clean_json(inputs)}
+
+
+@app.post("/api/report/{kind}/hwpx")
+def report_hwpx_file(kind: str, req: ReportReq):
+    rep = _report(kind)
+    body = rep["render"](_report_template(rep), rep["normalize"](req.inputs, req.year))
+    return Response(body, media_type="application/hwp+zip", headers={
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(rep['name'](int(req.year)))}"})
 
 
 # ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────

@@ -355,7 +355,7 @@ function forecastPanel() {
     ${head(`<span class="badge bg-subtle px-3 py-1 text-sm font-bold text-ink">기준 ${esc(t.base_year)}년</span>`)}
     <div class="mt-5 grid gap-3 sm:grid-cols-3">
       ${kpi("10년 누계", `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)} 천원`)}
-      ${kpi("연평균 증감", cagr === null ? "-" : `${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%`, `${m.years[0]} ${eok(m.yearTot[0])}억 → ${m.years[n - 1]} ${eok(m.yearTot[n - 1])}억`)}
+      ${kpi("연평균 증감", cagr === null ? "-" : `${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%`, `${m.years[0]} ${eok(m.yearTot[0])}억원 → ${m.years[n - 1]} ${eok(m.yearTot[n - 1])}억원`)}
       ${kpi("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
     </div>
     <div class="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
@@ -363,7 +363,7 @@ function forecastPanel() {
         <p class="flex items-center gap-2 text-xs text-sub"><span class="h-2 w-2 rounded-full bg-line-strong"></span>* 막대를 누르면 그 해 과목 상세 구성 페이지로 이동됩니다.</p>
         <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-sub" aria-label="막대 색 기준(아래 손익, 위 자본, 막대 위 숫자는 합계)">${STK.map(([l, c]) => `<span class="inline-flex items-center gap-1.5"><span class="h-3 w-5 rounded-sm" style="background:${c}"></span>${l}</span>`).join("")}</p></div>
       <div><h4 class="text-sm font-bold text-ink">10년 누계 상위 과목 <span class="font-semibold text-sub">(억원)</span></h4>
-        <div class="mt-4 space-y-4">${top.map(r => `<div><div class="mb-1.5 flex items-end justify-between gap-3"><span class="truncate text-sm font-semibold text-ink">${esc(r.key)}</span><span class="shrink-0 text-xs text-sub"><span class="font-semibold text-ink">${eok(r.total)}억</span> · ${(r.total / tot * 100).toFixed(0)}%</span></div>
+        <div class="mt-4 space-y-4">${top.map(r => `<div><div class="mb-1.5 flex items-end justify-between gap-3"><span class="truncate text-sm font-semibold text-ink">${esc(r.key)}</span><span class="shrink-0 text-xs text-sub"><span class="font-semibold text-ink">${eok(r.total)}억원</span> · ${(r.total / tot * 100).toFixed(0)}%</span></div>
           <div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full" style="width:${r.total / mx * 100}%;background:var(--chart-profit)"></div></div></div>`).join("")}</div>
         ${m.acctRows.length > 5 ? `<p class="mt-4 text-xs text-tri">외 ${m.acctRows.length - 5}개 과목 ${eok(m.acctRows.slice(5).reduce((a, r) => a + r.total, 0))}억원</p>` : ""}</div>
     </div>

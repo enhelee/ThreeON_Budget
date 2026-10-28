@@ -6,6 +6,7 @@ import { busy, toast } from "./components/feedback.js"
 import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
+import { onReportBlur, onReportClick, onReportFocus, onReportKey } from "./views/report.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -37,6 +38,7 @@ document.addEventListener("click", async e => {
   // 5번 탭(전망)의 클릭은 forecast_actions.js 가 맡는다 — 이 파일을 더 키우지 않기 위해서다.
   if (await fcClick(e)) return;
   if (await rqClick(e)) return;                   // 검토 큐 — review_actions.js
+  if (await onReportClick(e)) return;             // 4번 한글 보고서 — views/report.js
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   // 메인 중장기 전망 패널 → 5번 탭 «한눈에 보기»(전사). 연도가 있으면 그 해 구성으로.
@@ -703,7 +705,12 @@ const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tab
   .forEach(el => el.setAttribute("tabindex", "0"));
 new MutationObserver(markClickable).observe($("#page"), {childList: true, subtree: true});
 
+// 한글 보고서 문서 칸 — 들어갈 때 처음 글자 기억, 나갈 때 반영(focusin/out 은 거품이 오른다)
+document.addEventListener("focusin", onReportFocus);
+document.addEventListener("focusout", e => { onReportBlur(e); });
+
 document.addEventListener("keydown", e => {
+  if (onReportKey(e)) return;
   if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
   if (rqKey(e)) { e.preventDefault(); return; }   // 검토 큐 단축키 — review_actions.js
   if (e.key === "Escape" && chatIsOpen()) { closeChat(); renderPage(); syncFabMini(); return; }
