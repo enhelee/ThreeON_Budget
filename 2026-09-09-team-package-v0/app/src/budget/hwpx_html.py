@@ -31,7 +31,11 @@ ALIGN = {"LEFT": "left", "RIGHT": "right", "CENTER": "center", "JUSTIFY": "justi
 
 
 def px(v):
-    return round(float(v or 0) / PX, 2)
+    """HWPUNIT → px. 한글은 음수를 부호 없는 32비트로 적기도 한다(4294967295 = -1) — 부호를 되돌린다."""
+    n = int(float(v or 0))
+    if n >= 2 ** 31:
+        n -= 2 ** 32
+    return round(n / PX, 2)
 
 
 def _family(face):
@@ -51,7 +55,7 @@ class Styles:
         self.char, self.char_pt, self.para, self.para_align, self.border = {}, {}, {}, {}, {}
         for cp in root.iter(H("charPr")):
             pt = int(cp.get("height", "1000")) / 100
-            css = [f"font-size:{pt}pt"]
+            css = [f"font-size:calc({pt}pt * var(--fit, 1))"]   # --fit: 화면이 칸 맞춤으로 줄일 때
             fr = cp.find(H("fontRef"))
             if fr is not None and faces.get(fr.get("hangul")):
                 css.append(f"font-family:{_family(faces[fr.get('hangul')])}")
@@ -172,7 +176,7 @@ class Renderer:
         body = "".join(inner)
         if not re.sub(r"<[^>]+>|\s|　", "", body) and "<table" not in body and "<img" not in body:
             body = " "
-        fs = f"font-size:{first_pt}pt;" if first_pt else ""
+        fs = f"font-size:calc({first_pt}pt * var(--fit, 1));" if first_pt else ""
         tools = self.tools(p)
         return f'<div class="rp-p" style="{fs}{css}"{extra}>{body}{tools}</div>'
 
@@ -201,8 +205,10 @@ class Renderer:
                 st = [self.s.border.get(tc.get("borderFillIDRef"), "")]
                 if csz is not None:
                     st.append(f"width:{px(csz.get('width'))}px;height:{px(csz.get('height'))}px")
-                if cm is not None:
-                    st.append("padding:{}px {}px {}px {}px".format(*(px(cm.get(k)) for k in ("top", "right", "bottom", "left"))))
+                # hasMargin="0" = 표 기본 여백(inMargin)을 따름 — 이때 cellMargin 은 4294967295 같은 «미지정» 값이다
+                m = cm if tc.get("hasMargin") == "1" and cm is not None else tbl.find(P("inMargin"))
+                if m is not None:
+                    st.append("padding:{}px {}px {}px {}px".format(*(max(0, px(m.get(k))) for k in ("top", "right", "bottom", "left"))))
                 va = (sub.get("vertAlign") if sub is not None else "CENTER") or "CENTER"
                 st.append(f"vertical-align:{ {'TOP': 'top', 'BOTTOM': 'bottom'}.get(va, 'middle') }")
                 body = "".join(self.para(p) for p in (sub.findall(P("p")) if sub is not None else []))

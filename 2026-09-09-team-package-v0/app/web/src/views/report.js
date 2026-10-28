@@ -37,10 +37,13 @@ let rev = 0          // 고칠 때마다 +1 — 늦게 온 앞선 응답이 그 
  *  한글 글꼴(휴먼명조 등)이 없는 PC 에서는 대체 글꼴이 더 넓어 옆 칸을 침범한다 — 파일에는 영향 없음. */
 function fitCells(root = $("#rpDoc")) {
   if (!root) return
+  // zoom 은 쓰지 않는다 — 크롬에서 고정 폭 표 안의 zoom 이 칸 폭을 1,677만 px 로 키워 문서가 통째로 깨졌다(2026-10-28).
+  //   글자 크기에 곱하는 --fit 변수(hwpx_html 이 font-size:calc(…pt * var(--fit,1)) 로 낸다)를 줄인다.
   for (const p of root.querySelectorAll(".rp-tbl .rp-p")) {
-    p.style.zoom = ""
-    const over = p.scrollWidth / Math.max(1, p.clientWidth)
-    if (over > 1.01) p.style.zoom = String(Math.max(0.6, 1 / over))
+    p.style.removeProperty("--fit")
+    if (p.clientWidth < 8) continue                    // 아직 안 그려졌거나 숨은 칸 — 재면 엉뚱한 비율이 나온다
+    const over = p.scrollWidth / p.clientWidth
+    if (over > 1.01) p.style.setProperty("--fit", String(Math.max(0.6, 1 / over).toFixed(3)))
   }
 }
 
