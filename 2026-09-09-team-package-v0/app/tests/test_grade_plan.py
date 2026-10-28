@@ -101,3 +101,14 @@ def test_screen_edit_of_second_unit_changes_only_that_unit():
     u = {(q, int(y)): g for s, q, y, g in zip(u2["사업장"], u2["설비"], u2["연도"], u2["등급"]) if s == "동탄지사"}
     assert u[("#2 Block", 2027)] == "HGPI" and u[("#1 Block", 2027)] == "간이"
     assert _pivot(g2)[("동탄지사", 2027)] == "간이"            # 대표 = #1 Block 줄(GT 어휘 첫 줄)
+
+
+def test_screen_grid_carries_excel_cell_colors():
+    """사용자 양식은 CI 를 칸마다 다르게 칠한다(삼송 #2 GT 2026 파랑, 동탄 #1 Block 2029 없음) — 화면도 그대로."""
+    grades, units = fi.grade_plan_from_workbook(_template_bytes(), SITES)
+    grid = fe.grade_plan_grid(grades, SITES, 2026, units=units)
+    by = {(ln["site"], ln["unit"]): ln for ln in grid["lines"]}
+    assert by[("삼송지사", "#2 GT")]["colors"]["2026"] == "#00B0F0"
+    assert by[("동탄지사", "#1 Block")]["colors"]["2029"] == ""
+    assert by[("동탄지사", "#1 Block")]["colors"]["2028"] == "#FFFF00"
+    assert by[("수원사업소", "")]["colors"]["2026"]                 # «-» 연한 주황(테마 색)

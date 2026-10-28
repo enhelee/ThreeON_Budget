@@ -167,7 +167,9 @@ function gradePlanTable() {
     const name = `${first ? `<b class="text-ink">${esc(ln.label)}</b>` : '<span class="text-tri">〃</span>'}${ln.unit ? ` <span class="text-xs text-sub">${esc(ln.unit)}</span>` : ""}`
     return `${sep}<tr><td class="fc-stick table-cell bg-white">${name}</td>${gp.years.map(y => {
       const v = ln.values[String(y)] || ""
-      return `<td class="px-1 py-1"><input class="control fc-grade text-center" style="${gradeStyle(v)}" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
+      // 색은 엑셀 칸 색 그대로(양식에서 CI 는 칸마다 다름), 화면에서 고친 칸만 등급 색
+      const bg = ln.edited?.[String(y)] ? gradeStyle(v) : (ln.colors?.[String(y)] ? `background:${ln.colors[String(y)]};` : "")
+      return `<td class="px-1 py-1"><input class="control fc-grade text-center" style="${bg}" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
     }).join("")}</tr>`
   }).join("")
   return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">지사 · 설비</th>${gp.years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>

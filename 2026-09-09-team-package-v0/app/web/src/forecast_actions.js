@@ -466,6 +466,7 @@ export async function fcChange(e) {
     if (!ln) return true
     const raw = t.value.trim(), v = /^[a-z]+$/i.test(raw) ? raw.toUpperCase() : raw   // mi → MI, 한글(간이·준공)은 그대로
     ln.values[t.dataset.year] = v
+    ;(ln.edited ||= {})[t.dataset.year] = true
     t.value = v
     t.style.background = {TI: "#00B0F0", HGPI: "#00B0F0", CI: "#00B0F0", MI: "#FFFF00"}[v] || ""   // 다시 그리지 않고 색만(다음 칸 포커스 유지)
     markDirty("grade_plan")

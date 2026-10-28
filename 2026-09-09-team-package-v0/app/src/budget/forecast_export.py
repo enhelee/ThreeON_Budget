@@ -701,6 +701,19 @@ def fill_grade_plan_sheet(ws, grade_hist, site_names, base_year: int = forecast_
                     cell.fill = PatternFill("solid", fgColor=color) if color else PatternFill(fill_type=None)
 
 
+def _fill_hex(cell) -> str:
+    """칸 채우기 색 «#RRGGBB»(단색 RGB 만, 테마 색·없음은 빈 값)."""
+    f = cell.fill
+    if f.fill_type != "solid" or f.fgColor is None:
+        return ""
+    if f.fgColor.type == "theme":                 # 수원 «-·준공» 연한 주황(테마 5, 밝게 80%) — 비슷한 색으로
+        return "#FBE2D5" if f.fgColor.theme == 5 else "#F2F2F2"
+    if f.fgColor.type != "rgb" or not f.fgColor.rgb:
+        return ""
+    rgb = str(f.fgColor.rgb)[-6:]
+    return "" if rgb in ("000000",) and str(f.fgColor.rgb).startswith("00") else f"#{rgb}"
+
+
 def _merged_text(ws, r, c):
     from .forecast_import import _merged_value
     return str(_merged_value(ws, r, c) or "").strip()
@@ -719,7 +732,9 @@ def grade_plan_grid(grade_hist, site_names, base_year: int = forecast_calc.BASE_
     for ln in lines:
         out.append({"row": ln["row"], "group": ln["group"], "label": _merged_text(ws, ln["row"], 2) or _merged_text(ws, ln["row"], 1),
                     "unit": str(ws.cell(row=ln["row"], column=3).value or "").strip(), "site": ln["site"],
-                    "values": {str(y): str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()}})
+                    "values": {str(y): str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()},
+                    # 칸 색도 양식 그대로(사용자 양식은 CI 를 칸마다 다르게 칠함) — 화면이 이 색을 쓴다
+                    "colors": {str(y): _fill_hex(ws.cell(row=ln["row"], column=c)) for c, y in ln["years"].items()}})
     return {"years": years, "lines": out}
 
 
