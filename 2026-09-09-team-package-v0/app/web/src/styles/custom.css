@@ -448,3 +448,24 @@
 
 /* 입체 캐릭터 그림(components/characters.js charImg) — 자리 크기는 각 클래스가, 비율은 그림이 지킨다 */
 img.char-img{object-fit:contain;display:inline-block}
+
+/* ── 4번 한글 보고서 — 종이 모양 문서(views/report.js · 서버 hwpx_html) ──
+   종이는 테마와 무관하게 흰 바탕·검은 글자(한글 문서 그대로). 화면 폭이 좁으면 책상 영역이 가로로 흐른다. */
+.rp-desk { overflow-x: auto; padding: 24px 12px; border-radius: 16px; background: var(--color-subtle, #eef0f3); }
+.rp-page { background: #fff; color: #000; margin: 0 auto; box-sizing: content-box; box-shadow: 0 2px 14px rgb(0 0 0 / .14); }
+.rp-p { white-space: pre-wrap; min-height: 1em; position: relative; }
+.rp-tbl { border-collapse: collapse; table-layout: fixed; }
+.rp-tbl .rp-p { line-height: 1.25; white-space: pre; }   /* 한글은 칸 안 줄바꿈을 문단으로만 — 웹 글꼴이 조금 넓어도 줄이 넘어가지 않게 */
+.rp-tbl td { box-sizing: border-box; overflow: visible; }
+.rp-pic { display: inline-block; vertical-align: top; }
+.rp-pagebreak { border-top: 2px dashed #b8bec8; margin: 28px 0; }
+.rp-edit { background: #fff6cc; box-shadow: inset 0 -1px 0 #e0b63a; border-radius: 2px; cursor: text; outline: none; }
+.rp-edit:hover { background: #ffee99; }
+.rp-edit:focus { background: #fff; box-shadow: 0 0 0 2px #2f6fd6; }
+.rp-edit:empty::before, .rp-edit span:empty:only-child::before { content: "원인 입력"; color: #9aa1ab; }
+.rp-calc { color: inherit; }
+.rp-tools { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.rp-tool { font: 600 11px/1 system-ui, sans-serif; color: #1f4fa3; background: #e8effc; border: 1px solid #c5d4f2; border-radius: 6px; padding: 3px 7px; cursor: pointer; }
+.rp-tool:hover { background: #d6e3fa; }
+.rp-legend { padding: 0 4px; border-radius: 3px; }
+.rp-legend--edit { background: #fff6cc; color: #5c4400; box-shadow: inset 0 -1px 0 #e0b63a; }
