@@ -162,7 +162,7 @@ def test_review_summary_is_three_year_comparison_table():
 def test_review_forecast_is_stacked_by_budget_type():
     home = _read(SRC, "views", "home.js")
     body = _fn(home, "forecastPanel")
-    assert "구분" in body and "#9AA3B5" in body and "#C2C8D4" in body, "손익(회색)·자본(연회색) 누적 — «라»안"
+    assert "구분" in body and "#5F7FBF" in body and "#E0937A" in body, "손익(차분한 파랑)·자본(산호) 누적"
     pf = _read(APP, "src", "budget", "pipeline_forecast.py")
     assert '"구분"' in pf and "def capital_items" in pf, "전망 합계 행에 손익/자본 구분"
 
