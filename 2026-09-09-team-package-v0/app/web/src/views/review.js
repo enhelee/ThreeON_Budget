@@ -64,10 +64,6 @@ export function isResolved(status) { return RESOLVED.has(status) }
 
 // ── 표시 도우미 ───────────────────────────────────────────────
 
-const eok = v => {
-  const x = Math.abs(v) / 100000
-  return `${v < 0 ? "−" : ""}${x >= 100 ? fmt(x) : x >= 10 ? x.toFixed(1) : x.toFixed(2)}억`
-}
 const pct = (v, d = 0) => `${(v * 100).toFixed(d)}%`
 
 const REASON_CLS = {overload: "bg-err-bg text-err", negative: "bg-err-bg text-err",
@@ -160,15 +156,33 @@ function actionsHtml(it, locked) {
       <button class="btn-primary rq-btn" data-rq="ack" data-key="${k}" title="이상 없음 — 단축키 A">✓ 이상 없음</button>
       ${chips.map((c, i) => `<button class="rq-chip" data-rq="chip" data-key="${k}" data-note="${esc(c)}" title="사유로 저장 — 단축키 ${i + 1}">${esc(c)}</button>`).join("")}
       ${it.needsNote ? `<button class="rq-chip rq-chip--ghost" data-rq="note-edit" data-key="${k}">직접 입력…</button>` : ""}
+      <button class="btn-secondary rq-btn" data-rq="explain" data-key="${k}" aria-expanded="${r.explOpen === it.key}">${r.explOpen === it.key ? "근거 닫기 ▲" : "근거·초안 ▾"}</button>
       ${canMove ? `<button class="btn-secondary rq-btn" data-rq="expand" data-key="${k}" aria-expanded="${r.open === it.key}" title="단축키 E">${r.open === it.key ? "전표 닫기 ▲" : "전표·재배정 ▾"}</button>` : ""}
       ${detailBtn(it)}
     </div>
     ${editing ? `<div class="rq-noteedit">
-        <input id="rqNoteText" class="control flex-1" maxlength="500" placeholder="차이 사유 (500자 이내)" value="${esc(it.note || "")}" data-key="${k}">
+        <textarea id="rqNoteText" class="control flex-1" rows="${r.draft?.key === it.key ? 4 : 1}" maxlength="500" placeholder="차이 사유 (500자 이내 · Enter 저장, Shift+Enter 줄바꿈)" data-key="${k}">${esc(r.draft?.key === it.key ? r.draft.text : (it.note || ""))}</textarea>
         <button class="btn-primary rq-btn" data-rq="note-save" data-key="${k}">저장</button>
         <button class="btn-secondary rq-btn" data-rq="note-cancel">취소</button>
       </div>` : ""}
+    ${r.explOpen === it.key ? explainHtml(it) : ""}
     ${r.open === it.key ? suggestHtml(it, locked) : ""}`
+}
+
+// 근거 설명(B) — 분석 결과에 있는 사실만 문장으로. 원인은 «추정»으로만, 사유 저장은 사람이 고친 뒤.
+function explainHtml(it) {
+  const ex = state.rq.expl[it.key]
+  if (!ex) return `<div class="rq-sugg"><p class="text-sm text-sub">근거를 모으는 중…</p></div>`
+  if (ex.error) return `<div class="rq-sugg"><p class="text-sm text-err">${esc(ex.error)}</p></div>`
+  return `<div class="rq-sugg">
+      <h4 class="text-sm font-semibold text-ink">근거</h4>
+      <ul class="mt-1.5 space-y-1 text-sm text-ink">${ex.facts.map(f => `<li>· ${esc(f)}</li>`).join("")}</ul>
+      ${ex.hints.length ? `<h4 class="mt-3 text-sm font-semibold text-ink">추정 원인 <span class="text-xs font-normal text-tri">전표 글자·귀속 모양으로 짐작 — 확인 필요</span></h4>
+        <ul class="mt-1.5 space-y-1 text-sm text-sub">${ex.hints.map(h => `<li>· ${esc(h)}</li>`).join("")}</ul>` : ""}
+      ${it.needsNote && !it.resolved ? `<div class="mt-3 flex flex-wrap items-center gap-2">
+          <button class="btn-primary rq-btn" data-rq="draft" data-key="${esc(it.key)}">초안을 사유 칸에 넣기</button>
+          <span class="text-xs text-tri">넣은 뒤 고치고 [저장] — 바로 저장되지 않아요</span></div>` : ""}
+    </div>`
 }
 
 function detailBtn(it) {
@@ -192,7 +206,7 @@ function voucherRow(v, it, locked, mode) {
     const pick = state.rq.pick[v.erp_row_id] || ""
     action = cands.length ? `<select class="control min-w-0 flex-1 sm:max-w-[22rem]" data-rq-pick="${v.erp_row_id}" aria-label="옮길 사업" ${dis}>
         <option value="">옮길 사업 고르기 (잔액 큰 순)</option>
-        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)}</option>`).join("")}
+        ${cands.map(c => `<option value="${esc(c.name)}" ${pick === c.name ? "selected" : ""}>${esc(c.name)} · 잔액 ${fmt(c.remain)} 천원</option>`).join("")}
       </select>
       <button class="btn-secondary rq-btn" data-rq="move" data-key="${esc(it.key)}" data-id="${v.erp_row_id}" ${dis}>옮기기</button>`
       : '<span class="text-xs text-tri">같은 과목에 옮길 계획 사업이 없어요</span>'
@@ -242,19 +256,18 @@ function cardHtml(it, locked) {
           <p class="mt-1.5 break-keep font-semibold text-ink">${esc(it.name)}</p>
           <p class="text-xs text-sub">${esc(it.branch)} · ${esc(it.budget)} · ${esc(it.item)}</p>
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b> → 실적 <b class="text-ink">${fmt(it.actual)}</b>천원</span>
+            <span class="text-sub">계획 <b class="text-ink">${fmt(it.plan)}</b> 천원 → 실적 <b class="text-ink">${fmt(it.actual)}</b> 천원</span>
             ${it.rate !== null && it.rate !== undefined ? `<span class="font-bold ${rateCls(it.rate)}">${it.rate.toFixed(1)}%</span>` : ""}
           </div>
           ${bulletHtml(it)}
           <ul class="mt-2 space-y-0.5 text-sm text-ink">${it.reasons.map(x => `<li>${esc(x.text)}</li>`).join("")}</ul>
           ${it.ctx?.length ? `<ul class="mt-1 space-y-0.5 text-xs text-sub">${it.ctx.map(c => `<li>· ${esc(c)}</li>`).join("")}</ul>` : ""}
           ${it.note ? `<p class="mt-2 text-sm"><span class="font-semibold text-ink">사유</span> <span class="text-sub">${esc(it.note)}</span></p>` : ""}
-          ${it.ack && it.status !== "approved" ? `<p class="mt-1 text-xs text-warn">승인 ${esc(it.ack.operator || "")} ${esc(it.ack.updated_at || "")} — 그때 실적 ${fmt(it.ack.actual)}천원</p>` : ""}
+          ${it.ack && it.status !== "approved" ? `<p class="mt-1 text-xs text-warn">승인 ${esc(it.ack.operator || "")} ${esc(it.ack.updated_at || "")} — 그때 실적 ${fmt(it.ack.actual)} 천원</p>` : ""}
         </div>
         <div class="shrink-0 pl-[3.25rem] sm:pl-0 sm:text-right">
           <p class="text-xs font-semibold text-tri">검토 금액</p>
           <p class="text-xl font-bold text-ink">${fmt(it.amount)}<span class="ml-0.5 text-xs font-semibold text-tri">천원</span></p>
-          <p class="text-xs text-tri">${eok(it.amount)}</p>
         </div>
       </div>
       ${actionsHtml(it, locked)}

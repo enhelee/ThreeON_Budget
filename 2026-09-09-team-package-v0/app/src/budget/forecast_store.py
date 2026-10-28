@@ -26,7 +26,7 @@ import os
 
 import pandas as pd
 
-from . import config_store, forecast_calc
+from . import capacity, config_store, forecast_calc
 from . import db as dbm
 
 # ── 표 이름과 v2 컬럼 ────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_fact
           # 표준화 방향 반영(2026-10-26) — 아래 SPECS 가 모양을 정한다
           "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
           "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
-          "forecast_setting")
+          "forecast_setting", "site_capacity", "capacity_rule", "hot_parts_contract")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
@@ -358,12 +358,29 @@ SPECS = {
     "reference_standard": dict(cols=["사업장", "예산과목", "등급", "표준금액", "엑셀수식"], floats=["표준금액"],
                                key=["사업장", "예산과목", "등급"], need=["사업장", "예산과목", "등급"],
                                order="사업장, 예산과목, 등급"),
+    # 비어 있으면 capacity.py 기본값(사용자 엑셀 «한난_발전설비용량_261028»·기준 5개·대상 4개 지사)
+    "site_capacity": dict(cols=capacity.CAPACITY_COLS, opt_floats=["용량MW"], opt_ints=["준공연도"],
+                          key=["사업장", "설비"], need=["사업장", "설비"], order="사업장, 설비",
+                          default=capacity.default_capacity),
+    # 고온부품 지사별 계약방식·계약기간 — 비면 내장 양식(사용자 «26~35년 전지사 고온부품») 값
+    "hot_parts_contract": dict(cols=["사업장", "계약방식", "계약기간", "비고"], key=["사업장"], need=["사업장"],
+                               order="사업장", default=lambda: _hot_default()),
+    "capacity_rule": dict(cols=capacity.RULE_COLS, opt_ints=["적용시작연도"], opt_floats=["용량MW"],
+                          key=["사업장"], need=["사업장", "역할"], order="역할, 사업장",
+                          default=capacity.default_rules),
 }
+
+
+def _hot_default():
+    from .forecast_import import default_hot_contracts
+    return default_hot_contracts()
 
 
 def load_table(conn, base_year, name) -> pd.DataFrame:
     sp = SPECS[name]
     rows = _select(conn, name, base_year, sp["cols"], sp["order"])
+    if not rows and sp.get("default"):
+        return sp["default"]()
     df = _frame(rows, sp["cols"], ints=sp.get("ints", ()), floats=sp.get("floats", ()),
                 bools=sp.get("bools", ()))
     for c in sp.get("opt_ints", ()):

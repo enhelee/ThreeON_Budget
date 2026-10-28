@@ -67,7 +67,7 @@ export async function loadAlerts() {
 export async function loadReviewQueue() {
   const year = state.year;
   const data = await api(`/api/review-queue?year=${year}`);
-  if (state.rq.data && state.rq.dataYear !== year) { state.rq.sugg = {}; state.rq.pick = {}; state.rq.open = null; }
+  if (state.rq.data && state.rq.dataYear !== year) { state.rq.sugg = {}; state.rq.pick = {}; state.rq.open = null; state.rq.expl = {}; state.rq.explOpen = null; }
   state.rq.data = data; state.rq.dataYear = year;
 }
 
@@ -188,6 +188,10 @@ export async function loadForecastTable() {
 
 export async function loadForecastCompare() {
   state.fc.compare = await api(`/api/forecast/compare${fcQuery()}`);
+}
+
+export async function loadForecastCapacity() {
+  state.fc.capacity = await api(`/api/forecast/capacity${fcQuery()}`);
 }
 
 export async function loadForecastRegular() {

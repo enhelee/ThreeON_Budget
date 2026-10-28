@@ -32,7 +32,7 @@ function noteRowHtml(b, key) {
       <tr class="edit-row"><td colspan="${ncol()}" class="p-4">
         <div class="rounded-control border border-line-strong bg-subtle p-4">
           <p class="mb-2 text-sm font-bold text-ink">차이 사유 — "${esc(b.사업명)}"
-            <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)}천원 · 실적 ${fmt(b.실적)}천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
+            <span class="ml-2 text-xs font-medium text-sub">계획 ${fmt(b.연예산)} 천원 · 실적 ${fmt(b.실적)} 천원 · 집행률 ${fmtRate(b.연예산, b.실적)} · 권장 입력(500자 이내) · 비우고 저장하면 지워집니다</span></p>
           <textarea id="vnText" class="control min-h-20 w-full" maxlength="500" aria-label="차이 사유" placeholder="예: 정기점검 일정이 내년 3월로 이월 / 긴급 보수로 추가 집행">${esc(b.사유 || "")}</textarea>
           <div class="mt-3 flex gap-2">
             <button class="btn-primary" data-action="save-note" data-ekey="${esc(key)}">사유 저장</button>
@@ -111,7 +111,7 @@ function branchPickGrid() {
   return `${pickSortBar()}<section class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${sorted.map(r => `
     <button class="metric-card text-left hover:border-ink" data-branch="${esc(r.branch)}">
       <span class="flex items-center justify-between gap-2"><span class="font-semibold text-ink">${esc(r.branch)}</span>${rateBadge(r.plan, r.actual)}</span>
-      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} · 실적 ${fmt(r.actual)}천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
+      <span class="mt-2 block text-xs text-sub">계획 ${fmt(r.plan)} 천원 · 실적 ${fmt(r.actual)} 천원${r.lowConf ? ` · <span title="확신도 0.8 미만으로 붙은 사업 수">저확신 ${r.lowConf}건</span>` : ""}</span></button>`).join("")}</section>`
 }
 
 export function renderDetail() {
@@ -210,7 +210,7 @@ export function deleteBoxHtml(b, key) {
           ${others.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("")}
           <option value="__unassigned__" ${others.length ? "" : "selected"}>— 미지정 항목으로 이동 (${esc(unassignedName(b))}) —</option>
         </select></label>` : `
-      <p class="danger-text">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)}천원</b>)이 이후 분석에서 제외됩니다.</p>`}
+      <p class="danger-text">귀속 전표가 없습니다. 계획행(연예산 <b>${fmt(b.연예산)} 천원</b>)이 이후 분석에서 제외됩니다.</p>`}
       ${hasPlan ? `<p class="danger-text">원본 계획 자료는 지우지 않습니다 — 설정 탭 <b>'사업 삭제 이력'</b>에서 되돌릴 수 있습니다.</p>` : `<p class="danger-text">되돌리려면 설정 탭 <b>'수동 재배정 이력'</b>에서 해당 이동 기록을 지우면 됩니다.</p>`}
       <div class="mt-3 flex gap-2">
         <button class="btn-danger" data-action="confirm-delete" data-ekey="${esc(key)}">${!hasPlan ? "전표 옮기고 정리" : (n ? "옮기고 삭제" : "삭제")}</button>
@@ -258,7 +258,7 @@ export function detResultsHtml() {
     const vhead = !open || !b.전표.length ? "" : `
       <tr class="voucher-head">
         <td class="table-cell pl-6 text-xs font-bold text-sub" colspan="2">
-        ${locked ? "예산과목" : `<label class="flex items-center gap-2" title="이 사업의 전표 전체 선택/해제"><input type="checkbox" class="accent-brand" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>예산과목</span></label>`}</td>
+        ${locked ? "예산과목" : `<label class="flex items-center gap-2" title="이 사업의 전표 전체 선택/해제"><input type="checkbox" class="accent-navy" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>예산과목</span></label>`}</td>
         <td class="table-cell text-xs font-bold text-sub">전표번호</td>
         <td class="table-cell text-xs font-bold text-sub">전표 텍스트(ERP)</td>
         <td class="table-cell text-right text-xs font-bold text-sub">전기일</td>
@@ -269,7 +269,7 @@ export function detResultsHtml() {
     const vrows = !open ? "" : vhead + b.전표.map(v => `
       <tr class="voucher-row">
         <td class="table-cell pl-6" colspan="2">
-        <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-brand" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
+        <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-navy" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
         <span class="cell-item text-xs text-sub" title="${esc(v.과목 ?? b.예산과목)}">${esc(v.과목 ?? b.예산과목)}</span></label></td>
         <td class="table-cell cell-doc text-xs text-sub">${esc(v.전표번호 ?? "-")}</td>
         <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
@@ -314,7 +314,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right">${rateCell(b, key)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
         <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
-        ${locked ? "" : `<td class="table-cell text-center"><button class="mx-auto grid h-7 w-7 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button></td>`}
+        ${locked ? "" : `<td class="table-cell text-center"><button class="mx-auto grid h-7 w-7 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-mint-ink" title="사업 내용 수정" data-edit="${esc(key)}">✎</button></td>`}
       </tr>${noteRowHtml(b, key)}${editRow}${vrows}`;
   }).join("");
 
@@ -359,8 +359,8 @@ export function detResultsHtml() {
         </section>` : ""}
       <section class="panel mt-4 overflow-hidden">
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-2">
-          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
-          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-navy" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-navy" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
           <button class="push-right text-xs font-semibold text-sub hover:text-ink" data-action="toggle-guide" aria-expanded="${!!d.guideOpen}" aria-controls="detGuide">? 표 보는 법</button>
         </div>
         ${guideHtml()}

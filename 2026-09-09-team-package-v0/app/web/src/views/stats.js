@@ -2,6 +2,7 @@ import { rateBadge } from "../components/badges.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt, fmtRate } from "../util.js"
+import { reportHtml } from "./report.js"
 
 /** 증감률 — 부호 항상, 소수 한 자리, 천 단위 쉼표(+2,805.0% / -23.4%). */
 const signPct = v => `${v >= 0 ? "+" : ""}${Number(v).toLocaleString("ko-KR", {minimumFractionDigits: 1, maximumFractionDigits: 1})}%`
@@ -17,12 +18,12 @@ function drillRows(budget, x) {
       <td class="table-cell text-right text-sm font-semibold">${fmt(b.실적)}</td>
       <td class="table-cell" colspan="2"></td>
       <td class="table-cell text-right">${b.계획 > 0 ? rateBadge(b.계획, b.실적) : '<span class="text-xs text-tri">계획 없음</span>'}</td>
-      <td class="table-cell text-right" colspan="2">${b.처지사 === "(미매핑)" ? "" : `<button class="text-xs font-semibold text-ink hover:text-brand" data-drill="${esc(b.처지사)}" data-drill-item="${esc(x.예산과목)}" data-drill-budget="${esc(budget)}">전표 보기 →</button>`}</td>
+      <td class="table-cell text-right" colspan="2">${b.처지사 === "(미매핑)" ? "" : `<button class="text-xs font-semibold text-ink hover:text-mint-ink" data-drill="${esc(b.처지사)}" data-drill-item="${esc(x.예산과목)}" data-drill-budget="${esc(budget)}">전표 보기 →</button>`}</td>
     </tr>`).join("");
 }
 
 // 탭(2026-10-27 사용자 요청: 5번·설정처럼 한 묶음씩) — 손익 / 자본 / 전년 대비. 자료는 연 탭 것만 받는다(router).
-export const STATS_TABS = [["손익", "손익예산"], ["자본", "자본예산"], ["compare", "전년 대비 증감"]]
+export const STATS_TABS = [["손익", "손익예산"], ["자본", "자본예산"], ["compare", "전년 대비 증감"], ["report", "한글 보고서"]]
 const UNIT = '<span class="text-xs font-semibold text-tri">단위: 천원</span>'
 
 export function renderStats() {
@@ -30,6 +31,7 @@ export function renderStats() {
   const title = `<section><p class="text-sm font-semibold text-ink">STAGE 4</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">통계 · 내보내기 — ${esc(state.year)}년</h2></section>
     <div class="flex flex-wrap gap-2" role="tablist">${STATS_TABS.map(([k, l]) => `<button class="${tab === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${tab === k}" data-stattab="${k}">${esc(l)}</button>`).join("")}</div>`;
   if (tab === "compare") return `<div class="space-y-6">${title}${compareHtml()}</div>`;
+  if (tab === "report") return `<div class="space-y-6">${title}${reportHtml()}</div>`;
   const st = state.stats;
   if (!st || !Object.keys(st.budgets || {}).length) {
     return `<div class="space-y-6">${title}${emptyState("분석 이력이 없습니다. 먼저 분석을 실행하세요.")}</div>`;
@@ -55,8 +57,8 @@ export function renderStats() {
         <div class="border-t border-line p-5 sm:p-6"><div class="flex flex-wrap items-center justify-between gap-3"><h4 class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-bold text-ink">지사그룹별
             <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-sub"><span class="yr-dot yr-dot--plan"></span>계획</span><span class="inline-flex items-center gap-1.5 text-xs font-semibold text-sub"><span class="yr-dot yr-dot--act"></span>실적</span></h4>${UNIT}</div>
           <div class="mt-4 space-y-4">${data.groups.map(g => `<div><div class="mb-2 flex items-end justify-between"><span class="font-semibold text-ink">${esc(g.그룹)}</span><span class="flex items-center gap-2 text-xs text-sub"><span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--plan"></span><span class="font-semibold text-ink">${fmt(g.계획)}</span></span>/<span class="inline-flex items-center gap-1"><span class="yr-dot yr-dot--act"></span><span class="font-semibold text-ink">${fmt(g.실적)}</span></span> · ${fmtRate(g.계획, g.실적)}</span></div>
-          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(g.계획)}천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${g.계획 / maxA * 100}%"></div></div>
-          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(g.실적)}천원"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
+          <div class="space-y-1.5"><div class="h-3 overflow-hidden rounded-full bg-subtle" title="계획 ${fmt(g.계획)} 천원"><div class="yr-bar yr-bar--plan h-full rounded-full" style="width:${g.계획 / maxA * 100}%"></div></div>
+          <div class="h-3 overflow-hidden rounded-full bg-subtle" title="실적 ${fmt(g.실적)} 천원"><div class="yr-bar yr-bar--act h-full rounded-full" style="width:${g.실적 / maxA * 100}%"></div></div></div></div>`).join("")}</div></div>
       </section>`;
   }).join("");
   return `<div class="space-y-6">${title}${sections || emptyState(`${esc(tab)}예산 분석 결과가 없습니다.`)}</div>`;

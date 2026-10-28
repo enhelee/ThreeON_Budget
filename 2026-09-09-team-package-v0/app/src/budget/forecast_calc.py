@@ -67,8 +67,12 @@ SCHEDULE_PLACEHOLDER_TOKENS = {"", "-", "준공", "정비없음"}
 
 HOT_PARTS_ITEM_TO_LABEL = {
     "고온부품재생": "기계장치_고온부품재생",
-    "신품구매": "건설중인자산_재생고온부품",
+    "신품구매": "건설중인자산-재생고온부품",
 }
+
+
+# 고온부품 줄이 기준연도 계획본에서는 어느 과목 안에 들어 있나(그 과목 계획본이 있으면 기준연도 고온부품 = 0)
+HOT_PARTS_PLAN_ACCOUNT = {"고온부품재생": "기계장치", "신품구매": "건설중인자산-재생고온부품"}
 
 
 HQ_CATEGORY_TO_ACCOUNT = {
@@ -103,7 +107,7 @@ SITE_TABLE_LINES = [
     ("기계장치_기타기계장치", "표준화:기계장치"),
     ("외주비-열원정기점검", "표준화:외주비-열원정기점검"),
     ("공구와기구-열원시설공기구", "표준화:공구와기구-열원시설공기구"),
-    ("건설중인자산_재생고온부품", "고온부품:신품구매"),
+    ("건설중인자산-재생고온부품", "고온부품:신품구매"),
     ("건설중인자산-자산화예비품", "표준화:건설중인자산-자산화예비품"),
     ("저장품-열원(보수)", "표준화:저장품-열원(보수)"),
     # 표준화 방향 4-4·4-5 — 등급별 표준화 대신 연도별 계획으로 잡는 정기비용(2026-10-26)
@@ -434,7 +438,11 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                 amount = site_amount + hq_part
             elif source.startswith("고온부품:"):
                 item = source.split(":", 1)[1]
-                amount = hot_parts_lookup.get((site, year, item), 0.0)
+                # 기준연도에 그 과목 계획본이 있으면 고온부품은 이미 그 안에 있다 — LTSA·CRI 처럼 또 더하지 않는다(2026-10-28 사용자 결정)
+                if year == base_year and budget_lookup.get((site, HOT_PARTS_PLAN_ACCOUNT[item])) is not None:
+                    amount = 0.0
+                else:
+                    amount = hot_parts_lookup.get((site, year, item), 0.0)
             elif source.startswith(("정기계약:", "CRI:")):
                 # 기준연도에 그 과목의 확정 예산(계획본)이 있으면 LTSA·CRI 는 이미 그 안에 있다 — 또 더하지 않는다.
                 scope = source.split(":", 1)[1] or "자본"

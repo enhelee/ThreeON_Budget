@@ -324,6 +324,18 @@ def init_db(conn):
     cur.execute("""CREATE TABLE IF NOT EXISTS forecast_setting(
         base_year TEXT NOT NULL, 키 TEXT NOT NULL, 값 TEXT NOT NULL,
         PRIMARY KEY(base_year, 키))""")
+    # 설비 현황(발전설비·기타 소형 용량)과 용량 환산 규칙(기준·대상 지사) — 2026-10-28. 비어 있으면 capacity.py 기본값.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_capacity(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 설비 TEXT NOT NULL, 구분 TEXT,
+        용량MW REAL, 준공연도 INTEGER, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장, 설비))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS hot_parts_contract(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 계약방식 TEXT, 계약기간 TEXT, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS capacity_rule(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 역할 TEXT NOT NULL,
+        적용시작연도 INTEGER, 용량MW REAL, 정비제외연도 TEXT, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS reference_standard(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
         등급 TEXT NOT NULL, 표준금액 REAL NOT NULL, 엑셀수식 TEXT,

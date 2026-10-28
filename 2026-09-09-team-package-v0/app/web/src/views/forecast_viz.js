@@ -73,12 +73,12 @@ function kpis(m, scope) {
   const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
   const top = m.acctRows[0]
   const tot = sum(m.yearTot)
-  const card = (k, val, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-xl font-bold text-ink">${val}</p><p class="text-xs text-tri">${sub}</p></div>`
+  const card = (k, val, sub) => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${k}</p><p class="mt-1 text-xl font-bold text-ink">${val}</p>${sub ? `<p class="text-xs text-tri">${sub}</p>` : ""}</div>`
   return `<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]} 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, `${fmt(tot)}천원`)}
-    ${card("연평균 증감", cagr === null ? "-" : pctTxt(cagr), `${m.years[0]} ${eok(first)}억 → ${m.years[n - 1]} ${eok(last)}억`)}
+    ${card(`${esc(scope)} ${m.years[0]}~${m.years[n - 1]}년 누계`, `${eok(tot)}<span class="ml-1 text-xs font-semibold text-tri">억원</span>`, "")}
+    ${card("연평균 증감", cagr === null ? "-" : pctTxt(cagr), `${m.years[0]}년 ${eok(first)}억원 → ${m.years[n - 1]}년 ${eok(last)}억원`)}
     ${card("가장 많은 해", `${m.years[peak]}년`, `${eok(m.yearTot[peak])}억원`)}
-    ${card(`${esc(scope)} 가장 큰 과목`, top ? esc(top.key) : "-", top ? `10년 ${eok(top.total)}억 · ${(top.total / tot * 100).toFixed(0)}%` : "")}
+    ${card(`${esc(scope)} 가장 큰 과목`, top ? esc(top.key) : "-", top ? `${m.years[0]}~${m.years[n - 1]}년 ${eok(top.total)}억원 · ${(top.total / tot * 100).toFixed(0)}%` : "")}
   </div>`
 }
 
@@ -92,12 +92,13 @@ function mapView(v, m, isTotal, scope) {
   const maxY = Math.max(...m.yearTot)
   const cols = `grid-template-columns:minmax(8rem,12rem) repeat(${m.years.length},minmax(3.6rem,1fr)) 5.5rem`
   // 왼쪽 위 칸 = 위 막대가 무엇의 합계인지(전사 합계 / ○○지사 합계)와 단위
-  const corner = `<div class="fv-corner"><span class="fv-corner-k">${isTotal ? "전사 합계" : `${esc(scope)} 합계`}</span><span class="text-[11px] font-semibold text-sub">연도별 · 억원 →</span></div>`
-  const head = `${corner}${m.years.map((y, i) => `<button class="fv-colhead" data-fvlevel="year" data-fvyear="${y}" title="${isTotal ? "전사" : esc(scope)} ${y}년 합계 ${fmt(m.yearTot[i])}천원 — 눌러서 과목 구성 보기">
+  const corner = `<div class="fv-corner"><span class="fv-corner-k">${isTotal ? "전사 합계" : `${esc(scope)} 합계`}</span><span class="text-[11px] font-semibold text-sub">연도별 →</span></div>`
+  const head = `${corner}${m.years.map((y, i) => `<button class="fv-colhead" data-fvlevel="year" data-fvyear="${y}" title="${isTotal ? "전사" : esc(scope)} ${y}년 합계 ${fmt(m.yearTot[i])} 천원 — 눌러서 과목 구성 보기">
       <span class="fv-colbar"><span style="height:${maxY ? m.yearTot[i] / maxY * 100 : 0}%"></span></span>
-      <span class="text-[11px] font-semibold text-sub">${eok(m.yearTot[i])}억</span><span class="text-xs font-bold text-ink">${y}</span></button>`).join("")}
-    <div class="self-end pb-1 text-right text-xs font-bold leading-tight text-ink">10년 합계<br><span class="text-[11px] font-semibold text-sub">(억원)</span></div>
-    <div class="fv-rowcap">${isTotal ? "지사" : "예산과목"} <span class="font-semibold text-tri">· 단위 억원</span></div>`
+      <span class="text-[11px] font-semibold text-sub">${eok(m.yearTot[i])}억원</span><span class="text-xs font-bold text-ink">${y}</span></button>`).join("")}
+    <div aria-hidden="true"></div>
+    <div class="fv-rowcap">${isTotal ? "지사명" : "예산과목"}</div>
+    <div class="fv-rowcap fv-totcap">10년 합계 <span class="font-semibold text-sub">(억원)</span></div>`
   const body = m.mapRows.map(r => {
     const base = r.vals[0]
     const label = isTotal
@@ -110,7 +111,7 @@ function mapView(v, m, isTotal, scope) {
                          : `data-fvlevel="acct" data-fvacct="${esc(r.key)}" data-fvyear="${m.years[i]}"`
       const txt = v.mode === "chg" && i > 0 ? (isFinite(p) ? `${p >= 0 ? "+" : ""}${p.toFixed(0)}%` : "신규") : eok(val)
       return `<button class="fv-cell" ${go} style="background:${c.bg};color:${c.dark ? "#FFFFFF" : "#0D0D0D"}"
-        title="${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)}천원${i ? ` · ${m.years[0]}년 대비 ${pctTxt(p)}` : ""}">${txt}</button>`
+        title="${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)} 천원${i ? ` · ${m.years[0]}년 대비 ${pctTxt(p)}` : ""}">${txt}</button>`
     }).join("")
     return `${label}${cells}<div class="self-center pr-1 text-right text-xs font-semibold text-ink">${eok(r.total)}</div>`
   }).join("")
@@ -119,14 +120,14 @@ function mapView(v, m, isTotal, scope) {
     : `<span>작음</span>${SEQ.map(c => `<span class="h-3 w-5 rounded-sm" style="background:${c}"></span>`).join("")}<span>큼</span><span class="ml-2 inline-flex items-center gap-1"><span class="h-3 w-5 rounded-sm" style="background:#F5F5F5;outline:1px solid #E5E5E5"></span>0</span>`
   return `
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <p class="text-sm text-sub">${isTotal ? "행 = 지사 · 칸을 누르면 그 지사 그 해의 과목 구성으로, 지사 이름을 누르면 그 지사 지도로 확대" : "행 = 예산과목 · 칸이나 과목 이름을 누르면 그 과목의 10년 추이로, 연도를 누르면 그 해 구성으로 확대"}</p>
+      <p class="text-sm text-sub">${isTotal ? "지사 · 칸을 누르면 상세 자료로 변경됩니다." : "행 = 예산과목 · 칸이나 과목 이름을 누르면 그 과목의 10년 추이로, 연도를 누르면 그 해 구성으로 확대"}</p>
       <div class="flex gap-1" role="group" aria-label="색 기준">
         <button class="fv-step ${v.mode !== "chg" ? "fv-step-on" : ""}" data-fvmode="amt">금액</button>
         <button class="fv-step ${v.mode === "chg" ? "fv-step-on" : ""}" data-fvmode="chg">${m.years[0]}년 대비 증감</button>
       </div>
     </div>
-    <div class="mt-4 overflow-x-auto"><div class="fv-grid" style="${cols};min-width:${12 * 16 + m.years.length * 62 + 90}px">${head}${body}</div></div>
-    <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-sub">${legend}<span class="ml-3 text-tri">단위 억원 · 칸에 마우스를 올리면 천원</span></div>`
+    <div class="mt-2 overflow-x-auto px-1.5 py-2"><div class="fv-grid" style="${cols};min-width:${12 * 16 + m.years.length * 62 + 90}px">${head}${body}</div></div>
+    <div class="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-sub">${legend}</div>`
 }
 
 /** 기준연도 값이 어디서 왔는지 — 그 해 계획본이 없으면 표준금액으로 대체된다(forecast 표 notes). */
@@ -148,10 +149,10 @@ function yearView(v, m, isTotal, scope) {
     <div class="mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-1"><p class="font-hanan text-3xl font-semibold text-ink"><span class="text-sub">${esc(scope)} ${v.year}년 합계</span> ${eok(tot)}<span class="ml-1 text-base text-sub">억원</span></p><p class="text-sm font-semibold">${delta}</p><p class="ml-auto text-xs font-semibold text-sub">단위 억원 · 비중 · 전년 대비</p></div>
     <div class="mt-4 space-y-1.5">${rows.length ? rows.map(r => {
       const p = r.prev === null ? null : pct(r.val, r.prev)
-      return `<button class="fv-barrow" data-fvlevel="acct" data-fvacct="${esc(r.key)}" title="${esc(r.key)} · ${fmt(r.val)}천원 — 눌러서 10년 추이">
+      return `<button class="fv-barrow" data-fvlevel="acct" data-fvacct="${esc(r.key)}" title="${esc(r.key)} · ${fmt(r.val)} 천원 — 눌러서 10년 추이">
         <span class="truncate text-left text-sm font-semibold text-ink">${esc(r.key)}</span>
         <span class="fv-bartrack"><span style="width:${r.val / max * 100}%;background:${BAR}"></span></span>
-        <span class="text-right text-sm font-bold text-ink">${eok(r.val)}억</span>
+        <span class="text-right text-sm font-bold text-ink">${eok(r.val)}억원</span>
         <span class="text-right text-xs text-sub">${(r.val / tot * 100).toFixed(1)}%</span>
         <span class="text-right text-xs ${p === null ? "text-tri" : p > 0.05 ? "text-err" : p < -0.05 ? "text-ok" : "text-tri"}">${p === null ? "-" : (p > 0.05 ? "▲ " : p < -0.05 ? "▼ " : "") + pctTxt(p)}</span></button>`
     }).join("") : '<p class="py-8 text-center text-sm text-tri">이 해에는 금액이 없습니다.</p>'}</div>
@@ -171,10 +172,10 @@ function acctView(v, m, t, isTotal, scope) {
   r.vals.forEach((val, i) => {
     const h = val / max * (H - T - B), x = L + i * bw + bw * .18, w = bw * .64, y = H - B - h
     const fill = i === sel ? BAR_HI : i === 0 ? BAR_SOFT : BAR
-    s += `<g class="clickable" data-fvlevel="year" data-fvyear="${m.years[i]}"><title>${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)}천원${i ? ` · 전년 대비 ${pctTxt(pct(val, r.vals[i - 1]))}` : " · 기준연도"} (클릭: 그 해 구성)</title>
+    s += `<g class="clickable" data-fvlevel="year" data-fvyear="${m.years[i]}"><title>${esc(r.key)} · ${m.years[i]}년 · ${fmt(val)} 천원${i ? ` · 전년 대비 ${pctTxt(pct(val, r.vals[i - 1]))}` : " · 기준연도"} (클릭: 그 해 구성)</title>
       <rect x="${L + i * bw}" y="${T - 20}" width="${bw}" height="${H - T - B + 20}" fill="transparent"/>
       ${h > 0 ? `<path d="M${x},${H - B} V${y + Math.min(4, h)} q0,-4 4,-4 h${w - 8} q4,0 4,4 V${H - B} Z" fill="${fill}"/>` : ""}
-      ${show.has(i) ? `<text x="${x + w / 2}" y="${y - 8}" text-anchor="middle" font-size="13" font-weight="700" fill="#0D0D0D">${eok(val)}억</text>` : ""}
+      ${show.has(i) ? `<text x="${x + w / 2}" y="${y - 8}" text-anchor="middle" font-size="13" font-weight="700" fill="#0D0D0D">${eok(val)}억원</text>` : ""}
       <text x="${x + w / 2}" y="${H - B + 18}" text-anchor="middle" font-size="12" font-weight="${i === sel ? 700 : 500}" fill="${i === sel ? "#0D0D0D" : "#5D5D5D"}">${m.years[i]}</text>
       ${i === 0 ? `<text x="${x + w / 2}" y="${H - B + 33}" text-anchor="middle" font-size="10" fill="#767676">기준연도</text>` : ""}</g>`
   })
@@ -188,15 +189,15 @@ function acctView(v, m, t, isTotal, scope) {
     }).filter(x => x.total > 0).sort((a, b) => b.total - a.total)
     const top = list.slice(0, 8), rest = list.slice(8), mx = top[0]?.total || 1
     bySite = `<div class="mt-6"><h4 class="text-sm font-bold text-ink">${esc(r.key)} · 지사별 10년 누계 <span class="font-semibold text-sub">(억원) — 누르면 그 지사로 확대</span></h4>
-      <div class="mt-2 space-y-1.5">${top.map(x => `<button class="fv-barrow fv-barrow-site" data-fvsite="${esc(x.site)}" data-fvlevel="acct" title="${esc(x.site)} · ${fmt(x.total)}천원">
+      <div class="mt-2 space-y-1.5">${top.map(x => `<button class="fv-barrow fv-barrow-site" data-fvsite="${esc(x.site)}" data-fvlevel="acct" title="${esc(x.site)} · ${fmt(x.total)} 천원">
         <span class="truncate text-left text-sm font-semibold text-ink">${esc(x.site)}</span><span class="fv-bartrack"><span style="width:${x.total / mx * 100}%;background:${BAR}"></span></span>
-        <span class="text-right text-sm font-bold text-ink">${eok(x.total)}억</span><span class="text-right text-xs text-sub">${(x.total / r.total * 100).toFixed(1)}%</span></button>`).join("")}
+        <span class="text-right text-sm font-bold text-ink">${eok(x.total)}억원</span><span class="text-right text-xs text-sub">${(x.total / r.total * 100).toFixed(1)}%</span></button>`).join("")}
       ${rest.length ? `<p class="text-xs text-tri">외 ${rest.length}곳 ${eok(sum(rest.map(x => x.total)))}억원</p>` : ""}</div></div>`
   }
   return `
     <div class="fv-headline">${scopeTag(scope, isTotal, true)}<h4 class="fv-headline-t">${esc(r.key)}</h4><span class="text-sm font-semibold text-sub">10년 추이</span></div>
     <div class="mt-4 flex flex-wrap items-end justify-between gap-3">${pick}
-      <div class="flex flex-wrap gap-4 text-sm"><span><span class="text-sub">10년 누계</span> <b class="text-ink">${eok(r.total)}억</b></span><span><span class="text-sub">연평균</span> <b class="text-ink">${cagr === null ? "-" : pctTxt(cagr)}</b></span><span><span class="text-sub">${esc(scope)} ${m.years[sel] ?? ""}년</span> <b class="text-ink">${eok(r.vals[sel] || 0)}억</b></span></div></div>
+      <div class="flex flex-wrap gap-4 text-sm"><span><span class="text-sub">10년 누계</span> <b class="text-ink">${eok(r.total)}억원</b></span><span><span class="text-sub">연평균</span> <b class="text-ink">${cagr === null ? "-" : pctTxt(cagr)}</b></span><span><span class="text-sub">${esc(scope)} ${m.years[sel] ?? ""}년</span> <b class="text-ink">${eok(r.vals[sel] || 0)}억원</b></span></div></div>
     <div class="mt-4 overflow-x-auto"><svg viewBox="0 0 ${W} ${H}" class="w-full min-w-[560px]" role="img" aria-label="${esc(r.key)} 10년 추이">${s}</svg></div>
     <p class="text-xs text-tri">단위 억원 · 짙은 막대 = 고른 해 · 옅은 막대 = 기준연도(계획본) · 막대를 누르면 그 해 구성으로</p>
     ${bySite}`
@@ -219,7 +220,7 @@ export function fcVizHtml(t, site, isTotal) {
       <div class="fv-scope ${isTotal ? "fv-scope-total" : ""}">
         <p class="text-xs font-semibold text-sub">한눈에 보기 · 지금 보는 범위</p>
         <p class="fv-scope-name font-hanan">${isTotal ? `전사 합계<span class="fv-scope-sub">${t.sites.length}개 지사</span>` : `${esc(site)}${group ? `<span class="fv-scope-sub">${esc(group)}</span>` : ""}`}</p>
-        <p class="text-xs font-semibold text-sub">${m.years[0]}~${m.years[m.years.length - 1]} · 단위 <b class="text-ink">억원</b> (1억원 = 100,000천원)</p>
+        <p class="text-xs font-semibold text-sub">${m.years[0]}~${m.years[m.years.length - 1]}년 · 단위 <b class="text-ink">억원</b></p>
       </div>
       <div class="flex flex-wrap gap-2">
         ${!isTotal ? `<button class="btn-secondary min-h-[36px] px-4 text-xs" data-fvsite="__total__" data-fvlevel="map">↖ 전사로</button>` : ""}

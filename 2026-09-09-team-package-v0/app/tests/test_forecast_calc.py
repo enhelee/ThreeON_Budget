@@ -111,6 +111,24 @@ def test_compute_site_table_hot_parts_passthrough_without_factor():
     assert row[2027] == 5000.0
 
 
+def test_hot_parts_zero_in_base_year_when_plan_has_that_account():
+    """기준연도 계획본에 그 과목이 있으면 고온부품은 이미 그 안 — 또 더하지 않는다(2026-10-28). 다음 해부터는 그대로."""
+    grade_hist = pd.DataFrame(columns=["사업장", "연도", "등급"])
+    standard_df = pd.DataFrame(columns=["사업장", "구분", "예산과목", "등급", "표준금액"])
+    hot_parts = pd.DataFrame([{"사업장": "화성지사", "연도": y, "항목": i, "금액": 5000.0}
+                              for y in (2026, 2027) for i in ("고온부품재생", "신품구매")])
+    factors = pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.0, "활성": True}])
+    empty = lambda cols: pd.DataFrame(columns=cols)
+    table = lf.compute_site_table("화성지사", grade_hist, standard_df, hot_parts, {},
+                                   empty(["사업장", "연도", "예산과목", "금액"]), factors,
+                                   empty(["사업장", "연도", "예산과목", "금액", "사유"]), empty(["사업장", "지사유형", "금액"]),
+                                   budget_lookup={("화성지사", "기계장치"): 9000.0}, base_year=2026)
+    regen = table[table["예산과목"] == "기계장치_고온부품재생"].iloc[0]
+    new = table[table["예산과목"] == "건설중인자산-재생고온부품"].iloc[0]
+    assert regen[2026] == 0.0 and regen[2027] == 5000.0          # 기계장치 계획본이 있으니 기준연도 재생 = 0
+    assert new[2026] == 5000.0 and new[2027] == 5000.0           # 건설중인자산 계획본은 없으니 그대로
+
+
 def test_budget_amount_by_site_account_aggregates_by_site_and_account(monkeypatch):
     budget_df = pd.DataFrame([
         {"예산귀속 \n부서코드": "H001", "예산과목": "수선유지비-열원경상정비", "연예산 합계": 100.0},

@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="발전플랜트 유지보수 예산·실적 분석 프로그램">
-  <title>예산·실적 업무 분석 프로그램</title>
+  <link rel="icon" href="/src/assets/favicon.svg" type="image/svg+xml">
+  <title>ONDO · 예산·실적 업무 분석</title>
 </head>
 <body>
 
@@ -25,7 +26,7 @@
               <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
             </button>
             <!-- 사이드바를 접었을 때만 보이는 표지(누르면 메인). 내용은 components/sidebar.js renderHeaderBrand -->
-            <button id="headerBrand" type="button" class="header-brand brand-link" data-view="home" aria-label="메인으로 — 한국지역난방공사 ThreeON"></button>
+            <button id="headerBrand" type="button" class="header-brand brand-link" data-view="home" aria-label="메인으로 — 한국지역난방공사 ONDO by ThreeON"></button>
             <div class="min-w-0">
               <div class="flex min-w-0 items-center gap-2"><h1 id="pageTitle" class="truncate font-hanan text-[22px] font-semibold tracking-tight text-ink">홈</h1><span id="lockBadge"></span></div>
             </div>
@@ -51,6 +52,8 @@
     <!-- 오른쪽 아래 도움말(매칭이) — appShell 안에 둬서 로그인 게이트에서는 같이 숨는다.
          내용은 components/characters.js helpFabHtml() 을 router.renderPage() 가 채운다. -->
     <div id="helpFab"></div>
+    <!-- 대화 패널(components/chat.js) — #page 밖이라 화면을 옮겨도 대화가 남는다. 넓은 화면에선 오른쪽 열. -->
+    <div id="chatHost" class="chat-host"></div>
   </div>
 
   <!-- 로그인 게이트 — 비로그인 시 appShell 을 대신해 화면 전체를 차지한다.
@@ -60,10 +63,13 @@
   <input type="file" id="trainingFile" accept=".csv" class="hidden">
 
   <div id="toast" class="pointer-events-none fixed bottom-24 right-5 z-50 hidden max-w-sm rounded-visual bg-ink px-4 py-3 text-sm font-medium text-white shadow-float" role="status"></div>
-  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-overlay">
-    <div class="rounded-visual bg-base px-8 py-6 text-center shadow-float">
-      <div class="spinner mx-auto"></div>
-      <p id="busyText" class="mt-3 text-sm font-semibold text-ink">처리 중...</p>
+  <div id="busy" class="fixed inset-0 z-50 hidden place-items-center bg-overlay" role="status" aria-live="polite">
+    <div class="loader-card">
+      <svg class="loader-thermo" viewBox="0 0 40 100" aria-hidden="true"><defs><linearGradient id="loaderMerc" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#E58F79"/><stop offset="1" stop-color="#9DB3E0"/></linearGradient></defs>
+        <rect x="13" y="4" width="14" height="70" rx="7" fill="#F0F2F6" stroke="#D5DBE6" stroke-width="2"/>
+        <rect class="loader-merc" x="17" y="12" width="6" height="66" rx="3" fill="url(#loaderMerc)"/>
+        <circle cx="20" cy="82" r="12" fill="#E58F79"/></svg>
+      <div class="loader-side"><img id="busyChar" class="loader-char" alt="" aria-hidden="true"><p id="busyText" class="loader-text">처리 중...</p></div>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

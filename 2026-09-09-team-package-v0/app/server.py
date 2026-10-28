@@ -36,7 +36,9 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
-from budget import alerts as alertm, api_forecast, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import chat as chatm   # noqa: E402
+from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import report_hwpx, report_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -135,8 +137,10 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
             if bad:
                 return JSONResponse({"detail": bad}, status_code=400)
         response = await call_next(request)
+        # /api/chat 은 POST 지만 읽기만 한다 — 감사 로그에 남기면 질문 원문이 저장되고, 감사 로그 id 가
+        # 계산 캐시(viewcache) 버전이라 질문할 때마다 전망 계산이 다시 돈다.
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
-                and path not in ("/api/login", "/api/logout")):
+                and path not in ("/api/login", "/api/logout", "/api/chat")):
             if body_json and "password" in body_json:
                 body_json = {k: v for k, v in body_json.items() if k != "password"}
             try:
@@ -1568,6 +1572,54 @@ def put_review_ack(req: ReviewAckReq, request: Request):
 _RQ_VOUCHER_MAX = 12
 
 
+def _rq_line_vouchers(conn, year, budget, branch, item):
+    """최신 분석에서 한 지사·과목의 사업 줄과 줄별 전표 {사업명: [전표]} — 추천·근거 설명이 같이 쓴다."""
+    run = dbm.latest_run(conn, year, budget)
+    if not run:
+        raise HTTPException(404, "분석 실행 이력이 없습니다.")
+    biz = dbm.load_biz_lines(conn, run["id"])
+    biz = biz[(biz["처지사"] == branch) & (biz["예산과목"] == item)]
+    rows = biz[list(_RQ_COLS)].to_dict("records")
+    resolve = dbm._line_resolver(rows)
+    detail = dbm.load_match_detail(conn, run["id"], branch=branch)
+    detail = detail[detail["과목정규"] == item]
+    by_line = {}
+    for _, v in detail.iterrows():
+        line = resolve(v["처지사정규"], v["과목정규"], v["매칭행"], v["매칭사업명"])
+        by_line.setdefault(line, []).append({
+            "erp_row_id": int(v["erp_row_id"]), "전표번호": v["전표번호"], "전기일": v["전기일"],
+            "텍스트": v["전표텍스트"], "금액천원": round(v["금액천원"] or 0),
+            "확신도": v["매칭확신도"],
+            "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"])})
+    return rows, by_line
+
+
+@app.get("/api/review-explain")
+def review_explain(year: str, budget: str, branch: str, item: str, name: str):
+    """검토 큐 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
+    전년 같은 사업은 같은 예산·지사의 전년 최신 분석에서 이름(연도 글자 제외)으로 찾는다."""
+    conn = _conn()
+    try:
+        rows, by_line = _rq_line_vouchers(conn, year, budget, branch, item)
+        mine = [r for r in rows if r["사업명"] == name]
+        if not mine:
+            raise HTTPException(404, "그 사업 줄을 최신 분석에서 찾지 못했습니다 — 화면을 새로 고치세요.")
+        plan = sum(float(r["연예산"] or 0) for r in mine)
+        actual = sum(float(r["실적금액"] or 0) for r in mine)
+        prev = None
+        prev_run = dbm.latest_run(conn, str(int(year) - 1), budget)
+        if prev_run:
+            pb = dbm.load_biz_lines(conn, prev_run["id"])
+            pb = pb[pb["처지사"] == branch][["사업명", "실적금액", "연예산"]].to_dict("records")
+            prev = explainm.prev_match(name, pb)
+        out = explainm.build({"plan": plan, "actual": actual, "name": name},
+                             by_line.get(name, []), prev)
+        out["prev"] = prev
+        return _clean_json(out)
+    finally:
+        conn.close()
+
+
 @app.get("/api/review-suggest")
 def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
     """검토 큐 한 줄의 전표와 «추천 재배정».
@@ -1578,23 +1630,7 @@ def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
     """
     conn = _conn()
     try:
-        run = dbm.latest_run(conn, year, budget)
-        if not run:
-            raise HTTPException(404, "분석 실행 이력이 없습니다.")
-        biz = dbm.load_biz_lines(conn, run["id"])
-        biz = biz[(biz["처지사"] == branch) & (biz["예산과목"] == item)]
-        rows = biz[list(_RQ_COLS)].to_dict("records")
-        resolve = dbm._line_resolver(rows)
-        detail = dbm.load_match_detail(conn, run["id"], branch=branch)
-        detail = detail[detail["과목정규"] == item]
-        by_line = {}
-        for _, v in detail.iterrows():
-            line = resolve(v["처지사정규"], v["과목정규"], v["매칭행"], v["매칭사업명"])
-            by_line.setdefault(line, []).append({
-                "erp_row_id": int(v["erp_row_id"]), "전표번호": v["전표번호"], "전기일": v["전기일"],
-                "텍스트": v["전표텍스트"], "금액천원": round(v["금액천원"] or 0),
-                "확신도": v["매칭확신도"],
-                "근거": v["매칭근거"] or _basis_fallback(v["매칭확신도"], v["구분"])})
+        rows, by_line = _rq_line_vouchers(conn, year, budget, branch, item)
         plans = {}
         for r in rows:
             if str(r.get("구분") or "").startswith("신규"):
@@ -1677,6 +1713,12 @@ def delete_override(override_id: int):
 
 # ── 통계 (25년 확정 분류체계 기준) ──────────────────────────────────────
 
+def _amt(v):
+    """금액 칸 하나를 숫자로. 계획 없이 집행된 사업(신규)은 연예산이 NaN 인데, `NaN or 0` 은 NaN 이 참이라
+    그대로 더해져 과목 합계 전체가 NaN(→ JSON null → 화면 0)이 됐다(2026-10-28 메인 과목별 펼치기에서 발견)."""
+    return 0 if v is None or v != v else v
+
+
 @app.get("/api/stats")
 def stats(year: str):
     """과목별·지사그룹별 계획 대비 실적 통계(손익/자본)."""
@@ -1700,25 +1742,25 @@ def stats(year: str):
                                             "대분류": cat_of.get(it, "기타"),
                                             "계획": 0, "실적": 0, "집행": 0, "신규": 0,
                                             "사업수": 0, "미시행": 0, "_지사": {}})
-                g["계획"] += row["연예산"] or 0
-                g["실적"] += row["실적금액"] or 0
+                g["계획"] += _amt(row["연예산"])
+                g["실적"] += _amt(row["실적금액"])
                 # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
                 br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
                                            {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
-                br["계획"] += row["연예산"] or 0
-                br["실적"] += row["실적금액"] or 0
+                br["계획"] += _amt(row["연예산"])
+                br["실적"] += _amt(row["실적금액"])
                 br["사업수"] += 1
                 g["사업수"] += 1
                 if row["구분"] == "미시행":
                     g["미시행"] += 1
                 elif row["구분"] == "계획집행":
-                    g["집행"] += row["실적금액"] or 0
+                    g["집행"] += _amt(row["실적금액"])
                 else:
-                    g["신규"] += row["실적금액"] or 0
+                    g["신규"] += _amt(row["실적금액"])
                 grp = group_of.get(row["처지사"], "기타")
                 gg = by_group.setdefault(grp, {"그룹": grp, "계획": 0, "실적": 0})
-                gg["계획"] += row["연예산"] or 0
-                gg["실적"] += row["실적금액"] or 0
+                gg["계획"] += _amt(row["연예산"])
+                gg["실적"] += _amt(row["실적금액"])
             for g in by_item.values():
                 g["지사"] = sorted(g.pop("_지사").values(), key=lambda b: -abs(b["실적"]))
             order = ["본사", "중대형CHP", "소형CHP", "DH", "기타"]
@@ -1817,6 +1859,68 @@ def _ensure_actual_outputs(conn, year, budget):
     return True
 
 
+# ── 캐릭터 챗봇(2026-10-27, 1단계) — 규칙 엔진, 읽기만 ─────────────────────
+#   질문을 규칙으로 알아듣고(사용법·화면 이동·진행 상황), 숫자는 DB 에서 읽은 값만 쓴다.
+#   외부로 나가는 데이터는 없다. 대화 원문은 저장하지 않는다(감사 로그에도 남기지 않는 GET 성격의 POST).
+#   설계: docs/설계_캐릭터챗봇.md
+
+class ChatReq(BaseModel):
+    question: str
+    context: dict = {}
+
+
+_CHAT_VIEWS = set(chatm.kb.SUGGEST)
+
+
+def _chat_status(year):
+    """진행 상황 답에 쓸 값 — 데이터셋·최신 분석·미반영·마감. year 가 없으면 자료가 있는 최신 연도."""
+    conn = _conn()
+    try:
+        if not year:
+            years = sorted({str(d["year"]) for d in dbm.list_datasets(conn)})
+            year = years[-1] if years else None
+        if not year:
+            return None
+        runs = _latest_runs(conn, year)
+        try:
+            pend = _pending_data(conn, year, runs)
+        except Exception:
+            conn.rollback()
+            pend = None
+        return {"year": year, "datasets": dbm.list_datasets(conn, year),
+                "runs": {b: r["created_at"] for b, r in runs.items()},
+                "pending": pend, "locked": dbm.is_locked(conn, year)}
+    finally:
+        conn.close()
+
+
+def _chat_standard():
+    """예측이의 표준금액 근거 답 — 5번 표준화 결과(캐시) 그대로."""
+    conn = dbm.connect()
+    try:
+        return api_forecast.standard_rows(conn)
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+@app.post("/api/chat")
+def chat(req: ChatReq):
+    if len(req.question or "") > chatm.engine.MAX_LEN:
+        raise HTTPException(400, f"질문은 {chatm.engine.MAX_LEN}자까지예요.")
+    # context 는 본문 안쪽이라 연도 검증 미들웨어가 보지 않는다 — 여기서 모양을 강제한다.
+    raw = req.context or {}
+    ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
+           "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None}
+    return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard).answer(req.question, ctx))
+
+
+@app.get("/api/chat/suggestions")
+def chat_suggestions(view: str = "home"):
+    return {"suggestions": chatm.suggestions_for(view if view in _CHAT_VIEWS else "home")}
+
+
 @app.get("/api/export")
 def export(year: str, budget: str, kind: str = "actual"):
     names = _actual_output_names(year, budget)
@@ -1839,6 +1943,72 @@ def export(year: str, budget: str, kind: str = "actual"):
     media = mimetypes.guess_type(names[kind])[0] or "application/octet-stream"
     return Response(body, media_type=media, headers={
         "Content-Disposition": f"attachment; filename*=utf-8''{quote(names[kind])}"})
+
+
+# ── 한글(hwpx) 보고서 (report_hwpx.py) ───────────────────────────────────────
+# 화면이 입력값을 받아 고치고(투자비·원인 문장 등) → 그 입력값으로 문장 초안을 다시 쓰거나 → hwpx 로 받는다.
+# 서버는 고친 값을 저장하지 않는다 — 보고서는 내려받은 파일이 원본이고, 다시 열면 분석 결과로 새로 채운다.
+
+# 보고서 종류 — 2월용 집행성과분석(perf) · 5월용 붙임2 실적 및 계획(plan). 같은 다섯 단계를 종류별 함수로.
+REPORTS = {
+    "perf": dict(template="report_perf_template.hwpx", build=report_hwpx.build_perf_inputs,
+                 normalize=report_hwpx.normalize_inputs, texts=report_hwpx.auto_texts,
+                 preview=report_hwpx.preview_perf_html, render=report_hwpx.render_perf_hwpx,
+                 name=lambda y: f"{y % 100}년 열원 유지보수예산 집행성과분석.hwpx"),
+    "plan": dict(template="report_plan_template.hwpx", build=report_plan.build_plan_inputs,
+                 normalize=report_plan.normalize_inputs, texts=report_plan.auto_texts,
+                 preview=report_plan.preview_plan_html, render=report_plan.render_plan_hwpx,
+                 name=lambda y: f"[붙임2] {y % 100}년~{(y + 1) % 100}년 열원시설 유지보수예산 집행실적 및 계획.hwpx"),
+}
+
+
+class ReportReq(BaseModel):
+    year: str
+    inputs: dict
+
+
+def _report(kind):
+    if kind not in REPORTS:
+        raise HTTPException(404, "보고서 종류는 perf(2월 집행성과분석) 또는 plan(5월 붙임2)입니다.")
+    return REPORTS[kind]
+
+
+def _report_template(rep):
+    with open(os.path.join(APP_DIR, "templates", rep["template"]), "rb") as f:
+        return f.read()
+
+
+@app.get("/api/report/{kind}")
+def report_inputs(kind: str, year: str):
+    rep = _report(kind)
+    conn = _conn()
+    try:
+        return _clean_json(rep["build"](conn, year))
+    finally:
+        conn.close()
+
+
+@app.post("/api/report/{kind}/texts")
+def report_texts(kind: str, req: ReportReq):
+    """고친 숫자로 문장 초안(◈·□·○)을 다시 — 원인 칸은 비워 둔 채."""
+    rep = _report(kind)
+    return _clean_json(rep["texts"](rep["normalize"](req.inputs, req.year)))
+
+
+@app.post("/api/report/{kind}/preview")
+def report_preview(kind: str, req: ReportReq):
+    """화면용 — 양식을 채운 결과를 종이 모양 HTML 로(고칠 칸 표시 포함). 내려받는 hwpx 와 같은 채우기를 지난다."""
+    rep = _report(kind)
+    inputs = rep["normalize"](req.inputs, req.year)
+    return {"html": rep["preview"](_report_template(rep), inputs), "inputs": _clean_json(inputs)}
+
+
+@app.post("/api/report/{kind}/hwpx")
+def report_hwpx_file(kind: str, req: ReportReq):
+    rep = _report(kind)
+    body = rep["render"](_report_template(rep), rep["normalize"](req.inputs, req.year))
+    return Response(body, media_type="application/hwp+zip", headers={
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(rep['name'](int(req.year)))}"})
 
 
 # ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────
