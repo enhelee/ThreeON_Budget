@@ -178,8 +178,19 @@ async function applyPreview(mode) {
   try {
     if (p.kind === "grades" || p.kind === "schedule") {
       const have = new Set(d.grades.map(r => `${r.사업장}|${r.연도}`))
-      const rows = mode === "merge" ? [...d.grades, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}`))] : p.rows
+      // 정비등급 양식(미래 일정)의 «전체 교체»는 그 파일의 해만 바꾼다 — 2016~ 과거 이력까지 지우지 않게
+      const first = Math.min(...p.rows.map(r => Number(r.연도)))
+      const past = p.kind === "schedule" ? d.grades.filter(r => Number(r.연도) < first) : []
+      const rows = mode === "merge" ? [...d.grades, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}`))] : [...past, ...p.rows]
       await put("grades", {rows})
+      // 정비등급 양식이면 설비별 등급(삼송 #1·#2 GT 등)도 — 지난 해 줄은 두고, 가져온 지사·설비의 같은 해만 바꾼다
+      if (p.eq_rows?.length) {
+        const key = r => `${r.사업장}|${r.설비}|${r.연도}`
+        const got = new Set(p.eq_rows.map(key))
+        const keep = mode === "merge" ? d.site_grade_eq : d.site_grade_eq.filter(r => !got.has(key(r)))
+        const add = mode === "merge" ? p.eq_rows.filter(r => !new Set(d.site_grade_eq.map(key)).has(key(r))) : p.eq_rows
+        await put("site-grade-eq", {rows: [...keep, ...add]})
+      }
     } else if (p.kind === "hot-parts") {
       const have = new Set(d.hot_parts.map(r => `${r.사업장}|${r.연도}|${r.항목}`))
       const rows = mode === "merge" ? [...d.hot_parts, ...p.rows.filter(r => !have.has(`${r.사업장}|${r.연도}|${r.항목}`))] : p.rows

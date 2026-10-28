@@ -26,14 +26,16 @@ import re
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.styles import PatternFill
 
 from . import benchmark, forecast_calc
-from .forecast_import import site_sheet_map
+from .forecast_import import grade_plan_layout, is_grade_plan_sheet, site_sheet_map
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEMPLATE_DIR = os.path.join(APP_DIR, "templates")
 STD_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_표준화.xlsx")
 LT_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_중장기예산.xlsx")
+GRADE_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_정비등급.xlsx")   # 사용자가 정한 정비등급 양식(2026-10-28)
 
 MILLION = 1000.0          # 천원 → 백만원
 
@@ -630,6 +632,74 @@ def fill_summary_sheet(ws, site_tables):
 
 def _sheet_like(wb, pred):
     return next((n for n in wb.sheetnames if pred(n)), None)
+
+
+# 정비등급 양식의 칸 색 — 양식 그대로(TI·HGPI·CI 파랑, MI 노랑, 그 밖은 색 없음). 값이 바뀐 칸만 다시 칠한다.
+_GRADE_FILL = {"TI": "FF00B0F0", "HGPI": "FF00B0F0", "CI": "FF00B0F0", "MI": "FFFFFF00"}
+
+
+def fill_grade_plan_sheet(ws, grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR, units=None):
+    """정비등급 양식(한 해 한 열)에 저장된 미래 등급을 채운다.
+
+    설비 줄이 둘 이상인 지사는 설비별 등급(units)에서 같은 설비 이름으로, 없으면 대표 등급으로.
+    저장값이 없는 해의 등급 칸은 비운다 — 양식에 남은 옛 등급이 «현재값»처럼 보이지 않게.
+    «-»·«준공» 같은 표시는 등급이 아니라서 그대로 둔다."""
+    by = int(base_year)
+    lines = grade_plan_layout(ws, site_names)
+    # 연도 머리: 기준연도부터 다시 매긴다(2027 기준이면 2027~2036)
+    for r in range(1, ws.max_row + 1):
+        cols = sorted(c for c in range(1, ws.max_column + 1)
+                      if isinstance(ws.cell(row=r, column=c).value, (int, float)) and 2020 < ws.cell(row=r, column=c).value < 2050)
+        if len(cols) >= 2:
+            for i, c in enumerate(cols):
+                ws.cell(row=r, column=c).value = by + i
+    lines = [{**ln, "years": {c: by + i for i, c in enumerate(sorted(ln["years"]))}} for ln in lines]
+    g = grade_hist[grade_hist["연도"].astype(int) >= by] if not grade_hist.empty else grade_hist
+    rep = {(s, int(y)): v for s, y, v in zip(g["사업장"], g["연도"], g["등급"])}
+    u = units if units is not None and not units.empty else pd.DataFrame(columns=["사업장", "연도", "설비", "등급"])
+    unit = {(s, str(q), int(y)): v for s, q, y, v in zip(u["사업장"], u["설비"], u["연도"], u["등급"])}
+    site_lines = {}
+    for ln in lines:
+        site_lines.setdefault(ln["site"], []).append(ln)
+
+    def rep_line(lns):
+        """대표 등급을 받을 줄 — 가져오기와 같은 규칙(양식에 적힌 GT 어휘 줄 우선, 없으면 A/B/C 줄)."""
+        kinds = [forecast_calc._classify_grade_row({c: ws.cell(row=ln["row"], column=c).value for c in ln["years"]}) for ln in lns]
+        i = next((i for i, k in enumerate(kinds) if k == "GT"), None)
+        i = i if i is not None else next((i for i, k in enumerate(kinds) if k == "ST"), 0)
+        return lns[i]["row"]
+
+    for site, lns in site_lines.items():
+        rep_row = rep_line(lns)
+        for ln in lns:
+            has_unit = len(lns) > 1 and any(k[0] == site and k[1] == ln["unit"] for k in unit)
+            for col, year in ln["years"].items():
+                cell = ws.cell(row=ln["row"], column=col)
+                old = str(cell.value or "").strip()
+                if has_unit:
+                    val = unit.get((site, ln["unit"], year))
+                elif ln["row"] == rep_row:
+                    val = rep.get((site, year))
+                else:
+                    val = None
+                if val is None:
+                    if old in forecast_calc.VALID_GRADE_TOKENS:
+                        set_cell(ws, ln["row"], col, None)
+                        cell.fill = PatternFill(fill_type=None)
+                    continue
+                if str(val) != old:
+                    set_cell(ws, ln["row"], col, val)
+                    color = _GRADE_FILL.get(str(val))
+                    cell.fill = PatternFill("solid", fgColor=color) if color else PatternFill(fill_type=None)
+
+
+def build_grade_plan_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,
+                              units=None, template_path: str = GRADE_TEMPLATE) -> bytes:
+    """«현재값이 채워진 정비등급 양식» — 사용자가 정한 양식 그대로, 등급 칸만 저장값으로."""
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    fill_grade_plan_sheet(ws, grade_hist, site_names, base_year, units)
+    return _bytes(wb)
 
 
 def build_schedule_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,

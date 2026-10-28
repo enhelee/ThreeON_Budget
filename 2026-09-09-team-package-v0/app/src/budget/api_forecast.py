@@ -222,6 +222,12 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 master, ratio = forecast_import.hq_master_from_workbook(data, sites, int(base_year))
                 return clean_json({"kind": kind, "columns": [str(c) for c in master.columns],
                                    "rows": pf.records(master), "ratio_rows": pf.records(ratio)})
+            if kind == "schedule":
+                # 정비등급 양식(한 해 한 열)이면 설비별 등급도 같이 — 화면이 site_grade_eq 의 미래 줄로 넣는다
+                df, units = forecast_import.grade_plan_from_workbook(data, sites)
+                if df.empty:
+                    df = IMPORTERS[kind](data, sites)
+                return clean_json({"kind": kind, "rows": pf.records(df), "eq_rows": pf.records(units)})
             df = IMPORTERS[kind](data, sites)
             return clean_json({"kind": kind, "rows": pf.records(df)})
         except HTTPException:
@@ -347,9 +353,10 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 data = forecast_export.fill_longterm_workbook(f["tables"], f["grade"], f["hq_master"], f["sites"], by)
                 name = f"중장기예산_{by}-{by + 9}년_결과.xlsx"
             elif kind == "schedule":
-                data = forecast_export.build_schedule_download(
-                    fs.load_grade_history(conn, base_year), pf.forecast_sites(conn, base_year), by)
-                name = f"정기점검보수공사_일정_{by}년기준_현재값.xlsx"
+                data = forecast_export.build_grade_plan_download(
+                    fs.load_grade_history(conn, base_year), pf.forecast_sites(conn, base_year), by,
+                    units=fs.load_table(conn, base_year, "site_grade_eq"))
+                name = f"전지사_정비등급_{by}-{by + 9}년_현재값.xlsx"
             elif kind == "hot-parts":
                 data = forecast_export.build_hot_parts_download(
                     fs.load_hot_parts(conn, base_year), pf.forecast_sites(conn, base_year), by)
