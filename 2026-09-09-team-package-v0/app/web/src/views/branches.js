@@ -110,7 +110,7 @@ function brScatterHtml(rows) {
   const labels = [];
   for (const p of [...pts].sort((a, b) => b.plan - a.plan)) {
     const cx = sx(p.plan), cy = sy(Math.max(p.act, lo));
-    s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억 · 실적 ${p.act.toFixed(1)}억 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
+    s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억원 · 실적 ${p.act.toFixed(1)}억원 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
     if (!labeled.has(p.name)) continue;
     const txt = `${p.name} ${p.rate.toFixed(0)}%`, tw = txt.length * 10.5, th = 14;
     // 띠 바깥쪽으로 먼저 — 계획보다 더 쓴 지사(대각선 위)는 왼쪽 위, 덜 쓴 지사(아래)는 오른쪽 아래부터 찾는다.
@@ -137,7 +137,7 @@ function brScatterHtml(rows) {
         <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">계획 대비 실적 분포</h3><p class="section-help">점을 누르면 해당 지사의 상세 분석 화면으로 이동합니다.</p></div>
         <div class="flex gap-2"><span class="badge bg-err-bg text-err">▲ 120% 초과 ${over}곳</span><span class="badge bg-warn-bg text-warn">▼ 80% 미만 ${under}곳</span></div></div>
         <div class="mt-4 overflow-x-auto"><svg viewBox="0 0 ${W} ${H}" class="mx-auto block w-full min-w-[640px]" style="max-height:68vh" role="img" aria-label="지사별 계획 대비 실적 산점도">${s}</svg></div>
-        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span><span class="inline-flex items-center gap-1.5"><svg viewBox="0 0 22 6" class="h-1.5 w-6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="#0D0D0D" stroke-width="2" stroke-dasharray="5 3"/></svg>집행률 100%</span>${floored ? `<span>바닥선 = 실적 ${num(lo)}억 미만(0원 포함) ${floored}곳</span>` : ""}</div>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span><span class="inline-flex items-center gap-1.5"><svg viewBox="0 0 22 6" class="h-1.5 w-6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="#0D0D0D" stroke-width="2" stroke-dasharray="5 3"/></svg>집행률 100%</span>${floored ? `<span>바닥선 = 실적 ${num(lo)}억원 미만(0원 포함) ${floored}곳</span>` : ""}</div>
       </section>`;
 }
 

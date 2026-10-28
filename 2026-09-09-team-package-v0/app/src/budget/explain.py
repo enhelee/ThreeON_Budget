@@ -30,12 +30,12 @@ _RE_YEARWORD = re.compile(r"(?<!\d)(?:20\d{2}|'\d{2}|\d{2})\s*년(?:도)?|(?<!\d
 
 
 def money(v):
-    """천원 → 읽는 돈. 1억 이상은 «12.3억 원», 1백만 이상은 «345백만 원», 그 밑은 천원."""
+    """천원 → 읽는 돈. 1억 이상은 «12.3억원», 1백만 이상은 «345백만 원», 그 밑은 천원."""
     v = float(v or 0)
     sign = "−" if v < 0 else ""
     a = abs(v)
     if a >= 100_000:
-        return f"{sign}{a / 100_000:,.1f}억 원"
+        return f"{sign}{a / 100_000:,.1f}억원"
     if a >= 1_000:
         return f"{sign}{a / 1_000:,.0f}백만 원"
     return f"{sign}{a:,.0f} 천원"
