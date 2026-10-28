@@ -360,6 +360,13 @@ def forecast_frames(conn, base_year):
             "window": fs.learning_window(conn, base_year)}
 
 
+def capital_items(conn, year):
+    """자본예산 과목 이름 — 메인 전망 누적 막대(손익+자본)용. 읽기만 한다(load_item_config 는 없으면 시드를 저장하므로 쓰지 않음).
+    그 해 설정이 없으면 시드 목록. 여기 없는 과목은 손익으로 본다."""
+    rows = conn.execute("SELECT 과목 FROM item_config WHERE year=? AND budget='자본'", (str(year),)).fetchall()
+    return {r[0] for r in rows} or {x["과목"] for x in config_store.seed_item_config(year, "자본")}
+
+
 def run_forecast(conn, base_year):
     """4단계 — 지사별 기준연도~+9년 표와 전사 합계(JSON 용)."""
     f = forecast_frames(conn, base_year)
@@ -370,6 +377,7 @@ def run_forecast(conn, base_year):
         return [{"예산과목": r["예산과목"], **{str(y): float(r[y]) for y in years}} for _, r in df.iterrows()]
 
     out_tables = {s: rows_of(t) for s, t in tables.items()}
+    capital = capital_items(conn, base_year)
     total = {}
     for rows in out_tables.values():
         for r in rows:
@@ -380,6 +388,6 @@ def run_forecast(conn, base_year):
             "tables": out_tables, "cri_events": records(f["cri"]),
             "ranges": forecast_ranges(actuals, sites, years, int(base_year), f["factors"], f["window"]),
             "overhaul_years": {s: sorted(v) for s, v in (f["overhaul"] or {}).get("years", {}).items()},
-            "total_rows": [{"예산과목": k, **v} for k, v in total.items()],
+            "total_rows": [{"예산과목": k, "구분": "자본" if k in capital else "손익", **v} for k, v in total.items()],
             "notes": {"budget_plan_missing": bool(budget_df.empty), "grade_empty": bool(grade.empty),
                       "actuals_empty": bool(actuals.empty)}}

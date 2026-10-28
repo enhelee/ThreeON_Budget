@@ -478,3 +478,36 @@ img.char-img{object-fit:contain;display:inline-block}
   .gate-card{width:100%;max-width:28rem;background:#fff;box-shadow:none}
 }
 @media (prefers-reduced-motion:reduce){.gate-char{animation:none}}
+
+/* ── 메인 — 팀장 검토의견 반영(2026-10-28) ──
+   .yr-one: 옅은 계획 막대 위에 실적 막대를 겹친 한 줄(손익·자본·합계). .sum3: «3개년 실적비교» 표 */
+.yr-one{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 7.5rem 3.2rem;align-items:center;gap:.6rem;font-size:12px;color:var(--sub,#5B6478)}
+.yr-one__k{font-weight:600;color:#5B6478}
+.yr-one--sum .yr-one__k{font-weight:800;color:var(--navy)}
+.yr-one__track{position:relative;height:14px;border-radius:999px;background:#F1F3F7;overflow:hidden}
+.yr-one__plan{position:absolute;left:0;top:0;bottom:0;border-radius:999px}
+.yr-one__act{position:absolute;left:0;top:3px;bottom:3px;border-radius:999px;box-shadow:0 0 0 2px #fff}
+.yr-one__v{text-align:right;white-space:nowrap}.yr-one__v b{color:var(--navy);font-weight:700}
+.yr-one__r{text-align:right;font-weight:600;color:var(--navy)}
+.sum3{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.sum3 th,.sum3 td{padding:.5rem .6rem;text-align:right;border-bottom:1px solid #EEF1F6}
+.sum3 thead th{font-size:12px;font-weight:600;color:#5B6478;text-align:center;background:#F6F8FB}
+.sum3 thead th:first-child{text-align:left}
+.sum3__y{color:var(--navy)!important;font-weight:800!important;border-left:1px solid #E3E7EF}
+.sum3__sub th:nth-child(odd){border-left:1px solid #E3E7EF}
+.sum3 tbody th{text-align:left;font-weight:700;color:var(--navy);border-bottom:1px solid #E3E7EF}
+.sum3 tbody td:nth-child(2n){border-left:1px solid #EEF1F6}
+.sum3__row td{color:var(--ink,#1A2236)}
+.sum3__rate td{text-align:center;font-size:12px;color:#7A8294;border-bottom:1px solid #E3E7EF;border-left:1px solid #EEF1F6}
+.sum3__row--sum th,.sum3__row--sum td{background:#F6F8FB;font-weight:800;color:var(--navy)}
+.home-acct-btn{margin-top:.9rem;display:inline-flex;align-items:center;gap:.3rem;font-size:13px;font-weight:600;color:var(--navy);background:none;border:0;padding:0;cursor:pointer}
+.home-acct-btn:hover{text-decoration:underline}
+.acct-list{display:grid;gap:.55rem}
+.acct-row{display:grid;grid-template-columns:minmax(8rem,16rem) minmax(0,1fr) 13rem 4.2rem;align-items:center;gap:.75rem;font-size:13px;color:#5B6478}
+.acct-row__k{font-weight:600;color:var(--ink,#1A2236);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-row__v{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.acct-row__v b{color:var(--navy)}
+.year-pick{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.9rem}
+.year-pick button{padding:.3rem .75rem;border-radius:999px;border:1px solid #E3E7EF;background:#fff;font-size:12px;font-weight:600;color:#5B6478;cursor:pointer}
+.year-pick button:hover{border-color:var(--navy);color:var(--navy)}
+.year-pick button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+@media (max-width:767px){.acct-row{grid-template-columns:1fr 6rem}.acct-row .yr-one__track,.acct-row__v{display:none}}

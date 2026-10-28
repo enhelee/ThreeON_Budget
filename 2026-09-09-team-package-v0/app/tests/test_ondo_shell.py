@@ -137,3 +137,39 @@ def test_chart_plan_light_navy_and_actual_soft_coral():
     for k, v in (("plan", "#B8C4DD"), ("act", "#D9826B")):
         assert f".yr-bar--{k}{{background:{v}}}" in css and f".yr-dot--{k}{{background:{v}}}" in css, f"{k} 막대·점은 {v}"
     assert "#2F6FDB" not in css and "#D2601A" not in css, "예전 쨍한 파랑·주황이 남아 있습니다"
+
+
+# ── 팀장 검토의견 반영(2026-10-28 UI/검토의견.xlsx) ─────────────────────────────
+# ① 3개년: 계획·실적을 한 막대에(계획 위에 실적), 손익·자본·합계 따로 ② 연도별 요약 = «3개년 실적비교» 표(연도 가로·계획/실적·실적률)
+# ③ 전망 = 손익+자본 누적 막대 ④ 손익·자본 카드를 누르면 예산과목별로 펼침 ⑤ 카드에서 연도 고르기
+
+def _fn(src, name):
+    return src.split(f"function {name}(", 1)[1].split("\nfunction ", 1)[0].split("\nexport function", 1)[0]
+
+
+def test_review_multi_year_bars_split_budget_types_in_one_bar():
+    home = _read(SRC, "views", "home.js")
+    body = _fn(home, "multiYearPanels")
+    assert 'BT = ["손익", "자본", "합계"]' in home and "BT.map" in body, "손익·자본·합계 따로"
+    assert "yr-one" in body, "계획 막대 위에 실적 막대를 겹친 한 줄(.yr-one)"
+
+
+def test_review_summary_is_three_year_comparison_table():
+    body = _fn(_read(SRC, "views", "home.js"), "summaryTable")
+    assert "colspan" in body and "실적률" in body and "합계" in body and "억원" in body
+
+
+def test_review_forecast_is_stacked_by_budget_type():
+    home = _read(SRC, "views", "home.js")
+    body = _fn(home, "forecastPanel")
+    assert "구분" in body and "#3F5A9E" in body and "#C9923A" in body, "손익(남청)·자본(황토) 누적"
+    pf = _read(APP, "src", "budget", "pipeline_forecast.py")
+    assert '"구분"' in pf and "def capital_items" in pf, "전망 합계 행에 손익/자본 구분"
+
+
+def test_review_cards_expand_by_account_and_pick_year():
+    home = _read(SRC, "views", "home.js")
+    assert "data-homeacct" in home and "acctPanel" in home, "손익·자본 카드를 누르면 과목별 펼침"
+    assert "yearPickCard" in home and "data-goyear" in _fn(home, "yearPickCard"), "카드에서 연도 고르기"
+    js = _read(SRC, "main.js")
+    assert "data-homeacct" in js and "/api/stats?year=" in js

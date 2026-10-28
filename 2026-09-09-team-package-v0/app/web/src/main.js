@@ -47,8 +47,20 @@ document.addEventListener("click", async e => {
     navigate("forecast", {tab: "table"});
     return;
   }
+  // 메인 손익·자본 카드 «예산과목별 보기» — 처음 펼칠 때 그 연도 /api/stats 를 받는다(4번 통계 탭과 같은 자료)
+  const ha = e.target.closest("[data-homeacct]");
+  if (ha) {
+    state.homeAcct = state.homeAcct === ha.dataset.homeacct ? null : ha.dataset.homeacct;
+    renderPage();
+    const y = state.year;
+    if (state.homeAcct && String(state.stats?._year) !== String(y)) {
+      try { state.stats = {...await api(`/api/stats?year=${y}`), _year: y}; } catch { state.stats = {budgets: {}, _year: y}; }
+      renderPage();
+    }
+    return;
+  }
   const gy = e.target.closest("[data-goyear]");
-  if (gy) { changeYear(gy.dataset.goyear); return; }
+  if (gy) { state.homeAcct = null; changeYear(gy.dataset.goyear); return; }   // 펼친 과목 목록은 연도가 바뀌면 닫는다
   // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
   const st = e.target.closest("[data-stat-item]");
   if (st && !e.target.closest("button")) {

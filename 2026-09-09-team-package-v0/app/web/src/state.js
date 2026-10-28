@@ -3,6 +3,7 @@ export const state = {
   type: "all", search: "", sort: "rateDesc",
   brTableOpen: true,   // 3번 탭 지사 표 펼침 — 접으면 아래 계획–실적 분포 차트가 바로 보인다
   status: null, branches: null, stats: null, overview: null,
+  homeAcct: null,   // 메인에서 예산과목별로 펼친 카드(«손익»|«자본»)
   health: null,        // GET /healthz — DB 종류·인증 여부·리비전 (메인 헤더/카드)
   returnHash: null,  // 401 로 게이트에 튕기기 직전 보던 주소 — 로그인 후 여기로 돌아간다
   learned: null, overrides: null, bizEdits: null,
