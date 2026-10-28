@@ -24,7 +24,7 @@
   --line: #E5E5E5; --line-strong: #C9C9C9; --line-subtle: #F2F2F2;
   --base: #FFFFFF; --subtle: #F7F7F8; --page: #F4F6FA; --overlay: rgba(13,13,13,0.56);
   --brand: #FE0009; --brand-ink: #000000;   /* CI 빨강 — 로고 전용 */
-  --navy: #0B1020; --navy-2: #121A30;
+  --navy: #0B1020; --rail: #E9EDF4; --navy-2: #121A30;
   --char-mt: #3EE6C4; --char-gt: #FF8A6E; --char-yc: #A98BFF;   /* 캐릭터 색(어두운 바탕용) */
   --ok: #16794A; --ok-bg: #EAF5EF; --warn: #8F6000; --warn-bg: #FFF4D6;
   --err: #B42318; --err-bg: #FDECEC; --info: #315EAC; --info-bg: #EAF2FF;

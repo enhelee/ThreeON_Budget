@@ -45,7 +45,7 @@ export const STAGES = [
 ]
 
 function navButton(m) {
-  return `<button class="nav-button" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span>${m.char ? `<span class="nav-dot nav-dot--${m.char}" aria-hidden="true"></span>` : ""}</button>`
+  return `<button class="nav-button" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span></button>`
 }
 
 function groupLabel(text) {
@@ -63,7 +63,7 @@ export function renderSidebar() {
   return `
     <button type="button" class="sb-brand brand-link block w-full text-left" data-view="home" aria-label="메인으로 — 한국지역난방공사 ONDO by ThreeON">
       <span class="sb-full sb-ci"><img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-full"></span>
-      <span class="sb-name">${charImg("mt", "sidebar-mascot", {head: true})}<span class="sb-full sb-word"><b>ON</b>DO</span><span class="sb-full sb-by">by ThreeON</span></span>
+      <span class="sb-name">${charImg("mt", "sidebar-mascot", {head: true})}<span class="sb-full sb-word ondo-word"><b>ON</b>DO</span><span class="sb-full sb-by">by ThreeON</span></span>
       <span class="sb-full sb-desc">예산·실적 분석 · 발전플랜트 유지보수</span>
     </button>
 
@@ -80,7 +80,7 @@ export function renderHeaderBrand() {
   return `
     <img src="/assets/kdhc-signature-ko.svg" alt="" width="138" height="32" class="block h-8 w-auto">
     <span class="header-brand__text">
-      <span class="flex items-center gap-1.5 text-[15px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word"><b>ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span>${charImg("mt", "header-brand__mascot", {head: true})}</span>
+      <span class="flex items-center gap-1.5 text-[15px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word ondo-word"><b>ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span>${charImg("mt", "header-brand__mascot", {head: true})}</span>
       <span class="block text-[12px] leading-4 text-sub">예산·실적 분석 · 발전플랜트 유지보수</span>
     </span>`
 }

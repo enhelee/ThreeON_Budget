@@ -1713,6 +1713,12 @@ def delete_override(override_id: int):
 
 # ── 통계 (25년 확정 분류체계 기준) ──────────────────────────────────────
 
+def _amt(v):
+    """금액 칸 하나를 숫자로. 계획 없이 집행된 사업(신규)은 연예산이 NaN 인데, `NaN or 0` 은 NaN 이 참이라
+    그대로 더해져 과목 합계 전체가 NaN(→ JSON null → 화면 0)이 됐다(2026-10-28 메인 과목별 펼치기에서 발견)."""
+    return 0 if v is None or v != v else v
+
+
 @app.get("/api/stats")
 def stats(year: str):
     """과목별·지사그룹별 계획 대비 실적 통계(손익/자본)."""
@@ -1736,25 +1742,25 @@ def stats(year: str):
                                             "대분류": cat_of.get(it, "기타"),
                                             "계획": 0, "실적": 0, "집행": 0, "신규": 0,
                                             "사업수": 0, "미시행": 0, "_지사": {}})
-                g["계획"] += row["연예산"] or 0
-                g["실적"] += row["실적금액"] or 0
+                g["계획"] += _amt(row["연예산"])
+                g["실적"] += _amt(row["실적금액"])
                 # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
                 br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
                                            {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
-                br["계획"] += row["연예산"] or 0
-                br["실적"] += row["실적금액"] or 0
+                br["계획"] += _amt(row["연예산"])
+                br["실적"] += _amt(row["실적금액"])
                 br["사업수"] += 1
                 g["사업수"] += 1
                 if row["구분"] == "미시행":
                     g["미시행"] += 1
                 elif row["구분"] == "계획집행":
-                    g["집행"] += row["실적금액"] or 0
+                    g["집행"] += _amt(row["실적금액"])
                 else:
-                    g["신규"] += row["실적금액"] or 0
+                    g["신규"] += _amt(row["실적금액"])
                 grp = group_of.get(row["처지사"], "기타")
                 gg = by_group.setdefault(grp, {"그룹": grp, "계획": 0, "실적": 0})
-                gg["계획"] += row["연예산"] or 0
-                gg["실적"] += row["실적금액"] or 0
+                gg["계획"] += _amt(row["연예산"])
+                gg["실적"] += _amt(row["실적금액"])
             for g in by_item.values():
                 g["지사"] = sorted(g.pop("_지사").values(), key=lambda b: -abs(b["실적"]))
             order = ["본사", "중대형CHP", "소형CHP", "DH", "기타"]
