@@ -484,13 +484,13 @@ img.char-img{object-fit:contain;display:inline-block}
 .yr-one{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 7.5rem 4.4rem;align-items:center;gap:.6rem;font-size:12px;color:var(--sub,#5B6478)}
 .yr-one__k{font-weight:600;color:#5B6478}
 .yr-one--sum .yr-one__k{font-weight:800;color:var(--navy)}
-/* 손익 남색 · 자본 청록 · 합계 진한 남색 — 옅은 막대 = 계획, 진한 막대 = 실적(10/28 grace). 같은 색을 전망 누적 막대·과목별 펼침에도 쓴다 */
-.yr-one--pl .yr-one__plan{background:#C9D3EA}.yr-one--pl .yr-one__act{background:#3F5A9E}
-.yr-one--cap .yr-one__plan{background:#BFE3DA}.yr-one--cap .yr-one__act{background:#2E9E88}
-.yr-one--sum .yr-one__plan{background:#B9C2D6}.yr-one--sum .yr-one__act{background:#1F2D55}
+/* «라»안(10/28 grace): 손익 회색 · 자본 연회색 · 합계만 산호(실적 색) — 옅은 막대 = 계획, 진한 막대 = 실적. 전망 누적 막대·과목별 펼침도 같은 색 */
+.yr-one--pl .yr-one__plan{background:#ECEEF2}.yr-one--pl .yr-one__act{background:#9AA3B5}
+.yr-one--cap .yr-one__plan{background:#ECEEF2}.yr-one--cap .yr-one__act{background:#C2C8D4}
+.yr-one--sum .yr-one__plan{background:#F4D9CF}.yr-one--sum .yr-one__act{background:#D9826B}
 .yr-one--sum .yr-one__track{height:16px}
 .yr-key{display:inline-block;width:.8rem;height:.8rem;border-radius:3px}
-.yr-key--pl{background:#3F5A9E}.yr-key--cap{background:#2E9E88}.yr-key--sum{background:#1F2D55}
+.yr-key--pl{background:#9AA3B5}.yr-key--cap{background:#C2C8D4}.yr-key--sum{background:#D9826B}
 .yr-one__r .badge{font-size:12.5px;font-weight:700}
 .yr-one__track{position:relative;height:14px;border-radius:999px;background:#F1F3F7;overflow:hidden}
 .yr-one__plan{position:absolute;left:0;top:0;bottom:0;border-radius:999px}
