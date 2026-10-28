@@ -106,6 +106,55 @@ def _sim(a, b):
     return fuzz.WRatio(str(a), str(b))
 
 
+# 계획 사업 고르기용 유사도(2026-10-27 정밀도 측정 후속). 원문 WRatio 는 «용역»·«구매»·«경상정비»처럼
+# 흔한 낱말 하나만 겹쳐도 부분 일치 85.5점을 줬다 — 2025 손익 «자동확정» 오류 363건 대부분이 이 점수였다
+# («고양CES 빙축열냉동기 용역» → «고압전동기 절연진단 용역»). 연도·월·회차와 흔한 업무 낱말을 지운
+# «이름 핵심»끼리 비교하고, 한쪽 핵심이 너무 짧으면 원문 점수를 쓴다.
+_GENERIC = re.compile(
+    r"\d{1,2}\.\d{1,2}"                                   # (25.01) 같은 연·월 표기
+    r"|제?\d+차?회차?|\d+월분?|'?\d{2,4}년도?"
+    r"|구매|용역|공사|비용|귀속|역인식|인식|수수료|집행|관련|처리|지급|대금|기성|준공|외주비|입찰|계약|건"
+    r"|[()\[\]{}<>_·,.\-#/~]")
+_GROUP_WORDS = ("중대형", "소형")          # 지사 묶음 — 한쪽에만 «소형», 다른 쪽에 «중대형»이면 다른 사업
+SIM_MARGIN = 5.0                           # 1등과 2등 후보 점수 차가 이보다 작으면 «근소» — 확신도를 낮춘다
+NEAR_CONF = 79.0                           # 근소한 1등의 확신도 상한(자동확정 0.80 밑 → 검토 대상)
+
+
+def _name_core(s):
+    k = normalize.text_key(s) or ""
+    return _GENERIC.sub("", k)
+
+
+def _group_conflict(a, b):
+    ga = {w for w in _GROUP_WORDS if w in str(a)}
+    gb = {w for w in _GROUP_WORDS if w in str(b)}
+    return bool(ga and gb and not (ga & gb))
+
+
+def _core_sim(text, name):
+    """흔한 낱말을 뺀 «이름 핵심» 유사도(0~100). 한쪽 핵심이 너무 짧으면 None(판단 안 함)."""
+    if not text or not name:
+        return None
+    ca, cb = _name_core(text), _name_core(name)
+    if len(ca) < 3 or len(cb) < 3:
+        return None
+    s = fuzz.WRatio(ca, cb)
+    return min(s, 50.0) if _group_conflict(text, name) else s
+
+
+def _plan_sim(text, name):
+    """계획 사업 고르기 점수(0~100) — 원문 WRatio, 단 «소형↔중대형»처럼 지사 묶음이 엇갈리면 50점까지 깎는다."""
+    if not text or not name:
+        return 0.0
+    s = _sim(text, name)
+    return min(s, 50.0) if _group_conflict(text, name) else s
+
+
+CORE_SWITCH = 10.0      # 원문 동점인 다른 계획 사업이 핵심 점수로 이만큼 더 닮고(그리고 임계값 이상) 있으면 그쪽으로
+CORE_LOW = 80.0         # 고른 사업의 핵심 점수가 이보다 낮으면(흔한 낱말만 겹침) 확신도를 자동확정 밑으로
+                        #   (측정 2025 손익: 기존 자동확정 중 핵심 ≥80 은 99% 맞고, 80 밑은 57~86%)
+
+
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                   threshold=80, new_policy="group", small_threshold=2000,
                   selected_depts=None, budget_all=None, other_budget_all=None,
@@ -334,15 +383,36 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                         attributed[i] = cbest
                         erp_match_name[i] = cbest.get("사업명")
                     continue
-            # 대표 사업명 유사도 최고 계획행에 묶음 전체를 귀속. 동점(전표
-            # 텍스트가 비어 점수가 모두 0인 경우 포함)이면 연예산이 큰 계획행 —
-            # 입력 순서에 좌우되지 않고, 실무상 큰 사업에 귀속될 확률이 높다.
-            best, best_score, best_budget = None, -1.0, None
-            for prec in candidates:
-                s = _sim(rep_name, prec.get("사업명"))
-                pb = _clean_na(prec.get("연예산")) or 0.0
-                if s > best_score or (s == best_score and pb > (best_budget or 0.0)):
-                    best, best_score, best_budget = prec, s, pb
+            # 대표 사업명 유사도 최고 계획행에 묶음 전체를 귀속. 동점(전표 텍스트가 비어 점수가 모두 0인
+            # 경우 포함)이면 연예산이 큰 계획행 — 입력 순서에 좌우되지 않고, 실무상 큰 사업에 귀속될 확률이 높다.
+            scored = [(prec, _plan_sim(rep_name, prec.get("사업명")), _core_sim(rep_name, prec.get("사업명")),
+                       _clean_na(prec.get("연예산")) or 0.0) for prec in candidates]
+            best, best_score, cur, _ = max(scored, key=lambda t: (t[1], t[3]))
+            # «이름 핵심»(연도·월·회차·흔한 업무 낱말을 뺀 이름)으로 다시 본다.
+            #   원문 점수는 «용역»·«구매» 하나만 겹쳐도 85.5점이라, 틀린 귀속이 «자동확정»으로 보였다
+            #   (2025 손익 자동확정 오류 363건 대부분).
+            #   ① 원문 점수가 같은(동점) 다른 사업이 핵심으로 분명히 더 닮았으면(임계값 이상 · CORE_SWITCH 점 차)
+            #      그쪽으로 옮긴다 — 85.5점 동점이 흔해 예산 큰 사업으로 가던 것(«소형CHP 경상정비» → «중대형CHP·DH 경상정비»).
+            #      원문 점수가 다른 사업은 옮기지 않는다(검토 후 수용된 귀속을 넓게 바꾸지 않게 — 측정에서 12% 가 바뀌었다).
+            #   ② 옮겼거나, 고른 사업의 핵심이 임계값 밑이거나, 1·2등 원문 점수가 근소하면 확신도를 자동확정
+            #      밑으로 — 귀속은 두고 검토 큐가 보게 한다. 측정: 자동확정 정밀도 87.6% → 99%(귀속 변화 없음).
+            #   ③ 반대로 원문 점수는 임계값 밑이어도 고른 사업의 핵심이 임계값 이상이면 확신도를 핵심 점수로 올린다.
+            weak = False
+            if rep_name and not _is_material(key[0]):
+                alt = max(((p, c) for p, sc, c, _ in scored if c is not None and p is not best and sc >= best_score
+                           and not _same_name(p.get("사업명"), best.get("사업명"))),
+                          key=lambda pc: pc[1], default=None)
+                switched = bool(alt and cur is not None and alt[1] >= threshold and alt[1] >= cur + CORE_SWITCH)
+                if switched:
+                    best, cur = alt[0], alt[1]
+                    best_score = max(float(cur), float(_plan_sim(rep_name, best.get("사업명"))))
+                elif cur is not None and cur >= threshold and best_score < threshold:
+                    best_score = float(cur)      # ③ 원문은 낮아도 핵심이 분명히 닮았으면(측정: 핵심 ≥80 은 99% 맞음) 확신도를 핵심 점수로
+                second = max((sc for p, sc, _, _ in scored
+                              if p is not best and not _same_name(p.get("사업명"), best.get("사업명"))), default=-1.0)
+                weak = best_score >= threshold and (
+                    switched or (cur is not None and cur < CORE_LOW)
+                    or (second >= threshold and best_score - second < SIM_MARGIN))
             if new_policy == "strict_name" and best_score < threshold:
                 for i in vg["rows"]:
                     erp_score[i] = float(best_score)
@@ -355,7 +425,7 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
             #   저유사/임의귀속 카운트 제외(건별 검토 대상에서 뺀다). 담당자 규칙.
             mat = _is_material(key[0])
             for i in vg["rows"]:
-                score = 100.0 if mat else float(best_score)
+                score = 100.0 if mat else (min(float(best_score), NEAR_CONF) if weak else float(best_score))
                 erp_score[i] = score
                 if mat:
                     erp_basis[i] = "총액 기준(자재류)"

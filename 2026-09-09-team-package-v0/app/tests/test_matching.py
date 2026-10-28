@@ -278,3 +278,55 @@ def test_override_matches_plan_name_with_trailing_space():
                                  overrides={7: "대구지사 축열조 #2 상부 보수공사"})
     assert res["new_rows"] == []
     assert res["plan_rows"][0]["실적금액"] == 234_714.0
+
+
+# ── 이름 핵심 · 확신도 보정 (2026-10-27 정밀도 측정 후속) ────────────────────
+
+def _one_voucher(text, plans, item="수선유지비-열원정기유지보수", dept="고양지사"):
+    erp = pd.DataFrame([{"계정코드": "60909003", "예산과목원문": item, "연도": "2025", "전표번호": "V1",
+                         "금액원": 50_000_000, "금액천원": 50_000.0, "사업명": text, "지사원문": dept}])
+    plan = pd.DataFrame([{"_row": i + 1, "예산과목": item, "처지사": dept, "사업명": n, "연예산": b}
+                         for i, (n, b) in enumerate(plans)])
+    res = matching.match_actuals(plan, _erp_norm(erp), {item}, {item}, set(), threshold=80)
+    ann = res["erp_annotated"].iloc[0]
+    return ann["매칭사업명"], ann["매칭확신도"], ann["매칭근거"]
+
+
+def test_name_core_drops_years_months_and_common_words():
+    assert matching._name_core("25년 고양CES 빙축열냉동기 용역 10월") == "고양CES빙축열냉동기"
+    assert matching._name_core("소형CHP 경상정비 비용 귀속(25.11)") == "소형CHP경상정비"
+    assert matching._core_sim("용역", "고압전동기 절연진단 용역") is None        # 핵심이 너무 짧으면 판단 안 함
+    assert matching._group_conflict("소형CHP 경상정비", "중대형CHP 경상정비 공사")
+    assert not matching._group_conflict("소형CHP 경상정비", "DH 경상정비 공사")
+
+
+def test_generic_word_overlap_is_not_autoconfirmed():
+    """«용역» 하나만 겹친 85.5점 귀속은 자동확정(0.8) 밑으로 — 귀속은 그대로, 검토 큐가 본다."""
+    name, conf, basis = _one_voucher("25년 고양CES 빙축열냉동기 용역 10월",
+                                     [("고압전동기 절연진단 용역", 900_000.0), ("수질분석장비 점검", 10_000.0)])
+    assert name == "고압전동기 절연진단 용역" and basis == "사업명 유사"
+    assert conf < 0.8
+
+
+def test_core_match_keeps_high_confidence():
+    name, conf, _ = _one_voucher("25년 고양CES 빙축열냉동기 용역 10월",
+                                 [("고양CES 빙축열냉동기 유지보수용역", 100_000.0), ("수질분석장비 점검", 10_000.0)])
+    assert name == "고양CES 빙축열냉동기 유지보수용역" and conf >= 0.8
+
+
+def test_tied_candidates_pick_the_one_whose_core_matches():
+    """원문 85.5점 동점이면 예산 큰 사업으로 가던 것 — 핵심으로 분명히 더 닮은 쪽으로 옮기고 검토 대상으로 둔다.
+    지사 묶음이 엇갈리는 후보(소형 ↔ 중대형)는 깎는다."""
+    item = "수선유지비-열원경상정비"
+    name, conf, basis = _one_voucher("소형CHP 경상정비 비용 귀속(25.11)",
+                                     [("중대형CHP 경상정비 공사", 30_000_000.0), ("DH 경상정비 공사", 3_000_000.0),
+                                      ("소형CHP 경상정비 용역", 1_000_000.0)], item=item, dept="광교지사")
+    assert name == "소형CHP 경상정비 용역"
+    assert conf < 0.8 and str(basis).startswith("본사 배분") is False
+
+
+def test_untied_choice_is_not_switched():
+    """원문 점수가 분명히 앞선 귀속은 핵심 점수로 뒤집지 않는다 — 검토 후 수용된 귀속을 넓게 바꾸지 않게."""
+    name, _, _ = _one_voucher("화성지사 정기점검 보수공사 2025",
+                              [("화성지사 정기점검 보수공사", 20_000.0), ("화성 보수", 1_000.0)])
+    assert name == "화성지사 정기점검 보수공사"
