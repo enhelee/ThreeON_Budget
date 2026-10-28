@@ -324,13 +324,14 @@
 .rq-voucher--rec{border-color:#16794A;box-shadow:inset 3px 0 0 #16794A}
 .rq-rec{display:inline-block;padding:.05rem .45rem;border-radius:999px;background:#EAF5EF;color:#16794A;font-size:.7rem;font-weight:800}
 
-/* 메인 «최근 N개년» 막대 — 계획 파랑 · 실적 주황(2026-10-27 사용자 요청: 검정·초록보다 잘 보이게).
-   색약 구분·바탕 대비 검증 통과(dataviz validate_palette: CVD ΔE 27.8, 대비 3:1↑). 숫자는 글자색 그대로, 점이 계열을 알린다. */
-.yr-bar--plan{background:#2F6FDB}
-.yr-bar--act{background:#D2601A}
+/* 메인 «최근 N개년» 막대 — 계획 연한 남색 · 실적 차분한 산호(2026-10-28 grace·팀: 쨍한 파랑·주황이 남색 배너 옆에서 튀었다).
+   색약 구분 통과(dataviz validate_palette: CVD ΔE 15.9). 계획은 일부러 옅게 둔 기준선이라 바탕 대비가 낮다 —
+   막대마다 숫자와 범례 점이 붙어 있어 글자로도 읽힌다. 숫자는 글자색 그대로. */
+.yr-bar--plan{background:#B8C4DD}
+.yr-bar--act{background:#D9826B}
 .yr-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:999px;flex:none}
-.yr-dot--plan{background:#2F6FDB}
-.yr-dot--act{background:#D2601A}
+.yr-dot--plan{background:#B8C4DD}
+.yr-dot--act{background:#D9826B}
 
 /* 점진 그리기(2026-10-27) — 화면 밖 카드는 브라우저가 그리기를 미룬다(«전체» 1,400여 장도 가볍게). */
 .rq-card{content-visibility:auto;contain-intrinsic-size:auto 230px}
@@ -418,6 +419,35 @@
 
 /* 5번 10개년 상세 표 — 옆으로 넘겨도 예산과목 열은 왼쪽에 고정. 오른쪽 옅은 그림자로 «아래로 숫자가 지나간다»를 보이게 */
 .fc-stick{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 0 #E5E5E5,6px 0 6px -6px rgba(0,0,0,.18)}
+
+/* 배너 안 업무 단계 알약 — 누르면 그 화면으로 */
+.home-hero__steps{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.1rem}
+.home-hero__steps button{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .8rem;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);font-size:12px;color:#E6E9F0;cursor:pointer}
+.home-hero__steps button:hover{background:rgba(255,255,255,.16);color:#fff}
+.home-hero__steps button:focus-visible{outline:2px solid var(--char-mt);outline-offset:2px}
+.home-hero__steps b{font-weight:700;color:#fff}
+
+/* 현황 카드 — 맡은 캐릭터 색 얇은 선(매칭이 청록·검토미 산호·예측이 보라). 숫자·배지는 그대로 */
+.metric-card[class*="metric-card--"]{position:relative;overflow:hidden}
+.metric-card--mt::before,.metric-card--gt::before,.metric-card--yc::before,.metric-card--none::before{content:"";position:absolute;left:0;right:0;top:0;height:3px}
+.metric-card--mt::before{background:var(--char-mt)}
+.metric-card--gt::before{background:var(--char-gt)}
+.metric-card--yc::before{background:var(--char-yc)}
+.metric-card--none::before{background:var(--line-strong)}
+
+/* 업무 단계 카드 — 오른쪽 아래 담당 캐릭터, 번호는 캐릭터 색(흰 바탕 글자용 진한 값) */
+.stage-card{position:relative;overflow:hidden}
+.stage-card__desc{padding-right:3.5rem}
+.stage-card::after{content:"";position:absolute;right:-1.75rem;bottom:-1.75rem;width:7rem;height:7rem;border-radius:999px;z-index:0}
+.stage-card > *{position:relative;z-index:1}
+.stage-card > .stage-card__char{position:absolute;right:.5rem;bottom:.4rem;width:4.25rem;height:4.25rem;object-fit:contain;pointer-events:none}
+.stage-card--hj .stage-card__no{color:#6B6455}.stage-card--hj::after{background:#F4F1EA}
+.stage-card--mt .stage-card__no{color:#0F6E56}.stage-card--mt::after{background:#E1F8F1}
+.stage-card--gt .stage-card__no{color:#B4472A}.stage-card--gt::after{background:#FEECE6}
+.stage-card--yc .stage-card__no{color:#5B3FBF}.stage-card--yc::after{background:#F0EBFF}
+
+/* 입체 캐릭터 그림(components/characters.js charImg) — 자리 크기는 각 클래스가, 비율은 그림이 지킨다 */
+img.char-img{object-fit:contain;display:inline-block}
 
 /* ── 로그인 화면(views/gate.js) A안 — 왼쪽 어두운 장면 + 오른쪽 흰 로그인 카드(2026-10-28) ──
    움직임은 components/gate_intro.js(canvas). 그리지 않는 경우(움직임 줄이기·좁은 화면)엔 이 CSS 상태가 곧 마지막 장면 */
