@@ -1,4 +1,4 @@
-# HANDOFF — 개발자 인수인계 (현행, 2026-10-27)
+# HANDOFF — 개발자 인수인계 (현행, 2026-10-28)
 
 > **이 문서가 개발자 진입점이다.** «무엇을 왜»는 [PRD.md](PRD.md). 새 세션·새 사람이 이어받을 때 이것부터 읽고, 구조·로직·API 는 [통합_인수인계_MASTER.md](통합_인수인계_MASTER.md), 팀원용 요약은 [팀공유_최종안내.html](팀공유_최종안내.html).
 > 이전에 로컬에만 두던 인수인계(2026-09-19·20·21 판)를 여기로 합쳤다. 1단계 Streamlit 시절의 옛 HANDOFF 는 [archive/](archive/) 에 있다.
@@ -12,12 +12,12 @@
 | 저장소 | `enhelee/ThreeON_Budget` — 앱과 문서는 전부 `2026-09-09-team-package-v0/`(이하 «패키지»). 루트에는 `render.yaml`·`README.md`·`.gitignore` 만 |
 | 앱 | FastAPI + Vanilla JS SPA **하나**. 1~5단계(계획·실적 집계·분석·통계·표준화/중장기 전망) + 설정. 프로세스 하나(uvicorn) |
 | 배포 | Render 무료(Docker, **싱가포르**) + Supabase PostgreSQL(**서울** ap-northeast-2). main 병합하면 **자동 배포**(Render Events «Auto-Deploy», 빌드 40~60초 + 대기로 몇 분). **Manual Deploy 는 필요 없다.** 판별은 `/healthz` 의 `commit` |
-| 테스트 | `cd app && py -m pytest -q` → **455 passed**(2026-10-27). 5~9분. PR 마다 GitHub Actions(`.github/workflows/test.yml`)도 돈다 |
+| 테스트 | `cd app && py -m pytest -q` → **567 passed**(2026-10-28). 5~9분. PR 마다 GitHub Actions(`.github/workflows/test.yml`)도 돈다 |
 | 마지막 큰 변화 | 속도 개선·CI·백업(10-15~19, #47~#50) → **종합 검토 반영(10-22, #51~#55: 보안 P1·학습 기준·PG 풀·차이 사유·이상 알림·드릴다운)** → **화면 정리(10-26, #56·#57)** → **표준화 방향 6항목·백테스트 제안·한눈에 보기(10-26, #59, rev29)** → **운영 데이터 정비(10-26, rev30: 참고 엑셀 적용·2023~2025 전표 재매핑)** → 재배정 이름 공백·학습 일괄 쓰기(10-27, rev32) → **검토 큐(10-27, rev33)** → 화면 다듬기·점진 로딩(10-27, rev34) → 질의 묶기·계산 캐시·예열(10-27, rev35) → 5번 가정 캐시(10-27, rev36) → 산점도 라벨(10-27, rev37) — [변경이력](변경이력_CHANGELOG.md) rev22~37 |
-| 운영 배포 | `d6f683c`(2026-10-27, #69 rev37) — 판별은 `/healthz` 의 `commit`. 이날 #65~#69 다섯 번 배포, 요약 [개발정리_2026-10-27.md](개발정리_2026-10-27.md) |
+| 운영 배포 | `1caa98a`(2026-10-28, #93) — 판별은 `/healthz` 의 `commit`. 10-28 이 세션 #84·#86·#88·#90·#91·#93, 다른 세션 #85·#87·#89. 요약 [개발정리_2026-10-28.md](개발정리_2026-10-28.md)(10-27 은 [개발정리_2026-10-27.md](개발정리_2026-10-27.md)) |
 | 속도(운영) | 로그인 후 화면 전환 대부분 1.2~2.7초(2026-10-27 rev36 실측, 10-15 에는 33~40초) · 5번 표준화 0.9초·전망 표 1.2초(예열) · 표는 [운영점검_2026-10-27.md](운영점검_2026-10-27.md) |
 | 검증 연도 | 2023 · 2024 · 2025 모두 마감(2026-10-26 전표 재매핑 후 재마감). 2025 손익 98,554,802 · 자본 49,709,177 천원 — 재매핑 전후 동일 |
-| 5번 탭 운영 상태 | 2026 기준연도에 참고 엑셀(V3_R1) 적용 — 규칙 437 · 등급 169 · LTSA 초안 · CRI 2. 2023 A급 정비가 ERP 원본에 없음([운영_데이터정비_2026-10-26.md](운영_데이터정비_2026-10-26.md)) |
+| 5번 탭 운영 상태 | 2026 기준연도: 참고 엑셀(V3_R1) 규칙 437 · 과거 등급 169 · LTSA 초안 · CRI 2 + **10-28 사용자 확정 양식** 정비등급 2026~2035(대표 187 · 설비별 90) · 고온부품 56건 502,370,807천원 · 설비용량 기본값(용량 환산 대상 양산·대구·청주·수원). 전사 10년 18,001억원. 2023 A급 정비가 ERP 원본에 없음([운영_데이터정비_2026-10-26.md](운영_데이터정비_2026-10-26.md)) |
 
 ## 1. 폴더 지도
 
@@ -30,8 +30,8 @@
 │  ├─ static/                 빌드 산출물 — 커밋 안 함, Dockerfile 이 만든다
 │  ├─ scripts/                운영 스크립트 — backup_pg(주간 백업·복원) · prune_history(이력 정리) · migrate_pg(DB 지역 이전)
 │  │                          + 1회성(db_check · db_정리 · make_db_snapshot · make_hanan_font · restyle_sweep)
-│  ├─ templates/              내장 엑셀 양식 (표준화·중장기예산)
-│  ├─ tests/                  pytest 455
+│  ├─ templates/              내장 엑셀 양식 (표준화·중장기예산 + 사용자 확정 정비등급·고온부품, 2026-10-28)
+│  ├─ tests/                  pytest 567
 │  └─ data/ config/ output/ .env   로컬 상태·비밀 — 커밋 안 함
 ├─ deploy/                    Dockerfile · entrypoint.sh · docker-compose.yml · requirements.txt · onprem/(사내 반입 스크립트)
 ├─ docs/                      이 문서들 (§7) · img/ (캡처) · superpowers/ (설계·계획) · archive/ (역사)
@@ -43,7 +43,7 @@
 
 ```bash
 cd 2026-09-09-team-package-v0/app/web && npm install && npm run build   # 프론트 수정 후 반드시 (static/ 은 커밋 안 함)
-cd 2026-09-09-team-package-v0/app && py -m pytest -q                      # 455 passed
+cd 2026-09-09-team-package-v0/app && py -m pytest -q                      # 567 passed
 cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app --port 8010   # 로컬 sqlite
 ```
 
@@ -92,6 +92,12 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 | 10-27 | **계산 캐시 버전은 «숫자를 바꾸는 쓰기»만**(`viewcache.data_version` — 로그인·로그아웃·차이 사유·검토 승인·4xx 제외), 유효 6시간, 키별 잠금 · 운영은 예열 스레드(2분) · 화면 공통 API 는 질의 수 상한 테스트(nav-state 12, base-years 3) | 로그인마다 전망 28초 재계산 · nav-state 26 / base-years 41 질의(rev35) |
 | 10-27 | 설정 «시스템 정보»를 Aside 에서도 보이게 하는 작업은 **하지 않는다** — Aside 가 `/healthz` 를 막을 뿐 일반 브라우저는 정상 | 사용자 결정 |
 | 10-26 | 운영 전표 재매핑은 **사업 사이 이동만**(계정·지사 불변) — 기간귀속은 같은 계약의 본 사업으로, 계정대체는 원 비용과 한 사업으로 | 합계 불변을 검증 기준으로 삼으려고([운영_데이터정비_2026-10-26.md](운영_데이터정비_2026-10-26.md)) |
+| 10-28 | **정비등급은 사용자 확정 양식 하나** — 화면(기준연도~10년)·올리기·내려받기가 같은 줄(지사·설비), 화면 저장도 양식에 써서 **엑셀 가져오기와 같은 파서**로 읽는다(`grade_plan_from_cells`) | 사용자 결정 · 화면과 엑셀이 다르게 보이던 일(지사당 대표 한 줄) |
+| 10-28 | 정비등급 **웹 화면은 색 없음**, 엑셀 내보내기만 바뀐 칸 등급 색(안 바뀐 칸은 확정 양식 색 그대로) | 사용자 결정 |
+| 10-28 | **신규 발전설비 지사(양산 2023·대구 2024·청주 2025·수원 2029)는 용량 환산 표준금액** — 기준 5개 지사(화성·파주·광교·판교·삼송)에서 «고정분 + 등급별 MW당 단가», 적용시작 전 실적 제외, 수원 2027~28 정비제외(고정분만), 수원 136MW | 사용자 요청 · LOO 25%로 후보 넷 중 최소([개발정리_2026-10-28.md](개발정리_2026-10-28.md) §1-2) |
+| 10-28 | 고온부품은 사용자 양식 금액 그대로(팩터 없음), **기준연도에 그 과목 계획본이 있으면 따로 더하지 않음** | 사용자 결정 · LTSA·CRI 와 같은 이중계상 방지 |
+| 10-28 | 5번 패널 설명 문장은 화면에서 빼고 ⓘ + 예측이 챗봇(표준금액 근거는 표 + 엑셀) · 긴 표는 접기·지사 묶음 · 금액 «억원» | 사용자 결정 |
+| 10-28 | 학습 기간 3개년 유지(2개년이 과목 합계 오차는 작지만 지사 3년 누적 같음) | 사용자 결정 |
 
 ## 4. 코드 지도
 
@@ -101,6 +107,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - `server.py`: `AuthAuditMiddleware`(인증·감사 + `_bad_param` 연도/예산 구분 검증) · `SecurityHeadersMiddleware` · `ServerTimingMiddleware`(가장 바깥, `dbcore` 의 요청별 연결·질의 집계) · `GZipMiddleware`(**BaseHTTPMiddleware 안쪽**이어야 `minimum_size` 가 산다) · `ImmutableStaticFiles`(`/assets`) · `/healthz` · `/api/nav-state`(화면 전환 공통 3종 + `locked`)
 - 검토 큐(rev33): `review_queue.py`(이유·가중·상태·커버율 `build_items`/`summarize`, 추천 `suggest`/`suggest_incoming`/`conflicts`) · `db.py`(`review_ack` 표 · `basis_by_line` 줄별 전표·저확신·사람 재배정 합 · `moved_lines` 재배정 대기 줄 · `_line_resolver`) · `server.py`(`/api/review-queue` · `PUT /api/review-ack` · `/api/review-suggest`). 과다 귀속 판정은 `alerts.compute_alerts` 결과를 그대로 쓴다
 - `api_forecast.py`: 조회 셋은 `base_year` 생략 시 서버 기본값 · `_cached_view`(표준화·전망 결과 캐시) · rev29: `PUT /state/<site-history|site-event|site-grade-eq|benchmark-rule|actual-tag|regular-contract|cri-rule|investment-plan>` · `POST /reference?apply=` · `GET /compare` · `GET /regular` · `GET /backtest` · `PUT /settings`
+- 5번 10-28: `capacity.py`(설비 현황·용량 규칙 기본값 `DEFAULT_CAPACITY`/`DEFAULT_RULES`, `fit_model`·`standard_rows`·`apply_capacity`·`usage_events`·`excluded_grades`, 모형 과목 `MODEL_ACCOUNTS`) — `pipeline_forecast._standard` 가 `capacity_inputs` 로 붙인다(반환 다섯 번째 = cap) · `forecast_import.grade_plan_from_workbook`/`grade_plan_layout`/`is_grade_plan_sheet`(정비등급 양식, B열 지사·C열 설비·DH 둘째 표) · `hot_parts_contracts_from_workbook`/`hot_parts_notes` · `forecast_export.grade_plan_grid`/`grade_plan_from_cells`/`build_grade_plan_download`(바뀐 칸만 등급 색)/`build_hot_parts_download`(`HOT_TEMPLATE`) · `forecast_calc.HOT_PARTS_PLAN_ACCOUNT`(기준연도 계획본 겹침) · `benchmark.prepare_actuals`(표준화 모집단 공유) · 표 `site_capacity`·`capacity_rule`·`hot_parts_contract`(SPECS `default` = 비면 기본값) · API `GET/PUT /api/forecast/grade-plan` · `GET /api/forecast/capacity` · `GET /api/forecast/standard.xlsx` · 챗봇 `chat/engine.py _standard`(std_provider = `api_forecast.standard_rows`)
 
 **프론트 `app/web/`**
 - `index.html`(셸: 헤더 72px·사이드바·건너뛰기 링크·토스트·바쁨) · `src/main.js`(부팅·이벤트 위임·드로어 Escape/포커스) · `router.js`(해시 라우팅 `#/view`·딥링크 `#/detail/<지사>`·`#/forecast/bench|table`, 페이지 제목) · `data.js`·`state.js`·`api.js`
@@ -108,6 +115,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - 화면 상태 키(`state.js`): `rq`(검토 큐 — 보기 건수·거르기·펼친 줄·추천 캐시) · `rqBrief`(메인 요약) · `settingsTab`(설정 탭) · `fc.manageTab`(예측 기준정보 탭) · `brTableOpen`(지사 표 접기) · `det.guideOpen`(«? 표 보는 법») · `helpOpen`(도움말 말풍선)
 - 2026-10-26 추가: `lockbanner.js`(헤더 마감 배지 `lockBadgeHtml` + 메인 줄 `openLockItems`) · `branches.js brScatterHtml`(산점도, 색·모양은 `scColor`/`scMark`) · `badges.js rateBadge`(집행률 3색) · `sidebar.js renderHeaderBrand` · `main.js` 사이드바 펼침(`html.sb-rail` 고정 + `sb-collapsed` 를 hover/focus 로 토글)
 - 스타일: `tailwind.config.js`(한난 토큰 이름) · `src/styles/app.css`(`:root` 변수·`@font-face`·컴포넌트 클래스) · `custom.css`(손으로 쓴 규칙 — **det-table 열폭은 여기, 바꾸지 않는다**) · `public/assets/`(시그니처 SVG·`fonts/HananCha-v1.woff2`)
+- 5번 10-28(`views/forecast.js`): `gradePlanTable`(정비등급 양식 표, `data-fc="gp-cell"`, dirty 키 `grade_plan`) · `hotPartsPanel`(`hot-cell`) · `capacityBody` · `DETAIL_GROUPS`/`detailLines`(상세 표 합친 줄, `data-fcdgrp`) · `panel()` 접기(`data-fcpanel`)·`longTable` 지사 묶음(`data-fcgrp`) · 표준금액 `benchSiteGroups`(`data-fcbopen`)·거르기(`data-fcbf`) · 재학습(`fc-relearn`). 상태: `fc.gradePlan`·`fc.capacity`·`fc.closedPanels`·`fc.groupOpen`·`fc.benchOpen`·`fc.benchFilter`·`fc.openGroups`. `router.settle` 은 실패한 구역을 1.5초 뒤 한 번 더
 
 **표 열폭·CSS 함정**은 MASTER §7. 옛 팔레트(`blue-*`·`slate-*`)를 새 화면에 쓰면 `tests/test_ui_shell.py` 가 깨진다.
 
@@ -157,8 +165,11 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 - Aside REPL 은 한 번에 120초 — 긴 측정은 페이지 안 `window.__x` 에 백그라운드로 돌리고 나눠 읽는다. Aside 는 `/healthz` 요청을 막고(홈 «시스템 확인 불가»는 Aside 한정) 뷰포트 크기를 못 바꾼다(모바일은 다른 방법).
 - 내장 브라우저 pane 이 숨겨져 있으면 프로그램 `scrollTo` 가 scroll 이벤트를 안 쏜다 — 스크롤 동작은 실제 휠(Aside `mouse.wheel`)로 확인.
 - `migrate_pg.py`·`backup_pg.py` 처럼 스크립트 둘을 함께 import 할 때 `sys.stdout = TextIOWrapper(...)` 를 두 번 하면 스트림이 닫힌다 → `sys.stdout.reconfigure(encoding="utf-8")`.
+- (10-28) Git Bash 긴 heredoc(따옴표·백틱 많음)은 «unexpected EOF» — 편집 스크립트는 Write 로 파일을 만들어 `py 파일`. Aside 업로드는 Aside 세션 폴더 안 파일만(복사 → `filechooser.setFiles`), 해시만 바꾸면 새 번들 안 받음(`/?r=<시각>#/…`), 배경 탭 스크린샷은 `bringToFront()` 뒤. 확정 원본 엑셀은 사용자 바탕화면 `검증자료들\`
 
 ## 6. 남은 것 (우선순위)
+
+0-0. **(2026-10-28)** [개발정리_2026-10-28.md](개발정리_2026-10-28.md) §4 — ① [사용자] #93 배포 후 운영 «정비등급» 화면 눈 확인 ② [사용자] 2026 계획본 업로드 ③ [사용자 확인] 고온부품 수원 계약기간(양산과 같음) ④ [Claude, 선택] 용량 규칙 CI 오차 53% 개선 ⑤ [사용자 결정] 다른 세션 열린 PR(#92·#83·#81·#76·#72)
 
 0-1. **[Claude] (2026-10-27 추가, 경진대회)** [경진대회_전략_2026-10-27.md](경진대회_전략_2026-10-27.md) 3·6장 순서 — B 근거 설명 자동 초안(검토 큐 카드·전망 칸) → C 전망 시나리오 비교 → 전표 단위 매칭 정밀도 측정(사람 확정 668건) · 더미 데이터 세트 · 발표 리허설(콜드 스타트 대비 녹화본). 검토 큐 운영 PG 응답 시간도 배포 후 잰다.
 0. **[사용자 → Claude] (2026-10-26 추가)** ① 2023·2024 A급 정비 원장(건설가계정 «외주비-열원정기점검») 확보 → ERP 보충·재분석·재마감 ② 열수송관 취득·구역전기(AMI·배전) 실적을 플랜트 유지보수 범위에 넣을지 ③ LTSA 계약 금액·CRI 대상·미래 정기점검 일정 입력(A급정비 일정이 그때 켜진다) ④ 참고 엑셀 2023 동탄 LTSA 두 칸이 바뀌었는지 확인. 근거 [운영_데이터정비_2026-10-26.md](운영_데이터정비_2026-10-26.md)
@@ -180,6 +191,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 | **이 문서** | 이어받을 때 첫 30분 |
 | [PRD.md](PRD.md) | 무엇을 왜 만드나 — 문제·목표·사용자·단계별 요구사항·한계 |
 | [설계_표준화방향_반영.md](설계_표준화방향_반영.md) | 5번 탭 표준화·전망(rev29) — 방향 6항목, 계산 순서, 엑셀 수식 해석 범위, 쓰는 법 |
+| [개발정리_2026-10-28.md](개발정리_2026-10-28.md) | 2026-10-28 하루 — 정비등급·고온부품 확정 양식, 설비용량 환산(규칙·수치), 5번 화면 정리, 사용자 결정·함정·남은 일 |
 | [개발정리_2026-10-27.md](개발정리_2026-10-27.md) | 2026-10-27 하루(rev33~37) 한 장 요약 — 무엇이 바뀌었나·운영 실측·사용자 결정·남은 일 |
 | [운영점검_2026-10-27.md](운영점검_2026-10-27.md) | rev34~36 배포 후 Aside 점검·실측 기록, 추가 개선 목록과 처리 |
 | [설계_검토큐_2026-10-27.md](설계_검토큐_2026-10-27.md) | 검토 큐(rev33) — 이유·가중·상태 규칙, 추천 기준과 그 근거, API·표, 검증 수치 |
@@ -187,7 +199,7 @@ cd 2026-09-09-team-package-v0/app && DATABASE_URL=" " py -m uvicorn server:app -
 | [운영_데이터정비_2026-10-26.md](운영_데이터정비_2026-10-26.md) | 참고 엑셀 적용 · 2023~2025 전표 재매핑 원칙·결과 · 2023 실적 차이 원인 |
 | [통합_인수인계_MASTER.md](통합_인수인계_MASTER.md) | 구조·분석 로직 R1~R15·API·CSS 함정·표 열폭 (상단 현행화 블록부터) |
 | [DB_스냅샷.md](DB_스냅샷.md) | 스키마·현재 데이터·검증 기준치 (`make_db_snapshot.py` 로 재생성) |
-| [변경이력_CHANGELOG.md](변경이력_CHANGELOG.md) | 왜 이렇게 만들었나 — rev1~rev37 |
+| [변경이력_CHANGELOG.md](변경이력_CHANGELOG.md) | 왜 이렇게 만들었나 — rev1~ (2026-10-28 항목까지) |
 | [속도개선_운영점검_2026-10.md](속도개선_운영점검_2026-10.md) | 2026-10 속도 진단·개선 실측, Aside 검토 미해결 건, 다시 재는 법 |
 | [백업_복원.md](백업_복원.md) · [DB_지역이전_절차.md](DB_지역이전_절차.md) | 주간 백업·복원·이력 정리 · DB 를 싱가포르로 옮기는 절차 |
 | [연계계약_CONTRACT.md](연계계약_CONTRACT.md) | 앱이 받고 내는 파일의 스키마·단위·명명 |
