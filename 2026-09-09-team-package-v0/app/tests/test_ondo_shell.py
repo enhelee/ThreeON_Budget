@@ -162,7 +162,7 @@ def test_review_summary_is_three_year_comparison_table():
 def test_review_forecast_is_stacked_by_budget_type():
     home = _read(SRC, "views", "home.js")
     body = _fn(home, "forecastPanel")
-    assert "구분" in body and "#5F7FBF" in body and "#E0937A" in body, "손익(차분한 파랑)·자본(산호) 누적"
+    assert "구분" in body and "#718CBF" in body and "#ADB7C9" in body, "손익(파랑)·자본(회청) 누적 — 확정 팔레트"
     pf = _read(APP, "src", "budget", "pipeline_forecast.py")
     assert '"구분"' in pf and "def capital_items" in pf, "전망 합계 행에 손익/자본 구분"
 
@@ -185,3 +185,10 @@ def test_stats_amounts_ignore_missing_plan():
     body = _read(APP, "server.py").split('@app.get("/api/stats")', 1)[1].split("@app.get(", 1)[0]
     assert '"] or 0' not in body, "/api/stats 의 금액 합계는 _amt() 로"
     assert not math.isnan(sum(server._amt(v) for v in (1.0, float("nan"), 2.0)))
+
+
+def test_main_chart_palette_tokens():
+    css = _read(SRC, "styles", "custom.css")
+    for k, v in (("--chart-profit", "#718CBF"), ("--chart-capital", "#ADB7C9"), ("--chart-total", "#E58F79"),
+                 ("--status-good", "#31876F"), ("--status-warning", "#A77A27"), ("--status-poor", "#B65E53")):
+        assert f"{k}:{v}" in css, f"{k} = {v}(10/28 확정 팔레트)"

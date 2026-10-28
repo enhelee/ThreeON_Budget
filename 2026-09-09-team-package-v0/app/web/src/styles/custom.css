@@ -404,7 +404,7 @@
 .home-hero__date time{margin-left:.35rem;font-weight:700;color:var(--navy)}
 /* 예산 온도 막대 — 숫자 없는 그림(ONDO 이름 뜻). 계획(연한 남색) → 집행 → 과열(산호), 그래프 두 색과 같은 계열 */
 .home-hero__gauge{margin-top:1.1rem;max-width:22rem}
-.home-hero__gauge i{display:block;height:6px;border-radius:9px;background:linear-gradient(90deg,#C9D3E8,#8EA0C6 55%,#D9826B)}
+.home-hero__gauge i{display:block;height:6px;border-radius:9px;background:linear-gradient(90deg,var(--gradient-start),var(--gradient-end))}
 .home-hero__gauge em{font-style:normal}
 .home-hero__gauge span{display:flex;justify-content:space-between;margin-top:.35rem;font-size:11px;color:#98A0B0}
 .home-hero__cast{position:relative;width:100%;aspect-ratio:420/220;margin-bottom:-1.25rem}
@@ -484,13 +484,21 @@ img.char-img{object-fit:contain;display:inline-block}
 .yr-one{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 7.5rem 4.4rem;align-items:center;gap:.6rem;font-size:12px;color:var(--sub,#5B6478)}
 .yr-one__k{font-weight:600;color:#5B6478}
 .yr-one--sum .yr-one__k{font-weight:800;color:var(--navy)}
-/* «라»안(10/28 grace): 손익 회색 · 자본 연회색 · 합계만 산호(실적 색) — 옅은 막대 = 계획, 진한 막대 = 실적. 전망 누적 막대·과목별 펼침도 같은 색 */
-.yr-one--pl .yr-one__plan{background:#ECEEF2}.yr-one--pl .yr-one__act{background:#9AA3B5}
-.yr-one--cap .yr-one__plan{background:#ECEEF2}.yr-one--cap .yr-one__act{background:#C2C8D4}
-.yr-one--sum .yr-one__plan{background:#F4D9CF}.yr-one--sum .yr-one__act{background:#D9826B}
+/* 메인 그래프·배지 색 토큰(2026-10-28 grace 확정 팔레트) — 손익 파랑 · 자본 회청 · 합계 산호, 옅은 막대 = 계획, 진한 막대 = 실적.
+   전망 누적 막대(home.js STK)·상위 과목 막대·과목별 펼침·배너 온도 막대도 같은 값 */
+:root{--chart-profit:#718CBF;--chart-capital:#ADB7C9;--chart-total:#E58F79;--chart-profit-plan:#E3EAF5;--chart-capital-plan:#EBEEF3;--chart-total-plan:#F9E5DF;--chart-track:#F0F2F6;
+  --status-good:#31876F;--status-good-bg:#E8F4EE;--status-warning:#A77A27;--status-warning-bg:#FBF2DB;--status-poor:#B65E53;--status-poor-bg:#F9E8E5;--gradient-start:#BBC9E5;--gradient-end:#E58F79}
+.yr-one--pl .yr-one__plan{background:var(--chart-profit-plan)}.yr-one--pl .yr-one__act{background:var(--chart-profit)}
+.yr-one--cap .yr-one__plan{background:var(--chart-capital-plan)}.yr-one--cap .yr-one__act{background:var(--chart-capital)}
+.yr-one--sum .yr-one__plan{background:var(--chart-total-plan)}.yr-one--sum .yr-one__act{background:var(--chart-total)}
+.yr-one__track{background:var(--chart-track)!important}
+.yr-key--pl{background:var(--chart-profit)}.yr-key--cap{background:var(--chart-capital)}.yr-key--sum{background:var(--chart-total)}
+/* 집행률 배지(메인 그래프·표·과목별) — 정상 초록 · 미달 황토 · 초과 적갈 */
+:is(.yr-one__r,.sum3__rate,.acct-row) .bg-ok-bg{background:var(--status-good-bg)}:is(.yr-one__r,.sum3__rate,.acct-row) .text-ok{color:var(--status-good)}
+:is(.yr-one__r,.sum3__rate,.acct-row) .bg-warn-bg{background:var(--status-warning-bg)}:is(.yr-one__r,.sum3__rate,.acct-row) .text-warn{color:var(--status-warning)}
+:is(.yr-one__r,.sum3__rate,.acct-row) .bg-err-bg{background:var(--status-poor-bg)}:is(.yr-one__r,.sum3__rate,.acct-row) .text-err{color:var(--status-poor)}
 .yr-one--sum .yr-one__track{height:16px}
 .yr-key{display:inline-block;width:.8rem;height:.8rem;border-radius:3px}
-.yr-key--pl{background:#9AA3B5}.yr-key--cap{background:#C2C8D4}.yr-key--sum{background:#D9826B}
 .yr-one__r .badge{font-size:12.5px;font-weight:700}
 .yr-one__track{position:relative;height:14px;border-radius:999px;background:#F1F3F7;overflow:hidden}
 .yr-one__plan{position:absolute;left:0;top:0;bottom:0;border-radius:999px}

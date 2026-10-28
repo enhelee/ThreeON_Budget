@@ -259,7 +259,7 @@ function nextActions() {
 // 팀장 검토의견(2026-10-28): 계획·실적을 한 막대에(옅은 계획 막대 위에 실적 막대), 손익·자본·합계를 따로.
 // 단위는 억원(막대에 마우스를 올리면 천원). 기준(최댓값)은 모든 연도의 합계 계획·실적 중 최댓값 하나 — 길이를 서로 비교할 수 있게.
 const BT = ["손익", "자본", "합계"]
-const BT_KEY = {손익: "pl", 자본: "cap", 합계: "sum"}   // 색(«라»안 10/28 grace): 손익 회색 · 자본 연회색 · 합계만 산호로 강조(옅은 막대 = 계획, 진한 막대 = 실적)
+const BT_KEY = {손익: "pl", 자본: "cap", 합계: "sum"}   // 색(10/28 grace 확정 팔레트, custom.css --chart-*): 손익 파랑 · 자본 회청 · 합계 산호(옅은 막대 = 계획, 진한 막대 = 실적)
 const bv = (r, b, k) => b === "합계" ? (r["손익"]?.[k] || 0) + (r["자본"]?.[k] || 0) : (r[b]?.[k] || 0)
 const eokN = v => fmt(Math.round(v / 1e5))
 
@@ -322,10 +322,10 @@ function forecastPanel() {
   const n = m.years.length, tot = m.yearTot.reduce((a, b) => a + b, 0)
   const cagr = m.yearTot[0] > 0 ? ((m.yearTot[n - 1] / m.yearTot[0]) ** (1 / (n - 1)) - 1) * 100 : null
   const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
-  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(차분한 파랑) + 위 자본(산호). 회색은 3개년 막대에만(«라»안) — 전망까지 회색이면 밋밋하다(10/28 grace), 맨 위 합계(억원). 기준연도는 글자로만 표시.
+  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(파랑) + 위 자본(회청) — 3개년 막대와 같은 확정 팔레트(10/28 grace), 맨 위 합계(억원). 기준연도는 글자로만 표시.
   // 손익/자본 구분은 /api/forecast/table total_rows 의 «구분»(자본예산 과목 설정 기준). 없으면(옛 결과) 전부 손익으로 쌓인다.
   const cap = m.years.map(y => (t.total_rows || []).filter(r => r.구분 === "자본").reduce((a, r) => a + (Number(r[String(y)]) || 0), 0))
-  const STK = [["손익", "#5F7FBF"], ["자본", "#E0937A"]]
+  const STK = [["손익", "#718CBF"], ["자본", "#ADB7C9"]]   // custom.css --chart-profit / --chart-capital
   const W = 760, H = 260, L = 8, R = 8, T = 30, B = 44, bw = (W - L - R) / n, max = Math.max(...m.yearTot) || 1
   let s = `<text x="${W - R}" y="12" text-anchor="end" font-size="12" font-weight="600" fill="#5D5D5D">단위: 억원</text><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#C9C9C9"/>`
   m.yearTot.forEach((v, i) => {
@@ -364,7 +364,7 @@ function forecastPanel() {
         <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-sub" aria-label="막대 색 기준(아래 손익, 위 자본, 막대 위 숫자는 합계)">${STK.map(([l, c]) => `<span class="inline-flex items-center gap-1.5"><span class="h-3 w-5 rounded-sm" style="background:${c}"></span>${l}</span>`).join("")}</p></div>
       <div><h4 class="text-sm font-bold text-ink">10년 누계 상위 과목 <span class="font-semibold text-sub">(억원)</span></h4>
         <div class="mt-4 space-y-4">${top.map(r => `<div><div class="mb-1.5 flex items-end justify-between gap-3"><span class="truncate text-sm font-semibold text-ink">${esc(r.key)}</span><span class="shrink-0 text-xs text-sub"><span class="font-semibold text-ink">${eok(r.total)}억</span> · ${(r.total / tot * 100).toFixed(0)}%</span></div>
-          <div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full" style="width:${r.total / mx * 100}%;background:#5F7FBF"></div></div></div>`).join("")}</div>
+          <div class="h-3 overflow-hidden rounded-full bg-subtle"><div class="h-full rounded-full" style="width:${r.total / mx * 100}%;background:var(--chart-profit)"></div></div></div>`).join("")}</div>
         ${m.acctRows.length > 5 ? `<p class="mt-4 text-xs text-tri">외 ${m.acctRows.length - 5}개 과목 ${eok(m.acctRows.slice(5).reduce((a, r) => a + r.total, 0))}억원</p>` : ""}</div>
     </div>
   </section>`
