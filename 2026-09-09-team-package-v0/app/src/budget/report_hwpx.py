@@ -63,14 +63,64 @@ def _subject_label(budget):
     return {s: label for label, subs in PERF_ITEMS[budget] for s in subs}
 
 
-def _year_lines(conn, year):
-    """그 해 최신 실행의 biz_line → {(budget): DataFrame}. 실행이 없으면 빈 dict."""
+CAPEX_PREFIX = ("수선유지비", "지급수수료")       # 이 머리로 시작하면 손익, 나머지 열원 과목은 자본
+
+
+def _budget_of(item, code=None):
+    code = str(code or "")
+    if code[:1] == "6":
+        return "손익"
+    if code[:1] in ("1", "2"):
+        return "자본"
+    return "손익" if str(item).startswith(CAPEX_PREFIX) else "자본"
+
+
+def year_rows(conn, year):
+    """그 해 보고서 재료 — [{budget, 예산과목, 처지사, 배정, 실적(천원)}], 출처.
+
+    1) 분석 결과(biz_line)가 있으면 그것(출처 «분석»).
+    2) 없으면 중장기 예측의 참고 엑셀 실적(reference_actual — 지사×과목 실적, 2016년~)을 실적으로,
+       그 해 예산계획(plan_row)을 배정으로(출처 «참고 엑셀»). 참고 엑셀에는 배정이 없다.
+    3) 둘 다 없으면 빈 목록(출처 None)."""
     from . import db as dbm
-    out = {}
+    rows = []
     for budget in ("손익", "자본"):
         r = dbm.latest_run(conn, year, budget)
         if r:
-            out[budget] = dbm.load_biz_lines(conn, r["id"])
+            for _, x in dbm.load_biz_lines(conn, r["id"]).iterrows():
+                rows.append({"budget": budget, "예산과목": x["예산과목"], "처지사": x["처지사"],
+                             "배정": _num(x["연예산"]), "실적": _num(x["실적금액"])})
+    if rows:
+        return rows, "분석"
+    try:
+        ref = conn.execute(
+            "SELECT 사업장, 예산과목, SUM(금액) FROM reference_actual WHERE 연도=? AND base_year="
+            "(SELECT MAX(base_year) FROM reference_actual WHERE 연도=?) GROUP BY 사업장, 예산과목",
+            (int(year), int(year))).fetchall()
+    except Exception:
+        ref = []
+    for site, item, amt in ref:
+        rows.append({"budget": _budget_of(item), "예산과목": item, "처지사": site, "배정": 0.0, "실적": _num(amt)})
+    if not rows:
+        return [], None
+    plan = dbm.load_plan_df(conn, year)
+    if plan is not None:
+        for _, x in plan.iterrows():
+            rows.append({"budget": _budget_of(x["예산과목"], x.get("예산코드")), "예산과목": x["예산과목"],
+                         "처지사": x["처지사"], "배정": _num(x["연예산"]), "실적": 0.0})
+    return rows, "참고 엑셀"
+
+
+def source_note(sources):
+    """{연도: 출처} → 안내 문장(참고 엑셀·자료 없음인 해만)."""
+    ref = sorted(y for y, v in sources.items() if v == "참고 엑셀")
+    none = sorted(y for y, v in sources.items() if v is None)
+    out = []
+    if ref:
+        out.append(f"{', '.join(ref)}년은 분석 결과가 없어 중장기 예측의 참고 엑셀 실적을 썼습니다 — "
+                   "배정은 그 해 예산계획이 있을 때만 들어갑니다(없으면 0).")
+    if none:
+        out.append(f"{', '.join(none)}년은 앱에 자료가 없습니다 — 그 칸은 0입니다. 보고서 값으로 넣어 주세요.")
     return out
 
 
@@ -81,17 +131,19 @@ def _group_of(conn, year):
 
 
 def build_perf_inputs(conn, year):
-    """보고서 한 벌의 입력값(억원). 그 해 + 직전 2개년. 분석이 없는 해는 None."""
+    """보고서 한 벌의 입력값(억원). 그 해 + 직전 2개년. 자료가 없는 해는 None."""
     y = int(year)
     years = [str(y - 2), str(y - 1), str(y)]
     warnings = []
-    three = {}
+    three, sources, by_year = {}, {}, {}
     for yy in years:
-        lines = _year_lines(conn, yy)
-        three[yy] = {b: ({"배정": _eok(df["연예산"].fillna(0).sum()), "실적": _eok(df["실적금액"].fillna(0).sum())}
-                         if b in lines else None) for b, df in ((b, lines.get(b)) for b in ("손익", "자본"))}
+        rows, src = year_rows(conn, yy)
+        sources[yy], by_year[yy] = src, rows
+        three[yy] = {b: ({"배정": _eok(sum(r["배정"] for r in rows if r["budget"] == b)),
+                          "실적": _eok(sum(r["실적"] for r in rows if r["budget"] == b))} if rows else None)
+                     for b in ("손익", "자본")}
 
-    cur = _year_lines(conn, year)
+    cur = by_year[str(y)]
     group_of, cfg = _group_of(conn, year)
     items, groups = {}, {}
     for budget in ("손익", "자본"):
@@ -99,30 +151,27 @@ def build_perf_inputs(conn, year):
         acc = {label: {"배정": 0.0, "실적": 0.0} for label, _ in PERF_ITEMS[budget]}
         gacc = {g: {"배정": 0.0, "실적": 0.0} for g in GROUPS}
         unmapped, ungrouped = set(), set()
-        df = cur.get(budget)
-        if df is not None:
-            for _, row in df.iterrows():
-                p, a = _num(row["연예산"]), _num(row["실적금액"])
-                label = label_of.get(row["예산과목"])
-                if label is None:
-                    unmapped.add(str(row["예산과목"]))
-                else:
-                    acc[label]["배정"] += p
-                    acc[label]["실적"] += a
-                g = group_of.get(row["처지사"])
-                if g in gacc:
-                    gacc[g]["배정"] += p
-                    gacc[g]["실적"] += a
-                else:
-                    ungrouped.add(str(row["처지사"]))
+        for row in (r for r in cur if r["budget"] == budget):
+            p, a = row["배정"], row["실적"]
+            label = label_of.get(row["예산과목"])
+            if label is None:
+                unmapped.add(str(row["예산과목"]))
+            else:
+                acc[label]["배정"] += p
+                acc[label]["실적"] += a
+            g = group_of.get(row["처지사"])
+            if g in gacc:
+                gacc[g]["배정"] += p
+                gacc[g]["실적"] += a
+            else:
+                ungrouped.add(str(row["처지사"]))
         items[budget] = [{"label": label, "배정": _eok(v["배정"]), "실적": _eok(v["실적"])} for label, v in acc.items()]
         groups[budget] = {g: {"배정": _eok(v["배정"]), "실적": _eok(v["실적"])} for g, v in gacc.items()}
         if unmapped:
             warnings.append(f"{budget}: 보고서 행에 없는 예산과목 {len(unmapped)}개는 표에서 빠졌습니다 — {', '.join(sorted(unmapped))}")
         if ungrouped:
             warnings.append(f"{budget}: 지사 구성에 없는 조직 {len(ungrouped)}곳은 지사 유형별 표에서 빠졌습니다 — {', '.join(sorted(ungrouped))}")
-    if not cur:
-        warnings.append(f"{year}년 분석 결과가 없습니다. 먼저 분석을 실행하세요.")
+    warnings += source_note(sources)
     hq = groups["손익"]["본사"]["배정"] + groups["자본"]["본사"]["배정"]
     hq_act = groups["손익"]["본사"]["실적"] + groups["자본"]["본사"]["실적"]
     if hq and hq_act / hq < 0.5:
@@ -132,16 +181,11 @@ def build_perf_inputs(conn, year):
 
     counts = {g: sum(1 for d in cfg if d["그룹"] == g and d.get("포함", True)) for g in GROUPS if g != "본사"}
     prev_share = None
-    prev_lines = _year_lines(conn, years[1])
-    if prev_lines:
+    prev_rows = by_year[years[1]]
+    if prev_rows:
         pg, _ = _group_of(conn, years[1])
-        tot, by = 0.0, {g: 0.0 for g in GROUPS}
-        for df in prev_lines.values():
-            for _, row in df.iterrows():
-                a = _num(row["실적금액"])
-                tot += a
-                if pg.get(row["처지사"]) in by:
-                    by[pg[row["처지사"]]] += a
+        tot = sum(r["실적"] for r in prev_rows)
+        by = {g: sum(r["실적"] for r in prev_rows if pg.get(r["처지사"]) == g) for g in GROUPS}
         if tot:
             prev_share = {g: by[g] / tot * 100 for g in GROUPS}
 

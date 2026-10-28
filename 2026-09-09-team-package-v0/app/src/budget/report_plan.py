@@ -87,20 +87,16 @@ def build_plan_inputs(conn, year):
                   for key, names, _, _ in PLAN_ROWS[b]] for b in ("손익", "자본")}
     idx = {b: {r["key"]: r for r in matrix[b]} for b in matrix}
     unmapped = set()
-    missing = []
+    sources = {}
     for yy in years:
-        for b in ("손익", "자본"):
-            r = dbm.latest_run(conn, yy, b)
-            if not r:
-                missing.append(f"{yy}년 {b}")
+        rows, sources[yy] = rh.year_rows(conn, yy)
+        for row in rows:
+            key = _match(row["budget"], row["예산과목"])
+            if key is None:
+                unmapped.add(f"{row['budget']}·{row['예산과목']}")
                 continue
-            for _, row in dbm.load_biz_lines(conn, r["id"]).iterrows():
-                key = _match(b, row["예산과목"])
-                if key is None:
-                    unmapped.add(f"{b}·{row['예산과목']}")
-                    continue
-                idx[b][key]["v"][yy]["배정"] += _num(row["연예산"]) / EOK
-                idx[b][key]["v"][yy]["실적"] += _num(row["실적금액"]) / EOK
+            idx[row["budget"]][key]["v"][yy]["배정"] += row["배정"] / EOK
+            idx[row["budget"]][key]["v"][yy]["실적"] += row["실적"] / EOK
     plan = dbm.load_plan_df(conn, nxt)
     plan_budgets = set()
     if plan is not None:
@@ -115,8 +111,7 @@ def build_plan_inputs(conn, year):
                     break
             else:
                 unmapped.add(f"{nxt}계획·{row['예산과목']}")
-    if missing:
-        warnings.append(f"분석 결과가 없는 해: {', '.join(missing)} — 그 칸은 0으로 두었습니다. 보고서 값으로 넣어 주세요.")
+    warnings += rh.source_note(sources)
     for b in ("손익", "자본"):
         if b not in plan_budgets:
             warnings.append(f"{nxt}년 {b} 예산계획이 앱에 없습니다 — 다음해 계획표(배정)의 {b} 칸을 직접 넣어 주세요.")

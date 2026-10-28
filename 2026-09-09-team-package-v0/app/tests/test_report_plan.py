@@ -98,3 +98,25 @@ def test_api_plan_kind(srv):
     text = rh.section_text(r.content)
     assert "「‘23년～‘24년 열원시설」" in text and "’24년도 유지보수 배정예산" in text and "‘24년 유지보수 예산 계획" in text
     assert client.get("/api/report/xx?year=2023").status_code == 404
+
+
+def test_years_without_analysis_use_reference_actuals(tmp_path):
+    """분석이 없는 해(2016~)는 중장기 예측 참고 엑셀 실적으로 — 두 보고서 모두(2026-10-28 사용자 지적)."""
+    from budget import db as dbm
+    conn = dbm.connect(str(tmp_path / "r.db"))
+    conn.executemany("INSERT INTO reference_actual VALUES(?,?,?,?,?,?)", [
+        ("2026", "화성지사", 2019, "수선유지비-열원정기점검", "기타", 1_000_000),    # 천원 = 10억
+        ("2026", "화성지사", 2019, "기계장치", "기타", 2_000_000),
+        ("2026", "화성지사", 2019, "기계장치", "CRI", 500_000),
+        ("2025", "화성지사", 2019, "기계장치", "기타", 9_999_999),                 # 옛 기준연도 — 안 씀
+    ])
+    conn.commit()
+    rows, src = rh.year_rows(conn, "2019")
+    assert src == "참고 엑셀" and sum(r["실적"] for r in rows) == 3_500_000
+    plan = rp.build_plan_inputs(conn, "2020")
+    v = {r["key"]: r["v"]["2019"]["실적"] for b in ("손익", "자본") for r in plan["matrix"][b]}
+    assert v["정기점검"] == 10 and v["기계장치"] == 25
+    assert any("2019년은 분석 결과가 없어" in w for w in plan["warnings"])
+    perf = rh.build_perf_inputs(conn, "2019")
+    assert sum(x["실적"] for x in perf["items"]["자본"]) == 25
+    assert rh.year_rows(conn, "2010") == ([], None)

@@ -145,3 +145,17 @@ def test_normalize_splits_label_and_drops_end_mark():
                                          "ja_bullets": [{"label": "(기계장치)", "body": "공사 연기  끝."}]}}, "2025")
     assert inp["texts"]["son_bullets"] == [{"label": "경상정비", "body": "물가변동"}]
     assert inp["texts"]["ja_bullets"] == [{"label": "기계장치", "body": "공사 연기"}]
+
+
+def test_preview_never_emits_runaway_sizes():
+    """한글의 «미지정»(4294967295) 여백이 5,700만 px 칸 여백이 되어 문서가 통째로 깨졌다(2026-10-28 라이브)."""
+    from budget import hwpx_html, report_plan as rp
+    assert hwpx_html.px("4294967295") == round(-1 / 75, 2)
+    for path, build in ((TEMPLATE, _preview), (os.path.join(APP_DIR, "templates", "report_plan_template.hwpx"), None)):
+        if build:
+            html = build(_inputs())
+        else:
+            with open(path, "rb") as f:
+                html = rp.preview_plan_html(f.read(), rp.normalize_inputs({}, "2025") | {"texts": rp.auto_texts(rp.normalize_inputs({}, "2025"))})
+        sizes = [float(v) for v in re.findall(r"(-?\d+(?:\.\d+)?)px", html)]
+        assert sizes and max(sizes) < 2000 and min(sizes) > -500
