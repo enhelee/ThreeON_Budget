@@ -156,13 +156,13 @@ def test_review_multi_year_bars_split_budget_types_in_one_bar():
 
 def test_review_summary_is_three_year_comparison_table():
     body = _fn(_read(SRC, "views", "home.js"), "summaryTable")
-    assert "colspan" in body and "실적률" in body and "합계" in body and "억원" in body
+    assert "colspan" in body and "rateBadge" in body and "합계" in body and "억원" in body
 
 
 def test_review_forecast_is_stacked_by_budget_type():
     home = _read(SRC, "views", "home.js")
     body = _fn(home, "forecastPanel")
-    assert "구분" in body and "#3F5A9E" in body and "#C9923A" in body, "손익(남청)·자본(황토) 누적"
+    assert "구분" in body and "#3F5A9E" in body and "#A9B8DA" in body, "손익(진한 남색)·자본(연한 남색) 누적"
     pf = _read(APP, "src", "budget", "pipeline_forecast.py")
     assert '"구분"' in pf and "def capital_items" in pf, "전망 합계 행에 손익/자본 구분"
 
@@ -173,3 +173,15 @@ def test_review_cards_expand_by_account_and_pick_year():
     assert "yearPickCard" in home and "data-goyear" in _fn(home, "yearPickCard"), "카드에서 연도 고르기"
     js = _read(SRC, "main.js")
     assert "data-homeacct" in js and "/api/stats?year=" in js
+
+
+def test_stats_amounts_ignore_missing_plan():
+    """계획 없이 집행된 줄(연예산 NaN)이 과목 계획 합계를 통째로 NaN 으로 만들지 않는다(10/28 발견)."""
+    import math
+    import sys
+    sys.path.insert(0, APP)
+    import server
+    assert server._amt(float("nan")) == 0 and server._amt(None) == 0 and server._amt(5) == 5
+    body = _read(APP, "server.py").split('@app.get("/api/stats")', 1)[1].split("@app.get(", 1)[0]
+    assert '"] or 0' not in body, "/api/stats 의 금액 합계는 _amt() 로"
+    assert not math.isnan(sum(server._amt(v) for v in (1.0, float("nan"), 2.0)))

@@ -298,7 +298,7 @@ function summaryTable(recent) {
   const head = recent.map(r => `<th colspan="2" class="sum3__y clickable" data-goyear="${r.year}">${r.year}년</th>`).join("")
   const sub = recent.map(() => `<th>계획</th><th>실적</th>`).join("")
   const rows = BT.map(b => `<tr class="sum3__row ${b === "합계" ? "sum3__row--sum" : ""}"><th rowspan="2" scope="row">${b}</th>${recent.map(r => `<td>${eokN(bv(r, b, "계획"))}</td><td>${eokN(bv(r, b, "실적"))}</td>`).join("")}</tr>
-    <tr class="sum3__rate ${b === "합계" ? "sum3__row--sum" : ""}">${recent.map(r => `<td colspan="2">실적률 ${fmtRate(bv(r, b, "계획"), bv(r, b, "실적"))}</td>`).join("")}</tr>`).join("")
+    <tr class="sum3__rate ${b === "합계" ? "sum3__row--sum" : ""}">${recent.map(r => `<td colspan="2">${rateBadge(bv(r, b, "계획"), bv(r, b, "실적"))}</td>`).join("")}</tr>`).join("")
   return `<article class="panel overflow-hidden">
       <div class="flex items-start justify-between gap-3 p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">유지보수예산 ${recent.length}개년 실적비교 · 각 연도 최신 분석</p></div><div class="flex flex-col items-end gap-1.5"><button class="text-sm font-semibold text-ink hover:text-mint-ink" data-view="branches">전체 지사 →</button><span class="text-xs font-semibold text-tri">단위: 억원</span></div></div>
       <div class="overflow-x-auto px-5 pb-5 sm:px-6 sm:pb-6"><table class="sum3"><thead><tr><th rowspan="2">구분</th>${head}</tr><tr class="sum3__sub">${sub}</tr></thead><tbody>${rows}</tbody></table></div>
@@ -321,10 +321,10 @@ function forecastPanel() {
   const n = m.years.length, tot = m.yearTot.reduce((a, b) => a + b, 0)
   const cagr = m.yearTot[0] > 0 ? ((m.yearTot[n - 1] / m.yearTot[0]) ** (1 / (n - 1)) - 1) * 100 : null
   const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
-  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(남청) + 위 자본(황토), 맨 위 합계(억원). 기준연도는 글자로만 표시.
+  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(진한 남색) + 위 자본(연한 남색) — 색 하나의 진하기로만 나눈다(10/28 grace), 맨 위 합계(억원). 기준연도는 글자로만 표시.
   // 손익/자본 구분은 /api/forecast/table total_rows 의 «구분»(자본예산 과목 설정 기준). 없으면(옛 결과) 전부 손익으로 쌓인다.
   const cap = m.years.map(y => (t.total_rows || []).filter(r => r.구분 === "자본").reduce((a, r) => a + (Number(r[String(y)]) || 0), 0))
-  const STK = [["손익", "#3F5A9E"], ["자본", "#C9923A"]]
+  const STK = [["손익", "#3F5A9E"], ["자본", "#A9B8DA"]]
   const W = 760, H = 260, L = 8, R = 8, T = 30, B = 44, bw = (W - L - R) / n, max = Math.max(...m.yearTot) || 1
   let s = `<text x="${W - R}" y="12" text-anchor="end" font-size="12" font-weight="600" fill="#5D5D5D">단위: 억원</text><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#C9C9C9"/>`
   m.yearTot.forEach((v, i) => {
