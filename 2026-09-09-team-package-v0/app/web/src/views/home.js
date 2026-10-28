@@ -106,7 +106,7 @@ function acctPanel() {
   const mx = Math.max(1, ...items.map(r => Math.max(r.계획 || 0, r.실적 || 0)))
   const body = !st ? `<p class="text-sm text-tri">불러오는 중…</p>`
     : !items.length ? `<p class="text-sm text-tri">이 연도의 ${esc(b)}예산 과목 자료가 없습니다.</p>`
-    : `<div class="acct-list">${items.map(r => `<div class="acct-row"><span class="acct-row__k">${esc(r.예산과목)}</span>
+    : `<div class="acct-list yr-one--${BT_KEY[b]}">${items.map(r => `<div class="acct-row"><span class="acct-row__k">${esc(r.예산과목)}</span>
         <div class="yr-one__track"><div class="yr-bar yr-bar--plan yr-one__plan" style="width:${(r.계획 || 0) / mx * 100}%"></div><div class="yr-bar yr-bar--act yr-one__act" style="width:${(r.실적 || 0) / mx * 100}%"></div></div>
         <span class="acct-row__v"><b>${fmt(r.실적 || 0)}</b> / ${fmt(r.계획 || 0)}</span><span>${rateBadge(r.계획, r.실적)}</span></div>`).join("")}</div>`
   return `<section class="panel p-5 sm:p-6 acct-panel"><div class="mb-4 flex items-center justify-between gap-3"><h3 class="section-title">${esc(state.year)}년 ${esc(b)}예산 · 예산과목별</h3>
@@ -259,6 +259,7 @@ function nextActions() {
 // 팀장 검토의견(2026-10-28): 계획·실적을 한 막대에(옅은 계획 막대 위에 실적 막대), 손익·자본·합계를 따로.
 // 단위는 억원(막대에 마우스를 올리면 천원). 기준(최댓값)은 모든 연도의 합계 계획·실적 중 최댓값 하나 — 길이를 서로 비교할 수 있게.
 const BT = ["손익", "자본", "합계"]
+const BT_KEY = {손익: "pl", 자본: "cap", 합계: "sum"}   // 색: 손익 남색 · 자본 청록 · 합계 진한 남색(옅은 막대 = 계획, 진한 막대 = 실적)
 const bv = (r, b, k) => b === "합계" ? (r["손익"]?.[k] || 0) + (r["자본"]?.[k] || 0) : (r[b]?.[k] || 0)
 const eokN = v => fmt(Math.round(v / 1e5))
 
@@ -271,17 +272,17 @@ function multiYearPanels() {
   const maxV = Math.max(1, ...recent.flatMap(r => [bv(r, "합계", "계획"), bv(r, "합계", "실적")]))
   const bar = (r, b) => {
     const p = bv(r, b, "계획"), a = bv(r, b, "실적")
-    return `<div class="yr-one ${b === "합계" ? "yr-one--sum" : ""}"><span class="yr-one__k">${b}</span>
+    return `<div class="yr-one yr-one--${BT_KEY[b]}"><span class="yr-one__k">${b}</span>
       <div class="yr-one__track" title="${b} 계획 ${fmt(p)} 천원 · 실적 ${fmt(a)} 천원 · 집행률 ${fmtRate(p, a)}">
         <div class="yr-bar yr-bar--plan yr-one__plan" style="width:${p / maxV * 100}%"></div>
         <div class="yr-bar yr-bar--act yr-one__act" style="width:${a / maxV * 100}%"></div></div>
-      <span class="yr-one__v"><b>${eokN(a)}</b> / ${eokN(p)}</span><span class="yr-one__r">${fmtRate(p, a)}</span></div>`
+      <span class="yr-one__v"><b>${eokN(a)}</b> / ${eokN(p)}</span><span class="yr-one__r">${rateBadge(p, a)}</span></div>`
   }
   return `
   <section class="grid gap-6 xl:grid-cols-[1fr_1fr]">
     <article class="panel p-5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">최근 ${recent.length}개년 실적 분석</h3>
-        <p class="section-help flex flex-wrap items-center gap-x-3 gap-y-1"><span class="inline-flex items-center gap-1.5"><span class="yr-dot yr-dot--plan"></span>계획</span><span class="inline-flex items-center gap-1.5"><span class="yr-dot yr-dot--act"></span>실적</span><span>실적 / 계획 · 집행률</span></p></div>
+        <p class="section-help flex flex-wrap items-center gap-x-3 gap-y-1">${BT.map(b => `<span class="inline-flex items-center gap-1.5"><span class="yr-key yr-key--${BT_KEY[b]}"></span>${b}</span>`).join("")}<span>옅은 막대 계획 · 진한 막대 실적</span></p></div>
         <span class="text-xs font-semibold text-tri">단위: 억원</span></div>
       <div class="mt-6 space-y-5">
         ${recent.slice().reverse().map(r => `<div><p class="mb-2"><span class="font-bold text-ink clickable" data-goyear="${r.year}">${r.year}</span></p>
@@ -321,10 +322,10 @@ function forecastPanel() {
   const n = m.years.length, tot = m.yearTot.reduce((a, b) => a + b, 0)
   const cagr = m.yearTot[0] > 0 ? ((m.yearTot[n - 1] / m.yearTot[0]) ** (1 / (n - 1)) - 1) * 100 : null
   const peak = m.yearTot.indexOf(Math.max(...m.yearTot))
-  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(진한 남색) + 위 자본(연한 남색) — 색 하나의 진하기로만 나눈다(10/28 grace), 맨 위 합계(억원). 기준연도는 글자로만 표시.
+  // 10개년 누적 막대(팀장 검토의견 10/28): 아래 손익(남색) + 위 자본(청록) — 3개년 막대의 손익·자본 색과 같다(10/28 grace), 맨 위 합계(억원). 기준연도는 글자로만 표시.
   // 손익/자본 구분은 /api/forecast/table total_rows 의 «구분»(자본예산 과목 설정 기준). 없으면(옛 결과) 전부 손익으로 쌓인다.
   const cap = m.years.map(y => (t.total_rows || []).filter(r => r.구분 === "자본").reduce((a, r) => a + (Number(r[String(y)]) || 0), 0))
-  const STK = [["손익", "#3F5A9E"], ["자본", "#A9B8DA"]]
+  const STK = [["손익", "#3F5A9E"], ["자본", "#2E9E88"]]
   const W = 760, H = 260, L = 8, R = 8, T = 30, B = 44, bw = (W - L - R) / n, max = Math.max(...m.yearTot) || 1
   let s = `<text x="${W - R}" y="12" text-anchor="end" font-size="12" font-weight="600" fill="#5D5D5D">단위: 억원</text><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#C9C9C9"/>`
   m.yearTot.forEach((v, i) => {

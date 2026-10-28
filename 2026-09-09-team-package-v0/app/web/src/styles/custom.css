@@ -481,9 +481,17 @@ img.char-img{object-fit:contain;display:inline-block}
 
 /* ── 메인 — 팀장 검토의견 반영(2026-10-28) ──
    .yr-one: 옅은 계획 막대 위에 실적 막대를 겹친 한 줄(손익·자본·합계). .sum3: «3개년 실적비교» 표 */
-.yr-one{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 7.5rem 3.2rem;align-items:center;gap:.6rem;font-size:12px;color:var(--sub,#5B6478)}
+.yr-one{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 7.5rem 4.4rem;align-items:center;gap:.6rem;font-size:12px;color:var(--sub,#5B6478)}
 .yr-one__k{font-weight:600;color:#5B6478}
 .yr-one--sum .yr-one__k{font-weight:800;color:var(--navy)}
+/* 손익 남색 · 자본 청록 · 합계 진한 남색 — 옅은 막대 = 계획, 진한 막대 = 실적(10/28 grace). 같은 색을 전망 누적 막대·과목별 펼침에도 쓴다 */
+.yr-one--pl .yr-one__plan{background:#C9D3EA}.yr-one--pl .yr-one__act{background:#3F5A9E}
+.yr-one--cap .yr-one__plan{background:#BFE3DA}.yr-one--cap .yr-one__act{background:#2E9E88}
+.yr-one--sum .yr-one__plan{background:#B9C2D6}.yr-one--sum .yr-one__act{background:#1F2D55}
+.yr-one--sum .yr-one__track{height:16px}
+.yr-key{display:inline-block;width:.8rem;height:.8rem;border-radius:3px}
+.yr-key--pl{background:#3F5A9E}.yr-key--cap{background:#2E9E88}.yr-key--sum{background:#1F2D55}
+.yr-one__r .badge{font-size:12.5px;font-weight:700}
 .yr-one__track{position:relative;height:14px;border-radius:999px;background:#F1F3F7;overflow:hidden}
 .yr-one__plan{position:absolute;left:0;top:0;bottom:0;border-radius:999px}
 .yr-one__act{position:absolute;left:0;top:3px;bottom:3px;border-radius:999px;box-shadow:0 0 0 2px #fff}
@@ -492,16 +500,17 @@ img.char-img{object-fit:contain;display:inline-block}
 .sum3{width:100%;border-collapse:separate;border-spacing:0;font-size:15px;font-variant-numeric:tabular-nums}
 .sum3 th,.sum3 td{padding:.7rem .75rem;text-align:right}
 .sum3 thead th{font-size:12.5px;font-weight:600;color:#5B6478;text-align:center}
-.sum3 thead tr:first-child th{background:var(--navy);color:#fff;font-size:14px;font-weight:800}
+.sum3 thead tr:first-child th{background:#E6EBF5;color:var(--navy);font-size:14px;font-weight:800}
 .sum3 thead tr:first-child th:first-child{border-radius:10px 0 0 0;text-align:left}
 .sum3 thead tr:first-child th:last-child{border-radius:0 10px 0 0}
-.sum3__sub th{background:#F1F3F8;border-bottom:1px solid #E3E7EF}
+.sum3__sub th{background:#F4F6FA;border-bottom:1px solid #E3E7EF}
 .sum3__y{cursor:pointer}
 .sum3__sub th:nth-child(odd),.sum3 tbody td:nth-of-type(2n+1),.sum3__y{border-left:2px solid #fff}
 .sum3__sub th:nth-child(odd){border-left-color:#E3E7EF}
 .sum3 tbody td:nth-of-type(2n+1){border-left:1px solid #E3E7EF}
 .sum3 tbody th{text-align:left;font-weight:800;color:var(--navy);font-size:15px;border-bottom:1px solid #E3E7EF;vertical-align:middle}
 .sum3__row td{color:var(--ink,#1A2236);font-weight:600;padding-bottom:.25rem}
+.sum3__rate .badge{font-size:12.5px;font-weight:700}
 .sum3__rate td{text-align:center;padding-top:.15rem;padding-bottom:.7rem;border-bottom:1px solid #E3E7EF}
 .sum3__rate td+td,.sum3__rate td:first-child{border-left:1px solid #E3E7EF}
 .sum3__row--sum th,.sum3__row--sum td{background:#F6F8FB;font-weight:800;color:var(--navy)}
