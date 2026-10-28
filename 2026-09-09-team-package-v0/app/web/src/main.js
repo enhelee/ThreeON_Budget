@@ -3,7 +3,6 @@ import "./styles/app.css"
 import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { injectCharacterSprite } from "./components/characters.js"
 import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
@@ -740,8 +739,6 @@ $("#trainingFile").addEventListener("change", async e => {
 // 401 을 만나는 시점에 게이트로 넘어가게 한다.
 // 사이드바는 모든 화면에서 같으므로 부팅 때 한 번만 그린다.
 // (활성 표시는 renderPage() 가 화면마다 맞춘다)
-// 캐릭터 그림(<symbol>)은 사이드바·화면이 <use> 로 가져다 쓰므로 그보다 먼저 심는다.
-injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
 $("#headerBrand").innerHTML = renderHeaderBrand();
 

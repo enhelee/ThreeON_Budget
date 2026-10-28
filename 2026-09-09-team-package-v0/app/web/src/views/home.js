@@ -1,4 +1,6 @@
 import { rateBadge } from "../components/badges.js"
+import { CHAR_IMG } from "../components/char_images.js"
+import { NAMES } from "../components/characters.js"
 import { openLockItems } from "../components/lockbanner.js"
 import { STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
@@ -45,10 +47,13 @@ function unmappedTotals() {
 // ── ① 헤더 스트립 ────────────────────────────────────────────
 // 기준일·단위 칸은 뺐다(2026-10-27 사용자 요청) — 기준일은 설정 › 데이터 «시스템 정보»로, 여기엔 오늘 날짜만.
 // 남색 배너 + 오른쪽 캐릭터 셋(2026-10-27 grace 요청 — 남색 사이드바와 흰 본문이 따로 놀지 않게).
-// 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터는 3D PNG(/assets/characters, 320px로 줄인 것).
+// 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터 그림은 챗봇과 같은 한 벌(components/char_images.js).
+// 아래 알약은 업무 흐름 4단계 — 누르면 그 화면으로 간다(STAGE 카드와 같은 STAGES 에서 뽑는다).
+
+const HERO_STEPS = ["budget", "collect", "branches", "forecast"]
 
 function headerStrip() {
-  const cast = [["mt", "매칭이"], ["gt", "검토미"], ["yc", "예측이"]]
+  const steps = STAGES.filter(s => HERO_STEPS.includes(s.view))
   return `
   <section class="home-hero">
     <div class="home-hero__text">
@@ -56,17 +61,19 @@ function headerStrip() {
       <h2 class="home-hero__title font-hanan">발전플랜트 유지보수 예산,<br><em>계획에서 10개년 전망까지</em></h2>
       <p class="home-hero__desc">예산 계획과 ERP 전표를 자동으로 맞춰 보고, 차이를 살피고, 정비등급별 표준금액으로 10년 뒤를 예보합니다.</p>
       <p class="home-hero__date">오늘 <time datetime="${today()}">${todayLong()}</time></p>
+      <div class="home-hero__steps">${steps.map(s => `<button type="button" data-view="${s.view}"><b>${esc(s.no)}</b>${esc(s.title)}</button>`).join("")}</div>
     </div>
     <div class="home-hero__cast">
-      ${cast.map(([id, name]) => `<img class="home-hero__char home-hero__char--${id}" src="/assets/characters/${id}.png" alt="${name}" width="160" height="160" loading="lazy">`).join("")}
+      ${["mt", "gt", "yc"].map(id => `<img class="home-hero__char home-hero__char--${id}" src="${CHAR_IMG[id].full}" alt="${NAMES[id]}" width="160" height="160">`).join("")}
     </div>
   </section>`
 }
 
 // ── ② 현황 카드 ──────────────────────────────────────────────
 
-function card(title, badge, body) {
-  return `<article class="metric-card h-full">
+// tone = 이 카드를 맡은 캐릭터 — 카드 위 얇은 색 선(custom.css .metric-card--mt/gt/yc). 없으면 회색.
+function card(title, badge, body, tone) {
+  return `<article class="metric-card h-full metric-card--${tone || "none"}">
     <div class="flex items-start justify-between gap-2">
       <p class="text-sm font-semibold text-sub">${esc(title)}</p>${badge}
     </div>
@@ -85,7 +92,7 @@ function budgetCard(budget) {
        <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} 천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
     : `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
        <p class="mt-2 text-sm text-sub">이 연도의 ${esc(budget)}예산 분석 이력이 없습니다.</p>`
-  return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body)
+  return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body, "mt")
 }
 
 function prevYearCard() {
@@ -93,14 +100,14 @@ function prevYearCard() {
   if (!prev) {
     return card("직전 분석 연도", badgeMuted("없음"),
       `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
-       <p class="mt-2 text-sm text-sub">비교할 다른 연도의 분석 이력이 아직 없습니다.</p>`)
+       <p class="mt-2 text-sm text-sub">비교할 다른 연도의 분석 이력이 아직 없습니다.</p>`, "mt")
   }
   const p = (prev["손익"]?.계획 || 0) + (prev["자본"]?.계획 || 0)
   const a = (prev["손익"]?.실적 || 0) + (prev["자본"]?.실적 || 0)
   return card(`${prev.year}년 집계 (손익+자본)`, badgeOk("분석 완료"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span></p>
      <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)} 천원 · 집행률 ${rateBadge(p, a)}
-     <button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
+     <button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`, "mt")
 }
 
 function unmappedCard() {
@@ -114,7 +121,7 @@ function unmappedCard() {
   return card("미배정 전표 · 연도 마감", n ? badgeWarn(`${n}건`) : badgeOk("없음"),
     `<p class="mt-4 text-2xl font-bold tracking-tight ${n ?"text-warn" : "text-ink"}">${fmt(n)} <span class="text-sm font-semibold text-tri">건</span></p>
      <p class="mt-2 text-sm text-sub">${n ? `금액 ${fmt(amt)} 천원 · 종합표 미포함` : "모든 전표가 지사에 배정되었습니다."}</p>
-     <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`)
+     <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`, "gt")
 }
 
 
@@ -145,11 +152,12 @@ function stageCards() {
     <h3 class="section-title">업무 단계</h3>
     <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       ${STAGES.map(s => `
-      <button type="button" data-view="${s.view}" class="metric-card text-left transition hover:border-ink">
-        <p class="text-xs font-bold tracking-widest text-ink">STAGE ${esc(s.no)}</p>
+      <button type="button" data-view="${s.view}" class="metric-card stage-card stage-card--${s.char} text-left transition hover:border-ink">
+        <p class="stage-card__no text-xs font-bold tracking-widest">STAGE ${esc(s.no)}</p>
         <p class="mt-2 text-base font-bold text-ink">${esc(s.title)}</p>
-        <p class="mt-1.5 text-xs leading-5 text-sub">${esc(s.desc)}</p>
+        <p class="stage-card__desc mt-1.5 text-xs leading-5 text-sub">${esc(s.desc)}</p>
         <span class="mt-4 inline-block text-xs font-semibold text-ink">열기 →</span>
+        <img class="stage-card__char" src="${CHAR_IMG[s.char].full}" alt="" width="72" height="72" loading="lazy">
       </button>`).join("")}
     </div>
   </section>`
