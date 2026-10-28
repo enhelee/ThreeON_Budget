@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -288,6 +288,7 @@ export async function navigate(view, opts = {}) {
                  ["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
     }
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
+    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);

@@ -23,11 +23,12 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급 이력", ["grades", "site_grade_eq"]],
-                     ["learn", "학습 기간·백테스트", ["settings"]],
-                     ["factor", "팩터·고온부품", ["factors", "hot_parts"]],
+                     ["factor", "고온부품", ["hot_parts", "factors"]],
+                     ["capacity", "설비용량·신규표준", ["site_capacity", "capacity_rule"]],
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
                      ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan"]],
-                     ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]]]
+                     ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]],
+                     ["learn", "학습 기간·백테스트", ["settings"]]]
 const BENCH_VIEWS = [["std", "표준금액"], ["rules", "산정 규칙"], ["regular", "정기비용 분리"]]
 const TAG_LABEL = {기타: "기타(표준화)", LTSA: "LTSA", CRI: "CRI", 고온부품재생: "고온부품재생"}
 const HOT_ITEMS = ["고온부품재생", "신품구매"]
@@ -161,6 +162,54 @@ function eqPanel(d) {
       {f: "설비", label: "설비"}, {f: "등급", label: "등급"}], d.site_grade_eq, "설비별 등급이 없습니다 — «참고 엑셀·대조» 탭에서 가져오세요."), "site_grade_eq")
 }
 
+// ── 설비용량·신규표준(2026-10-28) — 신규 발전설비 지사(양산·대구·청주·수원)의 등급별 표준금액을 용량으로 환산 ──
+const eok1 = v => (Number(v || 0) / 1e5).toLocaleString("ko-KR", {minimumFractionDigits: 1, maximumFractionDigits: 1})
+const CAP_GRADES = ["간이", "CI", "TI/HGPI", "MI"]
+
+function capacityModelPanel() {
+  const c = state.fc.capacity
+  if (!c) return panel("용량 환산 규칙", "불러오는 중…", '<p class="p-5 text-sm text-tri">계산 중입니다.</p>')
+  const m = c.model
+  if (!m) return panel("용량 환산 규칙", "기준 지사·대상 지사가 있어야 계산합니다", '<p class="p-5 text-sm text-sub">아래 «용량 규칙» 표에 기준 지사와 대상 지사를 넣으세요.</p>')
+  const refs = Object.keys(m.refs)
+  const cell = {}
+  m.table.forEach(r => { cell[`${r.사업장}|${r.등급}`] = r })
+  const pct = v => v == null ? "-" : `${Math.round(v * 100)}%`
+  const refRows = refs.map(s => `<tr><td class="table-cell font-semibold text-ink">${esc(s)}</td><td class="table-cell text-right">${fmt(m.refs[s])}</td>${CAP_GRADES.map(g => {
+      const r = cell[`${s}|${g}`]
+      return `<td class="table-cell text-right">${r ? `${eok1(r.평균금액)}<span class="ml-1 text-[11px] text-tri">${r.해수}해 · ${(r.MW당 / 1e5).toFixed(3)}/MW</span>` : '<span class="text-tri">-</span>'}</td>`
+    }).join("")}</tr>`).join("")
+  const tgtRows = c.targets.map(t => `<tr><td class="table-cell font-semibold text-ink">${esc(t.사업장)}</td><td class="table-cell text-right">${fmt(t.용량MW)}</td>
+      <td class="table-cell">${t.적용시작연도 ?? "-"}년~${t.정비제외연도.length ? ` · 정비제외 ${t.정비제외연도.join("·")}` : ""}</td>
+      ${["간이", "CI", "TI", "MI"].map(g => `<td class="table-cell text-right">${t.등급별[g] != null ? eok1(t.등급별[g]) : "-"}</td>`).join("")}
+      <td class="table-cell text-right">${t.등급별["정비제외"] != null ? eok1(t.등급별["정비제외"]) : "-"}</td></tr>`).join("")
+  return panel("용량 환산 규칙", "한 해 정비비 = 고정분 + 등급별 MW당 단가 × 설비용량 · 과목별로는 기준 지사의 그 등급 해 과목 비중으로 나눔", `
+    <div class="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-5">
+      <div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">고정분 (지사 공통)</p><p class="mt-1 text-lg font-bold text-ink">${eok1(m.fixed)}<span class="ml-1 text-xs text-tri">억원</span></p></div>
+      ${CAP_GRADES.map(g => `<div class="rounded-control bg-subtle px-4 py-3"><p class="text-xs font-semibold text-sub">${g} · MW당</p><p class="mt-1 text-lg font-bold text-ink">${(Number(m.k[g] || 0) / 1e5).toFixed(3)}<span class="ml-1 text-xs text-tri">억원</span></p><p class="text-[11px] text-tri">맞혀 본 오차 ${pct(m.loo[g])}</p></div>`).join("")}
+    </div>
+    <p class="px-5 text-xs text-sub">* 맞혀 본 오차 = 기준 지사 하나씩 빼고 나머지로 그 지사를 맞혔을 때 평균 오차(전체 ${pct(m.loo_all)}) · TI 와 HGPI 는 같은 등급 · 고온부품 신품구매·LTSA·CRI 는 따로 잡혀 여기서 뺌</p>
+    <div class="overflow-x-auto p-5"><h4 class="mb-2 text-sm font-bold text-ink">기준 지사 — 등급 해 평균 (억원/년)</h4><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th><th class="px-3 py-2 text-right">MW</th>${CAP_GRADES.map(g => `<th class="px-3 py-2 text-right">${g}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-line-subtle">${refRows}</tbody></table></div>
+    <div class="overflow-x-auto p-5 pt-0"><h4 class="mb-2 text-sm font-bold text-ink">대상 지사 — 등급별 한 해 표준금액 (억원, 기준연도 값 · 이후 팩터 곱함)</h4><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th><th class="px-3 py-2 text-right">MW</th><th class="px-3 py-2">적용</th>${["간이", "CI", "TI/HGPI", "MI"].map(g => `<th class="px-3 py-2 text-right">${g}</th>`).join("")}<th class="px-3 py-2 text-right">정비제외</th></tr></thead>
+      <tbody class="divide-y divide-line-subtle">${tgtRows || '<tr><td class="table-cell text-tri" colspan="8">대상 지사가 없습니다.</td></tr>'}</tbody></table>
+      <p class="mt-2 text-xs text-sub">* MI 해에는 A급정비(외주비-열원정기점검) 포함 · 대상 지사의 적용시작 전 실적은 표준화에서 뺌 · 수동수정한 칸은 그대로 둠</p></div>`)
+}
+
+function capacityBody(d) {
+  const sites = [...sitesOpt(d), "본사"]
+  const mwSum = (d.site_capacity || []).filter(r => r.구분 === "발전설비").reduce((a, r) => a + Number(r.용량MW || 0), 0)
+  return `${capacityModelPanel()}
+  ${panel("용량 규칙", "역할 «기준» = 규칙을 찾는 지사 · «대상» = 용량으로 환산할 지사 · 용량 빈 칸 = 설비 현황의 가장 늦게 준공한 발전설비 · 정비제외연도 예: 2027~2028",
+    longTable("capacity_rule", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "역할", label: "역할", type: "select", options: ["기준", "대상"]},
+      {f: "적용시작연도", label: "적용시작연도", type: "int"}, {f: "용량MW", label: "용량(MW)", type: "num"},
+      {f: "정비제외연도", label: "정비제외연도"}, {f: "비고", label: "비고"}], d.capacity_rule || [], "규칙이 없습니다."), "capacity_rule")}
+  ${panel("설비 현황", `발전설비 ${mwSum.toLocaleString("ko-KR")}MW · 출처 «한난_발전설비용량_261028.xlsx»(한난 홈페이지 전력사업·지사안내, KPX 등록 2023.3)`,
+    longTable("site_capacity", [{f: "사업장", label: "지사", type: "select", options: sites}, {f: "설비", label: "설비"},
+      {f: "구분", label: "구분", type: "select", options: ["발전설비", "기타 소형"]}, {f: "용량MW", label: "용량(MW)", type: "num"},
+      {f: "준공연도", label: "준공연도", type: "int"}, {f: "비고", label: "비고"}], d.site_capacity || [], "설비가 없습니다."), "site_capacity")}`
+}
+
 function historyBody(d) {
   return `${panel("지사 연혁", "연도별 그룹·설비 구성 · 종료연도 빈 칸 = 현재까지",
     longTable("site_history", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "시작연도", label: "시작연도", type: "int"},
@@ -276,15 +325,16 @@ function manageBody() {
     ${mt === "history" ? historyBody(d) : ""}
     ${mt === "learn" ? learnBody(d) : ""}
     ${mt === "regular" ? regularBody(d) : ""}
-    ${mt === "factor" ? `${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
-      longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"},
-        {f: "적용구분", label: "적용구분", type: "select", options: opts().factor_scopes || ["전체", "손익", "자본"]}], d.factors), "factors")}
-    ${panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음", `
+    ${mt === "capacity" ? capacityBody(d) : ""}
+    ${mt === "factor" ? `${panel("고온부품 계획", "금액 그대로 반영 — 팩터를 곱하지 않음", `
       <div class="flex flex-wrap gap-2 p-5 pb-0">
         <button class="btn-secondary" data-fcimport="hot-parts">고온부품 엑셀에서 가져오기</button>
         <button class="btn-secondary" data-fcexport="hot-parts">현재값이 채워진 양식 내려받기</button>
       </div>
       ${longTable("hot_parts", [{f: "사업장", label: "지사", type: "select", options: d.sites}, {f: "연도", label: "연도", type: "int"}, {f: "항목", label: "항목", type: "select", options: HOT_ITEMS}, {f: "금액", label: "금액(천원)", type: "num"}], d.hot_parts, "고온부품 계획이 없습니다.")}`, "hot_parts")}
+    ${panel("팩터", "활성 팩터의 (1+비율)을 기준연도부터 복리로 곱함",
+      longTable("factors", [{f: "팩터명", label: "팩터명"}, {f: "연간비율", label: "연간비율 (0.015 = 1.5%)", type: "num"}, {f: "활성", label: "활성", type: "bool"},
+        {f: "적용구분", label: "적용구분", type: "select", options: opts().factor_scopes || ["전체", "손익", "자본"]}], d.factors), "factors")}
     ` : ""}
     ${mt === "hq" ? `${hqMasterPanel(d)}
     ${panel("본사 일시적 사업", "배분비율(계약체결금액)로 지사에 자동 배분",

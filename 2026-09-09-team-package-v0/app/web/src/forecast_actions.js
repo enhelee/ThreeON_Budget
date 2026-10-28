@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastCompare, loadForecastRegular, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastRegular, loadForecastState } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -20,11 +20,12 @@ const TABLE_URL = {grades: "grades", hot_parts: "hot-parts", factors: "factors",
                    // 표준화 방향 반영(2026-10-26)
                    site_history: "site-history", site_event: "site-event", site_grade_eq: "site-grade-eq",
                    benchmark_rule: "benchmark-rule", actual_tag: "actual-tag", regular_contract: "regular-contract",
-                   cri_rule: "cri-rule", investment_plan: "investment-plan"}
-const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도"])
+                   cri_rule: "cri-rule", investment_plan: "investment-plan",
+                   site_capacity: "site-capacity", capacity_rule: "capacity-rule"}
+const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도", "적용시작연도", "준공연도"])
 const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가"])
 // 비우면 «없음»(null)인 칸 — 0 과 뜻이 다르다(보정률 0 ≠ 보정 없음)
-const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도"])
+const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도", "용량MW"])
 
 const firstSite = () => state.fc.data?.sites?.[0] || ""
 const firstAccount = () => (state.fc.data?.accounts?.["손익"] || [])[0] || ""
@@ -44,6 +45,8 @@ const NEW_ROW = {
                             예산과목: "수선유지비-열원정기유지보수", 금액: 0, 비고: ""}),
   cri_rule: () => ({사업장: firstSite(), 짝지사: "", 지급시차: 2, 기준단가: 0, 단가기준연도: Number(state.fc.baseYear) - 1, 활성: true, 비고: ""}),
   investment_plan: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear) + 1, 금액: 0, 비고: ""}),
+  site_capacity: () => ({사업장: firstSite(), 설비: "", 구분: "발전설비", 용량MW: null, 준공연도: null, 비고: ""}),
+  capacity_rule: () => ({사업장: firstSite(), 역할: "대상", 적용시작연도: Number(state.fc.baseYear), 용량MW: null, 정비제외연도: "", 비고: ""}),
 }
 
 const json = body => ({method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
@@ -67,6 +70,7 @@ async function reload(withBench) {
   await loadForecastState()
   if (withBench || state.fc.tab === "bench") await Promise.all([loadForecastBench(), loadForecastRegular()])
   if (state.fc.compare || state.fc.manageTab === "ref") await loadForecastCompare()
+  if (state.fc.manageTab === "capacity") await loadForecastCapacity()
   renderPage()
 }
 
@@ -299,6 +303,10 @@ export async function fcClick(e) {
     if (state.fc.manageTab === "ref" && !state.fc.compare) {
       busy(true, "참고 엑셀과 대조 중...")
       try { await loadForecastCompare() } catch (err) { toast(err.message) } finally { busy(false) }
+    }
+    if (state.fc.manageTab === "capacity" && !state.fc.capacity) {
+      busy(true, "용량 규칙 계산 중...")
+      try { await loadForecastCapacity() } catch (err) { toast(err.message) } finally { busy(false) }
     }
     renderPage(); return true
   }

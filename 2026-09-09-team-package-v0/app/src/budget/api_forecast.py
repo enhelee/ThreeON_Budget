@@ -42,7 +42,8 @@ EMPTY_COLS = {
 # 가져오기로만 채운다(손으로 고치는 값이 아니라 대조 기준이라서).
 SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site-grade-eq": "site_grade_eq",
                "benchmark-rule": "benchmark_rule", "actual-tag": "actual_tag",
-               "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan"}
+               "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan",
+               "site-capacity": "site_capacity", "capacity-rule": "capacity_rule"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,
@@ -304,6 +305,16 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         try:
             by = _base(conn, base_year)
             return _cached_view("compare", conn, by, lambda: clean_json(pf.compare_reference(conn, by)))
+        finally:
+            conn.close()
+
+    @router.get("/capacity")
+    def capacity_model(base_year: str = None):
+        """설비용량·신규표준 — 용량 규칙(고정분·등급별 MW당 단가·LOO 오차)과 대상 지사 등급별 표준 합계."""
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return _cached_view("capacity", conn, by, lambda: clean_json(pf.capacity_view(conn, by)))
         finally:
             conn.close()
 
