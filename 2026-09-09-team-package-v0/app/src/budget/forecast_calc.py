@@ -71,6 +71,10 @@ HOT_PARTS_ITEM_TO_LABEL = {
 }
 
 
+# 고온부품 줄이 기준연도 계획본에서는 어느 과목 안에 들어 있나(그 과목 계획본이 있으면 기준연도 고온부품 = 0)
+HOT_PARTS_PLAN_ACCOUNT = {"고온부품재생": "기계장치", "신품구매": "건설중인자산-재생고온부품"}
+
+
 HQ_CATEGORY_TO_ACCOUNT = {
     "경상정비": "수선유지비-열원경상정비",
     "정기유지보수": "수선유지비-열원정기유지보수",
@@ -434,7 +438,11 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                 amount = site_amount + hq_part
             elif source.startswith("고온부품:"):
                 item = source.split(":", 1)[1]
-                amount = hot_parts_lookup.get((site, year, item), 0.0)
+                # 기준연도에 그 과목 계획본이 있으면 고온부품은 이미 그 안에 있다 — LTSA·CRI 처럼 또 더하지 않는다(2026-10-28 사용자 결정)
+                if year == base_year and budget_lookup.get((site, HOT_PARTS_PLAN_ACCOUNT[item])) is not None:
+                    amount = 0.0
+                else:
+                    amount = hot_parts_lookup.get((site, year, item), 0.0)
             elif source.startswith(("정기계약:", "CRI:")):
                 # 기준연도에 그 과목의 확정 예산(계획본)이 있으면 LTSA·CRI 는 이미 그 안에 있다 — 또 더하지 않는다.
                 scope = source.split(":", 1)[1] or "자본"
