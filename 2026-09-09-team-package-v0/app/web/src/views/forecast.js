@@ -119,8 +119,8 @@ function gradesPanel(d) {
   return panel("정비등급 이력", "빈 칸 = 그 해 이력 없음 · 이력이 없는 지사는 «표준» 한 종으로 계산", `
     <div class="flex flex-wrap gap-2 p-5 pb-0">
       <button class="btn-secondary" data-fcimport="grades">표준화 참고 엑셀에서 가져오기</button>
-      <button class="btn-secondary" data-fcimport="schedule">정기점검 일정 엑셀에서 가져오기</button>
-      <button class="btn-secondary" data-fcexport="schedule" title="지금 저장된 미래 등급이 채워진 원본 양식 — 고쳐서 다시 올릴 수 있습니다">현재값이 채워진 일정 양식 내려받기</button>
+      <button class="btn-secondary" data-fcimport="schedule" title="전지사 정비등급 양식(한 해 한 열) 또는 중장기예산 양식의 정기점검보수공사 일정 시트">정비등급 양식에서 가져오기</button>
+      <button class="btn-secondary" data-fcexport="schedule" title="전지사 정비등급 양식 그대로, 등급 칸만 지금 저장된 값 — 고쳐서 다시 올릴 수 있습니다">정비등급 양식으로 내려받기 (xlsx)</button>
     </div>
     <div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">지사</th>${years.map(y => `<th class="px-1 py-2 text-center">${y}</th>`).join("")}</tr></thead>
       <tbody class="divide-y divide-line-subtle">${sites.map(s => `<tr><td class="table-cell font-semibold text-ink">${esc(s)}</td>${years.map(y =>
@@ -299,7 +299,7 @@ function manageBody() {
 
 // ── 가져오기 미리보기 ────────────────────────────────────────
 
-const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정기점검 일정)",
+const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정비등급 양식)",
                       "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율"}
 
 function previewPanel() {
@@ -312,7 +312,7 @@ function previewPanel() {
   <article class="panel overflow-hidden border-line-strong" id="fcPreview">
     <div class="border-b border-line bg-subtle p-5 sm:p-6">
       <h3 class="section-title">가져오기 미리보기 — ${esc(IMPORT_LABEL[p.kind] || p.kind)}</h3>
-      <p class="section-help">${rows.length.toLocaleString()}건을 찾았습니다${p.ratio_rows ? ` · 배분비율 ${p.ratio_rows.length}개 지사` : ""}. 아직 저장되지 않았습니다 — 아래에서 적용 방식을 고르세요.</p>
+      <p class="section-help">${rows.length.toLocaleString()}건을 찾았습니다${p.ratio_rows ? ` · 배분비율 ${p.ratio_rows.length}개 지사` : ""}${p.eq_rows?.length ? ` · 설비별 등급 ${p.eq_rows.length}건(줄이 둘 이상인 지사)도 같이 저장` : ""}. 아직 저장되지 않았습니다 — 아래에서 적용 방식을 고르세요.</p>
       <div class="mt-3 flex flex-wrap gap-2">
         ${mergeable ? '<button class="btn-primary" data-action="fc-apply-merge">기존에 없는 것만 추가</button>' : ""}
         <button class="${mergeable ?"btn-secondary" : "btn-primary"}" data-action="fc-apply-replace">전체 교체</button>

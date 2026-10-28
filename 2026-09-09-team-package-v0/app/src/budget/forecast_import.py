@@ -88,10 +88,105 @@ def grades_from_workbook(data: bytes, site_names) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=GRADE_COLS)
 
 
+# ---------------------------------------------------------------- 정비등급 양식 (한 해 한 열)
+# 사용자가 정한 «26~35년 전지사 정비등급» 양식(2026-10-28, templates/builtin_template_정비등급.xlsx).
+# 중장기예산 양식의 일정 시트(한 해 = GT·ST·기간 세 열, 지사명 A열)와 달리 한 해 = «등급» 한 열,
+# A열 = 묶음(발전설비·DH, 세로 병합), B열 = 지사(«삼 송»·«청 주(신규CHP)»·«중앙 정비등급»),
+# C열 = 설비(#1 GT·#2 Block·우드칩…, 없으면 빈 칸). 표가 둘(발전설비·DH)이라 연도 머리가 두 번 나온다.
+UNIT_COLS = ["사업장", "연도", "설비", "등급"]
+
+
+def _year_cols(ws, r) -> dict:
+    return {c: int(ws.cell(row=r, column=c).value) for c in range(1, ws.max_column + 1)
+            if isinstance(ws.cell(row=r, column=c).value, (int, float)) and 2020 < ws.cell(row=r, column=c).value < 2050}
+
+
+def _merged_value(ws, r, c):
+    """병합 영역 안이면 왼쪽 위 칸 값 — B7:B8 «삼 송»의 아래 줄도 삼송으로 읽게."""
+    v = ws.cell(row=r, column=c).value
+    if v is not None:
+        return v
+    for rng in ws.merged_cells.ranges:
+        if rng.min_row <= r <= rng.max_row and rng.min_col <= c <= rng.max_col:
+            return ws.cell(row=rng.min_row, column=rng.min_col).value
+    return None
+
+
+def is_grade_plan_sheet(ws) -> bool:
+    """한 해 한 열 양식인가 — 연도 머리가 바로 옆 열로 이어진다(일정 시트는 세 열 간격)."""
+    for r in range(1, 6):
+        cols = sorted(_year_cols(ws, r))
+        if len(cols) >= 2:
+            return any(b - a == 1 for a, b in zip(cols, cols[1:]))
+    return False
+
+
+def grade_plan_layout(ws, site_names) -> list:
+    """[{row, site, unit, group, years: {열: 연도}}] — 등급이 적힌 줄마다. 연도 머리 줄·«등급» 줄은 건너뛴다."""
+    short_to_full = site_sheet_map(site_names)
+    shorts = sorted(short_to_full, key=len, reverse=True)
+    out, years = [], {}
+    for r in range(1, ws.max_row + 1):
+        ys = _year_cols(ws, r)
+        if len(ys) >= 2:
+            years = ys
+            continue
+        if not years:
+            continue
+        vals = [str(ws.cell(row=r, column=c).value or "").strip() for c in years]
+        if not any(vals) or all(v == "등급" for v in vals if v):
+            continue
+        site = None
+        for c in (2, 1):                       # 지사는 B열, 옛 모양(A열 지사)도 받는다
+            raw = str(_merged_value(ws, r, c) or "").replace(" ", "")
+            m = next((s for s in shorts if raw.startswith(s)), None)
+            if m:
+                site = short_to_full[m]
+                break
+        if site is None:
+            continue
+        group = str(_merged_value(ws, r, 1) or "").strip()
+        unit = str(ws.cell(row=r, column=3).value or "").strip()
+        if not unit:
+            unit = "DH" if "DH" in group.upper() else "등급"
+        out.append({"row": r, "site": site, "unit": unit, "group": group, "years": dict(years)})
+    return out
+
+
+def grade_plan_from_workbook(data: bytes, site_names):
+    """정비등급 양식 → (대표 등급 GRADE_COLS, 설비별 등급 UNIT_COLS).
+
+    대표 등급은 일정 시트와 같은 규칙 — 지사 줄 중 GT 어휘 줄 우선, 없으면 A/B/C 줄(DH 지사).
+    설비별 등급은 줄이 둘 이상인 지사만(삼송 #1·#2 GT, 동탄 #1·#2 Block, 대구 우드칩·신규CHP, 강남) —
+    A급정비 일정(«어느 설비든 MI 인 해»)이 대표 줄 하나만 보면 #2 설비의 MI 를 놓친다."""
+    wb = _wb(data)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), None)
+    if ws is None:
+        return pd.DataFrame(columns=GRADE_COLS), pd.DataFrame(columns=UNIT_COLS)
+    lines = grade_plan_layout(ws, site_names)
+    by_site = {}
+    for ln in lines:
+        vals = {y: str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()}
+        by_site.setdefault(ln["site"], []).append((ln["unit"], {y: v for y, v in vals.items() if v in VALID_GRADE_TOKENS}))
+    grades, units = [], []
+    for site, rows in by_site.items():
+        rep = next((v for _, v in rows if _classify_grade_row(v) == "GT"), None)             or next((v for _, v in rows if _classify_grade_row(v) == "ST"), None)
+        for y, g in sorted((rep or {}).items()):
+            grades.append({"사업장": site, "연도": y, "등급": g})
+        if len(rows) > 1:
+            for unit, v in rows:
+                for y, g in sorted(v.items()):
+                    units.append({"사업장": site, "연도": y, "설비": unit, "등급": g})
+    return pd.DataFrame(grades, columns=GRADE_COLS), pd.DataFrame(units, columns=UNIT_COLS)
+
+
 # ---------------------------------------------------------------- 정기점검보수공사 일정 (미래 등급)
 def schedule_from_workbook(data: bytes, site_names) -> pd.DataFrame:
-    """'정기점검보수공사' 시트에서 지사별 미래 정비등급. GT 계열 행 우선, 없으면 ST 계열 행."""
+    """'정기점검보수공사' 시트에서 지사별 미래 정비등급. GT 계열 행 우선, 없으면 ST 계열 행.
+    한 해 한 열인 정비등급 양식이면 그 파서로(설비별 등급은 `grade_plan_from_workbook`)."""
     wb = _wb(data)
+    if any(is_grade_plan_sheet(wb[n]) for n in wb.sheetnames):
+        return grade_plan_from_workbook(data, site_names)[0]
     sheet_name = next((n for n in wb.sheetnames if "정기점검보수공사" in n), None)
     if sheet_name is None:
         return pd.DataFrame(columns=GRADE_COLS)
