@@ -156,7 +156,7 @@ def test_review_multi_year_bars_split_budget_types_in_one_bar():
 
 def test_review_summary_is_three_year_comparison_table():
     body = _fn(_read(SRC, "views", "home.js"), "summaryTable")
-    assert "colspan" in body and "rateBadge" in body and "합계" in body and "억원" in body
+    assert "colspan" in body and "homeRateBadge" in body and "합계" in body and "억원" in body
 
 
 def test_review_forecast_is_stacked_by_budget_type():
@@ -192,3 +192,12 @@ def test_main_chart_palette_tokens():
     for k, v in (("--chart-profit", "#718CBF"), ("--chart-capital", "#ADB7C9"), ("--chart-total", "#E58F79"),
                  ("--status-good", "#31876F"), ("--status-warning", "#A77A27"), ("--status-poor", "#B65E53")):
         assert f"{k}:{v}" in css, f"{k} = {v}(10/28 확정 팔레트)"
+
+
+def test_home_rate_badge_thresholds():
+    """메인 집행률 배지(10/28 grace): 90% 이상 초록 · 미만 노랑 · 100% 초과 빨강. 다른 탭은 80~120% 그대로."""
+    b = _read(SRC, "components", "badges.js")
+    fn = b.split("export function homeRateBadge", 1)[1].split("\n}", 1)[0]
+    assert "r > 100" in fn and "r >= 90" in fn
+    home = _read(SRC, "views", "home.js")
+    assert "homeRateBadge(" in home and "rateBadge(" not in home.replace("homeRateBadge(", "")

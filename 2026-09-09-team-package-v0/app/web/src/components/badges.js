@@ -11,6 +11,15 @@ export function rateBadge(p, a) {
   return `<span class="badge ${cls}">${r.toFixed(1)}%</span>`;
 }
 
+// 메인 화면 집행률 배지(2026-10-28 grace): 90% 이상 초록 · 90% 미만 노랑 · 100% 초과 빨강.
+// 다른 탭(차이 사유 ±20%p 기준과 같은 80~120%)은 rateBadge 그대로.
+export function homeRateBadge(p, a) {
+  const r = rateVal(p, a);
+  if (r === null) return '<span class="badge bg-subtle text-sub">-</span>';
+  const cls = r > 100 ? "bg-err-bg text-err" : r >= 90 ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn";
+  return `<span class="badge ${cls}">${r.toFixed(1)}%</span>`;
+}
+
 export function confBadge(c) {
   if (c === null || c === undefined) return '<span class="badge bg-subtle text-sub">신규</span>';
   const n = Number(c);
