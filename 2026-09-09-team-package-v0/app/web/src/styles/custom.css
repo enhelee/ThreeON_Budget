@@ -291,7 +291,9 @@
 .fv-headline-t{font-size:1.5rem;font-weight:700;color:#0D0D0D;letter-spacing:-.01em}
 .fv-corner{display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:0 .5rem 4px;border-left:4px solid #0D0D0D}
 .fv-corner-k{font-size:.95rem;font-weight:800;color:#0D0D0D;line-height:1.2}
-.fv-rowcap{grid-column:1/-1;padding:.4rem .5rem .1rem;font-size:.75rem;font-weight:700;color:#5D5D5D;border-top:1px solid #E5E5E5}
+.fv-rowcap{grid-column:1/-2;padding:.4rem .5rem .1rem;font-size:.75rem;font-weight:700;color:#5D5D5D;border-top:1px solid #E5E5E5}
+/* 합계 열 머리는 «지사명» 줄 오른쪽 끝 — 바로 아래 합계 숫자와 한 열로 읽히게 */
+.fv-rowcap.fv-totcap{grid-column:auto;padding-right:.25rem;text-align:right;white-space:nowrap;color:#0D0D0D}
 .fv-present .fv-scope-name{font-size:3rem}
 /* ── 검토 큐(2026-10-27, views/review.js) ─────────────────────────────
    색은 한난 토큰만 쓴다: 잉크(#0D0D0D) 곡선 · ok(#16794A) 진행·덮은 구간 · 선(#E5E5E5) 격자. */
