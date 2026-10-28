@@ -247,6 +247,7 @@
 .fv-chip:hover{border-color:#0D0D0D;color:#0D0D0D}
 .fv-chip-on{background:#0d366b;border-color:#0d366b;color:#fff}
 .fv-chip-on:hover{color:#fff}
+/* 칸을 누르면 1.12배 + 검은 테두리 — 감싼 overflow 상자가 잘라 마지막 줄 아래에 스크롤바가 생기지 않게 바깥(px-1.5 py-2)에 여유를 둔다 */
 .fv-grid{display:grid;gap:3px;align-items:stretch}
 .fv-colhead{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;border-radius:.4rem}
 .fv-colhead:hover{background:#F2F2F2}
@@ -414,3 +415,6 @@
 @keyframes heroBob{50%{transform:translateY(-6px)}}
 @media (max-width:767px){.home-hero{grid-template-columns:1fr;padding:1.5rem}.home-hero__cast{max-width:320px;justify-self:end}}
 @media (prefers-reduced-motion:reduce){.home-hero__char{animation:none}}
+
+/* 5번 10개년 상세 표 — 옆으로 넘겨도 예산과목 열은 왼쪽에 고정. 오른쪽 옅은 그림자로 «아래로 숫자가 지나간다»를 보이게 */
+.fc-stick{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 0 #E5E5E5,6px 0 6px -6px rgba(0,0,0,.18)}

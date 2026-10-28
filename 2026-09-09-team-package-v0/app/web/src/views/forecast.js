@@ -463,10 +463,10 @@ function tableBody() {
   </article>
   ${fcVizHtml(t, site, site === TOTAL)}
   <article class="panel overflow-hidden">
-    <div class="border-b border-line px-5 py-3"><h3 class="section-title">10개년 상세 표 · ${site === TOTAL ? "전사 합계" : esc(site)}</h3><p class="text-xs text-tri">단위 천원</p></div>
-    <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="table-cell font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
-      <tr class="bg-subtle font-bold"><td class="table-cell text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
+    <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line px-5 py-3"><h3 class="section-title">10개년 상세 표 · ${site === TOTAL ? "전사 합계" : esc(site)}</h3><p class="text-right text-xs text-tri"><span class="hidden sm:inline">Shift + 마우스 휠 = 좌우 이동 · </span>단위 <b class="font-semibold text-sub">천원</b></p></div>
+    <div class="overflow-x-auto"><table class="w-full"><thead class="table-head"><tr><th class="fc-stick bg-subtle px-3 py-2">예산과목</th>${t.years.map(y => `<th class="px-3 py-2 text-right">${y}</th>`).join("")}</tr></thead>
+      <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr><td class="fc-stick table-cell bg-white font-semibold text-ink">${esc(r.예산과목)}</td>${t.years.map(y => cellOf(r, y)).join("")}</tr>`).join("")}
+      <tr class="bg-subtle font-bold"><td class="fc-stick table-cell bg-subtle text-ink">합계</td>${t.years.map(y => `<td class="table-cell text-right">${fmt(sums[y])}</td>`).join("")}</tr></tbody></table></div>
   </article>
   ${criPanel(t, site)}`
 }
