@@ -1894,6 +1894,17 @@ def _chat_status(year):
         conn.close()
 
 
+def _chat_standard():
+    """예측이의 표준금액 근거 답 — 5번 표준화 결과(캐시) 그대로."""
+    conn = dbm.connect()
+    try:
+        return api_forecast.standard_rows(conn)
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
 @app.post("/api/chat")
 def chat(req: ChatReq):
     if len(req.question or "") > chatm.engine.MAX_LEN:
@@ -1902,7 +1913,7 @@ def chat(req: ChatReq):
     raw = req.context or {}
     ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
            "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None}
-    return _clean_json(chatm.RuleEngine(status_provider=_chat_status).answer(req.question, ctx))
+    return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard).answer(req.question, ctx))
 
 
 @app.get("/api/chat/suggestions")

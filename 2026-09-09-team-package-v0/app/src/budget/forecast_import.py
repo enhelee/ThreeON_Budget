@@ -11,6 +11,7 @@ v2 와 다른 것 둘.
   ② 단위 천원. v2 고온부품 파서는 양식(천원)을 원으로 환산했다. 이 앱은 천원이 표준이다.
 """
 import io
+import os
 import re
 
 import pandas as pd
@@ -258,6 +259,54 @@ def schedule_from_workbook(data: bytes, site_names) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- 고온부품
+HOT_CONTRACT_COLS = ["사업장", "계약방식", "계약기간", "비고"]
+HOT_TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                            "templates", "builtin_template_고온부품.xlsx")   # 사용자 «26~35년 전지사 고온부품»(2026-10-28)
+
+
+def _hot_sheet(wb):
+    name = next((n for n in wb.sheetnames if n.strip().startswith("고온부품")), None)
+    return wb[name] if name else None
+
+
+def hot_parts_contracts_from_workbook(data: bytes, site_names) -> pd.DataFrame:
+    """고온부품 시트 B·C열 — 지사별 계약방식(LTSA·LTPM…)·계약기간. 지사 칸(A)이 병합이라 첫 줄에만 있다."""
+    ws = _hot_sheet(_wb(data))
+    if ws is None:
+        return pd.DataFrame(columns=HOT_CONTRACT_COLS)
+    short_to_full = site_sheet_map(site_names)
+    rows = []
+    for r in range(1, ws.max_row + 1):
+        site = short_to_full.get(str(ws.cell(row=r, column=1).value or "").strip())
+        if site and ws.cell(row=r, column=5).value:
+            rows.append({"사업장": site, "계약방식": str(ws.cell(row=r, column=2).value or "").strip(),
+                         "계약기간": str(ws.cell(row=r, column=3).value or "").strip(), "비고": ""})
+    return pd.DataFrame(rows, columns=HOT_CONTRACT_COLS)
+
+
+def hot_parts_notes(data: bytes) -> list:
+    """«(작성 기준)» 아래 줄들 — 계약단가·물가·관세·운전시간 가정. 화면에 그대로 보인다."""
+    ws = _hot_sheet(_wb(data))
+    if ws is None:
+        return []
+    out, on = [], False
+    for r in range(1, ws.max_row + 1):
+        v = str(ws.cell(row=r, column=1).value or "").strip()
+        if v.startswith("(작성 기준)"):
+            on = True
+            continue
+        if on and v:
+            out.append(v)
+    return out
+
+
+def default_hot_contracts() -> pd.DataFrame:
+    """내장 고온부품 양식의 계약방식·계약기간(표가 비었을 때)."""
+    from .capacity import DEFAULT_CAPACITY
+    names = sorted({r[0] for r in DEFAULT_CAPACITY})
+    return hot_parts_contracts_from_workbook(open(HOT_TEMPLATE, "rb").read(), names)
+
+
 def hot_parts_from_workbook(data: bytes, site_names) -> pd.DataFrame:
     """'고온부품(NN)' 시트에서 지사×연도×항목(고온부품재생/신품구매) 금액. **천원 그대로.**"""
     wb = _wb(data)

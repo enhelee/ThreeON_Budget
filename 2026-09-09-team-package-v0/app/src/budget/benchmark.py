@@ -254,6 +254,25 @@ def _num(v, default):
     return default if f != f else f
 
 
+def prepare_actuals(actuals_df: pd.DataFrame, item_alias: dict = None, events: pd.DataFrame = None) -> pd.DataFrame:
+    """표준화 모집단 — 과목 이름 정규화 · 표준화 과목만 · 정기비용(LTSA·CRI·고온부품재생) 제외 · «실적사용시작» 이전 제외.
+    용량 환산(capacity.py)도 같은 모집단을 쓴다."""
+    alias = item_alias if item_alias is not None else config_store.seed_item_alias()
+    df = actuals_df.copy()
+    if not df.empty:
+        df["예산과목"] = df["예산과목"].apply(lambda v: normalize.normalize_item(v, alias))
+        df = df[df["예산과목"].isin(ALL_ACCOUNTS)]
+        if "유형" in df.columns:
+            df = drop_regular(df)
+        elif "투자유형세부_확정" in df.columns:
+            machine_mask = df["예산과목"] == "기계장치"
+            ltsa_mask = machine_mask & df["투자유형세부_확정"].isin(LTSA_LIKE_DETAILS)
+            df = df[~ltsa_mask]
+        # 둘 다 없으면 '기계장치'를 정기비용 분리 없이 총액 그대로 쓴다(화면이 한 번 안내한다).
+        df = apply_usage_events(df, events)
+    return df
+
+
 def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.DataFrame,
                               method_map: pd.DataFrame = None, overrides: pd.DataFrame = None,
                               item_alias: dict = None, rules: pd.DataFrame = None,
@@ -278,19 +297,7 @@ def compute_standard_amounts(actuals_df: pd.DataFrame, grade_history_df: pd.Data
     if actuals_df.empty and not rule_dict:
         return pd.DataFrame(columns=result_cols)
 
-    alias = item_alias if item_alias is not None else config_store.seed_item_alias()
-    df = actuals_df.copy()
-    if not df.empty:
-        df["예산과목"] = df["예산과목"].apply(lambda v: normalize.normalize_item(v, alias))
-        df = df[df["예산과목"].isin(ALL_ACCOUNTS)]
-        if "유형" in df.columns:
-            df = drop_regular(df)
-        elif "투자유형세부_확정" in df.columns:
-            machine_mask = df["예산과목"] == "기계장치"
-            ltsa_mask = machine_mask & df["투자유형세부_확정"].isin(LTSA_LIKE_DETAILS)
-            df = df[~ltsa_mask]
-        # 둘 다 없으면 '기계장치'를 정기비용 분리 없이 총액 그대로 쓴다(화면이 한 번 안내한다).
-        df = apply_usage_events(df, events)
+    df = prepare_actuals(actuals_df, item_alias, events)
 
     # 연도별 합계는 한 번의 groupby 로 — 지사×과목 그룹마다 groupby 하면 계산 시간의 절반이다(백테스트 13초 → 6초).
     def _yearly(frame):
