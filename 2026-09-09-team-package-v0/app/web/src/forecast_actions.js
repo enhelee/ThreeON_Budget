@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastRegular, loadForecastState } from "./data.js"
+import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastRegular, loadForecastScenarios, loadForecastState } from "./data.js"
 import { navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
@@ -355,6 +355,13 @@ export async function fcClick(e) {
     open.has(k) ? open.delete(k) : open.add(k)
     renderPage(); return true
   }
+  if (e.target.closest("[data-sc=run]")) {           // 시나리오 비교 — 손잡이 값으로 다시 계산
+    const sc = state.fc.sc
+    sc.loading = true; renderPage()
+    await loadForecastScenarios(true)
+    sc.cmp = Math.min(sc.cmp, Math.max(1, sc.specs.length - 1))
+    renderPage(); return true
+  }
   const bview = e.target.closest("[data-fcbview]")
   if (bview) { state.fc.benchView = bview.dataset.fcbview; renderPage(); return true }
   if (fvClick(e)) return true
@@ -401,6 +408,14 @@ export async function fcClick(e) {
 export async function fcChange(e) {
   if (state.view !== "forecast") return false
   const t = e.target
+  // 시나리오 손잡이 — 값만 담아 두고 «다시 계산»에서 보낸다(입력마다 세 번 계산하지 않게)
+  if (t.matches("[data-sc-field]")) {
+    const s = state.fc.sc.specs[Number(t.dataset.i)]
+    const f = t.dataset.scField
+    s[f] = f === "name" ? t.value.slice(0, 20) : (Number(t.value) || 0)
+    return true
+  }
+  if (t.matches("[data-sc-cmp]")) { state.fc.sc.cmp = Number(t.value) || 1; renderPage(); return true }
   if (t.matches("[data-fcbase]")) {
     state.fc.baseYear = t.value; state.fc.preview = null; state.fc.dirty = new Set()
     await navigate("forecast"); return true

@@ -8,6 +8,7 @@ Phase 6-6. server.py 는 1,480줄이라 여기에 300줄을 더 얹지 않는다
 기준연도(base_year)는 마감 대상이 아니다 — 마감은 분석 연도(2023·2025)의 개념이고
 전망 상태는 «어느 해에 세운 가정인가»다. 그래서 마감 가드가 없다.
 """
+import json
 import time
 from urllib.parse import quote
 
@@ -169,6 +170,18 @@ def build_state(conn, base_year):
     }
 
 
+def scenario_specs(sp):
+    """시나리오 손잡이 정규화 — API 와 예열이 같은 캐시 키를 쓰게(이름 20자 · 숫자는 float)."""
+    return [{"name": str(s.get("name") or "")[:20], "price": float(s.get("price") or 0),
+             "volume": float(s.get("volume") or 0)} for s in sp]
+
+
+def scenarios_cached(conn, by, sp, clean_json):
+    key = json.dumps(sp, ensure_ascii=False, sort_keys=True)
+    return viewcache.get_or_compute(("forecast", "scenarios", str(by), key), _data_version(conn),
+                                    lambda: clean_json(pf.run_scenarios(conn, by, sp)), ttl=VIEW_CACHE_TTL)
+
+
 def warm(conn, clean_json):
     """기본 기준연도의 전망 표·표준화·정기비용 분리를 미리 계산해 캐시에 채운다(이미 있으면 바로 끝).
     server 의 예열 스레드가 배포 직후와 자료가 바뀐 뒤 부른다 — 사용자가 첫 계산(운영 수십 초)을 맞지 않게."""
@@ -176,6 +189,7 @@ def warm(conn, clean_json):
     for kind, fn in (("state", build_state), ("table", pf.run_forecast), ("benchmark", pf.run_benchmark),
                      ("regular", pf.regular_breakdown)):
         _cached_view(kind, conn, by, lambda fn=fn: clean_json(fn(conn, by)))
+    scenarios_cached(conn, by, scenario_specs(pf.DEFAULT_SCENARIOS), clean_json)
     return by
 
 
@@ -397,6 +411,24 @@ def make_router(conn_factory, clean_json) -> APIRouter:
         try:
             by = _base(conn, base_year)
             return _cached_view("benchmark", conn, by, lambda: clean_json(pf.run_benchmark(conn, by)))
+        finally:
+            conn.close()
+
+    @router.get("/scenarios")
+    def scenarios(base_year: str = None, specs: str = None):
+        """시나리오 비교(C) — specs = JSON [{name, price(연 %p), volume(%)}] 최대 3개, 없으면 기본 셋.
+        읽기 전용(GET) — 저장된 가정을 바꾸지 않고 감사 로그에도 남지 않는다. 같은 손잡이 값이면 캐시."""
+        try:
+            sp = json.loads(specs) if specs else pf.DEFAULT_SCENARIOS
+            if not isinstance(sp, list) or not sp or len(sp) > pf.SCENARIO_MAX:
+                raise ValueError
+            sp = scenario_specs(sp)
+        except (ValueError, TypeError, AttributeError):
+            raise HTTPException(400, f"specs 는 [{{name, price, volume}}] 형식(최대 {pf.SCENARIO_MAX}개)이어야 합니다.")
+        conn = conn_factory()
+        try:
+            by = _base(conn, base_year)
+            return scenarios_cached(conn, by, sp, clean_json)
         finally:
             conn.close()
 

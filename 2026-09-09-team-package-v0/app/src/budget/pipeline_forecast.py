@@ -368,16 +368,13 @@ def benchmark_frames(conn, base_year):
             "sites": forecast_sites(conn, base_year)}
 
 
-def forecast_frames(conn, base_year):
-    """4단계 계산 결과(지사별 DataFrame, 연도 int 열)와 그 입력 — 화면(JSON)과 엑셀(양식) 둘이 같은 계산을 쓴다.
-    반환 dict: tables · years · years_used · sites · grade · hq_master · budget_df · actuals"""
+def forecast_inputs(conn, base_year):
+    """4단계 계산의 입력 한 벌(DB 에서 읽기만) — 시나리오 비교가 한 번 읽고 여러 번 계산하려고 나눴다."""
     fs.bind_site_resolvers(conn, base_year)
     by = int(base_year)
-    years = forecast_calc.forecast_years(by)
     std, actuals, years_used, grade, cap = _standard(conn, base_year)
     sites = forecast_sites(conn, base_year)
     budget_df = budget_plan_for(conn, base_year)
-    hq_master = fs.load_hq_master(conn, base_year)
     targets = cap["targets"]
     # 용량 환산 대상은 적용시작 전 실적이 지금 설비와 맞지 않는다 — A급정비 1회 금액·예측 범위에서도 뺀다
     actuals = benchmark.apply_usage_events(actuals, cap["events"][cap["events"]["사업장"].isin(targets)])
@@ -393,21 +390,64 @@ def forecast_frames(conn, base_year):
         drop = set(zip(excl["사업장"], excl["연도"]))
         grade_calc = pd.concat([grade[[(s, int(y)) not in drop for s, y in zip(grade["사업장"], grade["연도"])]], excl],
                                ignore_index=True)
-    tables = forecast_calc.compute_all_sites(
-        sites, grade_calc, std, fs.load_hot_parts(conn, base_year), hq_master,
-        fs.load_hq_temp_projects(conn, base_year), fs.load_hq_ratio(conn, base_year),
-        fs.load_factors(conn, base_year), fs.load_surprise_projects(conn, base_year),
-        forecast_calc.investment_by_site(budget_df), budget_df, base_year=by, years=years,
-        contracts_df=fs.load_table(conn, base_year, "regular_contract"),
-        cri_rules=fs.load_table(conn, base_year, "cri_rule"),
-        invest_plan_df=fs.load_table(conn, base_year, "investment_plan"),
-        overhaul=overhaul)
-    cri = forecast_calc.cri_events(grade, fs.load_table(conn, base_year, "cri_rule"),
-                                   fs.load_factors(conn, base_year), years)
-    return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,
-            "hq_master": hq_master, "budget_df": budget_df, "actuals": actuals, "cri": cri,
-            "factors": fs.load_factors(conn, base_year), "overhaul": overhaul,
+    return {"base_year": by, "years": forecast_calc.forecast_years(by),
+            "std": std, "actuals": actuals, "years_used": years_used, "grade": grade, "grade_calc": grade_calc,
+            "sites": sites, "budget_df": budget_df, "hq_master": fs.load_hq_master(conn, base_year),
+            "overhaul": overhaul,
+            "hot_parts": fs.load_hot_parts(conn, base_year), "hq_temp": fs.load_hq_temp_projects(conn, base_year),
+            "hq_ratio": fs.load_hq_ratio(conn, base_year), "factors": fs.load_factors(conn, base_year),
+            "surprise": fs.load_surprise_projects(conn, base_year),
+            "contracts": fs.load_table(conn, base_year, "regular_contract"),
+            "cri_rules": fs.load_table(conn, base_year, "cri_rule"),
+            "invest_plan": fs.load_table(conn, base_year, "investment_plan"),
             "window": fs.learning_window(conn, base_year)}
+
+
+def scenario_inputs(inp, price=0.0, volume=0.0):
+    """시나리오 = 저장된 가정 위에 손잡이 둘을 얹은 입력(저장된 가정은 바꾸지 않는다).
+
+    price   물가 연 %p 가감 — 활성 팩터는 그대로 두고 «시나리오 물가 조정» 팩터(전체)를 하나 더 건다.
+            배수가 (1+기존)(1+가감) 이라 기존 팩터가 손익·자본으로 나뉘어 있어도 둘 다 같은 폭으로 움직인다.
+    volume  물량 % — 표준금액(표준화 대상 과목, 용량 환산 포함)과 A급정비 1회 금액에 (1+volume/100) 을 곱한다.
+            기준연도 계획본·정기계약·고온부품·본사배분·투자계획처럼 «정해진 금액»은 건드리지 않는다.
+    """
+    out = dict(inp)
+    if price:
+        f = inp["factors"]
+        row = {"팩터명": "시나리오 물가 조정", "연간비율": float(price) / 100.0, "활성": True, "적용구분": "전체"}
+        out["factors"] = pd.concat([f, pd.DataFrame([row])], ignore_index=True) if not f.empty \
+            else pd.DataFrame([row])
+    if volume:
+        k = 1 + float(volume) / 100.0
+        if not inp["std"].empty:
+            out["std"] = inp["std"].assign(표준금액=inp["std"]["표준금액"] * k)
+        if inp["overhaul"]:
+            out["overhaul"] = {**inp["overhaul"],
+                               "amount": {s: v * k for s, v in inp["overhaul"]["amount"].items()}}
+    return out
+
+
+def compute_tables(inp):
+    """입력 한 벌 → 지사별 10개년 표 + CRI 일정. 표는 정비제외가 반영된 등급(grade_calc), CRI 는 저장된 등급으로."""
+    tables = forecast_calc.compute_all_sites(
+        inp["sites"], inp["grade_calc"], inp["std"], inp["hot_parts"], inp["hq_master"],
+        inp["hq_temp"], inp["hq_ratio"], inp["factors"], inp["surprise"],
+        forecast_calc.investment_by_site(inp["budget_df"]), inp["budget_df"],
+        base_year=inp["base_year"], years=inp["years"], contracts_df=inp["contracts"],
+        cri_rules=inp["cri_rules"], invest_plan_df=inp["invest_plan"], overhaul=inp["overhaul"])
+    cri = forecast_calc.cri_events(inp["grade"], inp["cri_rules"], inp["factors"], inp["years"])
+    return tables, cri
+
+
+def forecast_frames(conn, base_year):
+    """4단계 계산 결과(지사별 DataFrame, 연도 int 열)와 그 입력 — 화면(JSON)과 엑셀(양식) 둘이 같은 계산을 쓴다.
+    반환 dict: tables · years · years_used · sites · grade · hq_master · budget_df · actuals"""
+    inp = forecast_inputs(conn, base_year)
+    tables, cri = compute_tables(inp)
+    return {"tables": tables, "years": inp["years"], "years_used": inp["years_used"], "sites": inp["sites"],
+            "grade": inp["grade"], "hq_master": inp["hq_master"], "budget_df": inp["budget_df"],
+            "actuals": inp["actuals"], "cri": cri, "factors": inp["factors"], "overhaul": inp["overhaul"],
+            "window": inp["window"]}
 
 
 def capital_items(conn, year):
@@ -415,6 +455,65 @@ def capital_items(conn, year):
     그 해 설정이 없으면 시드 목록. 여기 없는 과목은 손익으로 본다."""
     rows = conn.execute("SELECT 과목 FROM item_config WHERE year=? AND budget='자본'", (str(year),)).fetchall()
     return {r[0] for r in rows} or {x["과목"] for x in config_store.seed_item_config(year, "자본")}
+
+
+# ── 시나리오 비교(2026-10-27, 경진대회 C) ─────────────────────────────────
+# 10개년 전망이 가정 한 벌로만 보이면 «전망을 믿을 수 있나»에 답이 «오차 25~36%»뿐이다. 가정 2~3벌을
+# 나란히 놓으면 질문이 «어떤 가정이 얼마를 움직이나»로 바뀐다(Pigment 식 side-by-side).
+DEFAULT_SCENARIOS = [{"name": "기준(현재 가정)", "price": 0.0, "volume": 0.0},
+                     {"name": "보수(물가↑·물량↑)", "price": 1.0, "volume": 10.0},
+                     {"name": "절감(물가↓·물량↓)", "price": -0.5, "volume": -10.0}]
+SCENARIO_MAX = 3
+PRICE_LIM, VOLUME_LIM = 10.0, 50.0           # 손잡이 범위(연 %p · %) — 오타로 터무니없는 값이 들어오지 않게
+
+
+def _site_year_totals(tables, years):
+    return {s: {str(y): float(t[y].sum()) for y in years} for s, t in tables.items()}
+
+
+def run_scenarios(conn, base_year, specs=None):
+    """시나리오마다 전사·지사 연도별 합계. 첫 시나리오가 비교 기준이다.
+
+    반환: years · sites · scenarios[{name, price, volume, total{연도}, sum10, by_site{지사{연도}}}]
+          · band{연도: [하한, 상한]} — 첫 시나리오 합계에 «학습 기간 실적 범위»(전망 표의 예측 범위)를 더한 띠
+    """
+    specs = (specs or DEFAULT_SCENARIOS)[:SCENARIO_MAX]
+    inp = forecast_inputs(conn, base_year)
+    years = inp["years"]
+    out = []
+    first_tables = None
+    for sp in specs:
+        price = max(-PRICE_LIM, min(PRICE_LIM, float(sp.get("price") or 0)))
+        volume = max(-VOLUME_LIM, min(VOLUME_LIM, float(sp.get("volume") or 0)))
+        tables, _ = compute_tables(scenario_inputs(inp, price, volume))
+        if first_tables is None:
+            first_tables = tables
+        by_site = _site_year_totals(tables, years)
+        total = {str(y): sum(v[str(y)] for v in by_site.values()) for y in years}
+        out.append({"name": str(sp.get("name") or f"시나리오 {len(out) + 1}")[:20], "price": price,
+                    "volume": volume, "total": total, "sum10": sum(total.values()), "by_site": by_site})
+    # 예측 범위 띠 — 범위가 있는 칸(표준화 과목)만 그 칸 값 대신 하한·상한을 넣은 합계
+    ranges = forecast_ranges(inp["actuals"], inp["sites"], years, inp["base_year"],
+                             scenario_inputs(inp, specs[0].get("price") or 0)["factors"], inp["window"])
+    base_total = out[0]["total"] if out else {}
+    band = {}
+    for y in years:
+        lo = hi = base_total.get(str(y), 0.0)
+        for site, rng in ranges.items():
+            t = first_tables.get(site)
+            if t is None:
+                continue
+            for label, by_year in rng.items():
+                cell = by_year.get(str(y))
+                if not cell:
+                    continue
+                v = float(t.loc[t["예산과목"] == label, y].sum())
+                lo += cell[0] - v
+                hi += cell[1] - v
+        band[str(y)] = [min(lo, hi), max(lo, hi)]
+    return {"base_year": str(base_year), "years": years, "sites": inp["sites"], "scenarios": out, "band": band,
+            "notes": {"budget_plan_missing": bool(inp["budget_df"].empty),
+                      "actuals_empty": bool(inp["actuals"].empty)}}
 
 
 def run_forecast(conn, base_year):

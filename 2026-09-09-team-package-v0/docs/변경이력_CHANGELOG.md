@@ -18,6 +18,17 @@
 
 ---
 
+## 2026-10-27 · 5번 «시나리오 비교» — 전망 가정 2~3벌 나란히 (rev40, 경진대회 C)
+
+**대상:** `pipeline_forecast.py`(`forecast_inputs`·`scenario_inputs`·`compute_tables`·`run_scenarios` — `forecast_frames` 는 이 셋으로 다시 짰고 결과는 같다) · `api_forecast.py` `GET /api/forecast/scenarios`(캐시·예열) · `web/src/views/forecast_scenario.js`(새)·`forecast.js`·`forecast_actions.js`·`router.js`·`data.js`·`state.js` · 테스트 `test_forecast_scenarios.py` 4개. 설계 [설계_시나리오비교_2026-10-27.md](설계_시나리오비교_2026-10-27.md).
+
+- 손잡이 둘 — 물가(연 %p, 팩터 하나 더) · 물량(표준금액·A급정비 금액 ±%). 저장된 가정은 바뀌지 않는다(GET, 감사 로그 없음).
+- 화면: 손잡이 카드 3장 · 10년 누계와 기준 대비 · 근거 문장(«… → 10년 누계 +2,029억 원, 차이가 가장 큰 지사 …») · 연도별 선 그래프(예측 범위 띠, 선 끝 이름표, 툴팁) · 지사 × 연도 차이 히트맵.
+- 운영 사본(2026 기준): 기준 13,852억 원(= 전망 표 합계) · 보수 +2,029억 원(+14.6%) · 절감 −1,606억 원(−11.6%). 3벌 계산 로컬 17.8초 → 캐시·예열.
+- 전체 pytest 469 passed.
+
+---
+
 ## 2026-10-27 · 검토 큐 «근거·초안» — 근거 설명 자동 초안 (rev39, 경진대회 B)
 
 **대상:** `app/src/budget/explain.py`(새) · `server.py` `GET /api/review-explain`(추천 재배정과 전표 읽기를 `_rq_line_vouchers` 로 공유) · `web/src/views/review.js`·`review_actions.js`·`state.js`·`data.js`·`styles/app.css` · 테스트 `test_explain.py` 6개. 설계 [설계_근거설명_2026-10-27.md](설계_근거설명_2026-10-27.md).

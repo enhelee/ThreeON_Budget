@@ -25,7 +25,11 @@ export const state = {
         compare: null, regular: null, refPreview: null, refFile: null, benchView: "std", cmpOnlyDiff: true,
         backtest: null, showRange: false,   // 백테스트 결과(눌렀을 때만 계산) · 전망 표 예측 범위 표시
         // 중장기 전망 한눈에 보기(views/forecast_viz.js) — 단계·고른 해·과목·색 기준·애니메이션·발표 모드
-        viz: {level: "map", year: null, acct: "", mode: "amt", anim: null, origin: "", present: false} },
+        viz: {level: "map", year: null, acct: "", mode: "amt", anim: null, origin: "", present: false},
+        // 시나리오 비교(views/forecast_scenario.js) — 손잡이 값 · 결과 · 히트맵에서 비교할 시나리오
+        sc: {specs: [{name: "기준(현재 가정)", price: 0, volume: 0}, {name: "보수(물가↑·물량↑)", price: 1, volume: 10},
+                     {name: "절감(물가↓·물량↓)", price: -0.5, volume: -10}],
+             data: null, dataKey: "", loading: false, error: "", cmp: 1} },
   lockStates: null, // 마감을 풀어 놓고 아직 다시 잠그지 않은 연도들 — 전 화면 배너
   loadErrors: [],   // 이번 화면에서 못 불러온 구역들 — 조용히 비어 보이지 않게 배너로 알린다
   statOpen: null,   // 통계 과목 표에서 펼친 행(«예산|과목») — 지사별 드릴다운

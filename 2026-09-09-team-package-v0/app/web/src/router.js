@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastScenarios, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -33,7 +33,7 @@ const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
 // 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
-const FC_TABS = ["manage", "bench", "table"];
+const FC_TABS = ["manage", "bench", "table", "scenario"];
 // 4번 통계·설정 탭도 주소에 담는다(#/stats/compare · #/settings/history) — 새로고침·링크 공유에 그 탭이 남게.
 //   첫 탭(손익·연도·학습)은 주소를 짧게 두려고 생략한다. 통계 탭 이름은 주소용 영문으로 바꿔 적는다.
 const STATS_HASH = {손익: "", 자본: "capital", compare: "compare", report: "report"};
@@ -290,6 +290,8 @@ export async function navigate(view, opts = {}) {
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
+    // 시나리오는 세 번 계산한다(운영 첫 계산 수십 초) — 손잡이부터 그리고 결과 칸만 «계산 중».
+    if (state.fc.tab === "scenario") later.push(["시나리오 비교", loadForecastScenarios]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래
