@@ -75,3 +75,42 @@ def test_download_for_next_base_year_shifts_year_headers():
     ws = load_workbook(io.BytesIO(fe.build_grade_plan_download(grades, SITES, 2027))).active
     assert ws["D1"].value == 2027 and ws["M1"].value == 2036 and ws["D21"].value == 2027
     assert ws["D4"].value == "TI" and ws["E4"].value is None
+
+
+def test_screen_grid_has_every_excel_line_and_round_trips():
+    """화면 표 = 엑셀 양식 줄 그대로(삼송 #1·#2 GT, 동탄 #1·#2 Block, 대구 우드칩·신규CHP, 강남 동남권·일원·DH …)."""
+    grades, units = fi.grade_plan_from_workbook(_template_bytes(), SITES)
+    grid = fe.grade_plan_grid(grades, SITES, 2026, units=units)
+    assert grid["years"] == list(range(2026, 2036))
+    lines = {(ln["site"], ln["unit"]) for ln in grid["lines"]}
+    assert {("동탄지사", "#1 Block"), ("동탄지사", "#2 Block"), ("삼송지사", "#2 GT"),
+            ("대구지사", "우드칩"), ("대구지사", "신규CHP"), ("강남지사", "일원"), ("중앙지사", "")} <= lines
+    cells = [{"row": ln["row"], "year": int(y), "grade": v} for ln in grid["lines"] for y, v in ln["values"].items()]
+    g2, u2, multi = fe.grade_plan_from_cells(cells, SITES, 2026)
+    assert _pivot(g2) == _pivot(grades) and len(u2) == len(units)
+    assert multi == {"강남지사", "대구지사", "동탄지사", "삼송지사"}
+
+
+def test_screen_edit_of_second_unit_changes_only_that_unit():
+    grades, units = fi.grade_plan_from_workbook(_template_bytes(), SITES)
+    grid = fe.grade_plan_grid(grades, SITES, 2026, units=units)
+    row2 = next(ln["row"] for ln in grid["lines"] if ln["site"] == "동탄지사" and ln["unit"] == "#2 Block")
+    cells = [{"row": ln["row"], "year": int(y), "grade": ("HGPI" if ln["row"] == row2 and y == "2027" else v)}
+             for ln in grid["lines"] for y, v in ln["values"].items()]
+    g2, u2, _ = fe.grade_plan_from_cells(cells, SITES, 2026)
+    u = {(q, int(y)): g for s, q, y, g in zip(u2["사업장"], u2["설비"], u2["연도"], u2["등급"]) if s == "동탄지사"}
+    assert u[("#2 Block", 2027)] == "HGPI" and u[("#1 Block", 2027)] == "간이"
+    assert _pivot(g2)[("동탄지사", 2027)] == "간이"            # 대표 = #1 Block 줄(GT 어휘 첫 줄)
+
+
+
+def test_download_recolors_only_changed_cells():
+    """엑셀 내보내기 — 안 바뀐 칸은 양식 색 그대로(CI 칸마다 다름), 바뀐 칸만 등급 색. 화면은 색 없음(2026-10-28)."""
+    grades, units = fi.grade_plan_from_workbook(_template_bytes(), SITES)
+    units = units.copy()
+    m = (units["사업장"] == "동탄지사") & (units["설비"] == "#2 Block") & (units["연도"] == 2027)
+    units.loc[m, "등급"] = "HGPI"
+    ws = load_workbook(io.BytesIO(fe.build_grade_plan_download(grades, SITES, 2026, units=units))).active
+    assert ws["E10"].value == "HGPI" and ws["E10"].fill.fgColor.rgb == "FF00B0F0"     # 바뀐 칸 → 파랑
+    assert ws["G9"].value == "CI" and ws["G9"].fill.fill_type is None                  # 안 바뀐 CI(양식에 색 없음) 그대로
+    assert ws["D8"].value == "CI" and ws["D8"].fill.fgColor.rgb == "FF00B0F0"         # 안 바뀐 CI(양식에 파랑) 그대로

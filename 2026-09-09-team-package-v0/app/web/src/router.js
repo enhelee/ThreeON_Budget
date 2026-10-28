@@ -1,6 +1,6 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -221,7 +221,13 @@ async function settle(jobs, limit = SETTLE_LIMIT) {
     while (next < jobs.length) {
       const i = next++;
       const [label, fn] = jobs[i];
-      try { await fn(); } catch (e) { errs[i] = `${label}: ${e.message}`; }
+      // 배포·재시작 중 잠깐 끊긴 요청(빈 오류 문구)으로 배너가 뜨지 않게 한 번만 1.5초 뒤 다시 — 로그인 만료(401)는 api() 가 따로 처리
+      try { await fn(); }
+      catch (e) {
+        if (e.message === "로그인이 필요합니다.") { errs[i] = `${label}: ${e.message}`; continue; }
+        await new Promise(r => setTimeout(r, 1500));
+        try { await fn(); } catch (e2) { errs[i] = `${label}: ${e2.message || e.message || "서버 응답 없음"}`; }
+      }
     }
   };
   await Promise.all(Array.from({length: Math.min(limit, jobs.length)}, worker));
@@ -289,6 +295,7 @@ export async function navigate(view, opts = {}) {
     }
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
     if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
+    if ((state.fc.tab || "manage") === "manage" && (state.fc.manageTab || "grades") === "grades") jobs.push(["정비등급 양식", loadForecastGradePlan]);
     if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
