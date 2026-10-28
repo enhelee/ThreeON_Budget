@@ -96,3 +96,13 @@ def test_favicon_is_thermometer_svg():
     assert 'rel="icon"' in html and "favicon.svg" in html, "탭 아이콘(온도계, 2026-10-28 grace 3번)"
     svg = _read(SRC, "assets", "favicon.svg")
     assert "#FE0009" in svg and "#0B1020" in svg
+
+
+def test_gate_matches_main_palette_and_fades_into_main():
+    """오프닝 → 메인이 이어지게(10/28): 장면 색은 메인 팔레트(파랑·산호), 로그인하면 밝게 풀리며 메인이 떠오른다."""
+    css = _read(SRC, "styles", "custom.css")
+    scene = css.split(".gate-scene{", 1)[1].split("}", 1)[0]
+    assert "62,230,196" not in scene and "113,140,191" in scene, "빛 번짐은 메인 파랑·산호"
+    assert "gate--leave" in css and "app-enter" in css and "prefers-reduced-motion" in css.split("gate--leave", 1)[1]
+    hide = GATE.split("export function hideGate", 1)[1].split("\nexport function", 1)[0]
+    assert "gate--leave" in hide and "app-enter" in hide

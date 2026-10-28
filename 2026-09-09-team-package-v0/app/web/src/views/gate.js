@@ -101,8 +101,13 @@ export function hideGate() {
   stopIntro()                                   // 로그인하면 장면 애니메이션을 완전히 멈춘다
   const pw = $("#gatePw")
   if (pw) pw.value = ""
-  $("#gate").hidden = true
-  $("#appShell").hidden = false
+  const gate = $("#gate"), shell = $("#appShell")
+  shell.hidden = false
+  // 로그인 → 메인 전환(10/28): 장면이 밝게 풀리며 사라지고 메인이 떠오른다. 게이트가 안 보이던 경우·움직임 줄이기면 바로.
+  if (gate.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { gate.hidden = true; return }
+  gate.classList.add("gate--leave")
+  shell.classList.add("app-enter")
+  setTimeout(() => { gate.hidden = true; gate.classList.remove("gate--leave"); shell.classList.remove("app-enter") }, 650)
 }
 
 /** 로그인 후 돌아갈 주소. 401 로 튕기기 직전에 보던 «#/...» 를 기억해 둔다. */

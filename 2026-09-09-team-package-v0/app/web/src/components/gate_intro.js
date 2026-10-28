@@ -4,7 +4,7 @@
 // ① 인트로(약 2.5초): 흩어진 점들이 날아와 «ONDO» 글자가 된다(ON 은 CI 빨강).
 //    글자는 카드에 가리지 않게 카드 왼쪽 빈 곳 가운데에 쓴다.
 // ② 글자가 왼쪽 아래로 쓸려 내려가며 사라지고, 같은 자리에서 데이터 흐름이 시작된다.
-// ③ 흐름: 점들이 매칭이 → 검토미 → 예측이를 차례로 지나며 그 캐릭터 색으로 바뀐다.
+// ③ 흐름: 점들이 매칭이 → 검토미 → 예측이를 차례로 지나며 메인 그래프 색(파랑 → 산호 → 회청)으로 바뀐다.
 //
 // 지키는 것
 // - 누르거나 키를 치면 ①②를 건너뛴다(입력 칸 포커스는 건드리지 않는다).
@@ -13,7 +13,8 @@
 // 숫자(금액·건수)는 그리지 않는다 — 게이트 원칙.
 // ─────────────────────────────────────────────────────────────
 
-const RED = [254, 0, 9], MINT = [62, 230, 196], CORAL = [255, 138, 110], VIOLET = [169, 139, 255], GRAY = [150, 165, 190], WHITE = [230, 236, 245]
+const RED = [254, 0, 9], GRAY = [150, 165, 190], WHITE = [230, 236, 245]
+const BLUE = [157, 179, 224], PEACH = [229, 143, 121], SLATE = [173, 183, 201]   // 메인 그래프 팔레트(10/28)
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t)
 const rnd = (a, b) => a + Math.random() * (b - a)
@@ -78,7 +79,7 @@ export function startIntro(scene) {
     const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t)
     return [f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]
   }
-  const STOPS = [GRAY, MINT, CORAL, VIOLET, VIOLET]
+  const STOPS = [GRAY, BLUE, PEACH, SLATE, SLATE]
   const colorAt = u => { const i = Math.min(3, Math.floor(u)); return mix(STOPS[i], STOPS[i + 1], Math.min(1, (u - i) * 3)) }
 
   function toFlow() {

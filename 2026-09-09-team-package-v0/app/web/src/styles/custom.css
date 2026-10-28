@@ -441,14 +441,15 @@ img.char-img{object-fit:contain;display:inline-block}
    움직임은 components/gate_intro.js(canvas). 그리지 않는 경우(움직임 줄이기·좁은 화면)엔 이 CSS 상태가 곧 마지막 장면 */
 .gate{position:relative;min-height:100vh;background:var(--navy)}
 .gate-scene{position:fixed;inset:0;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:1.5rem;padding:3.5rem calc(min(440px,36vw) + 6rem) 3rem 4rem;color:#fff;
-  background:radial-gradient(40% 45% at 12% 85%,rgba(62,230,196,.28),transparent 70%),radial-gradient(32% 40% at 40% 55%,rgba(255,138,110,.22),transparent 70%),radial-gradient(38% 45% at 62% 82%,rgba(169,139,255,.30),transparent 70%),var(--navy)}
+  background:radial-gradient(40% 45% at 12% 85%,rgba(113,140,191,.34),transparent 70%),radial-gradient(32% 40% at 40% 55%,rgba(229,143,121,.22),transparent 70%),radial-gradient(38% 45% at 62% 82%,rgba(173,183,201,.20),transparent 70%),var(--navy)}   /* 빛 번짐도 메인 팔레트(파랑·산호·회청) — 10/28 */
 .gate-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .gate-copy,.gate-cast,.gate-lines{position:relative;z-index:1;transition:opacity .9s ease,transform .9s ease}
 .gate-scene.is-intro .gate-copy,.gate-scene.is-intro .gate-cast,.gate-scene.is-intro .gate-lines{opacity:0;transform:translateY(12px)}
-.gate-kicker{font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--char-mt)}
-.gate-kicker span{background:linear-gradient(90deg,#FFC35A,#FF7A5C);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-kicker{font-size:12px;font-weight:700;letter-spacing:.18em;color:#9DB3E0}
+.gate-kicker span{color:#E58F79}
 .gate-title{margin-top:.9rem;font-size:clamp(30px,3.4vw,52px);font-weight:600;line-height:1.15;letter-spacing:-.03em;color:#fff}
-.gate-title em{font-style:normal;background:linear-gradient(90deg,var(--char-mt),var(--char-gt) 55%,var(--char-yc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-title em{font-style:normal;background:linear-gradient(90deg,#9DB3E0,#E58F79);   /* 메인 배너 온도 막대와 같은 흐름 */
+  -webkit-background-clip:text;background-clip:text;color:transparent}
 .gate-mean{margin-top:.9rem;font-size:14px;color:#AEB6C6}
 .gate-mean b{color:#fff;font-weight:700}
 .gate-cast{display:flex;justify-content:space-around;align-items:flex-end;height:clamp(150px,30vh,260px)}
@@ -533,3 +534,13 @@ img.char-img{object-fit:contain;display:inline-block}
 .year-pick button:hover{border-color:var(--navy);color:var(--navy)}
 .year-pick button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
 @media (max-width:767px){.acct-row{grid-template-columns:1fr 6rem}.acct-row .yr-one__track,.acct-row__v{display:none}}
+
+/* 로그인 → 메인 전환(10/28): 어두운 장면 위로 메인 바탕색 막이 0.6초 동안 차오르며(어둠 → 밝음) 사라지고, 메인이 살짝 떠오른다.
+   밝기 필터는 캐릭터가 하얗게 바래서 쓰지 않는다. 움직임 줄이기면 바로 바뀐다 */
+#gate.gate--leave{position:fixed;inset:0;z-index:80;pointer-events:none;animation:gateLeave .6s ease forwards}
+#gate.gate--leave::after{content:"";position:fixed;inset:0;z-index:5;background:var(--page);animation:gateVeil .6s ease forwards}
+@keyframes gateLeave{70%{opacity:1}to{opacity:0}}
+@keyframes gateVeil{from{opacity:0}to{opacity:1}}
+.app-enter{animation:appEnter .6s ease both}
+@keyframes appEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#gate.gate--leave,#gate.gate--leave::after,.app-enter{animation:none}}
