@@ -19,14 +19,17 @@ def _read(*parts):
 CHARS = _read(SRC, "components", "characters.js")
 
 
-def test_sprite_defines_four_characters_once():
-    for who in ("hj", "mt", "gt", "yc"):
-        assert CHARS.count(f'<symbol id="ch-{who}"') == 1, f"캐릭터 «{who}» symbol 이 한 번만 있어야 합니다"
-    # 그림은 characters.js 한 곳에만 — 화면 파일에 symbol 을 또 그리면 생김새가 갈라진다
+def test_characters_are_the_3d_set_only():
+    """2026-10-27: 옛 벡터(<symbol>) 캐릭터를 걷어 내고 입체 v2 그림(char_images.js) 한 벌만 쓴다.
+    안내 줄·빈 화면·사이드바 머리까지 같은 그림이어야 «새 캐릭터로 안 바뀐 곳»이 안 생긴다."""
+    assert "<symbol" not in CHARS and "injectCharacterSprite" not in CHARS, "옛 벡터 sprite 가 남아 있습니다"
+    assert "CHAR_IMG" in CHARS.split("export function charImg", 1)[1].split("\nexport function", 1)[0]
     for root, _, files in os.walk(SRC):
         for f in files:
-            if f.endswith(".js") and f != "characters.js":
-                assert "<symbol id=" not in _read(root, f), f"{f}: 캐릭터 그림은 characters.js 의 symbol 만 씁니다"
+            if f.endswith(".js"):
+                body = _read(root, f)
+                assert "<symbol id=" not in body and "charSvg(" not in body, f"{f}: 옛 벡터 캐릭터 호출"
+                assert "#ch-" not in body, f"{f}: 옛 sprite 참조(<use href=\"#ch-…\">)"
 
 
 def test_help_covers_every_menu_view():
@@ -50,12 +53,11 @@ def test_review_threshold_matches_conf_badge():
 
 
 def test_placements_wired():
-    assert 'charSvg("mt", "sidebar-mascot", {head: true})' in _read(SRC, "components", "sidebar.js")
-    assert 'charSvg("hj"' in _read(SRC, "components", "widgets.js"), "빈 화면에는 한장이"
+    assert 'charImg("mt", "sidebar-mascot", {head: true})' in _read(SRC, "components", "sidebar.js")
+    assert 'charImg("hj"' in _read(SRC, "components", "widgets.js"), "빈 화면에는 한장이"
     assert 'who: "mt"' in _read(SRC, "views", "collect.js"), "실적 집계에는 매칭이"
     assert 'who: "yc"' in _read(SRC, "views", "forecast.js"), "중장기 예측에는 예측이"
     main = _read(SRC, "main.js")
-    assert main.index("injectCharacterSprite()") < main.index('$("#sidebar").innerHTML'), "그림을 먼저 심고 사이드바를 그립니다"
     assert "toggle-help" in main and "close-help" in main
 
 

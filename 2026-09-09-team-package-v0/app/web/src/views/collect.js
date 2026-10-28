@@ -32,7 +32,7 @@ export function alertsPanelHtml() {
             <span class="badge ${a.severity === "높음" ? "bg-err-bg text-err" : "bg-warn-bg text-warn"}">${esc(a.severity)}</span>
             <span class="badge bg-subtle text-ink">미매칭 비중</span>
             <span class="min-w-0 flex-1"><span class="font-semibold text-ink">${where(a)}</span><span class="block text-xs text-sub">${esc(a.text)}</span></span>
-            ${a.branch && a.branch !== "(미매핑)" ? `<button class="text-xs font-semibold text-ink hover:text-brand" data-branch="${esc(a.branch)}">상세 →</button>` : ""}
+            ${a.branch && a.branch !== "(미매핑)" ? `<button class="text-xs font-semibold text-ink hover:text-mint-ink" data-branch="${esc(a.branch)}">상세 →</button>` : ""}
           </li>`).join("")}</ul>` : ""}`
         : `<p class="mt-4 text-sm text-sub">${!Object.keys(state.status?.runs || {}).length ? "분석 결과가 생기면 여기에 알림이 나옵니다." : "규칙에 걸린 항목이 없어요."}</p>`}
       </section>`;

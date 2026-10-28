@@ -20,7 +20,7 @@ export function renderBudget() {
           <input id="planFile" class="hidden" type="file" accept=".xlsx" multiple>
         </article>
         <article class="panel p-6"><h3 class="section-title">이 연도의 계획 데이터셋</h3>
-          <div class="dataset-box">${ds.length ? `<ul class="space-y-2 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between gap-3 rounded-control ${i === 0 ?"border border-line-strong bg-base" : "bg-base"} p-3"><div><p class="font-semibold text-ink">${esc(d.label)}</p><p class="text-xs text-sub">${d.row_count.toLocaleString()}행 · ${fmt(d.total_amount)}천원 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-subtle text-ink">사용중</span>' : '<span class="badge bg-subtle text-sub">이전본</span>'}</li>`).join("")}</ul>` : `<p class="grid h-full place-items-center text-sm text-sub">${esc(state.year)}년 계획이 아직 없습니다.</p>`}</div>
+          <div class="dataset-box">${ds.length ? `<ul class="space-y-2 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between gap-3 rounded-control ${i === 0 ?"border border-line-strong bg-base" : "bg-base"} p-3"><div><p class="font-semibold text-ink">${esc(d.label)}</p><p class="text-xs text-sub">${d.row_count.toLocaleString()}행 · ${fmt(d.total_amount)} 천원 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-subtle text-ink">사용중</span>' : '<span class="badge bg-subtle text-sub">이전본</span>'}</li>`).join("")}</ul>` : `<p class="grid h-full place-items-center text-sm text-sub">${esc(state.year)}년 계획이 아직 없습니다.</p>`}</div>
           <ul class="mt-3 space-y-0.5 text-xs text-sub">
             <li>* 가장 최근 업로드된 자료가 사용됩니다.</li>
             <li>* 나누어서 작성된 자료는 하나의 자료로 병합하여 업로드하여 주시기 바랍니다.</li>

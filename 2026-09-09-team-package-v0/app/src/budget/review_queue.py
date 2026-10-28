@@ -110,7 +110,7 @@ def _basis_hint(bs):
 def _reasons(plan, actual, lowconf_amt, overload=False):
     rs = []
     if actual <= -NEG_MIN:
-        rs.append(("negative", abs(actual), f"실적 {actual:,.0f}천원 — 대체·취소 전표가 붙었는지 보세요"))
+        rs.append(("negative", abs(actual), f"실적 {actual:,.0f} 천원 — 대체·취소 전표가 붙었는지 보세요"))
     if overload and plan > 0:
         rs.append(("overload", actual - plan,
                    f"계획의 {actual / plan:,.1f}배가 붙었어요 — 다른 사업 전표가 섞였을 수 있어요"))
@@ -118,10 +118,10 @@ def _reasons(plan, actual, lowconf_amt, overload=False):
         if actual == 0:
             text = "미시행 — 계획 전액이 집행되지 않았어요"
         else:
-            text = f"계획보다 {abs(actual - plan):,.0f}천원 {'더' if actual > plan else '덜'} 집행했어요"
+            text = f"계획보다 {abs(actual - plan):,.0f} 천원 {'더' if actual > plan else '덜'} 집행했어요"
         rs.append(("variance", abs(actual - plan), text))
     if lowconf_amt >= LOWCONF_MIN:
-        rs.append(("lowconf", lowconf_amt, f"확신도 0.8 미만 전표 {lowconf_amt:,.0f}천원 — 귀속이 맞는지 보세요"))
+        rs.append(("lowconf", lowconf_amt, f"확신도 0.8 미만 전표 {lowconf_amt:,.0f} 천원 — 귀속이 맞는지 보세요"))
     return rs
 
 
@@ -273,7 +273,7 @@ def suggest(vouchers, current, candidates):
         if best and best[1] >= SUGGEST_MIN and best[1] >= cur + SUGGEST_MARGIN:
             _, s, c, remain, fits = best
             why = f"전표 글자 유사도 {s:.2f} (지금 사업 {cur:.2f})"
-            why += f" · 잔액 {remain:,.0f}천원" + (" 충분" if fits else " 부족")
+            why += f" · 잔액 {remain:,.0f} 천원" + (" 충분" if fits else " 부족")
             sug = {"target": c["name"], "sim": round(s, 2), "cur_sim": round(cur, 2),
                    "remain": round(remain), "why": why}
         out.append({**v, "suggest": sug})
