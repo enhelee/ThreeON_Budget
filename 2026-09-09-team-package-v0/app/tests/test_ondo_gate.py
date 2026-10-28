@@ -106,3 +106,9 @@ def test_gate_matches_main_palette_and_fades_into_main():
     assert "gate--leave" in css and "app-enter" in css and "prefers-reduced-motion" in css.split("gate--leave", 1)[1]
     hide = GATE.split("export function hideGate", 1)[1].split("\nexport function", 1)[0]
     assert "gate--leave" in hide and "app-enter" in hide
+
+
+def test_flow_is_rich_but_capped():
+    """흐름 점이 허전하지 않게(10/28) — 양을 늘리되 상한을 둬서 느려지지 않게."""
+    intro = _read(SRC, "components", "gate_intro.js")
+    assert "flow.length < 1400" in intro and "lighter" in intro and "destination-out" in intro

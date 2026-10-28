@@ -5,6 +5,7 @@
 //    글자는 카드에 가리지 않게 카드 왼쪽 빈 곳 가운데에 쓴다.
 // ② 글자가 왼쪽 아래로 쓸려 내려가며 사라지고, 같은 자리에서 데이터 흐름이 시작된다.
 // ③ 흐름: 점들이 매칭이 → 검토미 → 예측이를 차례로 지나며 메인 그래프 색(파랑 → 산호 → 회청)으로 바뀐다.
+//    초당 약 90개·최대 1400개, 반짝임·빛 꼬리·큰 점 빛 번짐(10/28 «더 있어 보이게»).
 //
 // 지키는 것
 // - 누르거나 키를 치면 ①②를 건너뛴다(입력 칸 포커스는 건드리지 않는다).
@@ -38,7 +39,7 @@ export function startIntro(scene) {
   const ctx = cv?.getContext("2d")
   if (!ctx) return
 
-  let W = 0, H = 0, logo = [], flow = [], phase = "logo", t0 = performance.now(), last = t0, flowAt = 0
+  let W = 0, H = 0, logo = [], flow = [], spawn = 0, phase = "logo", t0 = performance.now(), last = t0, flowAt = 0
   const chars = [...scene.querySelectorAll(".gate-char")]
 
   function size() {
@@ -102,17 +103,27 @@ export function startIntro(scene) {
         ctx.fillStyle = rgba(p.c, 0.9 * fade); ctx.fillRect(p.x, p.y, 2, 2)
       }
     } else {
-      ctx.clearRect(0, 0, W, H)
+      // 꼬리: 지난 프레임을 조금씩 지워 점 뒤에 짧은 빛 꼬리를 남긴다. 캔버스는 투명이라 destination-out 으로 지운다(뒤 빛 번짐 배경을 가리지 않게).
+      ctx.globalCompositeOperation = "destination-out"; ctx.fillStyle = "rgba(0,0,0,.26)"; ctx.fillRect(0, 0, W, H)
+      ctx.globalCompositeOperation = "lighter"                           // 겹친 점은 더 밝게 — 흐름이 빛의 띠처럼 보인다
       const K = pathPoints()
-      if (Math.random() < 0.6 * k) flow.push({u: 0, v: rnd(0.00022, 0.00036), o: rnd(-1, 1), r: rnd(1.2, 2.4)})
+      spawn += 0.09 * dt                                                 // 초당 약 90개(2026-10-28 grace: 양이 적어 허전하다)
+      while (spawn >= 1 && flow.length < 1400) {
+        spawn--
+        flow.push({u: 0, v: rnd(0.00022, 0.00036), o: rnd(-1, 1) + rnd(-1, 1) * 0.5, r: rnd(0.7, 2.6), tw: rnd(0, 6.3)})
+      }
+      spawn = Math.min(spawn, 1)
       for (const p of flow) {
         p.u += p.v * dt
         const a = at(K, p.u), b = at(K, Math.min(4, p.u + 0.01)), ang = Math.atan2(b[1] - a[1], b[0] - a[0])
-        const spread = 26 * (0.15 + 0.85 * Math.sin(Math.PI * (p.u % 1)))   // 캐릭터 가까이에서 좁아진다
+        const spread = 44 * (0.12 + 0.88 * Math.sin(Math.PI * (p.u % 1)))   // 캐릭터 가까이에서 좁아진다
         const x = a[0] - Math.sin(ang) * p.o * spread, y = a[1] + Math.cos(ang) * p.o * spread
-        ctx.fillStyle = rgba(colorAt(p.u), 0.85)
+        const c = colorAt(p.u), al = 0.55 + 0.45 * Math.sin(now / 320 + p.tw)  // 반짝임
+        if (p.r > 1.7) { ctx.fillStyle = rgba(c, 0.10 * al); ctx.beginPath(); ctx.arc(x, y, p.r * 3.4, 0, 7); ctx.fill() }   // 큰 점엔 빛 번짐
+        ctx.fillStyle = rgba(c, 0.9 * al)
         ctx.beginPath(); ctx.arc(x, y, p.r, 0, 7); ctx.fill()
       }
+      ctx.globalCompositeOperation = "source-over"
       flow = flow.filter(p => p.u < 4)
     }
     if (run) run.raf = requestAnimationFrame(frame)
