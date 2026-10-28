@@ -45,7 +45,7 @@ export const STAGES = [
 ]
 
 function navButton(m) {
-  return `<button class="nav-button" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span>${m.char ? `<span class="nav-dot nav-dot--${m.char}" aria-hidden="true"></span>` : ""}</button>`
+  return `<button class="nav-button" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span></button>`
 }
 
 function groupLabel(text) {

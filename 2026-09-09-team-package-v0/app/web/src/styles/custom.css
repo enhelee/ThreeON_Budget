@@ -159,28 +159,25 @@
 }
 @media (prefers-reduced-motion:reduce){#sidebar{transition:none}}
 
-/* ONDO 사이드바 — 남색 바탕 + 아래쪽 민트빛 + 오른쪽 3색 선(매칭이·검토미·예측이). 2026-10-27 grace 결정.
+/* ONDO 사이드바 — 연회색 띠(본문보다 한 단계 진한 밝은 바탕), 고른 메뉴만 흰 칸. 캐릭터 색은 쓰지 않는다.
+   2026-10-27 남색 → 2026-10-28 grace·팀 피드백(«다크·화이트 모드가 섞인 느낌», 색이 많다)으로 밝게 통일.
    데스크톱은 76px 띠가 기본(.sb-collapsed, 마우스를 올리면 잠깐 펼침), «메뉴 펼치기»로 고정하면 html.sb-open
    (본문이 288px 비킨다). 모바일 드로어도 같은 색 */
-#sidebar{background:radial-gradient(120% 40% at 20% 108%,rgba(62,230,196,.26),transparent 60%),var(--navy);color:#C7CDDA;border-right-color:transparent}
-#sidebar::after{content:"";position:absolute;top:0;right:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--char-mt),var(--char-gt),var(--char-yc));pointer-events:none}
-#sidebar :focus-visible{outline-color:var(--char-mt)}
+#sidebar{background:var(--rail);color:#5B6478;border-right-color:#DDE2EC}
 .sb-ci{display:block;background:#fff;border-radius:12px;padding:10px 12px}
 .sb-name{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding:0 .25rem}
-.sb-word{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#fff}
+.sb-word{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1;color:var(--navy)}
 .ondo-word b{font-weight:800;color:var(--brand)}   /* ONDO 의 ON = CI 빨강(워드마크는 로고) — 2026-10-28 grace */
-.sb-by{margin-left:auto;font-size:11px;color:#7D859A}
-.sb-desc{display:block;margin-top:.25rem;padding:0 .25rem;font-size:12px;line-height:1.5;color:#8A92A6}
-#sidebar .nav-button{color:#C7CDDA}
-#sidebar .nav-button:hover{background:rgba(255,255,255,.06);color:#fff}
-#sidebar .nav-button-active,#sidebar .nav-button-active:hover{background:rgba(62,230,196,.13);color:#fff;box-shadow:inset 0 0 0 1px rgba(62,230,196,.25)}
-#sidebar .nav-tag{background:rgba(255,255,255,.07);color:#8A92A6;font-weight:700}
-#sidebar .nav-button-active .nav-tag{background:var(--char-mt);color:#04342C}
-#sidebar .nav-group{color:#646C82}
-.nav-dot{flex:none;width:7px;height:7px;border-radius:999px;margin-left:auto}
-.nav-dot--mt{background:var(--char-mt)}.nav-dot--gt{background:var(--char-gt)}.nav-dot--yc{background:var(--char-yc)}
-.sb-fold{display:flex;align-items:center;gap:.625rem;width:100%;margin-top:.75rem;padding:.6rem .75rem;border:0;border-radius:12px;background:none;font-size:13px;color:#8A92A6;cursor:pointer;text-align:left}
-.sb-fold:hover{background:rgba(255,255,255,.06);color:#fff}
+.sb-by{margin-left:auto;font-size:11px;color:#98A0B0}
+.sb-desc{display:block;margin-top:.25rem;padding:0 .25rem;font-size:12px;line-height:1.5;color:#7A8294}
+#sidebar .nav-button{color:#5B6478}
+#sidebar .nav-button:hover{background:rgba(11,16,32,.05);color:var(--navy)}
+#sidebar .nav-button-active,#sidebar .nav-button-active:hover{background:#fff;color:var(--navy);font-weight:700;box-shadow:0 1px 2px rgba(11,16,32,.06),0 4px 14px rgba(11,16,32,.06)}
+#sidebar .nav-tag{background:rgba(11,16,32,.06);color:#5B6478;font-weight:700}
+#sidebar .nav-button-active .nav-tag{background:var(--navy);color:#fff}
+#sidebar .nav-group{color:#98A0B0}
+.sb-fold{display:flex;align-items:center;gap:.625rem;width:100%;margin-top:.75rem;padding:.6rem .75rem;border:0;border-radius:12px;background:none;font-size:13px;color:#7A8294;cursor:pointer;text-align:left}
+.sb-fold:hover{background:rgba(11,16,32,.05);color:var(--navy)}
 .sb-fold__icon{width:1.75rem;text-align:center;font-size:15px;line-height:1}
 @media (max-width:1023px){.sb-fold{display:none}}
 @media (min-width:1024px){
@@ -188,9 +185,8 @@
   .sb-rail.sb-open #sidebar{box-shadow:none}
   .sb-rail.sb-open .header-brand{display:none}
   .sb-collapsed #sidebar .sb-name{justify-content:center;margin-top:0;padding:0}
-  .sb-collapsed #sidebar .nav-dot{position:absolute;top:.45rem;right:.85rem;box-shadow:0 0 0 2px var(--navy)}
   .sb-collapsed #sidebar .sb-fold{justify-content:center;padding-left:0;padding-right:0}
-  .sb-collapsed #sidebar .nav-group{border-top-color:rgba(255,255,255,.12)}
+  .sb-collapsed #sidebar .nav-group{border-top-color:#DDE2EC}
 }
 
 /* 표지(로고·ThreeON) — 누르면 메인. 사이드바 맨 위 + 접혔을 때 상단 머리글 */
@@ -395,20 +391,24 @@
 @keyframes chatSpot{50%{outline-color:rgba(23,160,144,.25);box-shadow:0 0 0 8px rgba(23,160,144,.18)}}
 @media (prefers-reduced-motion:reduce){.chat-spot{animation:none}}
 
-/* 메인 남색 배너(views/home.js headerStrip) — 사이드바와 같은 남색 + 캐릭터 색 빛 번짐.
+/* 메인 배너(views/home.js headerStrip) — 흰 카드 + 오른쪽 아주 연한 남색 빛, 남색 글자. 2026-10-28 밝게 통일.
    글자 칸과 캐릭터 칸을 나눠 화면 폭이 바뀌어도 캐릭터가 글자를 가리지 않는다 */
-.home-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,34%,420px);gap:1.5rem;align-items:end;border-radius:20px;padding:1.75rem 2rem;color:#fff;
-  background:radial-gradient(40% 70% at 66% 95%,rgba(62,230,196,.40),transparent 70%),radial-gradient(30% 60% at 80% 8%,rgba(255,138,110,.38),transparent 70%),radial-gradient(35% 70% at 96% 85%,rgba(169,139,255,.45),transparent 70%),var(--navy)}
+.home-hero{position:relative;overflow:hidden;display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,34%,420px);gap:1.5rem;align-items:end;border-radius:20px;padding:1.75rem 2rem;color:var(--ink);border:1px solid #E3E7EF;
+  background:radial-gradient(55% 120% at 88% 75%,#E8EDF8,transparent 70%),#fff}
 .home-hero__text{position:relative;z-index:1;min-width:0}
-.home-hero__kicker{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--char-mt)}
-.home-hero__kicker span{color:#FFB37A}
-.home-hero__title{margin-top:.6rem;font-size:clamp(22px,2.4vw,30px);font-weight:600;line-height:1.3;letter-spacing:-.02em;color:#fff}
-.home-hero__title em{font-style:normal;background:linear-gradient(90deg,var(--char-mt),var(--char-gt) 55%,var(--char-yc));-webkit-background-clip:text;background-clip:text;color:transparent}
-.home-hero__desc{margin-top:.6rem;max-width:34rem;font-size:14px;line-height:1.6;color:#C3C9D6}
-.home-hero__date{margin-top:1rem;font-size:13px;color:#8A92A6}
-.home-hero__date time{margin-left:.35rem;font-weight:700;color:#fff}
+.home-hero__kicker{font-size:12px;font-weight:700;letter-spacing:.16em;color:#5B6478}
+.home-hero__title{margin-top:.6rem;font-size:clamp(22px,2.4vw,30px);font-weight:600;line-height:1.3;letter-spacing:-.02em;color:var(--navy)}
+.home-hero__title em{font-style:normal;color:var(--navy)}
+.home-hero__desc{margin-top:.6rem;max-width:34rem;font-size:14px;line-height:1.6;color:#5B6478}
+.home-hero__date{margin-top:1rem;font-size:13px;color:#98A0B0}
+.home-hero__date time{margin-left:.35rem;font-weight:700;color:var(--navy)}
+/* 예산 온도 막대 — 숫자 없는 그림(ONDO 이름 뜻). 계획(연한 남색) → 집행 → 과열(산호), 그래프 두 색과 같은 계열 */
+.home-hero__gauge{margin-top:1.1rem;max-width:22rem}
+.home-hero__gauge i{display:block;height:6px;border-radius:9px;background:linear-gradient(90deg,#C9D3E8,#8EA0C6 55%,#D9826B)}
+.home-hero__gauge em{font-style:normal}
+.home-hero__gauge span{display:flex;justify-content:space-between;margin-top:.35rem;font-size:11px;color:#98A0B0}
 .home-hero__cast{position:relative;width:100%;aspect-ratio:420/220;margin-bottom:-1.25rem}
-.home-hero__char{position:absolute;width:33%;height:auto;filter:drop-shadow(0 14px 18px rgba(0,0,0,.45));animation:heroBob 4s ease-in-out infinite}
+.home-hero__char{position:absolute;width:33%;height:auto;filter:drop-shadow(0 14px 16px rgba(11,16,32,.16));animation:heroBob 4s ease-in-out infinite}
 .home-hero__char--mt{left:0;bottom:6%}
 .home-hero__char--gt{left:32%;bottom:24%;width:36%;animation-delay:-1.3s}
 .home-hero__char--yc{left:67%;bottom:6%;animation-delay:-2.6s}
@@ -421,29 +421,18 @@
 
 /* 배너 안 업무 단계 알약 — 누르면 그 화면으로 */
 .home-hero__steps{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.1rem}
-.home-hero__steps button{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .8rem;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);font-size:12px;color:#E6E9F0;cursor:pointer}
-.home-hero__steps button:hover{background:rgba(255,255,255,.16);color:#fff}
-.home-hero__steps button:focus-visible{outline:2px solid var(--char-mt);outline-offset:2px}
-.home-hero__steps b{font-weight:700;color:#fff}
+.home-hero__steps button{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .8rem;border-radius:999px;border:1px solid #E3E7EF;background:#fff;font-size:12px;color:#5B6478;cursor:pointer}
+.home-hero__steps button:hover{border-color:var(--navy);color:var(--navy)}
+.home-hero__steps button:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.home-hero__steps b{font-weight:700;color:var(--navy)}
 
-/* 현황 카드 — 맡은 캐릭터 색 얇은 선(매칭이 청록·검토미 산호·예측이 보라). 숫자·배지는 그대로 */
-.metric-card[class*="metric-card--"]{position:relative;overflow:hidden}
-.metric-card--mt::before,.metric-card--gt::before,.metric-card--yc::before,.metric-card--none::before{content:"";position:absolute;left:0;right:0;top:0;height:3px}
-.metric-card--mt::before{background:var(--char-mt)}
-.metric-card--gt::before{background:var(--char-gt)}
-.metric-card--yc::before{background:var(--char-yc)}
-.metric-card--none::before{background:var(--line-strong)}
-
-/* 업무 단계 카드 — 오른쪽 아래 담당 캐릭터, 번호는 캐릭터 색(흰 바탕 글자용 진한 값) */
+/* 업무 단계 카드 — 오른쪽 아래 담당 캐릭터. 번호·동그라미는 무채색(10/28 색 줄이기) */
 .stage-card{position:relative;overflow:hidden}
 .stage-card__desc{padding-right:3.5rem}
 .stage-card::after{content:"";position:absolute;right:-1.75rem;bottom:-1.75rem;width:7rem;height:7rem;border-radius:999px;z-index:0}
 .stage-card > *{position:relative;z-index:1}
 .stage-card > .stage-card__char{position:absolute;right:.5rem;bottom:.4rem;width:4.25rem;height:4.25rem;object-fit:contain;pointer-events:none}
-.stage-card--hj .stage-card__no{color:#6B6455}.stage-card--hj::after{background:#F4F1EA}
-.stage-card--mt .stage-card__no{color:#0F6E56}.stage-card--mt::after{background:#E1F8F1}
-.stage-card--gt .stage-card__no{color:#B4472A}.stage-card--gt::after{background:#FEECE6}
-.stage-card--yc .stage-card__no{color:#5B3FBF}.stage-card--yc::after{background:#F0EBFF}
+.stage-card__no{color:var(--navy)}.stage-card::after{background:#EEF1F7}   /* 캐릭터 색은 그림에만(10/28) */
 
 /* 입체 캐릭터 그림(components/characters.js charImg) — 자리 크기는 각 클래스가, 비율은 그림이 지킨다 */
 img.char-img{object-fit:contain;display:inline-block}

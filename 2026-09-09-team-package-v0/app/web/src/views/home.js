@@ -60,6 +60,7 @@ function headerStrip() {
       <p class="home-hero__kicker">ONDO · <span>예산의 온도를 읽다</span></p>
       <h2 class="home-hero__title font-hanan">발전플랜트 유지보수 예산,<br><em>계획에서 10개년 전망까지</em></h2>
       <p class="home-hero__desc">예산 계획과 ERP 전표를 자동으로 맞춰 보고, 차이를 살피고, 정비등급별 표준금액으로 10년 뒤를 예보합니다.</p>
+      <div class="home-hero__gauge" aria-hidden="true"><i></i><span><em>계획</em><em>집행</em><em>과열</em></span></div>
       <p class="home-hero__date">오늘 <time datetime="${today()}">${todayLong()}</time></p>
       <div class="home-hero__steps">${steps.map(s => `<button type="button" data-view="${s.view}"><b>${esc(s.no)}</b>${esc(s.title)}</button>`).join("")}</div>
     </div>
@@ -71,9 +72,8 @@ function headerStrip() {
 
 // ── ② 현황 카드 ──────────────────────────────────────────────
 
-// tone = 이 카드를 맡은 캐릭터 — 카드 위 얇은 색 선(custom.css .metric-card--mt/gt/yc). 없으면 회색.
-function card(title, badge, body, tone) {
-  return `<article class="metric-card h-full metric-card--${tone || "none"}">
+function card(title, badge, body) {
+  return `<article class="metric-card h-full">
     <div class="flex items-start justify-between gap-2">
       <p class="text-sm font-semibold text-sub">${esc(title)}</p>${badge}
     </div>
@@ -92,7 +92,7 @@ function budgetCard(budget) {
        <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} 천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
     : `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
        <p class="mt-2 text-sm text-sub">이 연도의 ${esc(budget)}예산 분석 이력이 없습니다.</p>`
-  return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body, "mt")
+  return card(`${state.year}년 ${budget}예산`, s ? badgeOk("분석 완료") : badgeMuted("미실행"), body)
 }
 
 function prevYearCard() {
@@ -100,14 +100,14 @@ function prevYearCard() {
   if (!prev) {
     return card("직전 분석 연도", badgeMuted("없음"),
       `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
-       <p class="mt-2 text-sm text-sub">비교할 다른 연도의 분석 이력이 아직 없습니다.</p>`, "mt")
+       <p class="mt-2 text-sm text-sub">비교할 다른 연도의 분석 이력이 아직 없습니다.</p>`)
   }
   const p = (prev["손익"]?.계획 || 0) + (prev["자본"]?.계획 || 0)
   const a = (prev["손익"]?.실적 || 0) + (prev["자본"]?.실적 || 0)
   return card(`${prev.year}년 집계 (손익+자본)`, badgeOk("분석 완료"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span></p>
      <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(p)} 천원 · 집행률 ${rateBadge(p, a)}
-     <button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`, "mt")
+     <button class="ml-1 font-semibold text-ink hover:text-mint-ink" data-goyear="${esc(prev.year)}">이 연도로 전환 →</button></p>`)
 }
 
 function unmappedCard() {
@@ -121,7 +121,7 @@ function unmappedCard() {
   return card("미배정 전표 · 연도 마감", n ? badgeWarn(`${n}건`) : badgeOk("없음"),
     `<p class="mt-4 text-2xl font-bold tracking-tight ${n ?"text-warn" : "text-ink"}">${fmt(n)} <span class="text-sm font-semibold text-tri">건</span></p>
      <p class="mt-2 text-sm text-sub">${n ? `금액 ${fmt(amt)} 천원 · 종합표 미포함` : "모든 전표가 지사에 배정되었습니다."}</p>
-     <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`, "gt")
+     <p class="mt-1 text-sm text-sub">${esc(state.year)}년 ${lockText}</p>`)
 }
 
 

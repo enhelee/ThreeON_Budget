@@ -39,7 +39,7 @@ def test_every_work_menu_names_its_character():
     expected = {"budget": "mt", "collect": "mt", "branches": "gt", "detail": "gt",
                 "review": "gt", "stats": "gt", "forecast": "yc"}
     assert owners == expected, f"메뉴별 담당 캐릭터가 다릅니다: {owners}"
-    assert "nav-dot" in _read(SRC, "components", "sidebar.js"), "메뉴 버튼에 캐릭터 색 점(.nav-dot)"
+    assert "nav-dot" not in _read(SRC, "components", "sidebar.js"), "메뉴 색 점은 뺐다(10/28 색 줄이기)"
 
 
 def test_sidebar_starts_as_rail_and_remembers_pin():
@@ -53,14 +53,15 @@ def test_sidebar_starts_as_rail_and_remembers_pin():
     assert ".sb-open #appShell" in css, "펼침 고정이면 본문이 사이드바 폭만큼 비켜야 합니다"
 
 
-def test_sidebar_is_dark_navy_with_three_color_edge():
+def test_sidebar_is_light_rail_without_character_colors():
+    """10/28 피드백: 남색 사이드바 + 밝은 본문은 «다크·화이트 모드가 섞인 느낌» → 연회색 사이드바로 통일."""
     css = _read(SRC, "styles", "custom.css")
     app = _read(SRC, "styles", "app.css")
-    assert re.search(r"--navy:\s*#0B1020", app, re.I), "app.css :root 에 --navy"
-    sb = css.split("/* ONDO 사이드바", 1)[1]
-    assert "var(--navy)" in sb, "사이드바 바탕은 남색"
-    for c in ("--char-mt", "--char-gt", "--char-yc"):
-        assert c in sb, f"사이드바 3색 선·점에 {c}"
+    assert re.search(r"--navy:\s*#0B1020", app, re.I), "app.css :root 에 --navy(글자·강조색)"
+    sb = css.split("/* ONDO 사이드바", 1)[1].split("/* 표지", 1)[0]
+    assert re.search(r"#sidebar\{[^}]*background:var\(--rail\)", sb), "사이드바 바탕은 연회색(--rail)"
+    for c in ("--char-mt", "--char-gt", "--char-yc", "var(--navy)}"):
+        assert c not in sb.replace("color:var(--navy)}", ""), f"사이드바에 {c} 없음(캐릭터 색은 그림에만)"
 
 
 def test_brand_red_stays_only_in_logo():
@@ -93,17 +94,17 @@ def test_page_background_is_soft_gray_and_cards_stay_white():
     assert "bg-base" in app.split(".panel {", 1)[1].split("}", 1)[0]
 
 
-def test_home_banner_is_navy_with_three_characters():
+def test_home_banner_is_light_with_temperature_gauge_and_characters():
     home = _read(SRC, "views", "home.js")
     strip = home.split("function headerStrip()", 1)[1].split("\n}\n", 1)[0]
-    assert "home-hero" in strip, "메인 맨 위 배너는 .home-hero(남색)"
-    assert "예산의 온도를 읽다" in strip
+    assert "home-hero" in strip and "예산의 온도를 읽다" in strip
+    assert "home-hero__gauge" in strip, "배너의 예산 온도 막대(숫자 없음, 이름 뜻 그림)"
     assert "CHAR_IMG[id].full" in strip and 'alt="${NAMES[id]}"' in strip, "캐릭터 그림은 챗봇과 같은 char_images.js"
     assert '["mt", "gt", "yc"]' in strip, "배너에 매칭이·검토미·예측이"
     assert not os.path.isdir(os.path.join(WEB, "public", "assets", "characters")), "그림은 한 벌(src/assets/characters webp)만"
     css = _read(SRC, "styles", "custom.css")
     hero = css.split(".home-hero{", 1)[1].split("}", 1)[0]
-    assert "var(--navy)" in hero
+    assert "var(--navy)" not in hero and "#fff" in hero, "배너는 흰 카드(남색 덩어리는 로그인 화면에만)"
     assert "prefers-reduced-motion" in css.split(".home-hero{", 1)[1], "캐릭터 둥실 움직임은 움직임 줄이기 설정에서 멈춘다"
 
 
@@ -116,15 +117,10 @@ def test_banner_lists_work_steps_as_links():
     assert "home-hero__steps" in strip and "data-view" in strip, "배너 안 업무 단계 알약(누르면 이동)"
 
 
-def test_status_cards_carry_their_character_tone():
+def test_status_cards_have_no_character_color_lines():
     home = _read(SRC, "views", "home.js")
-    assert re.search(r"function card\(title, badge, body, tone\)", home), "card() 가 담당 캐릭터(tone)를 받는다"
-    for fn, tone in (("budgetCard", "mt"), ("prevYearCard", "mt"), ("unmappedCard", "gt")):
-        body = home.split(f"function {fn}(", 1)[1].split("\nfunction ", 1)[0]
-        assert f'"{tone}")' in body, f"{fn} 은 {tone} 색"
-    css = _read(SRC, "styles", "custom.css")
-    for t in ("mt", "gt", "yc"):
-        assert f".metric-card--{t}" in css, f"카드 위 색 선 .metric-card--{t}"
+    assert re.search(r"function card\(title, badge, body\)", home), "카드 위 캐릭터 색 선은 뺐다(10/28 색 줄이기)"
+    assert "metric-card--" not in home + _read(SRC, "styles", "custom.css")
 
 
 def test_stage_cards_show_their_character():
