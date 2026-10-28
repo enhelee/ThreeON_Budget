@@ -1,4 +1,4 @@
-import { rateBadge } from "../components/badges.js"
+import { homeRateBadge } from "../components/badges.js"
 import { CHAR_IMG } from "../components/char_images.js"
 import { NAMES } from "../components/characters.js"
 import { openLockItems } from "../components/lockbanner.js"
@@ -89,7 +89,7 @@ function budgetCard(budget) {
   const s = curRow()?.[budget]
   const body = s
     ? `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${fmt(s.실적)} <span class="text-sm font-semibold text-tri">천원</span></p>
-       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} 천원 · 집행률 ${rateBadge(s.계획, s.실적)}</p>`
+       <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">계획 ${fmt(s.계획)} 천원 · 집행률 ${homeRateBadge(s.계획, s.실적)}</p>`
     : `<p class="mt-4 text-2xl font-bold tracking-tight">${dash}</p>
        <p class="mt-2 text-sm text-sub">이 연도의 ${esc(budget)}예산 분석 이력이 없습니다.</p>`
   const open = state.homeAcct === budget
@@ -108,7 +108,7 @@ function acctPanel() {
     : !items.length ? `<p class="text-sm text-tri">이 연도의 ${esc(b)}예산 과목 자료가 없습니다.</p>`
     : `<div class="acct-list yr-one--${BT_KEY[b]}">${items.map(r => `<div class="acct-row"><span class="acct-row__k">${esc(r.예산과목)}</span>
         <div class="yr-one__track"><div class="yr-bar yr-bar--plan yr-one__plan" style="width:${(r.계획 || 0) / mx * 100}%"></div><div class="yr-bar yr-bar--act yr-one__act" style="width:${(r.실적 || 0) / mx * 100}%"></div></div>
-        <span class="acct-row__v"><b>${fmt(r.실적 || 0)}</b> / ${fmt(r.계획 || 0)}</span><span>${rateBadge(r.계획, r.실적)}</span></div>`).join("")}</div>`
+        <span class="acct-row__v"><b>${fmt(r.실적 || 0)}</b> / ${fmt(r.계획 || 0)}</span><span>${homeRateBadge(r.계획, r.실적)}</span></div>`).join("")}</div>`
   return `<section class="panel p-5 sm:p-6 acct-panel"><div class="mb-4 flex items-center justify-between gap-3"><h3 class="section-title">${esc(state.year)}년 ${esc(b)}예산 · 예산과목별</h3>
     <div class="flex items-center gap-3"><span class="text-xs font-semibold text-tri">실적 / 계획 · 단위: 천원</span><button type="button" class="text-sm font-semibold text-sub hover:text-ink" data-homeacct="${esc(b)}">접기 ▴</button></div></div>${body}</section>`
 }
@@ -120,7 +120,7 @@ function yearPickCard() {
   const p = c ? bv(c, "합계", "계획") : 0, a = c ? bv(c, "합계", "실적") : 0
   return card(`${state.year}년 합계 (손익+자본)`, c ? badgeOk("분석 완료") : badgeMuted("미실행"),
     `<p class="mt-4 text-2xl font-bold tracking-tight text-ink">${c ? `${fmt(a)} <span class="text-sm font-semibold text-tri">천원</span>` : dash}</p>
-     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">${c ? `계획 ${fmt(p)} 천원 · 집행률 ${rateBadge(p, a)}` : "이 연도의 분석 이력이 없습니다."}</p>
+     <p class="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-sub">${c ? `계획 ${fmt(p)} 천원 · 집행률 ${homeRateBadge(p, a)}` : "이 연도의 분석 이력이 없습니다."}</p>
      <div class="year-pick" role="group" aria-label="연도 고르기">${years.map(y => `<button type="button" data-goyear="${esc(y)}" aria-pressed="${y === String(state.year)}">${esc(y)}</button>`).join("")}</div>`)
 }
 
@@ -276,7 +276,7 @@ function multiYearPanels() {
       <div class="yr-one__track" title="${b} 계획 ${fmt(p)} 천원 · 실적 ${fmt(a)} 천원 · 집행률 ${fmtRate(p, a)}">
         <div class="yr-bar yr-bar--plan yr-one__plan" style="width:${p / maxV * 100}%"></div>
         <div class="yr-bar yr-bar--act yr-one__act" style="width:${a / maxV * 100}%"></div></div>
-      <span class="yr-one__v"><b>${eokN(a)}</b> / ${eokN(p)}</span><span class="yr-one__r">${rateBadge(p, a)}</span></div>`
+      <span class="yr-one__v"><b>${eokN(a)}</b> / ${eokN(p)}</span><span class="yr-one__r">${homeRateBadge(p, a)}</span></div>`
   }
   return `
   <section class="grid gap-6 xl:grid-cols-[1fr_1fr]">
@@ -299,7 +299,7 @@ function summaryTable(recent) {
   const head = recent.map(r => `<th colspan="2" class="sum3__y clickable" data-goyear="${r.year}">${r.year}년</th>`).join("")
   const sub = recent.map(() => `<th>계획</th><th>실적</th>`).join("")
   const rows = BT.map(b => `<tr class="sum3__row ${b === "합계" ? "sum3__row--sum" : ""}"><th rowspan="2" scope="row">${b}</th>${recent.map(r => `<td>${eokN(bv(r, b, "계획"))}</td><td>${eokN(bv(r, b, "실적"))}</td>`).join("")}</tr>
-    <tr class="sum3__rate ${b === "합계" ? "sum3__row--sum" : ""}">${recent.map(r => `<td colspan="2">${rateBadge(bv(r, b, "계획"), bv(r, b, "실적"))}</td>`).join("")}</tr>`).join("")
+    <tr class="sum3__rate ${b === "합계" ? "sum3__row--sum" : ""}">${recent.map(r => `<td colspan="2">${homeRateBadge(bv(r, b, "계획"), bv(r, b, "실적"))}</td>`).join("")}</tr>`).join("")
   return `<article class="panel overflow-hidden">
       <div class="flex items-start justify-between gap-3 p-5 sm:p-6"><div><h3 class="section-title">연도별 요약</h3><p class="section-help">유지보수예산 ${recent.length}개년 실적비교 · 각 연도 최신 분석</p></div><div class="flex flex-col items-end gap-1.5"><button class="text-sm font-semibold text-ink hover:text-mint-ink" data-view="branches">전체 지사 →</button><span class="text-xs font-semibold text-tri">단위: 억원</span></div></div>
       <div class="overflow-x-auto px-5 pb-5 sm:px-6 sm:pb-6"><table class="sum3"><thead><tr><th rowspan="2">구분</th>${head}</tr><tr class="sum3__sub">${sub}</tr></thead><tbody>${rows}</tbody></table></div>
