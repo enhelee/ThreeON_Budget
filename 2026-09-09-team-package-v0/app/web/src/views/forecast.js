@@ -143,8 +143,7 @@ function longTable(key, cols, rows, empty) {
       const years = idx.map(i => Number(rows[i].연도)).filter(Boolean)
       const span = years.length ? ` · ${Math.min(...years)}~${Math.max(...years)}` : ""
       const total = money ? ` · 금액 합계 ${fmt(idx.reduce((s, i) => s + Number(rows[i].금액 || 0), 0))}` : ""
-      return `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="${cols.length}"><b class="text-ink">${esc(k)}</b><span class="text-sub"> · ${idx.length}줄${span}${total}</span></td>
-        <td class="px-2 py-1 text-right">${foldBtn(`data-fcgrp="${esc(id)}" data-open="${open}"`, open, "이 묶음")}</td></tr>${open ? idx.map(i => line(rows[i], i)).join("") : ""}`
+      return `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="${cols.length + 1}"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${foldBtn(`data-fcgrp="${esc(id)}" data-open="${open}"`, open, "이 묶음")}<b class="text-ink">${esc(k)}</b><span class="text-sub">${idx.length}줄${span}${total}</span></div></td></tr>${open ? idx.map(i => line(rows[i], i)).join("") : ""}`
     }).join("")
   }
   return `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>${head}</tr></thead>
@@ -522,8 +521,9 @@ function benchSiteGroups(rows, filtered) {
     const open = filtered || opened[site] === true
     const total = list.reduce((s, r) => s + Number(r.표준금액 || 0), 0)
     const warn = list.filter(r => r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3).length
-    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="8"><b class="text-ink">${esc(site)}</b><span class="text-sub"> · ${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></td>
-      <td class="px-2 py-1 text-right">${filtered ? "" : `<button class="btn-secondary min-h-[32px] px-3 text-xs" data-fcbopen="${esc(site)}" aria-expanded="${open}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`}</td></tr>`
+    // 접기 단추는 줄 맨 앞 + 왼쪽에 붙임(sticky) — 좁은 화면에서 표가 가로로 넘쳐도 단추가 화면 밖으로 밀리지 않게
+    const btn = filtered ? "" : `<button class="btn-secondary min-h-[32px] shrink-0 px-3 text-xs" data-fcbopen="${esc(site)}" aria-expanded="${open}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`
+    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="9"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${btn}<b class="text-ink">${esc(site)}</b><span class="text-sub">${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></div></td></tr>`
     return {head, list: open ? list : []}
   })
 }
