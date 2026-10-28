@@ -418,3 +418,41 @@
 
 /* 5번 10개년 상세 표 — 옆으로 넘겨도 예산과목 열은 왼쪽에 고정. 오른쪽 옅은 그림자로 «아래로 숫자가 지나간다»를 보이게 */
 .fc-stick{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 0 #E5E5E5,6px 0 6px -6px rgba(0,0,0,.18)}
+
+/* ── 로그인 화면(views/gate.js) A안 — 왼쪽 어두운 장면 + 오른쪽 흰 로그인 카드(2026-10-28) ──
+   움직임은 components/gate_intro.js(canvas). 그리지 않는 경우(움직임 줄이기·좁은 화면)엔 이 CSS 상태가 곧 마지막 장면 */
+.gate{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(400px,1fr);min-height:100vh;background:var(--page)}
+.gate-scene{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:1.5rem;padding:3rem 3rem 2.5rem;color:#fff;
+  background:radial-gradient(45% 45% at 18% 85%,rgba(62,230,196,.30),transparent 70%),radial-gradient(35% 40% at 55% 55%,rgba(255,138,110,.24),transparent 70%),radial-gradient(40% 45% at 88% 80%,rgba(169,139,255,.32),transparent 70%),var(--navy)}
+.gate-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.gate-copy,.gate-cast,.gate-lines{position:relative;z-index:1;transition:opacity .9s ease,transform .9s ease}
+.gate-scene.is-intro .gate-copy,.gate-scene.is-intro .gate-cast,.gate-scene.is-intro .gate-lines{opacity:0;transform:translateY(12px)}
+.gate-kicker{font-size:12px;font-weight:700;letter-spacing:.18em;color:var(--char-mt)}
+.gate-kicker span{background:linear-gradient(90deg,#FFC35A,#FF7A5C);-webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-title{margin-top:.9rem;font-size:clamp(30px,3.4vw,52px);font-weight:600;line-height:1.15;letter-spacing:-.03em;color:#fff}
+.gate-title em{font-style:normal;background:linear-gradient(90deg,var(--char-mt),var(--char-gt) 55%,var(--char-yc));-webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-mean{margin-top:.9rem;font-size:14px;color:#AEB6C6}
+.gate-mean b{color:#fff;font-weight:700}
+.gate-cast{display:flex;justify-content:space-around;align-items:flex-end;height:clamp(150px,30vh,260px)}
+.gate-char{position:relative;width:clamp(100px,11vw,180px);aspect-ratio:1;animation:gateBob 4s ease-in-out infinite}
+.gate-char--gt{margin-bottom:12%;animation-delay:-1.3s}
+.gate-char--yc{animation-delay:-2.6s}
+.gate-char img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 18px 22px rgba(0,0,0,.5));transition:opacity .2s ease,transform .3s cubic-bezier(.3,1.6,.5,1)}
+.gate-char__b{opacity:0}
+.gate-char:hover .gate-char__a{opacity:0}
+.gate-char:hover .gate-char__b{opacity:1}
+.gate-char:hover img{transform:scale(1.06) rotate(-3deg)}
+@keyframes gateBob{50%{transform:translateY(-8px)}}
+.gate-lines{display:grid;gap:.35rem;font-size:15px;color:#C9CFDB}
+.gate-lines b{font-weight:800;-webkit-background-clip:text;background-clip:text;color:transparent}
+.gate-name--mt{background-image:linear-gradient(90deg,#2FD9B5,#9FF7E4)}
+.gate-name--gt{background-image:linear-gradient(90deg,#FF7A5C,#FFC2AD)}
+.gate-name--yc{background-image:linear-gradient(90deg,#9A78FF,#D9CCFF)}
+.gate-panel{display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem}
+@media (max-width:1023px){
+  .gate{grid-template-columns:1fr}
+  .gate-scene{padding:1.75rem 1.25rem 1.5rem;gap:1rem}
+  .gate-cast{height:130px}
+  .gate-lines{display:none}
+}
+@media (prefers-reduced-motion:reduce){.gate-char{animation:none}}

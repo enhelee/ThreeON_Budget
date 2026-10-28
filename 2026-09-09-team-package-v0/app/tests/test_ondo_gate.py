@@ -1,0 +1,70 @@
+# -*- coding: utf-8 -*-
+"""ONDO 3단계 — 로그인 화면 A안(좌우 나눔) 구조 검사 (2026-10-28 grace 결정).
+
+- 왼쪽: 어두운 장면. 처음 ~3초 «ONDO» 글자가 점으로 모였다 흩어져 데이터 흐름이 되고,
+  매칭이·검토미·예측이가 그 흐름을 받는다. 오른쪽: 지금의 흰 로그인 카드(처음부터 입력 가능).
+- 누르거나 키를 치면 인트로를 건너뛴다. 움직임 줄이기 설정·좁은 화면은 애니메이션 없이 마지막 장면만.
+- 로그인하면 애니메이션을 완전히 멈춘다(작업 화면이 느려지지 않게).
+- 운영 수치(금액·건수·집행률)는 한 글자도 넣지 않는다(게이트 원칙).
+"""
+import os
+import re
+
+APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(APP, "web", "src")
+
+
+def _read(*parts):
+    with open(os.path.join(*parts), encoding="utf-8") as f:
+        return f.read()
+
+
+GATE = _read(SRC, "views", "gate.js")
+
+
+def _render_block():
+    """renderGate() 의 화면 글자 — 왼쪽 장면은 scene() 이 그려 ${scene()} 자리에 들어간다."""
+    body = GATE.split("export function renderGate", 1)[1].split("\nexport function", 1)[0]
+    scene = GATE.split("function scene()", 1)[1].split("\nexport function", 1)[0]
+    assert "${scene()}" in body
+    return body.replace("${scene()}", scene)
+
+
+def test_gate_is_split_scene_left_and_login_card_right():
+    body = _render_block()
+    assert "gate-scene" in body and "gate-panel" in body, "왼쪽 장면 + 오른쪽 로그인 카드"
+    assert body.index("gate-scene") < body.index("gate-panel")
+    panel = body.split("gate-panel", 1)[1]
+    assert 'id="gateForm"' in panel and 'id="gateName"' in panel and 'id="gatePw"' in panel, "로그인 칸은 오른쪽 카드에 그대로"
+    assert "<canvas" in body.split("gate-panel", 1)[0], "인트로·데이터 흐름은 왼쪽 canvas"
+
+
+def test_scene_uses_3d_characters_and_ondo_copy():
+    scene = _render_block().split("gate-panel", 1)[0]
+    assert "CHAR_IMG" in scene, "캐릭터는 챗봇과 같은 입체 그림"
+    for who in ("mt", "gt", "yc"):
+        assert f'"{who}"' in GATE, f"장면에 {who}"
+    assert "지금 몇 도인가요?" in scene and "10년 뒤 예보까지" in scene
+
+
+def test_scene_shows_no_operating_numbers():
+    scene = re.sub(r"<[^>]+>", " ", _render_block().split("gate-panel", 1)[0])
+    assert not re.search(r"\d{1,3}(,\d{3})+|\d+(\.\d+)?\s*%|\d+\s*(건|천원|억)", scene), "게이트 장면에 금액·건수·집행률 금지"
+
+
+def test_intro_can_skip_respects_reduced_motion_and_stops_after_login():
+    intro = _read(SRC, "components", "gate_intro.js")
+    assert "export function startIntro" in intro and "export function stopIntro" in intro
+    assert "prefers-reduced-motion" in intro, "움직임 줄이기 설정이면 애니메이션 없이"
+    assert "cancelAnimationFrame" in intro and "removeEventListener" in intro, "멈출 때 그리기·이벤트를 모두 걷는다"
+    assert re.search(r"pointerdown|keydown", intro), "누르거나 키를 치면 건너뛰기"
+    show = GATE.split("export function showGate", 1)[1].split("\nexport function", 1)[0]
+    hide = GATE.split("export function hideGate", 1)[1].split("\nexport function", 1)[0]
+    assert "startIntro(" in show and "stopIntro(" in hide, "게이트를 띄울 때 시작, 로그인하면 멈춤"
+
+
+def test_gate_styles_exist():
+    css = _read(SRC, "styles", "custom.css")
+    for cls in (".gate-scene", ".gate-panel", ".gate-char"):
+        assert cls in css, f"custom.css 에 {cls}"
+    assert "var(--navy)" in css.split(".gate-scene{", 1)[1].split("}", 1)[0]

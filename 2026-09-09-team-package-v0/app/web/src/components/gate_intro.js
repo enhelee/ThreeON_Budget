@@ -1,0 +1,131 @@
+// ─────────────────────────────────────────────────────────────
+// 로그인 화면 왼쪽 장면의 움직임 (views/gate.js) — 2026-10-28 grace 결정(A안: 좌우 나눔).
+//
+// ① 인트로(약 2.5초): 흩어진 점들이 날아와 «ONDO» 글자가 된다(ON 은 민트).
+// ② 글자가 왼쪽 아래로 쓸려 내려가며 사라지고, 같은 자리에서 데이터 흐름이 시작된다.
+// ③ 흐름: 점들이 매칭이 → 검토미 → 예측이를 차례로 지나며 그 캐릭터 색으로 바뀐다.
+//
+// 지키는 것
+// - 누르거나 키를 치면 ①②를 건너뛴다(입력 칸 포커스는 건드리지 않는다).
+// - 움직임 줄이기 설정 · 좁은 화면(<1024px)은 그리지 않는다 — CSS 기본 상태(캐릭터·문구)가 곧 마지막 장면.
+// - stopIntro() 가 그리기·이벤트를 모두 걷는다. 로그인하면 hideGate() 가 부른다.
+// 숫자(금액·건수)는 그리지 않는다 — 게이트 원칙.
+// ─────────────────────────────────────────────────────────────
+
+const MINT = [62, 230, 196], CORAL = [255, 138, 110], VIOLET = [169, 139, 255], GRAY = [150, 165, 190], WHITE = [230, 236, 245]
+const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t)
+const rnd = (a, b) => a + Math.random() * (b - a)
+
+let run = null
+
+export function stopIntro() {
+  if (!run) return
+  cancelAnimationFrame(run.raf)
+  run.off()
+  run.scene.classList.remove("is-intro")
+  run = null
+}
+
+export function startIntro(scene) {
+  stopIntro()
+  if (!scene) return
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  if (reduce || window.innerWidth < 1024) return
+  const cv = scene.querySelector("canvas")
+  const ctx = cv?.getContext("2d")
+  if (!ctx) return
+
+  let W = 0, H = 0, logo = [], flow = [], phase = "logo", t0 = performance.now(), last = t0, flowAt = 0
+  const chars = [...scene.querySelectorAll(".gate-char")]
+
+  function size() {
+    const r = scene.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2)
+    W = r.width; H = r.height
+    cv.width = W * dpr; cv.height = H * dpr
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+
+  // «ONDO» 글자 모양의 점 목표 — 화면 밖 캔버스에 글자를 쓰고 픽셀을 훑는다
+  function logoTargets() {
+    const o = document.createElement("canvas"), c = o.getContext("2d")
+    o.width = Math.ceil(W); o.height = Math.ceil(H)
+    const fs = Math.min(W * 0.28, H * 0.3)
+    c.font = `800 ${fs}px Pretendard, system-ui, sans-serif`
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#fff"
+    c.fillText("ONDO", W / 2, H * 0.45)
+    const split = W / 2 - c.measureText("ONDO").width / 2 + c.measureText("ON").width
+    const d = c.getImageData(0, 0, o.width, o.height).data, gap = Math.max(4, Math.round(fs / 34)), pts = []
+    for (let y = 0; y < o.height; y += gap) for (let x = 0; x < o.width; x += gap)
+      if (d[(y * o.width + x) * 4 + 3] > 128) pts.push({x: rnd(0, W), y: rnd(0, H), vx: 0, vy: 0, tx: x, ty: y, c: x < split ? MINT : WHITE})
+    return pts
+  }
+
+  // 흐름 길: 왼쪽 아래 → 세 캐릭터 가운데 → 오른쪽 위 (Catmull-Rom)
+  function pathPoints() {
+    const s = scene.getBoundingClientRect()
+    return [[-40, H * 0.92], ...chars.map(el => {
+      const r = el.getBoundingClientRect()
+      return [r.left - s.left + r.width / 2, r.top - s.top + r.height * 0.45]
+    }), [W + 40, H * 0.35]]
+  }
+  function at(K, u) {
+    const i = Math.min(K.length - 2, Math.floor(u)), t = u - i
+    const p0 = K[Math.max(0, i - 1)], p1 = K[i], p2 = K[i + 1], p3 = K[Math.min(K.length - 1, i + 2)]
+    const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t)
+    return [f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]
+  }
+  const STOPS = [GRAY, MINT, CORAL, VIOLET, VIOLET]
+  const colorAt = u => { const i = Math.min(3, Math.floor(u)); return mix(STOPS[i], STOPS[i + 1], Math.min(1, (u - i) * 3)) }
+
+  function toFlow() {
+    if (phase !== "logo") return
+    phase = "sweep"; flowAt = performance.now()
+  }
+
+  function frame(now) {
+    const dt = Math.min(50, now - last), k = dt / 16; last = now
+    if (phase === "logo" && now - t0 > 2500) toFlow()
+    if (phase === "sweep" && now - flowAt > 900) { phase = "flow"; scene.classList.remove("is-intro") }
+
+    if (phase !== "flow") {
+      ctx.fillStyle = "rgba(11,16,32,.35)"; ctx.fillRect(0, 0, W, H)
+      const fade = phase === "sweep" ? Math.max(0, 1 - (now - flowAt) / 900) : 1
+      for (const p of logo) {
+        if (phase === "logo") { p.vx += (p.tx - p.x) * 0.012 * k; p.vy += (p.ty - p.y) * 0.012 * k }
+        else { const dx = -40 - p.x, dy = H * 0.92 - p.y, d = Math.hypot(dx, dy) || 1; p.vx += dx / d * 2 * k; p.vy += dy / d * 2 * k }
+        p.vx *= 0.86; p.vy *= 0.86; p.x += p.vx * k; p.y += p.vy * k
+        ctx.fillStyle = rgba(p.c, 0.9 * fade); ctx.fillRect(p.x, p.y, 2, 2)
+      }
+    } else {
+      ctx.clearRect(0, 0, W, H)
+      const K = pathPoints()
+      if (Math.random() < 0.6 * k) flow.push({u: 0, v: rnd(0.00022, 0.00036), o: rnd(-1, 1), r: rnd(1.2, 2.4)})
+      for (const p of flow) {
+        p.u += p.v * dt
+        const a = at(K, p.u), b = at(K, Math.min(4, p.u + 0.01)), ang = Math.atan2(b[1] - a[1], b[0] - a[0])
+        const spread = 26 * (0.15 + 0.85 * Math.sin(Math.PI * (p.u % 1)))   // 캐릭터 가까이에서 좁아진다
+        const x = a[0] - Math.sin(ang) * p.o * spread, y = a[1] + Math.cos(ang) * p.o * spread
+        ctx.fillStyle = rgba(colorAt(p.u), 0.85)
+        ctx.beginPath(); ctx.arc(x, y, p.r, 0, 7); ctx.fill()
+      }
+      flow = flow.filter(p => p.u < 4)
+    }
+    if (run) run.raf = requestAnimationFrame(frame)
+  }
+
+  const onResize = () => { size(); if (phase === "logo") logo = logoTargets() }
+  const onSkip = () => toFlow()
+  window.addEventListener("resize", onResize)
+  scene.addEventListener("pointerdown", onSkip)
+  document.addEventListener("keydown", onSkip)
+
+  size(); logo = logoTargets()
+  scene.classList.add("is-intro")
+  run = {scene, raf: requestAnimationFrame(frame), off() {
+    window.removeEventListener("resize", onResize)
+    scene.removeEventListener("pointerdown", onSkip)
+    document.removeEventListener("keydown", onSkip)
+    ctx.clearRect(0, 0, W, H)
+  }}
+}
