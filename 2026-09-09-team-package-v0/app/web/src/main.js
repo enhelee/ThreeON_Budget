@@ -62,7 +62,12 @@ document.addEventListener("click", async e => {
     return;
   }
   const gy = e.target.closest("[data-goyear]");
-  if (gy) { state.homeAcct = null; changeYear(gy.dataset.goyear); return; }   // 펼친 과목 목록은 연도가 바뀌면 닫는다
+  if (gy) {                                   // 펼친 과목 목록은 연도가 바뀌면 닫는다
+    state.homeAcct = null;
+    const y0 = state.view === "home" ? window.scrollY : null;   // 메인에서 연도를 바꿔도 보던 자리 그대로(10/28 grace)
+    await changeYear(gy.dataset.goyear);
+    if (y0 !== null) window.scrollTo({top: y0, behavior: "instant"});
+    return; }
   // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
   const st = e.target.closest("[data-stat-item]");
   if (st && !e.target.closest("button")) {

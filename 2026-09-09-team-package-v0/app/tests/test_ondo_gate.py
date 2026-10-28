@@ -95,7 +95,7 @@ def test_favicon_is_thermometer_svg():
     html = _read(APP, "web", "index.html")
     assert 'rel="icon"' in html and "favicon.svg" in html, "탭 아이콘(온도계, 2026-10-28 grace 3번)"
     svg = _read(SRC, "assets", "favicon.svg")
-    assert "#FE0009" in svg and "#0B1020" in svg
+    assert "#9DB3E0" in svg and "#E58F79" in svg and "#0B1020" in svg, "수은은 파랑→산호(10/28 grace — CI 빨강은 탭에서 너무 셌다)"
 
 
 def test_gate_matches_main_palette_and_fades_into_main():
@@ -112,3 +112,31 @@ def test_flow_is_rich_but_capped():
     """흐름 점이 허전하지 않게(10/28) — 양을 늘리되 상한을 둬서 느려지지 않게."""
     intro = _read(SRC, "components", "gate_intro.js")
     assert "flow.length < 1400" in intro and "lighter" in intro and "destination-out" in intro
+
+
+def test_flow_speed_and_soft_twinkle():
+    intro = _read(SRC, "components", "gate_intro.js")
+    assert "rnd(0.00032, 0.0005)" in intro, "흐름 점 조금 더 빠르게(10/28)"
+    assert "0.75 + 0.25 * Math.sin" in intro, "반짝임은 은은하게"
+
+
+def test_busy_overlay_is_thermometer_with_character():
+    """4단계 로딩(10/28 가안): 온도계 수은이 파랑→산호로 차오르고, 옆에 그 일을 맡은 캐릭터 + 문구. 조잡하지 않게 카드 하나."""
+    html = _read(APP, "web", "index.html")
+    busy = html.split('id="busy"', 1)[1].split("</div>\n  </div>", 1)[0]
+    assert "loader-thermo" in busy and 'id="busyChar"' in busy and 'id="busyText"' in busy
+    fb = _read(SRC, "components", "feedback.js")
+    assert "CHAR_IMG" in fb and "busyChar" in fb
+    css = _read(SRC, "styles", "custom.css")
+    assert "@keyframes loaderFill" in css and "prefers-reduced-motion" in css.split("@keyframes loaderFill", 1)[1]
+
+
+def test_home_year_buttons_keep_scroll():
+    js = _read(SRC, "main.js")
+    gy = js.split('closest("[data-goyear]")', 1)[1].split("return; }", 1)[0]
+    assert "scrollY" in gy, "메인 연도 버튼을 눌러도 맨 위로 튀지 않게(10/28 grace)"
+
+
+def test_chat_title_is_ondo():
+    chat = _read(SRC, "components", "chat.js")
+    assert "ONDO 탐험대" in chat and "ThreeON 탐험대" not in chat

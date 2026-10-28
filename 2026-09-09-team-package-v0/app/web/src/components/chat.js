@@ -68,7 +68,7 @@ function render() {
   host.innerHTML = `<aside class="chat-panel" role="dialog" aria-label="ThreeON 대화" aria-modal="false">
     <header class="chat-head">
       <img src="${img("mt")}" alt="">
-      <div><p class="chat-title">ThreeON 탐험대</p><p class="chat-sub">숫자는 앱 계산에서만 가져와요 · 외부 전송 없음</p></div>
+      <div><p class="chat-title">ONDO 탐험대</p><p class="chat-sub">숫자는 앱 계산에서만 가져와요 · 외부 전송 없음</p></div>
       <button class="chat-x" data-chat-close aria-label="대화 닫기">×</button>
     </header>
     <div class="chat-cast">${cast}</div>

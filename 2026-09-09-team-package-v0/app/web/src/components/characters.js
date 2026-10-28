@@ -80,7 +80,7 @@ export const HELP = {
 export function helpFabHtml() {
   const open = !!state.chatOpen
   return `<div class="help-fab">
-    <button class="help-fab__btn" data-action="toggle-help" aria-expanded="${open}" title="ThreeON 탐험대에게 물어보기">
+    <button class="help-fab__btn" data-action="toggle-help" aria-expanded="${open}" title="ONDO 탐험대에게 물어보기">
       <span class="help-fab__pill">물어보기</span><img class="help-fab__img help-fab__img--3d" src="${CHAR_IMG.mt.full}" alt="매칭이">
     </button>
   </div>`
