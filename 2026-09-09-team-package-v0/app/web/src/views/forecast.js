@@ -270,10 +270,11 @@ function hotPartsPanel(d) {
       const cells = years.map(y => {
         const v = amt[`${s}|${item}|${y}`] || 0
         rowSum += v; colSum[y] += v
-        return `<td class="px-1 py-1"><input class="control min-w-[6.5rem] text-right" inputmode="numeric" data-fc="hot-cell" data-site="${esc(s)}" data-item="${item}" data-year="${y}" value="${v ? Math.round(v) : ""}" placeholder="0"></td>`
+        return `<td class="px-1 py-1"><input class="control min-w-[6.5rem] px-2 text-right text-sm" inputmode="numeric" data-fc="hot-cell" data-site="${esc(s)}" data-item="${item}" data-year="${y}" value="${v ? Math.round(v) : ""}" placeholder="0"></td>`
       }).join("")
-      const head = li === 0 ? `<td class="fc-stick table-cell bg-white align-top" rowspan="2"><b class="text-ink">${esc(s)}</b>
-          ${c ? `<div class="mt-1 space-y-1">${cellInput("hot_parts_contract", ci, {f: "계약방식"}, c.계약방식)}${cellInput("hot_parts_contract", ci, {f: "계약기간"}, c.계약기간)}</div>` : ""}</td>` : ""
+      // 지사 칸은 좁게(계약방식·계약기간을 위아래로) — 넓으면 연도가 두 해만 보인다
+      const head = li === 0 ? `<td class="fc-stick table-cell w-40 min-w-[10rem] max-w-[11rem] whitespace-normal bg-white align-top" rowspan="2"><b class="text-ink">${esc(s)}</b>
+          ${c ? `<div class="mt-1 grid gap-1 [&_input]:min-h-[32px] [&_input]:w-full [&_input]:px-2 [&_input]:text-xs">${cellInput("hot_parts_contract", ci, {f: "계약방식"}, c.계약방식)}${cellInput("hot_parts_contract", ci, {f: "계약기간"}, c.계약기간)}</div>` : ""}</td>` : ""
       return `<tr class="${li ? "" : "border-t-2 border-line"}">${head}<td class="table-cell text-xs text-sub">${acct}<br><span class="font-semibold text-ink">${label}</span></td>${cells}<td class="table-cell text-right font-semibold">${fmt(Math.round(rowSum))}</td></tr>`
     }).join("")
   }).join("")
@@ -339,8 +340,8 @@ function learnBody(d) {
   const best = bt?.runs?.length ? bt.runs.reduce((a, r) => (r.account ?? 9) < (a.account ?? 9) ? r : a) : null
   const btBody = bt ? `<div class="overflow-x-auto p-5"><table class="w-full"><thead class="table-head"><tr>
       <th class="px-3 py-2">학습 기간</th><th class="px-3 py-2 text-right">과목 합계 오차</th><th class="px-3 py-2 text-right">지사 3년 누적 오차</th><th class="px-3 py-2 text-right">칸별 오차 (참고)</th></tr></thead>
-      <tbody class="divide-y divide-line-subtle">${bt.runs.map(r => `<tr class="${String(r.window) === String(bt.window) ? "bg-subtle font-semibold" : ""}">
-        <td class="table-cell">최근 ${esc(r.window)}개년${String(r.window) === String(bt.window) ? " · 지금 설정" : ""}</td>
+      <tbody class="divide-y divide-line-subtle">${bt.runs.map(r => `<tr class="${String(r.window) === win ? "bg-subtle font-semibold" : ""}">
+        <td class="table-cell">최근 ${esc(r.window)}개년${String(r.window) === win ? " · 지금 설정" : ""}</td>
         <td class="table-cell text-right">${pct(r.account)}</td><td class="table-cell text-right">${pct(r.site3)}</td><td class="table-cell text-right text-sub">${pct(r.cell)}</td></tr>`).join("")}</tbody></table>
       <p class="mt-2 text-xs text-sub">시험 연도 ${esc((bt.runs[0]?.targets || []).join("·") || "없음")} — 그 해보다 앞선 해로 표준금액을 만들어 맞혀 본 결과(마감 ${esc((bt.sources?.마감 || []).join("·") || "없음")} · 참고 엑셀 ${esc((bt.sources?.참고 || []).length)}개년). 고온부품재·LTSA·CRI·재생고온부품은 계획으로 받는 줄이라 뺐습니다.</p>
       ${bt.runs[0]?.overhaul ? `<p class="mt-1 text-xs text-sub">A급정비 일정 규칙: 실제 ${bt.runs[0].overhaul.events}건 중 ${bt.runs[0].overhaul.hits}건 맞힘 · 헛예측 ${bt.runs[0].overhaul.false_positive}칸 · 총액 ${sgn(bt.runs[0].overhaul.total)}</p>` : ""}</div>`
@@ -452,7 +453,7 @@ function previewPanel() {
       </div>
     </div>
     ${rows.length ? `<div class="max-h-80 overflow-auto p-5"><table class="w-full"><thead class="table-head"><tr>${cols.map(c => `<th class="px-3 py-2">${esc(c)}</th>`).join("")}</tr></thead>
-      <tbody class="divide-y divide-line-subtle">${rows.slice(0, 100).map(r => `<tr>${cols.map(c => `<td class="table-cell">${esc(typeof r[c] === "number" ? fmt(r[c]) : r[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
+      <tbody class="divide-y divide-line-subtle">${rows.slice(0, 100).map(r => `<tr>${cols.map(c => `<td class="table-cell">${esc(typeof r[c] === "number" && c !== "연도" ? fmt(r[c]) : r[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>
       ${rows.length > 100 ? '<p class="mt-2 text-xs text-tri">앞 100건만 표시합니다.</p>' : ""}</div>`
       : '<p class="p-5 text-sm text-warn">이 파일에서 해당 자료를 찾지 못했습니다 — 양식·시트명을 확인하세요. 지사 시트명은 지사 이름에서 «지사»·«사업소»를 뗀 것(예: 화성)이어야 합니다.</p>'}
   </article>`
@@ -573,11 +574,11 @@ function benchStd() {
         return `<tr>
           <td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
           <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
-          <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
+          <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" || r.방식출처 === "용량규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
           <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
           <td class="table-cell text-right text-sub">${r.재무팀금액 == null ? "—" : fmt(r.재무팀금액)}</td>
           <td class="table-cell text-right ${r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3 ? "bg-warn-bg text-warn" : "text-sub"}">${sgn(r.재무팀대비)}</td>
-          <td class="table-cell text-xs text-sub">${esc(r.근거 || r.비고 || "")}</td></tr>`
+          <td class="table-cell min-w-[14rem] whitespace-normal text-xs text-sub">${esc(r.근거 || r.비고 || "")}</td></tr>`
       }).join("")).join("") : `<tr><td class="table-cell text-tri" colspan="9">${filtered ? "조건에 맞는 줄이 없습니다." : "표준화 대상 실적이 없습니다."}</td></tr>`}</tbody></table></div>
   </article>`
 }
