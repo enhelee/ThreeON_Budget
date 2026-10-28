@@ -168,8 +168,7 @@
 .sb-ci{display:block;background:#fff;border-radius:12px;padding:10px 12px}
 .sb-name{display:flex;align-items:center;gap:.5rem;margin-top:1rem;padding:0 .25rem}
 .sb-word{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1;color:#fff}
-.sb-word b,.header-brand__word b{font-weight:800;color:var(--char-mt)}
-.header-brand__word b{color:#0F6E56}
+.ondo-word b{font-weight:800;color:var(--brand)}   /* ONDO 의 ON = CI 빨강(워드마크는 로고) — 2026-10-28 grace */
 .sb-by{margin-left:auto;font-size:11px;color:#7D859A}
 .sb-desc{display:block;margin-top:.25rem;padding:0 .25rem;font-size:12px;line-height:1.5;color:#8A92A6}
 #sidebar .nav-button{color:#C7CDDA}
@@ -449,11 +448,11 @@
 /* 입체 캐릭터 그림(components/characters.js charImg) — 자리 크기는 각 클래스가, 비율은 그림이 지킨다 */
 img.char-img{object-fit:contain;display:inline-block}
 
-/* ── 로그인 화면(views/gate.js) A안 — 왼쪽 어두운 장면 + 오른쪽 흰 로그인 카드(2026-10-28) ──
+/* ── 로그인 화면(views/gate.js) B안 — 화면 전체 어두운 장면 + 오른쪽에 떠 있는 로그인 카드(2026-10-28) ──
    움직임은 components/gate_intro.js(canvas). 그리지 않는 경우(움직임 줄이기·좁은 화면)엔 이 CSS 상태가 곧 마지막 장면 */
-.gate{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(400px,1fr);min-height:100vh;background:var(--page)}
-.gate-scene{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:1.5rem;padding:3rem 3rem 2.5rem;color:#fff;
-  background:radial-gradient(45% 45% at 18% 85%,rgba(62,230,196,.30),transparent 70%),radial-gradient(35% 40% at 55% 55%,rgba(255,138,110,.24),transparent 70%),radial-gradient(40% 45% at 88% 80%,rgba(169,139,255,.32),transparent 70%),var(--navy)}
+.gate{position:relative;min-height:100vh;background:var(--navy)}
+.gate-scene{position:fixed;inset:0;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:1.5rem;padding:3.5rem calc(min(440px,36vw) + 6rem) 3rem 4rem;color:#fff;
+  background:radial-gradient(40% 45% at 12% 85%,rgba(62,230,196,.28),transparent 70%),radial-gradient(32% 40% at 40% 55%,rgba(255,138,110,.22),transparent 70%),radial-gradient(38% 45% at 62% 82%,rgba(169,139,255,.30),transparent 70%),var(--navy)}
 .gate-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .gate-copy,.gate-cast,.gate-lines{position:relative;z-index:1;transition:opacity .9s ease,transform .9s ease}
 .gate-scene.is-intro .gate-copy,.gate-scene.is-intro .gate-cast,.gate-scene.is-intro .gate-lines{opacity:0;transform:translateY(12px)}
@@ -478,11 +477,15 @@ img.char-img{object-fit:contain;display:inline-block}
 .gate-name--mt{background-image:linear-gradient(90deg,#2FD9B5,#9FF7E4)}
 .gate-name--gt{background-image:linear-gradient(90deg,#FF7A5C,#FFC2AD)}
 .gate-name--yc{background-image:linear-gradient(90deg,#9A78FF,#D9CCFF)}
-.gate-panel{display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem}
+.gate-panel{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:flex-end;padding:2.5rem 4rem;pointer-events:none}
+.gate-card{pointer-events:auto;width:min(440px,36vw);max-width:none;background:rgba(255,255,255,.94);border-color:rgba(255,255,255,.6);box-shadow:0 30px 80px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.gate-word{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1}
 @media (max-width:1023px){
-  .gate{grid-template-columns:1fr}
-  .gate-scene{padding:1.75rem 1.25rem 1.5rem;gap:1rem}
+  .gate{background:var(--page)}
+  .gate-scene{position:relative;padding:1.75rem 1.25rem 1.5rem;gap:1rem}
   .gate-cast{height:130px}
   .gate-lines{display:none}
+  .gate-panel{min-height:0;justify-content:center;padding:1.5rem 1rem 2.5rem}
+  .gate-card{width:100%;max-width:28rem;background:#fff;box-shadow:none}
 }
 @media (prefers-reduced-motion:reduce){.gate-char{animation:none}}

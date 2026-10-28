@@ -11,22 +11,12 @@ import { startIntro, stopIntro } from "../components/gate_intro.js"
 // 운영 수치(금액·건수·집행률)는 한 글자도 노출하지 않는다 —
 // 그건 로그인 뒤 메인 화면의 몫이다.
 //
-// 2026-10-28 grace 결정(A안): 왼쪽은 어두운 장면(«ONDO» 인트로 → 캐릭터 셋이 받는 데이터 흐름,
-// components/gate_intro.js), 오른쪽은 지금의 흰 로그인 카드 — 입력 칸은 처음부터 보이고 바로 쓸 수 있다.
+// 2026-10-28 grace 결정(B안): 화면 전체가 어두운 장면(«ONDO» 인트로 → 캐릭터 셋이 받는 데이터 흐름,
+// components/gate_intro.js), 오른쪽에 반투명 로그인 카드가 떠 있다 — 입력 칸은 처음부터 보이고 바로 쓸 수 있다.
+// 소개는 장면이 하므로 카드는 로고·ONDO·입력 칸·입장만 둔다.
 // 카드는 앱과 **같은 컴포넌트 클래스**(.panel · .control · .btn-primary · .section-help)를 그대로 쓰므로
 // 나중에 그 스타일을 고치면 게이트도 같이 따라온다.
 // ─────────────────────────────────────────────────────────────
-
-const STAGES = ["예산 계획", "실적 집계·매칭", "예산 표준화", "중장기 전망"]
-
-function stageFlow() {
-  return STAGES.map((s, i) => `
-    <span class="inline-flex items-center gap-1.5">
-      <span class="grid h-5 w-5 place-items-center rounded-md bg-subtle text-[0.65rem] font-bold text-ink">${i + 1}</span>
-      <span class="text-xs font-medium text-sub">${s}</span>
-    </span>
-    ${i < STAGES.length - 1 ? '<span class="text-tri" aria-hidden="true">→</span>' : ""}`).join("")
-}
 
 // 장면의 캐릭터 — 처음 표정(a)과 마우스를 올렸을 때 표정(b). 2026-10-27 grace 결정.
 const CAST = [
@@ -61,25 +51,13 @@ export function renderGate() {
   <div class="gate">
   ${scene()}
   <div class="gate-panel">
-    <div class="panel w-full max-w-md p-7 sm:p-9">
+    <div class="panel gate-card w-full max-w-sm p-7 sm:p-9">
 
       <img src="/assets/kdhc-signature-ko.svg" alt="한국지역난방공사" width="184" height="43" class="block h-auto w-[184px]">
-      <p class="mt-2.5 flex items-center gap-1.5 text-[15px] font-bold tracking-tight text-ink"><span><b class="text-mint-ink">ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span></p>
-      <p class="mt-0.5 text-[13px] text-sub">예산·실적 분석 · 발전플랜트 유지보수</p>
+      <h1 class="mt-6 flex items-baseline gap-2 tracking-tight text-ink"><span class="ondo-word gate-word"><b>ON</b>DO</span><span class="text-xs font-medium text-tri">by ThreeON</span></h1>
+      <p class="mt-1 text-[13px] text-sub">예산·실적 분석 · 발전플랜트 유지보수</p>
 
-      <h1 class="mt-7 font-hanan text-[28px] font-semibold leading-snug tracking-tight text-ink">
-        계획에서 실적,<br>실적에서 10개년 소요 전망까지
-      </h1>
-      <p class="section-help leading-6">
-        지사 19곳의 예산계획과 SAP 실적 전표를 자동으로 맞춰 보고,
-        그 결과를 정비등급별 표준금액과 2026~2035년 예산 전망의 근거로 넘깁니다.
-      </p>
-
-      <div class="mt-5 flex flex-wrap items-center gap-x-2 gap-y-2 border-y border-line py-3">
-        ${stageFlow()}
-      </div>
-
-      <form id="gateForm" class="mt-6" autocomplete="off">
+      <form id="gateForm" class="mt-7" autocomplete="off">
         <label for="gateName" class="block text-xs font-semibold text-ink">작업자 이름</label>
         <input id="gateName" class="control mt-1.5 w-full" maxlength="40" placeholder="예: 홍길동" required>
 

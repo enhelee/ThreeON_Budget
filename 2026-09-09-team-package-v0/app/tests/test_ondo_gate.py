@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ONDO 3단계 — 로그인 화면 A안(좌우 나눔) 구조 검사 (2026-10-28 grace 결정).
+"""ONDO 3단계 — 로그인 화면 B안(전체 화면 장면 + 떠 있는 카드) 구조 검사 (2026-10-28 grace 결정: A안 → B안).
 
-- 왼쪽: 어두운 장면. 처음 ~3초 «ONDO» 글자가 점으로 모였다 흩어져 데이터 흐름이 되고,
-  매칭이·검토미·예측이가 그 흐름을 받는다. 오른쪽: 지금의 흰 로그인 카드(처음부터 입력 가능).
+- 화면 전체가 어두운 장면. 처음 ~3초 «ONDO» 글자가 점으로 모였다 흩어져 데이터 흐름이 되고,
+  매칭이·검토미·예측이가 그 흐름을 받는다. 오른쪽에 반투명 흰 로그인 카드가 떠 있다(처음부터 입력 가능).
+- 소개는 장면이 하므로 카드는 로고·ONDO·입력 칸·입장만. «ONDO» 의 ON 은 CI 빨강(워드마크 = 로고).
 - 누르거나 키를 치면 인트로를 건너뛴다. 움직임 줄이기 설정·좁은 화면은 애니메이션 없이 마지막 장면만.
 - 로그인하면 애니메이션을 완전히 멈춘다(작업 화면이 느려지지 않게).
 - 운영 수치(금액·건수·집행률)는 한 글자도 넣지 않는다(게이트 원칙).
@@ -30,7 +31,7 @@ def _render_block():
     return body.replace("${scene()}", scene)
 
 
-def test_gate_is_split_scene_left_and_login_card_right():
+def test_gate_is_full_scene_with_floating_login_card():
     body = _render_block()
     assert "gate-scene" in body and "gate-panel" in body, "왼쪽 장면 + 오른쪽 로그인 카드"
     assert body.index("gate-scene") < body.index("gate-panel")
@@ -67,4 +68,24 @@ def test_gate_styles_exist():
     css = _read(SRC, "styles", "custom.css")
     for cls in (".gate-scene", ".gate-panel", ".gate-char"):
         assert cls in css, f"custom.css 에 {cls}"
-    assert "var(--navy)" in css.split(".gate-scene{", 1)[1].split("}", 1)[0]
+    scene = css.split(".gate-scene{", 1)[1].split("}", 1)[0]
+    assert "var(--navy)" in scene
+    assert "position:fixed" in scene and "inset:0" in scene, "B안: 장면이 화면 전체를 덮는다"
+
+
+def test_card_is_simple_login_only():
+    panel = _render_block().split("gate-panel", 1)[1]
+    for gone in ("stageFlow", "10개년", "section-help"):
+        assert gone not in panel, f"카드에서 {gone} 는 뺐다(소개는 장면 몫)"
+    assert "ondo-word" in panel and "<b>ON</b>DO" in panel
+
+
+def test_on_of_ondo_is_ci_red_everywhere():
+    css = _read(SRC, "styles", "custom.css")
+    assert re.search(r"\.ondo-word b\{[^}]*color:var\(--brand\)", css), "워드마크 ON 은 CI 빨강"
+    side = _read(SRC, "components", "sidebar.js")
+    assert side.count("ondo-word") >= 2, "사이드바·머리 워드마크도 같은 클래스"
+    intro = _read(SRC, "components", "gate_intro.js")
+    assert "RED" in intro and "? RED" in intro, "인트로 점 글자의 ON 도 빨강"
+    left = intro.split("function logoTargets", 1)[1].split("\n  }", 1)[0]
+    assert "W * 0.3" in left or "cx" in left, "B안: 글자는 카드 왼쪽 빈 곳 가운데"

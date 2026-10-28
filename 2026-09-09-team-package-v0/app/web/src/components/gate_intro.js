@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-// 로그인 화면 왼쪽 장면의 움직임 (views/gate.js) — 2026-10-28 grace 결정(A안: 좌우 나눔).
+// 로그인 화면 왼쪽 장면의 움직임 (views/gate.js) — 2026-10-28 grace 결정(B안: 전체 화면 + 떠 있는 카드).
 //
-// ① 인트로(약 2.5초): 흩어진 점들이 날아와 «ONDO» 글자가 된다(ON 은 민트).
+// ① 인트로(약 2.5초): 흩어진 점들이 날아와 «ONDO» 글자가 된다(ON 은 CI 빨강).
+//    글자는 카드에 가리지 않게 카드 왼쪽 빈 곳 가운데에 쓴다.
 // ② 글자가 왼쪽 아래로 쓸려 내려가며 사라지고, 같은 자리에서 데이터 흐름이 시작된다.
 // ③ 흐름: 점들이 매칭이 → 검토미 → 예측이를 차례로 지나며 그 캐릭터 색으로 바뀐다.
 //
@@ -12,7 +13,7 @@
 // 숫자(금액·건수)는 그리지 않는다 — 게이트 원칙.
 // ─────────────────────────────────────────────────────────────
 
-const MINT = [62, 230, 196], CORAL = [255, 138, 110], VIOLET = [169, 139, 255], GRAY = [150, 165, 190], WHITE = [230, 236, 245]
+const RED = [254, 0, 9], MINT = [62, 230, 196], CORAL = [255, 138, 110], VIOLET = [169, 139, 255], GRAY = [150, 165, 190], WHITE = [230, 236, 245]
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
 const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t)
 const rnd = (a, b) => a + Math.random() * (b - a)
@@ -50,24 +51,26 @@ export function startIntro(scene) {
   function logoTargets() {
     const o = document.createElement("canvas"), c = o.getContext("2d")
     o.width = Math.ceil(W); o.height = Math.ceil(H)
-    const fs = Math.min(W * 0.28, H * 0.3)
+    const card = document.querySelector(".gate-card")?.getBoundingClientRect()
+    const room = card && card.left > W * 0.4 ? card.left : W   // 카드 왼쪽 빈 곳
+    const cx = room / 2, fs = Math.min(room * 0.3, H * 0.3)
     c.font = `800 ${fs}px Pretendard, system-ui, sans-serif`
     c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#fff"
-    c.fillText("ONDO", W / 2, H * 0.45)
-    const split = W / 2 - c.measureText("ONDO").width / 2 + c.measureText("ON").width
+    c.fillText("ONDO", cx, H * 0.45)
+    const split = cx - c.measureText("ONDO").width / 2 + c.measureText("ON").width
     const d = c.getImageData(0, 0, o.width, o.height).data, gap = Math.max(4, Math.round(fs / 34)), pts = []
     for (let y = 0; y < o.height; y += gap) for (let x = 0; x < o.width; x += gap)
-      if (d[(y * o.width + x) * 4 + 3] > 128) pts.push({x: rnd(0, W), y: rnd(0, H), vx: 0, vy: 0, tx: x, ty: y, c: x < split ? MINT : WHITE})
+      if (d[(y * o.width + x) * 4 + 3] > 128) pts.push({x: rnd(0, W), y: rnd(0, H), vx: 0, vy: 0, tx: x, ty: y, c: x < split ? RED : WHITE})
     return pts
   }
 
-  // 흐름 길: 왼쪽 아래 → 세 캐릭터 가운데 → 오른쪽 위 (Catmull-Rom)
+  // 흐름 길: 왼쪽 아래 → 세 캐릭터 가운데 → 카드 뒤로 (Catmull-Rom) — 카드 오른쪽으로 다시 새어 나오지 않게
   function pathPoints() {
-    const s = scene.getBoundingClientRect()
+    const s = scene.getBoundingClientRect(), card = document.querySelector(".gate-card")?.getBoundingClientRect()
     return [[-40, H * 0.92], ...chars.map(el => {
       const r = el.getBoundingClientRect()
       return [r.left - s.left + r.width / 2, r.top - s.top + r.height * 0.45]
-    }), [W + 40, H * 0.35]]
+    }), [card && card.left > W * 0.4 ? card.left + 60 : W + 40, H * 0.35]]
   }
   function at(K, u) {
     const i = Math.min(K.length - 2, Math.floor(u)), t = u - i
