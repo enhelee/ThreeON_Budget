@@ -124,7 +124,9 @@ def _run_text(t):
     out = [escape(t.text or "")]
     for ch in t:
         tag = ch.tag.split("}")[1]
-        out.append({"fwSpace": "　", "nbSpace": " ", "tab": "  ", "lineBreak": "<br>"}.get(tag, ""))
+        # fwSpace = 한글의 «고정폭 빈칸» — 양쪽 정렬에서도 늘어나지 않는다. 그냥 «　» 로 두면 브라우저가 늘려
+        #   «◈ (전체금액)» 사이가 크게 벌어졌다(2026-10-29) → 폭 고정 상자(글자는 그대로 둬 고친 글에도 남는다).
+        out.append({"fwSpace": '<span class="rp-fw">　</span>', "nbSpace": " ", "tab": "  ", "lineBreak": "<br>"}.get(tag, ""))
         out.append(escape(ch.tail or ""))
     return "".join(out)
 
