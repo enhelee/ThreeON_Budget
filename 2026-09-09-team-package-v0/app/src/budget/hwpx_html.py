@@ -53,6 +53,7 @@ class Styles:
             if ff.get("lang") == "HANGUL":
                 faces = {f.get("id"): f.get("face") for f in ff.iter(H("font"))}
         self.char, self.char_pt, self.para, self.para_pad, self.border = {}, {}, {}, {}, {}
+        self.para_dist = set()        # 배분 정렬 문단 — 글자를 칸 폭에 고르게(화면에서 report.js 가 자간으로)
         for cp in root.iter(H("charPr")):
             pt = int(cp.get("height", "1000")) / 100
             css = [f"font-size:calc({pt}pt * var(--fit, 1))"]   # --fit: 화면이 칸 맞춤으로 줄일 때
@@ -81,6 +82,8 @@ class Styles:
             al = pp.find(H("align"))
             align = ALIGN.get(al.get("horizontal") if al is not None else "", "justify")
             css = [f"text-align:{align}"]
+            if al is not None and al.get("horizontal") == "DISTRIBUTE":
+                self.para_dist.add(pp.get("id"))
             sw = pp.find(f"{P('switch')}/{P('default')}")
             box = sw if sw is not None else pp
             mg = box.find(H("margin"))
@@ -131,6 +134,32 @@ def _run_text(t):
     return "".join(out)
 
 
+def _colgroup(tbl):
+    """열 폭 — 칸마다 (시작 열, 칸 수, 폭)으로 열 하나하나의 폭을 푼다.
+    table-layout:fixed 는 첫 줄로 열 폭을 정하는데, 첫 줄에 합친 칸이 있으면 고르게 나눠 버려 과목 칸이
+    195px 이 115px 로 그려졌다(2026-10-29) → <col> 로 정확한 폭을 준다."""
+    n = int(tbl.get("colCnt") or 0)
+    cells = []
+    for tc in (tc for tr in tbl.findall(P("tr")) for tc in tr.findall(P("tc"))):   # 칸 안 표는 빼고
+        addr, span, sz = tc.find(P("cellAddr")), tc.find(P("cellSpan")), tc.find(P("cellSz"))
+        if addr is None or sz is None:
+            continue
+        cells.append((int(addr.get("colAddr")), int(span.get("colSpan") if span is not None else 1), int(sz.get("width"))))
+    if not n or not cells:
+        return ""
+    col = [None] * n
+    for _ in range(n + 1):                              # 한 칸에 모르는 열이 하나뿐이면 빼서 구한다 — 될 때까지
+        for c0, k, wd in cells:
+            unknown = [i for i in range(c0, min(c0 + k, n)) if col[i] is None]
+            if len(unknown) == 1:
+                col[unknown[0]] = wd - sum(col[i] for i in range(c0, min(c0 + k, n)) if col[i] is not None)
+        if None not in col:
+            break
+    if None in col or min(col) <= 0:
+        return ""                                       # 못 풀면 브라우저에 맡긴다(예전처럼)
+    return "<colgroup>" + "".join(f'<col style="width:{px(v)}px">' for v in col) + "</colgroup>"
+
+
 def _attrs(slot):
     """칸 정보 → HTML 속성. kind: num·text·count·date·label·body(고침) / calc(계산 — 못 고침)."""
     if not slot:
@@ -179,7 +208,8 @@ class Renderer:
             body = " "
         fs = f"font-size:calc({first_pt}pt * var(--fit, 1));" if first_pt else ""
         tools = self.tools(p)
-        return f'<div class="rp-p" style="{fs}{css}"{extra}>{body}{tools}</div>'
+        cls = "rp-p rp-dist" if p.get("paraPrIDRef") in self.s.para_dist else "rp-p"
+        return f'<div class="{cls}" style="{fs}{css}"{extra}>{body}{tools}</div>'
 
     def tools(self, p):
         """○ 줄 늘이기·빼기 단추(편집 화면에서만 보인다 — hwpx 에는 없다)."""
@@ -232,7 +262,7 @@ class Renderer:
                 cells.append(f'<td{attr} style="{";".join(st)}">{body}</td>')
             rows.append(f"<tr>{''.join(cells)}</tr>")
         width = f"width:{w}px;" if w else ""
-        return f'<table class="rp-tbl" style="{width}{margin}">{"".join(rows)}</table>'
+        return f'<table class="rp-tbl" style="{width}{margin}">{_colgroup(tbl)}{"".join(rows)}</table>'
 
     def pic(self, pic):
         img = pic.find(f".//{C('img')}")

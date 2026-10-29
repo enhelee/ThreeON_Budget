@@ -92,14 +92,51 @@ function alignHangs(root) {
   }
 }
 
-/** 그린 뒤 맞춤 — 내어쓰기 줄 → 표 칸 글자 → 종이 폭 순서. */
+/** 배분 정렬 칸(과목 이름 등) — 한글은 글자를 칸 폭에 고르게 벌린다. CSS 양쪽 정렬은 한 줄짜리 한글을
+ *  벌리지 않아 왼쪽에 붙어 보였다(2026-10-29) → 남는 폭을 글자 사이 자간으로 나눈다. 넘치는 칸은 fitCells 가 줄인다. */
+function distribute(root, reset) {
+  for (const p of root.querySelectorAll(".rp-dist")) {
+    const own = [...p.querySelectorAll("span")].filter(e => e.style.letterSpacing)   // 글자 모양의 자간(-0.04em 등)
+    if (reset) {
+      p.dataset.ta ??= p.style.textAlign                 // 원래 정렬(문단 모양) — 지우지 말고 되돌린다
+      p.style.letterSpacing = p.style.marginRight = ""
+      p.style.textAlign = p.dataset.ta
+      for (const e of own) if (e.dataset.ls != null) e.style.letterSpacing = e.dataset.ls
+      continue
+    }
+    const n = [...p.innerText.trim()].length
+    if (n < 2 || p.clientWidth < 8) continue
+    const r = document.createRange(); r.selectNodeContents(p)
+    const rects = [...r.getClientRects()]
+    const tops = rects.map(x => x.top)
+    if (Math.max(...tops) - Math.min(...tops) > rects[0].height / 2) continue   // 여러 줄 — 그대로(글자 상자끼리 1px 차이는 한 줄)
+    const k = p.getBoundingClientRect().width / p.offsetWidth
+    const cs = getComputedStyle(p)
+    const avail = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+    const used = (Math.max(...rects.map(x => x.right)) - Math.min(...rects.map(x => x.left))) / k
+    const gap = (avail - used) / (n - 1)
+    if (gap <= 0.5) continue
+    p.style.textAlign = "left"
+    p.style.letterSpacing = `${gap.toFixed(2)}px`
+    for (const e of own) {
+      e.dataset.ls ??= e.style.letterSpacing
+      e.style.letterSpacing = `calc(${e.dataset.ls} + ${gap.toFixed(2)}px)`
+    }
+    p.style.marginRight = `${(-gap).toFixed(2)}px`                         // 마지막 글자 뒤 자간만큼 — 칸을 넘지 않게
+  }
+}
+
+/** 그린 뒤 맞춤 — 내어쓰기 줄 → 표 칸 글자 → 배분 정렬 → 종이 폭 순서. */
 function layout(root = $("#rpDoc")) {
   if (!root) return
+  distribute(root, true)
   alignHangs(root)
   fitCells(root)
+  distribute(root)
   fitPage()
 }
 document.fonts?.ready.then(() => layout())          // 글꼴이 늦게 오면 폭이 바뀐다
+document.addEventListener("visibilitychange", () => { if (!document.hidden) layout() })   // 숨은 탭에서는 재는 값이 틀린다
 
 /** 종이가 화면보다 넓으면 통째로 줄여 맞춘다 — 좁은 창에서 오른쪽이 잘려 보였다(2026-10-29).
  *  transform 은 그리기만 줄이고 칸 폭 계산은 그대로라 fitCells·한글 파일에 영향이 없다. */
@@ -181,7 +218,7 @@ export function reportHtml() {
   const yy = String(inp.year).slice(2)
   const K = KINDS[rp.kind]
   const warn = (inp.warnings || []).map(w => `<li>${esc(w)}</li>`).join("")
-  setTimeout(() => layout(), 0)                         // 그려진 뒤 줄·칸·종이 맞춤(이 함수는 HTML 문자열만 돌려준다)
+  setTimeout(() => requestAnimationFrame(() => layout()), 0)   // 그려진 뒤(다음 화면 그리기 때) 줄·칸·종이 맞춤 — HTML 문자열만 돌려주므로
   const years = [...new Set([...(rp.years || []), String(inp.year)])].sort().reverse()
   return `
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="보고서 종류">${Object.entries(KINDS).map(([k, v]) => `<button class="${rp.kind === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${rp.kind === k}" data-rp-act="kind" data-kind="${k}">${esc(v.tab)}</button>`).join("")}</div>
