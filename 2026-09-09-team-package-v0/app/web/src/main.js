@@ -6,7 +6,7 @@ import { busy, toast } from "./components/feedback.js"
 import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
-import { onReportBlur, onReportClick, onReportFocus, onReportKey } from "./views/report.js"
+import { onReportBlur, onReportChange, onReportClick, onReportFocus, onReportKey } from "./views/report.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -530,6 +530,7 @@ document.addEventListener("change", async e => {
   if (await fcChange(e)) return;                 // 5번 탭(전망) 입력 — forecast_actions.js
   if (rqChange(e)) return;                       // 검토 큐 거르기·옮길 사업 — review_actions.js
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
+  if (await onReportChange(e)) return;           // 한글 보고서 안의 «보고서 연도»
   // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
   const yc = e.target.closest("[data-yc]");
   if (yc) {

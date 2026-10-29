@@ -75,6 +75,18 @@ def _budget_of(item, code=None):
     return "손익" if str(item).startswith(CAPEX_PREFIX) else "자본"
 
 
+def report_years(conn):
+    """보고서를 쓸 수 있는 해 — 분석 결과·예산계획·참고 엑셀 실적(2016년~) 중 하나라도 있는 해, 최근 해부터."""
+    ys = set()
+    for q in ("SELECT DISTINCT year FROM run", "SELECT DISTINCT year FROM dataset WHERE kind='plan'",
+              "SELECT DISTINCT 연도 FROM reference_actual"):
+        try:
+            ys.update(str(r[0]) for r in conn.execute(q) if str(r[0]).isdigit())
+        except Exception:
+            pass
+    return sorted(ys, reverse=True)
+
+
 def year_rows(conn, year):
     """그 해 보고서 재료 — [{budget, 예산과목, 처지사, 배정, 실적(천원)}], 출처.
 

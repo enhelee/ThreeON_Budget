@@ -1978,6 +1978,16 @@ def _report_template(rep):
         return f.read()
 
 
+@app.get("/api/report-years")
+def report_years():
+    """보고서 연도 고르기 — 대상연도(분석한 해)보다 넓다. 예전 해는 참고 엑셀 실적으로 채운다."""
+    conn = _conn()
+    try:
+        return report_hwpx.report_years(conn)
+    finally:
+        conn.close()
+
+
 @app.get("/api/report/{kind}")
 def report_inputs(kind: str, year: str):
     rep = _report(kind)

@@ -24,11 +24,25 @@ const KINDS = {
 }
 const kindOf = () => state.reportKind || "perf"
 
+// 보고서 연도 — 기본은 대상연도. 대상연도는 분석한 해만 고를 수 있어 2016년 같은 예전 해를 못 고른다(2026-10-29 라이브 확인)
+//   → 보고서 안에서 따로 고른다(참고 엑셀 실적이 있는 해까지). 대상연도를 바꾸면 다시 대상연도를 따른다.
+export const reportYear = () => state.reportPick?.base === state.year ? state.reportPick.year : state.year
+
 export async function loadReport() {
-  const y = state.year, kind = kindOf()
-  const inputs = await api(`/api/report/${kind}?year=${y}`)
+  const y = reportYear(), kind = kindOf()
+  const [inputs, years] = await Promise.all([api(`/api/report/${kind}?year=${y}`), api("/api/report-years")])
   const pv = await api(`/api/report/${kind}/preview`, post({year: y, inputs}))
-  state.report = {kind, inputs: {...pv.inputs, warnings: inputs.warnings}, html: pv.html, _year: y}
+  state.report = {kind, inputs: {...pv.inputs, warnings: inputs.warnings}, html: pv.html, _year: y, years}
+}
+
+/** 보고서 연도 고르기(change) — 처리했으면 true. */
+export async function onReportChange(e) {
+  if (!e.target.dataset.rpYear) return false
+  state.reportPick = {base: state.year, year: e.target.value}
+  busy(true, "불러오는 중…")
+  try { await loadReport() } catch (err) { toast(err.message) } finally { busy(false) }
+  renderPage()
+  return true
 }
 
 let rev = 0          // 고칠 때마다 +1 — 늦게 온 앞선 응답이 그 뒤에 고친 값을 덮지 않게
@@ -47,6 +61,23 @@ function fitCells(root = $("#rpDoc")) {
   }
 }
 
+/** 종이가 화면보다 넓으면 통째로 줄여 맞춘다 — 좁은 창에서 오른쪽이 잘려 보였다(2026-10-29).
+ *  transform 은 그리기만 줄이고 칸 폭 계산은 그대로라 fitCells·한글 파일에 영향이 없다. */
+function fitPage() {
+  const desk = $(".rp-desk"), doc = $("#rpDoc"), page = doc?.querySelector(".rp-page")
+  if (!page) return
+  doc.style.transform = doc.style.marginBottom = ""
+  const cs = getComputedStyle(desk)
+  const avail = desk.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+  const w = page.offsetWidth
+  if (w < 8 || avail >= w) return
+  const k = Math.max(0.5, avail / w)
+  doc.style.transformOrigin = "top left"
+  doc.style.transform = `scale(${k.toFixed(3)})`
+  doc.style.marginBottom = `${-(doc.offsetHeight * (1 - k)).toFixed(0)}px`   // 줄인 만큼 아래 빈자리를 없앤다
+}
+addEventListener("resize", () => { clearTimeout(fitPage.t); fitPage.t = setTimeout(fitPage, 150) })
+
 /** 입력값이 바뀐 뒤 — 문서만 다시 받아 그 자리만 갈아 끼운다(스크롤·탭 유지). */
 async function refresh() {
   const mine = ++rev
@@ -62,6 +93,7 @@ async function refresh() {
   const back = ae && doc.contains(ae) ? ae.dataset.path : null
   doc.innerHTML = pv.html
   fitCells(doc)
+  fitPage()
   const el = back && doc.querySelector(`[data-path="${CSS.escape(back)}"]`)
   if (el) {
     el.focus()
@@ -110,14 +142,17 @@ export function reportHtml() {
   const yy = String(inp.year).slice(2)
   const K = KINDS[rp.kind]
   const warn = (inp.warnings || []).map(w => `<li>${esc(w)}</li>`).join("")
-  setTimeout(() => fitCells(), 0)                       // 그려진 뒤 칸 맞춤(이 함수는 HTML 문자열만 돌려준다)
+  setTimeout(() => { fitCells(); fitPage() }, 0)        // 그려진 뒤 칸·종이 맞춤(이 함수는 HTML 문자열만 돌려준다)
+  const years = [...new Set([...(rp.years || []), String(inp.year)])].sort().reverse()
   return `
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="보고서 종류">${Object.entries(KINDS).map(([k, v]) => `<button class="${rp.kind === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${rp.kind === k}" data-rp-act="kind" data-kind="${k}">${esc(v.tab)}</button>`).join("")}</div>
     <section class="panel p-5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div><h3 class="section-title">${esc(K.title(yy))}</h3>
           <p class="mt-1 text-sm text-sub">${esc(K.desc)} 아래 문서에서 <span class="rp-legend rp-legend--edit">노란 칸</span>을 눌러 바로 고치세요. 나머지 숫자는 따라서 다시 계산됩니다.</p></div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="text-sm text-sub">보고서 연도
+            <select class="ml-1 rounded-lg border border-line px-2 py-1.5 text-sm" data-rp-year="1" aria-label="보고서 연도">${years.map(y => `<option value="${y}"${y === String(inp.year) ? " selected" : ""}>${y}년</option>`).join("")}</select></label>
           <button class="btn-secondary" data-rp-act="regen" title="고친 숫자로 ◈·□ 문장을 다시 씁니다(○ 원인 줄은 그대로)">숫자로 문장 다시 쓰기</button>
           <button class="btn-secondary" data-rp-act="reset" title="고친 내용을 버리고 분석 결과로 다시 채웁니다">처음 값으로</button>
           <button class="btn-primary" data-rp-act="download">한글(hwpx) 내려받기</button>
@@ -186,7 +221,7 @@ export async function onReportClick(e) {
       busy(true, "불러오는 중…")
       try { await loadReport() } finally { busy(false) }
       const doc = $("#rpDoc")
-      if (doc) { doc.innerHTML = state.report.html; fitCells(doc) }
+      if (doc) { doc.innerHTML = state.report.html; fitCells(doc); fitPage() }
       return true
     }
     const inp = state.report.inputs
