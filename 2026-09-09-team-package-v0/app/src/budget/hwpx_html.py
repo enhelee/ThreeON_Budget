@@ -52,7 +52,7 @@ class Styles:
         for ff in root.iter(H("fontface")):
             if ff.get("lang") == "HANGUL":
                 faces = {f.get("id"): f.get("face") for f in ff.iter(H("font"))}
-        self.char, self.char_pt, self.para, self.para_pad, self.para_hang, self.border = {}, {}, {}, {}, {}, {}
+        self.char, self.char_pt, self.para, self.para_pad, self.border = {}, {}, {}, {}, {}
         for cp in root.iter(H("charPr")):
             pt = int(cp.get("height", "1000")) / 100
             css = [f"font-size:calc({pt}pt * var(--fit, 1))"]   # --fit: 화면이 칸 맞춤으로 줄일 때
@@ -92,8 +92,6 @@ class Styles:
                     self.para_pad[pp.get("id")] = (px(left), px(left + max(0, -indent)))   # (왼쪽 여백, 그린 안쪽 여백)
                 if indent:
                     css.append(f"text-indent:{px(indent)}px")
-                if indent < 0:
-                    self.para_hang[pp.get("id")] = px(-indent)
                 if get("right"):
                     css.append(f"padding-right:{px(get('right'))}px")
                 if get("prev"):
@@ -155,7 +153,7 @@ class Renderer:
 
     def para(self, p):
         css = self.s.para.get(p.get("paraPrIDRef"), "")
-        inner, first_pt, lead = [], None, None
+        inner, first_pt = [], None
         for run in p.findall(P("run")):
             cid = run.get("charPrIDRef")
             first_pt = first_pt or self.s.char_pt.get(cid)
@@ -171,14 +169,8 @@ class Renderer:
             if slot and inner:
                 # 이 run 의 글자 span 을 고칠 수 있는 칸으로 감싼다(라벨·본문)
                 last = inner.pop()
-                lead = len(inner) if lead is None else lead
                 inner.append(f'<span{_attrs(slot)}>{last}</span>')
         slot = self.marks.get(p)
-        hang = self.s.para_hang.get(p.get("paraPrIDRef"))
-        if hang and lead and not slot:
-            # 내어쓰기 문단의 머리(«○ », «□ » 등) — 한글은 둘째 줄을 내어쓴 자리에서 시작하고, 원본은 머리 폭을 거기에
-            #   맞춰 두었다. 대체 글꼴은 머리 폭이 달라 첫 줄 글과 둘째 줄이 어긋났다(2026-10-29) → 머리를 그 폭에 맞춘다.
-            inner[:lead] = [f'<span class="rp-head" style="min-width:{hang}px">{"".join(inner[:lead])}</span>']
         extra = _attrs(slot) if slot else ""
         body = "".join(inner)
         if not re.sub(r"<[^>]+>|\s|　", "", body) and "<table" not in body and "<img" not in body:

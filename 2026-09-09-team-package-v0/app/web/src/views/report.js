@@ -61,6 +61,46 @@ function fitCells(root = $("#rpDoc")) {
   }
 }
 
+const BULLET = /[^\s\u3000□○ㅇ◈◦▪■●◆◇·ㆍ∙※▷➢☞-]/   // 머리 기호(양식은 «○» 대신 한글 «ㅇ»도 쓴다)·빈칸이 아닌 첫 글자
+
+/** 내어쓰기 문단 — 둘째 줄을 머리 기호(□·○·◈) 다음 첫 글자(대개 «(») 자리에 맞춘다.
+ *  한글은 둘째 줄을 정해진 내어쓰기 폭에서 시작하고, 원본은 그 폭을 휴먼명조의 «□ » 폭에 맞춰 두었다.
+ *  대체 글꼴은 폭이 달라 줄이 어긋났다(2026-10-29) → 그려진 뒤 첫 글자 자리를 재서 내어쓰기 폭을 그 값으로. 파일은 그대로. */
+function alignHangs(root) {
+  for (const p of root.querySelectorAll(".rp-p")) {
+    const st = p.style
+    p.dataset.ti ??= st.textIndent
+    p.dataset.pl ??= st.paddingLeft
+    st.textIndent = p.dataset.ti; st.paddingLeft = p.dataset.pl
+    const ti = parseFloat(p.dataset.ti)
+    if (!(ti < 0) || p.querySelector(".rp-tbl") || p.clientWidth < 8) continue
+    const walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT)
+    let node, at = -1
+    while ((node = walk.nextNode())) {
+      if (node.parentElement.closest(".rp-tools")) continue
+      at = node.data.search(BULLET)
+      if (at >= 0) break
+    }
+    if (at < 0) continue
+    const r = document.createRange(); r.setStart(node, at); r.setEnd(node, at + 1)
+    const pr = p.getBoundingClientRect(), k = pr.width / p.offsetWidth   // 종이를 줄였으면 그 비율
+    const l0 = (parseFloat(p.dataset.pl) || 0) + ti                       // 첫 줄 시작(문단 왼쪽 여백)
+    const w = (r.getBoundingClientRect().left - pr.left) / k - l0
+    if (w <= 0 || w > p.clientWidth / 2) continue                          // 첫 글자가 첫 줄에 없다 — 그대로
+    st.paddingLeft = `${(l0 + w).toFixed(2)}px`
+    st.textIndent = `${(-w).toFixed(2)}px`
+  }
+}
+
+/** 그린 뒤 맞춤 — 내어쓰기 줄 → 표 칸 글자 → 종이 폭 순서. */
+function layout(root = $("#rpDoc")) {
+  if (!root) return
+  alignHangs(root)
+  fitCells(root)
+  fitPage()
+}
+document.fonts?.ready.then(() => layout())          // 글꼴이 늦게 오면 폭이 바뀐다
+
 /** 종이가 화면보다 넓으면 통째로 줄여 맞춘다 — 좁은 창에서 오른쪽이 잘려 보였다(2026-10-29).
  *  transform 은 그리기만 줄이고 칸 폭 계산은 그대로라 fitCells·한글 파일에 영향이 없다. */
 function fitPage() {
@@ -92,8 +132,7 @@ async function refresh() {
   const ae = document.activeElement
   const back = ae && doc.contains(ae) ? ae.dataset.path : null
   doc.innerHTML = pv.html
-  fitCells(doc)
-  fitPage()
+  layout(doc)
   const el = back && doc.querySelector(`[data-path="${CSS.escape(back)}"]`)
   if (el) {
     el.focus()
@@ -142,7 +181,7 @@ export function reportHtml() {
   const yy = String(inp.year).slice(2)
   const K = KINDS[rp.kind]
   const warn = (inp.warnings || []).map(w => `<li>${esc(w)}</li>`).join("")
-  setTimeout(() => { fitCells(); fitPage() }, 0)        // 그려진 뒤 칸·종이 맞춤(이 함수는 HTML 문자열만 돌려준다)
+  setTimeout(() => layout(), 0)                         // 그려진 뒤 줄·칸·종이 맞춤(이 함수는 HTML 문자열만 돌려준다)
   const years = [...new Set([...(rp.years || []), String(inp.year)])].sort().reverse()
   return `
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="보고서 종류">${Object.entries(KINDS).map(([k, v]) => `<button class="${rp.kind === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${rp.kind === k}" data-rp-act="kind" data-kind="${k}">${esc(v.tab)}</button>`).join("")}</div>
@@ -221,7 +260,7 @@ export async function onReportClick(e) {
       busy(true, "불러오는 중…")
       try { await loadReport() } finally { busy(false) }
       const doc = $("#rpDoc")
-      if (doc) { doc.innerHTML = state.report.html; fitCells(doc); fitPage() }
+      if (doc) { doc.innerHTML = state.report.html; layout(doc) }
       return true
     }
     const inp = state.report.inputs
