@@ -16,7 +16,7 @@ import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
 import { renderStats } from "./views/stats.js"
-import { loadReport } from "./views/report.js"
+import { loadReport, reportYear } from "./views/report.js"
 
 // ───────────────────────── 해시 라우팅 ─────────────────────────
 // 주소의 «#/...» 조각이 "지금 어느 화면인가"의 단일 근거다.
@@ -179,7 +179,7 @@ const statsJobs = tab => tab === "report"
 export async function openStatsTab(tab) {
   state.statsTab = tab;
   syncHash();
-  const have = tab === "report" ? state.report?._year === state.year && state.report?.kind === (state.reportKind || "perf")
+  const have = tab === "report" ? state.report?._year === reportYear() && state.report?.kind === (state.reportKind || "perf")
     : tab === "compare" ? state.statsCompare?._year === state.year : state.stats?._year === state.year;
   if (!have) {
     busy(true, "불러오는 중…");

@@ -120,3 +120,19 @@ def test_years_without_analysis_use_reference_actuals(tmp_path):
     perf = rh.build_perf_inputs(conn, "2019")
     assert sum(x["실적"] for x in perf["items"]["자본"]) == 25
     assert rh.year_rows(conn, "2010") == ([], None)
+
+
+def test_report_years_reach_reference_years(tmp_path):
+    """보고서 연도는 대상연도(분석한 해)보다 넓다 — 참고 엑셀 실적만 있는 2016년도 고를 수 있게(2026-10-29 라이브)."""
+    from budget import db as dbm
+    conn = dbm.connect(str(tmp_path / "y.db"))
+    conn.executemany("INSERT INTO reference_actual VALUES(?,?,?,?,?,?)", [
+        ("2026", "화성지사", 2016, "기계장치", "기타", 1.0), ("2026", "화성지사", 2019, "기계장치", "기타", 1.0)])
+    conn.commit()
+    assert rh.report_years(conn) == ["2019", "2016"]
+
+
+def test_api_report_years(srv):
+    _, client, _ = srv
+    _analyzed(client)
+    assert "2023" in client.get("/api/report-years").json()

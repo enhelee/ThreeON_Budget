@@ -554,6 +554,7 @@ img.char-img{object-fit:contain;display:inline-block}
 .rp-p { white-space: pre-wrap; min-height: 1em; position: relative; }
 .rp-tbl { border-collapse: collapse; table-layout: fixed; }
 .rp-tbl .rp-p { line-height: 1.25; white-space: pre; }   /* 한글은 칸 안 줄바꿈을 문단으로만 — 웹 글꼴이 조금 넓어도 줄이 넘어가지 않게 */
+.rp-tbl .rp-text, .rp-tbl .rp-body { white-space: pre-wrap; }   /* 상자 칸 안 ◈·○ 문장은 줄바꿈 — 안 그러면 숫자가 길 때 종이 밖으로 나간다(2026-10-29) */
 .rp-tbl td { box-sizing: border-box; overflow: visible; }
 .rp-pic { display: inline-block; vertical-align: top; }
 .rp-pagebreak { border-top: 2px dashed #b8bec8; margin: 28px 0; }
