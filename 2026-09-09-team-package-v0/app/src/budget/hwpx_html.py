@@ -52,7 +52,7 @@ class Styles:
         for ff in root.iter(H("fontface")):
             if ff.get("lang") == "HANGUL":
                 faces = {f.get("id"): f.get("face") for f in ff.iter(H("font"))}
-        self.char, self.char_pt, self.para, self.para_align, self.border = {}, {}, {}, {}, {}
+        self.char, self.char_pt, self.para, self.para_pad, self.border = {}, {}, {}, {}, {}
         for cp in root.iter(H("charPr")):
             pt = int(cp.get("height", "1000")) / 100
             css = [f"font-size:calc({pt}pt * var(--fit, 1))"]   # --fit: 화면이 칸 맞춤으로 줄일 때
@@ -89,6 +89,7 @@ class Styles:
                 left, indent = get("left"), get("intent")
                 if left or indent < 0:
                     css.append(f"padding-left:{px(left + max(0, -indent))}px")
+                    self.para_pad[pp.get("id")] = (px(left), px(left + max(0, -indent)))   # (왼쪽 여백, 그린 안쪽 여백)
                 if indent:
                     css.append(f"text-indent:{px(indent)}px")
                 if get("right"):
@@ -101,7 +102,6 @@ class Styles:
             if ls is not None and ls.get("type") == "PERCENT":
                 css.append(f"line-height:{int(ls.get('value', '160')) / 100}")
             self.para[pp.get("id")] = ";".join(css)
-            self.para_align[pp.get("id")] = align
         for bf in root.iter(H("borderFill")):
             css = []
             for side in ("left", "right", "top", "bottom"):
@@ -153,7 +153,6 @@ class Renderer:
 
     def para(self, p):
         css = self.s.para.get(p.get("paraPrIDRef"), "")
-        align = self.s.para_align.get(p.get("paraPrIDRef"), "justify")
         inner, first_pt = [], None
         for run in p.findall(P("run")):
             cid = run.get("charPrIDRef")
@@ -163,7 +162,7 @@ class Renderer:
                 if tag == "t":
                     inner.append(f'<span style="{self.s.char.get(cid, "")}">{_run_text(ch)}</span>')
                 elif tag == "tbl":
-                    inner.append(self.table(ch, align))
+                    inner.append(self.table(ch, self.s.para_pad.get(p.get("paraPrIDRef"), (0, 0))))
                 elif tag == "pic":
                     inner.append(self.pic(ch))
             slot = self.marks.get(run)
@@ -192,10 +191,18 @@ class Renderer:
             btn.append(f'<button class="rp-tool" contenteditable="false" data-rp-act="del-bullet" data-k="{t["del"][0]}" data-i="{t["del"][1]}" title="이 ○ 줄 빼기">−</button>')
         return f'<span class="rp-tools">{"".join(btn)}</span>'
 
-    def table(self, tbl, align):
+    def table(self, tbl, pad=(0, 0)):
         sz = tbl.find(P("sz"))
         w = px(sz.get("width")) if sz is not None else None
-        margin = "margin:0 auto" if align == "center" else ("margin-left:auto" if align == "right" else "")
+        pos = tbl.find(P("pos"))
+        if pos is None or pos.get("treatAsChar") == "1":
+            # «글자처럼 취급» 표 — 한글에서는 문단 첫 줄의 글자 자리에 놓인다. 블록으로 그리면 내어쓰기 문단에서
+            #   표가 내어쓴 만큼 오른쪽으로 밀렸다(2026-10-29) → 줄 안 표로 그려 문단 정렬·첫 줄 들여쓰기를 그대로 따른다.
+            margin = "display:inline-table;vertical-align:top"
+        else:
+            # 떠 있는 표 — 단(COLUMN)·문단(PARA) 왼쪽에서 horzOffset 만큼. 문단 안쪽 여백(내어쓰기)은 빼 준다
+            base = pad[0] if pos.get("horzRelTo") == "PARA" else 0
+            margin = f"margin-left:{round(px(pos.get('horzOffset')) + base - pad[1], 2)}px"
         rows = []
         for tr in tbl.findall(P("tr")):
             cells = []
@@ -266,5 +273,7 @@ def render(zin, sec, marks=None):
     styles = Styles(zin.read("Contents/header.xml"))
     width, ml, mr = page_css(sec)
     body = Renderer(styles, images_of(zin), marks).section(sec)
-    return (f'<div class="rp-page" style="width:{width}px;padding:56px {mr}px 72px {ml}px">'
+    # 용지 폭에는 좌우 여백이 들어 있다 — 글자 영역 = 폭 − 여백(.rp-page 는 content-box). 여백을 두 번 더해
+    #   글자 영역이 151px 넓었고, 그래서 표가 한쪽으로 쏠리고 양쪽 정렬 줄이 벌어져 보였다(2026-10-29).
+    return (f'<div class="rp-page" style="width:{round(width - ml - mr, 2)}px;padding:56px {mr}px 72px {ml}px">'
             f"{body}</div>")
