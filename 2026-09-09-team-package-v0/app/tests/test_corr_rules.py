@@ -124,15 +124,47 @@ def test_assign_rule_beats_similarity_and_learned():
     assert ann["매칭확신도"].iloc[0] == 1.0
 
 
-def test_assign_rule_with_unknown_name_falls_through():
-    """계획에 없는 이름이면 규칙을 건너뛴다 — 신규 사업을 만들지 않고 원래 매칭대로."""
-    erp = _erp([("화성 정기점검 보수공사", 1000, "화성지사")])
-    rules = {("화성지사", ITEM, normalize.corr_key("화성 정기점검 보수공사")):
-             {"동작": "배정", "사업명": "계획에 없는 집계표 이름"}}
-    res = _run(erp, rules)
-    assert _row(res, "화성 정기점검 보수공사")["실적금액"] == 1000.0
+def _assign(text, name, dept="화성지사"):
+    return {(dept, ITEM, normalize.corr_key(text)): {"동작": "배정", "사업명": name}}
+
+
+def test_assign_rule_with_unknown_name_makes_new_project():
+    """계획에 같은·비슷한 사업이 없으면 규칙 이름 그대로 신규 사업 줄로 — 유사도로 아무 데나 붙이지 않는다."""
+    erp = _erp([("화성 정기점검 보수공사 3회", 1000, "화성지사")])
+    res = _run(erp, _assign("화성 정기점검 보수공사 3회", "화성 발전설비동 옥상방수 공사"))
+    assert _row(res, "화성 정기점검 보수공사")["실적금액"] == 0.0
+    assert [(r["사업명"], r["실적금액"]) for r in res["new_rows"]] == [("화성 발전설비동 옥상방수 공사", 1000.0)]
+    assert res["erp_annotated"]["매칭근거"].iloc[0] == "보정 규칙(신규 사업)"
+
+
+def test_assign_rule_ltsa_spelling_finds_plan_project():
+    """장기유지보수계약 = LTSA 표기만 다른 같은 사업이면 계획 사업에 붙인다."""
+    plan = pd.concat([_plan(), pd.DataFrame([{"_row": 4, "예산과목": ITEM, "처지사": "화성지사",
+                                               "사업명": "화성 GT LTSA", "연예산": 9000.0}])])
+    erp = _erp([("가스터빈 정비 기성", 1000, "화성지사")])
+    res = matching.match_actuals(plan, erp, {ITEM}, {ITEM}, set(), threshold=80,
+                                 corr_rules=_assign("가스터빈 정비 기성", "화성 GT 장기유지보수계약"))
+    assert _row(res, "화성 GT LTSA")["실적금액"] == 1000.0
     assert res["new_rows"] == []
-    assert res["erp_annotated"]["매칭근거"].iloc[0] != "보정 규칙"
+
+
+def test_assign_rule_ltsa_of_other_project_is_not_merged():
+    """LTSA 가 들어갔다고 같은 사업이 아니다 — 앞 이름(발전소·호기)이 다르면 신규로 둔다."""
+    plan = pd.concat([_plan(), pd.DataFrame([{"_row": 4, "예산과목": ITEM, "처지사": "화성지사",
+                                               "사업명": "화성 1호기 LTSA", "연예산": 9000.0}])])
+    erp = _erp([("정비 기성", 1000, "화성지사")])
+    for name in ("대구 장기유지보수계약", "화성 2호기 장기유지보수계약"):
+        res = matching.match_actuals(plan, erp, {ITEM}, {ITEM}, set(), threshold=80,
+                                     corr_rules=_assign("정비 기성", name))
+        assert _row(res, "화성 1호기 LTSA")["실적금액"] == 0.0, name
+        assert [r["사업명"] for r in res["new_rows"]] == [name]
+
+
+def test_assign_rule_near_identical_name_finds_plan_project():
+    erp = _erp([("보수 3회", 1000, "화성지사")])
+    res = _run(erp, _assign("보수 3회", "화성 정기점검 보수 공사분"))
+    assert _row(res, "화성 정기점검 보수공사")["실적금액"] == 1000.0
+    assert res["erp_annotated"]["매칭근거"].iloc[0] == "보정 규칙"
 
 
 def test_rule_is_branch_specific():

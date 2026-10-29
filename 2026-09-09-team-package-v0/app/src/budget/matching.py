@@ -109,6 +109,35 @@ def _sim(a, b):
 # 보정 규칙 «제외»로 뺀 전표의 제외사유(합계행·타연도와 같이 어떤 집계에도 넣지 않는다).
 EXCL_RULE = "제외(보정규칙)"
 
+# 보정 규칙 사업명 ↔ 계획 사업명: 이 점수 이상이고 숫자(호기·차수)가 같아야 같은 사업으로 본다.
+RULE_NAME_SIM = 90
+_LTSA_RE = re.compile(r"장기\s*유지\s*보수(\s*계약)?")
+_DIGITS_RE = re.compile(r"\d+")
+
+
+def _rule_name_key(name):
+    """«장기유지보수계약»과 «LTSA»는 같은 표기로, 띄어쓰기·기호는 무시."""
+    return normalize.corr_key(_LTSA_RE.sub("LTSA", str(name or ""))).upper()
+
+
+def _rule_plan_target(name, candidates):
+    """규칙 사업명이 가리키는 계획행. 같은 이름 → 표기만 다름 → 아주 비슷(숫자 같음) 순. 없으면 None."""
+    exact = next((p for p in candidates if _same_name(p.get("사업명"), name)), None)
+    if exact is not None:
+        return exact
+    k = _rule_name_key(name)
+    if not k:
+        return None
+    best, best_s = None, 0.0
+    for p in candidates:
+        pk = _rule_name_key(p.get("사업명"))
+        if not pk or _DIGITS_RE.findall(pk) != _DIGITS_RE.findall(k):
+            continue
+        s = 100.0 if pk == k else _sim(k, pk)
+        if s > best_s:
+            best, best_s = p, s
+    return best if best_s >= RULE_NAME_SIM else None
+
 
 def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                   threshold=80, new_policy="group", small_threshold=2000,
@@ -311,13 +340,22 @@ def match_actuals(plan_df, erp_norm_df, budget_items, pl_items, cap_items,
                     vg["강제신규명"] = target
                     unattributed_vgroups.setdefault(key, []).append(vg)
                 continue
-            # ── 보정 규칙(담당자 보정사전): 같은 지사·과목·텍스트면 지정 계획 사업으로.
+            # ── 보정 규칙(담당자 보정사전): 같은 지사·과목·텍스트면 지정 사업으로.
+            #    계획에 같은(표기만 다른·아주 비슷한) 사업이 있으면 그 계획 사업, 없으면 그 이름의 신규 사업.
             rule = _rule_for(key[1], key[0], rep_name)
-            if rule and rule.get("동작") == "배정":
-                prec = next((p for p in candidates
-                             if _same_name(p.get("사업명"), rule.get("사업명"))), None)
+            if rule and rule.get("동작") == "배정" and rule.get("사업명"):
+                prec = _rule_plan_target(rule["사업명"], candidates)
+                rule_cnt += len(vg["rows"])
+                if prec is None:
+                    for i in vg["rows"]:
+                        erp_score[i] = 100.0
+                        erp_basis[i] = "보정 규칙(신규 사업)"
+                        attributed[i] = None
+                        erp_match_name[i] = None
+                    vg["강제신규명"] = " ".join(str(rule["사업명"]).split())
+                    unattributed_vgroups.setdefault(key, []).append(vg)
+                    continue
                 if prec is not None:
-                    rule_cnt += len(vg["rows"])
                     for i in vg["rows"]:
                         erp_score[i] = 100.0
                         erp_basis[i] = "보정 규칙"
