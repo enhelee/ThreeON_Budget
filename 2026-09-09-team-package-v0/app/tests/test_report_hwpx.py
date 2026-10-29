@@ -167,3 +167,4 @@ def test_preview_page_text_area_and_inline_tables():
     w, right, left = (float(x) for x in re.search(r'rp-page" style="width:([\d.]+)px;padding:56px ([\d.]+)px 72px ([\d.]+)px', html).groups())
     assert abs(w + left + right - 793.71) < 1           # A4 59528 / 75
     assert html.count("display:inline-table") == html.count('class="rp-tbl"')
+    assert re.search(r'<span class="rp-head" style="min-width:[\d.]+px">.*?○', html)   # ○ 머리 = 내어쓰기 폭
