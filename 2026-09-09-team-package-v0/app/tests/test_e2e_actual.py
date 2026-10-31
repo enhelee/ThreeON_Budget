@@ -5,9 +5,7 @@ import openpyxl
 import pytest
 
 from budget import config_store, db as dbm, pipeline_plan, pipeline_actual
-from budget.excel_actual_writer import (
-    ACTUAL_HEADER, ACTUAL_SHEET, DATA_START, HEADER_ROW,
-)
+from budget.excel_actual_writer import FORM_DATA_START, FORM_HEADER_ROW, REF_SHEET
 
 ROOT = r"C:\Users\User\Desktop\중장기 예산 소요 전망"
 REAL_PLAN = os.path.join(ROOT, "양식1_월별_템플릿(25년 계획분)_R1.xlsx")
@@ -58,24 +56,24 @@ def test_actual_total_conserves_full_erp(tmp_path):
 
 
 def test_actual_sheet_layout_matches_reference(tmp_path):
-    """데이터시트가 사용자 분석본 [Sheet1] 포맷(2행 헤더·3행 데이터, A~J 동일)이고,
-    실적금액은 I열(9)이며 zrfm2_V1에 반영구분(20열)이 있다."""
+    """실적 집계표가 팀 양식3(자본) 그대로 — 시트 이름·A~I 머리글(2행)·4행부터 데이터, 실적금액은 I열,
+    종합표는 양식의 SUMIFS, 앱 분석 열은 (참고) 시트. zrfm2_V1에 반영구분(20열)이 있다(2026-10-31)."""
     plan_path, conn, out = _make_plan(tmp_path, "자본")
     res = pipeline_actual.run_actual(
         plan_path, ZRFM2, MASTER, conn, out, "2025", "자본", new_policy="group",
     )
     wb = openpyxl.load_workbook(res["output_path"])
-    ws = wb[ACTUAL_SHEET]
-    header = [ws.cell(HEADER_ROW, c).value for c in range(1, len(ACTUAL_HEADER) + 1)]
-    assert header == ACTUAL_HEADER
-    # 분석본 Sheet1의 A~J 헤더와 정확히 일치해야 한다
-    assert header[:10] == [
-        "연번", "예산과목", "속성", "주관부서명", "예산귀속 부서명(처.지사)",
-        "예산귀속 부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)", "구 분",
-    ]
-    # 데이터 첫 행 연번=1, 실적금액 숫자
-    assert ws.cell(DATA_START, 1).value == 1
-    assert isinstance(ws.cell(DATA_START, 9).value, (int, float))
+    assert wb.sheetnames == ["25년 계획 대비 실적", "(작성불필요)종합표", REF_SHEET, "(참고)검토리포트"]
+    ws = wb.worksheets[0]
+    header = [ws.cell(FORM_HEADER_ROW, c).value for c in range(1, 10)]
+    assert header == ["연번", "예산과목", "속성", "주관부서명", "예산귀속\n부서명(처.지사)",
+                      "예산귀속\n부서명(팀)", "사업명", "연예산(A)", "최종 실적금액(B)"]
+    assert ws.max_column == 9                          # 앱 분석 열은 양식 시트에 붙이지 않는다
+    assert ws.cell(FORM_DATA_START, 1).value == 1
+    assert isinstance(ws.cell(FORM_DATA_START, 9).value, (int, float))
+    assert ws.cell(FORM_DATA_START, 9).fill.fgColor.rgb == "FFFFFF00"   # 양식의 노란 실적 칸
+    assert "SUMIFS('25년 계획 대비 실적'!$I:$I" in wb.worksheets[1]["C6"].value
+    assert wb[REF_SHEET].cell(1, 7).value == "집행구분"
     wb.close()
 
     v1 = openpyxl.load_workbook(res["zrfm2_v1_path"])
@@ -111,14 +109,11 @@ def test_deselect_item_becomes_unreflected(tmp_path):
     assert base_total + base_unref == pytest.approx(
         res["요약"]["총 실적(천원)"] + res["요약"]["미반영(천원)"], abs=2)
 
-    # 데이터시트·종합표에 '기계장치'가 남지 않아야 함(선택된 항목만 포함)
+    # 첫 시트에 '기계장치' 행이 남지 않아야 함 — 종합표는 양식이라 줄은 있고 SUMIFS 가 0 을 낸다
     wb = openpyxl.load_workbook(res["output_path"], data_only=True)
-    items_in_sheet = {wb[ACTUAL_SHEET].cell(r, 2).value
-                      for r in range(DATA_START, wb[ACTUAL_SHEET].max_row + 1)}
+    ws = wb.worksheets[0]
+    items_in_sheet = {ws.cell(r, 2).value for r in range(FORM_DATA_START, ws.max_row + 1)}
     assert "기계장치" not in items_in_sheet
-    summary_items = {wb["종합표"].cell(r, 2).value
-                     for r in range(5, wb["종합표"].max_row + 1)}
-    assert "기계장치" not in summary_items
     wb.close()
     # 그 전표들은 zrfm2_V1에서 '미반영'으로 표기
     v1 = openpyxl.load_workbook(res["zrfm2_v1_path"], data_only=True)
@@ -135,3 +130,4 @@ def test_strict_policy_more_new(tmp_path):
     assert abs(grp["요약"]["총 실적(천원)"] - strt["요약"]["총 실적(천원)"]) <= ROUND_TOL
     # 엄격정책은 신규 실적이 더 큼
     assert strt["요약"]["신규 실적(천원)"] > grp["요약"]["신규 실적(천원)"]
+
