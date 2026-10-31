@@ -38,7 +38,7 @@ authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (D
 
 from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
-from budget import report_hwpx, report_plan   # noqa: E402
+from budget import excel_actual_writer, report_hwpx, report_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -1852,7 +1852,11 @@ def _ensure_actual_outputs(conn, year, budget):
         return False
     paths = [os.path.join(OUT_DIR, n) for n in _actual_output_names(year, budget).values()]
     # 분석은 속도를 위해 파일을 만들지 않는다 → 없거나 최신 분석보다 오래됐으면 지금 생성.
-    if any(not os.path.exists(p) or _mtime_str(p) < str(run["created_at"]) for p in paths):
+    #   양식(templates/actual_template_*)이 파일보다 새로우면(배포로 양식이 바뀜)도 다시 — 안 그러면
+    #   다음 분석 전까지 옛 모양 파일이 계속 나간다(2026-10-31 팀 양식으로 바꾸며).
+    tpl = excel_actual_writer.form_template(budget)
+    newer = max(str(run["created_at"]), _mtime_str(tpl) if tpl else "")
+    if any(not os.path.exists(p) or _mtime_str(p) < newer for p in paths):
         # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
         pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
                                   make_files=True, record_run=False)

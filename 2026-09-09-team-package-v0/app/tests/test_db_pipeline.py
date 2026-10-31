@@ -535,8 +535,8 @@ def test_override_forced_new_name(env):
     dbm.add_override(conn, "2023", "손익", int(row["erp_row_id"]), "긴급 배관보수(수동)")
     res = pipeline_db.run_actual_db(conn, out, "2023", "손익")
     wb = openpyxl.load_workbook(res["output_path"])
-    ws = wb["Sheet1"]
-    names = {ws.cell(r, 7).value for r in range(3, ws.max_row + 1)}
+    ws = wb.worksheets[0]                          # 팀 양식 첫 시트(«…계획 대비 실적»), 4행부터
+    names = {ws.cell(r, 7).value for r in range(4, ws.max_row + 1)}
     wb.close()
     assert "긴급 배관보수(수동)" in names
     assert res["요약"]["총 실적(천원)"] == TOTAL
