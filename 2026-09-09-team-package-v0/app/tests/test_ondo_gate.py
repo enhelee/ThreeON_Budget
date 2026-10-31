@@ -96,7 +96,7 @@ def test_favicon_is_on_logo():
     html = _read(APP, "web", "index.html")
     assert 'rel="icon"' in html and "favicon.svg" in html
     svg = _read(SRC, "assets", "favicon.svg")
-    assert 'id="red"' in svg and 'id="silver"' in svg and "<circle" in svg, "빨간 O(원)·은색 N(경로)"
+    assert 'id="red"' in svg and 'id="gold"' in svg and "<circle" in svg, "빨간 금속 O(원)·금빛 N(경로)"
     assert not os.path.exists(os.path.join(SRC, "assets", "favicon.png")), "캡처 그림은 쓰지 않는다(화질)"
 
 def test_gate_matches_main_palette_and_fades_into_main():
