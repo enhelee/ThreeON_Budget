@@ -92,12 +92,15 @@ def test_on_of_ondo_is_ci_red_everywhere():
 
 
 def test_favicon_is_on_logo():
-    """탭 아이콘 = 발표 오프닝 입체 «ON» 로고를 다시 그린 벡터(빨강 O·은색 N, 2026-10-31 grace) — 작게 줄여도 선명하게."""
+    """탭 아이콘 = 입체 «ON» 로고(O 의 오른쪽이 N 의 왼쪽 기둥, 빨강→금빛 금속). grace 가 이미지 생성으로 만든 1254px 원본을
+    잘라 32·64·180px 로 줄였다(2026-10-31) — 벡터로는 금속 느낌이 안 났다."""
     html = _read(APP, "web", "index.html")
-    assert 'rel="icon"' in html and "favicon.svg" in html
-    svg = _read(SRC, "assets", "favicon.svg")
-    assert 'id="metal"' in svg and "<circle" in svg, "O·N 이 같은 금속 그라데이션(빨강→금빛)으로 이어진다"
-    assert not os.path.exists(os.path.join(SRC, "assets", "favicon.png")), "캡처 그림은 쓰지 않는다(화질)"
+    for size in ("32", "64", "180"):
+        png = os.path.join(SRC, "assets", f"favicon-{size}.png")
+        with open(png, "rb") as f:
+            assert f.read(8) == b"\x89PNG\r\n\x1a\n", png
+        assert f"favicon-{size}.png" in html
+    assert not os.path.exists(os.path.join(SRC, "assets", "favicon.svg"))
 
 def test_gate_matches_main_palette_and_fades_into_main():
     """오프닝 → 메인이 이어지게(10/28): 장면 색은 메인 팔레트(파랑·산호), 로그인하면 밝게 풀리며 메인이 떠오른다."""
