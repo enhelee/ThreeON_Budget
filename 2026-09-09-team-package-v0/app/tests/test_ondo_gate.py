@@ -100,6 +100,10 @@ def test_favicon_is_on_logo():
         with open(png, "rb") as f:
             assert f.read(8) == b"\x89PNG\r\n\x1a\n", png
         assert f"favicon-{size}.png" in html
+    # 배경은 투명 — 남색 네모 없이 로고만(2026-10-31 grace)
+    with open(os.path.join(SRC, "assets", "favicon-64.png"), "rb") as f:
+        head = f.read(26)
+    assert head[25] == 6, "RGBA(색 형식 6) — 투명 배경"
     assert not os.path.exists(os.path.join(SRC, "assets", "favicon.svg"))
 
 def test_gate_matches_main_palette_and_fades_into_main():
