@@ -52,7 +52,8 @@ class Styles:
         for ff in root.iter(H("fontface")):
             if ff.get("lang") == "HANGUL":
                 faces = {f.get("id"): f.get("face") for f in ff.iter(H("font"))}
-        self.char, self.char_pt, self.para, self.para_align, self.border = {}, {}, {}, {}, {}
+        self.char, self.char_pt, self.para, self.para_pad, self.border = {}, {}, {}, {}, {}
+        self.para_dist = set()        # 배분 정렬 문단 — 글자를 칸 폭에 고르게(화면에서 report.js 가 자간으로)
         for cp in root.iter(H("charPr")):
             pt = int(cp.get("height", "1000")) / 100
             css = [f"font-size:calc({pt}pt * var(--fit, 1))"]   # --fit: 화면이 칸 맞춤으로 줄일 때
@@ -81,6 +82,8 @@ class Styles:
             al = pp.find(H("align"))
             align = ALIGN.get(al.get("horizontal") if al is not None else "", "justify")
             css = [f"text-align:{align}"]
+            if al is not None and al.get("horizontal") == "DISTRIBUTE":
+                self.para_dist.add(pp.get("id"))
             sw = pp.find(f"{P('switch')}/{P('default')}")
             box = sw if sw is not None else pp
             mg = box.find(H("margin"))
@@ -89,6 +92,7 @@ class Styles:
                 left, indent = get("left"), get("intent")
                 if left or indent < 0:
                     css.append(f"padding-left:{px(left + max(0, -indent))}px")
+                    self.para_pad[pp.get("id")] = (px(left), px(left + max(0, -indent)))   # (왼쪽 여백, 그린 안쪽 여백)
                 if indent:
                     css.append(f"text-indent:{px(indent)}px")
                 if get("right"):
@@ -101,7 +105,6 @@ class Styles:
             if ls is not None and ls.get("type") == "PERCENT":
                 css.append(f"line-height:{int(ls.get('value', '160')) / 100}")
             self.para[pp.get("id")] = ";".join(css)
-            self.para_align[pp.get("id")] = align
         for bf in root.iter(H("borderFill")):
             css = []
             for side in ("left", "right", "top", "bottom"):
@@ -124,9 +127,37 @@ def _run_text(t):
     out = [escape(t.text or "")]
     for ch in t:
         tag = ch.tag.split("}")[1]
-        out.append({"fwSpace": "　", "nbSpace": " ", "tab": "  ", "lineBreak": "<br>"}.get(tag, ""))
+        # fwSpace = 한글의 «고정폭 빈칸»(숫자 한 자 폭) — 양쪽 정렬에서도 늘어나지 않는다. 그냥 «　» 로 두면 브라우저가 늘려
+        #   «◈ (전체금액)» 사이가 크게 벌어졌다(2026-10-29) → 폭 고정 상자(글자는 그대로 둬 고친 글에도 남는다).
+        out.append({"fwSpace": '<span class="rp-fw">　</span>', "nbSpace": " ", "tab": "  ", "lineBreak": "<br>"}.get(tag, ""))
         out.append(escape(ch.tail or ""))
     return "".join(out)
+
+
+def _colgroup(tbl):
+    """열 폭 — 칸마다 (시작 열, 칸 수, 폭)으로 열 하나하나의 폭을 푼다.
+    table-layout:fixed 는 첫 줄로 열 폭을 정하는데, 첫 줄에 합친 칸이 있으면 고르게 나눠 버려 과목 칸이
+    195px 이 115px 로 그려졌다(2026-10-29) → <col> 로 정확한 폭을 준다."""
+    n = int(tbl.get("colCnt") or 0)
+    cells = []
+    for tc in (tc for tr in tbl.findall(P("tr")) for tc in tr.findall(P("tc"))):   # 칸 안 표는 빼고
+        addr, span, sz = tc.find(P("cellAddr")), tc.find(P("cellSpan")), tc.find(P("cellSz"))
+        if addr is None or sz is None:
+            continue
+        cells.append((int(addr.get("colAddr")), int(span.get("colSpan") if span is not None else 1), int(sz.get("width"))))
+    if not n or not cells:
+        return ""
+    col = [None] * n
+    for _ in range(n + 1):                              # 한 칸에 모르는 열이 하나뿐이면 빼서 구한다 — 될 때까지
+        for c0, k, wd in cells:
+            unknown = [i for i in range(c0, min(c0 + k, n)) if col[i] is None]
+            if len(unknown) == 1:
+                col[unknown[0]] = wd - sum(col[i] for i in range(c0, min(c0 + k, n)) if col[i] is not None)
+        if None not in col:
+            break
+    if None in col or min(col) <= 0:
+        return ""                                       # 못 풀면 브라우저에 맡긴다(예전처럼)
+    return "<colgroup>" + "".join(f'<col style="width:{px(v)}px">' for v in col) + "</colgroup>"
 
 
 def _attrs(slot):
@@ -153,7 +184,6 @@ class Renderer:
 
     def para(self, p):
         css = self.s.para.get(p.get("paraPrIDRef"), "")
-        align = self.s.para_align.get(p.get("paraPrIDRef"), "justify")
         inner, first_pt = [], None
         for run in p.findall(P("run")):
             cid = run.get("charPrIDRef")
@@ -163,7 +193,7 @@ class Renderer:
                 if tag == "t":
                     inner.append(f'<span style="{self.s.char.get(cid, "")}">{_run_text(ch)}</span>')
                 elif tag == "tbl":
-                    inner.append(self.table(ch, align))
+                    inner.append(self.table(ch, self.s.para_pad.get(p.get("paraPrIDRef"), (0, 0))))
                 elif tag == "pic":
                     inner.append(self.pic(ch))
             slot = self.marks.get(run)
@@ -178,7 +208,8 @@ class Renderer:
             body = " "
         fs = f"font-size:calc({first_pt}pt * var(--fit, 1));" if first_pt else ""
         tools = self.tools(p)
-        return f'<div class="rp-p" style="{fs}{css}"{extra}>{body}{tools}</div>'
+        cls = "rp-p rp-dist" if p.get("paraPrIDRef") in self.s.para_dist else "rp-p"
+        return f'<div class="{cls}" style="{fs}{css}"{extra}>{body}{tools}</div>'
 
     def tools(self, p):
         """○ 줄 늘이기·빼기 단추(편집 화면에서만 보인다 — hwpx 에는 없다)."""
@@ -192,10 +223,18 @@ class Renderer:
             btn.append(f'<button class="rp-tool" contenteditable="false" data-rp-act="del-bullet" data-k="{t["del"][0]}" data-i="{t["del"][1]}" title="이 ○ 줄 빼기">−</button>')
         return f'<span class="rp-tools">{"".join(btn)}</span>'
 
-    def table(self, tbl, align):
+    def table(self, tbl, pad=(0, 0)):
         sz = tbl.find(P("sz"))
         w = px(sz.get("width")) if sz is not None else None
-        margin = "margin:0 auto" if align == "center" else ("margin-left:auto" if align == "right" else "")
+        pos = tbl.find(P("pos"))
+        if pos is None or pos.get("treatAsChar") == "1":
+            # «글자처럼 취급» 표 — 한글에서는 문단 첫 줄의 글자 자리에 놓인다. 블록으로 그리면 내어쓰기 문단에서
+            #   표가 내어쓴 만큼 오른쪽으로 밀렸다(2026-10-29) → 줄 안 표로 그려 문단 정렬·첫 줄 들여쓰기를 그대로 따른다.
+            margin = "display:inline-table;vertical-align:top"
+        else:
+            # 떠 있는 표 — 단(COLUMN)·문단(PARA) 왼쪽에서 horzOffset 만큼. 문단 안쪽 여백(내어쓰기)은 빼 준다
+            base = pad[0] if pos.get("horzRelTo") == "PARA" else 0
+            margin = f"margin-left:{round(px(pos.get('horzOffset')) + base - pad[1], 2)}px"
         rows = []
         for tr in tbl.findall(P("tr")):
             cells = []
@@ -223,7 +262,7 @@ class Renderer:
                 cells.append(f'<td{attr} style="{";".join(st)}">{body}</td>')
             rows.append(f"<tr>{''.join(cells)}</tr>")
         width = f"width:{w}px;" if w else ""
-        return f'<table class="rp-tbl" style="{width}{margin}">{"".join(rows)}</table>'
+        return f'<table class="rp-tbl" style="{width}{margin}">{_colgroup(tbl)}{"".join(rows)}</table>'
 
     def pic(self, pic):
         img = pic.find(f".//{C('img')}")
@@ -266,5 +305,7 @@ def render(zin, sec, marks=None):
     styles = Styles(zin.read("Contents/header.xml"))
     width, ml, mr = page_css(sec)
     body = Renderer(styles, images_of(zin), marks).section(sec)
-    return (f'<div class="rp-page" style="width:{width}px;padding:56px {mr}px 72px {ml}px">'
+    # 용지 폭에는 좌우 여백이 들어 있다 — 글자 영역 = 폭 − 여백(.rp-page 는 content-box). 여백을 두 번 더해
+    #   글자 영역이 151px 넓었고, 그래서 표가 한쪽으로 쏠리고 양쪽 정렬 줄이 벌어져 보였다(2026-10-29).
+    return (f'<div class="rp-page" style="width:{round(width - ml - mr, 2)}px;padding:56px {mr}px 72px {ml}px">'
             f"{body}</div>")

@@ -136,3 +136,11 @@ def test_api_report_years(srv):
     _, client, _ = srv
     _analyzed(client)
     assert "2023" in client.get("/api/report-years").json()
+
+
+def test_preview_column_widths_and_distribute():
+    """열 폭은 칸 위치로 풀어 <col> 로(첫 줄 합친 칸 때문에 과목 칸이 좁아졌다), 배분 정렬 칸은 rp-dist(2026-10-29)."""
+    with open(TEMPLATE, "rb") as f:
+        html = rp.preview_plan_html(f.read(), _inputs())
+    assert html.count("<colgroup>") == html.count('class="rp-tbl"') == 18
+    assert html.count("rp-p rp-dist") == 46

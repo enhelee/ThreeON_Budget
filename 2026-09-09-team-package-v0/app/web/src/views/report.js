@@ -61,6 +61,83 @@ function fitCells(root = $("#rpDoc")) {
   }
 }
 
+const BULLET = /[^\s\u3000□○ㅇ◈◦▪■●◆◇·ㆍ∙※▷➢☞-]/   // 머리 기호(양식은 «○» 대신 한글 «ㅇ»도 쓴다)·빈칸이 아닌 첫 글자
+
+/** 내어쓰기 문단 — 둘째 줄을 머리 기호(□·○·◈) 다음 첫 글자(대개 «(») 자리에 맞춘다.
+ *  한글은 둘째 줄을 정해진 내어쓰기 폭에서 시작하고, 원본은 그 폭을 휴먼명조의 «□ » 폭에 맞춰 두었다.
+ *  대체 글꼴은 폭이 달라 줄이 어긋났다(2026-10-29) → 그려진 뒤 첫 글자 자리를 재서 내어쓰기 폭을 그 값으로. 파일은 그대로. */
+function alignHangs(root) {
+  for (const p of root.querySelectorAll(".rp-p")) {
+    const st = p.style
+    p.dataset.ti ??= st.textIndent
+    p.dataset.pl ??= st.paddingLeft
+    st.textIndent = p.dataset.ti; st.paddingLeft = p.dataset.pl
+    const ti = parseFloat(p.dataset.ti)
+    if (!(ti < 0) || p.querySelector(".rp-tbl") || p.clientWidth < 8) continue
+    const walk = document.createTreeWalker(p, NodeFilter.SHOW_TEXT)
+    let node, at = -1
+    while ((node = walk.nextNode())) {
+      if (node.parentElement.closest(".rp-tools")) continue
+      at = node.data.search(BULLET)
+      if (at >= 0) break
+    }
+    if (at < 0) continue
+    const r = document.createRange(); r.setStart(node, at); r.setEnd(node, at + 1)
+    const pr = p.getBoundingClientRect(), k = pr.width / p.offsetWidth   // 종이를 줄였으면 그 비율
+    const l0 = (parseFloat(p.dataset.pl) || 0) + ti                       // 첫 줄 시작(문단 왼쪽 여백)
+    const w = (r.getBoundingClientRect().left - pr.left) / k - l0
+    if (w <= 0 || w > p.clientWidth / 2) continue                          // 첫 글자가 첫 줄에 없다 — 그대로
+    st.paddingLeft = `${(l0 + w).toFixed(2)}px`
+    st.textIndent = `${(-w).toFixed(2)}px`
+  }
+}
+
+/** 배분 정렬 칸(과목 이름 등) — 한글은 글자를 칸 폭에 고르게 벌린다. CSS 양쪽 정렬은 한 줄짜리 한글을
+ *  벌리지 않아 왼쪽에 붙어 보였다(2026-10-29) → 남는 폭을 글자 사이 자간으로 나눈다. 넘치는 칸은 fitCells 가 줄인다. */
+function distribute(root, reset) {
+  for (const p of root.querySelectorAll(".rp-dist")) {
+    const own = [...p.querySelectorAll("span")].filter(e => e.style.letterSpacing)   // 글자 모양의 자간(-0.04em 등)
+    if (reset) {
+      p.dataset.ta ??= p.style.textAlign                 // 원래 정렬(문단 모양) — 지우지 말고 되돌린다
+      p.style.letterSpacing = p.style.marginRight = ""
+      p.style.textAlign = p.dataset.ta
+      for (const e of own) if (e.dataset.ls != null) e.style.letterSpacing = e.dataset.ls
+      continue
+    }
+    const n = [...p.innerText.trim()].length
+    if (n < 2 || p.clientWidth < 8) continue
+    const r = document.createRange(); r.selectNodeContents(p)
+    const rects = [...r.getClientRects()]
+    const tops = rects.map(x => x.top)
+    if (Math.max(...tops) - Math.min(...tops) > rects[0].height / 2) continue   // 여러 줄 — 그대로(글자 상자끼리 1px 차이는 한 줄)
+    const k = p.getBoundingClientRect().width / p.offsetWidth
+    const cs = getComputedStyle(p)
+    const avail = p.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+    const used = (Math.max(...rects.map(x => x.right)) - Math.min(...rects.map(x => x.left))) / k
+    const gap = (avail - used) / (n - 1)
+    if (gap <= 0.5) continue
+    p.style.textAlign = "left"
+    p.style.letterSpacing = `${gap.toFixed(2)}px`
+    for (const e of own) {
+      e.dataset.ls ??= e.style.letterSpacing
+      e.style.letterSpacing = `calc(${e.dataset.ls} + ${gap.toFixed(2)}px)`
+    }
+    p.style.marginRight = `${(-gap).toFixed(2)}px`                         // 마지막 글자 뒤 자간만큼 — 칸을 넘지 않게
+  }
+}
+
+/** 그린 뒤 맞춤 — 내어쓰기 줄 → 표 칸 글자 → 배분 정렬 → 종이 폭 순서. */
+function layout(root = $("#rpDoc")) {
+  if (!root) return
+  distribute(root, true)
+  alignHangs(root)
+  fitCells(root)
+  distribute(root)
+  fitPage()
+}
+document.fonts?.ready.then(() => layout())          // 글꼴이 늦게 오면 폭이 바뀐다
+document.addEventListener("visibilitychange", () => { if (!document.hidden) layout() })   // 숨은 탭에서는 재는 값이 틀린다
+
 /** 종이가 화면보다 넓으면 통째로 줄여 맞춘다 — 좁은 창에서 오른쪽이 잘려 보였다(2026-10-29).
  *  transform 은 그리기만 줄이고 칸 폭 계산은 그대로라 fitCells·한글 파일에 영향이 없다. */
 function fitPage() {
@@ -92,8 +169,7 @@ async function refresh() {
   const ae = document.activeElement
   const back = ae && doc.contains(ae) ? ae.dataset.path : null
   doc.innerHTML = pv.html
-  fitCells(doc)
-  fitPage()
+  layout(doc)
   const el = back && doc.querySelector(`[data-path="${CSS.escape(back)}"]`)
   if (el) {
     el.focus()
@@ -142,7 +218,7 @@ export function reportHtml() {
   const yy = String(inp.year).slice(2)
   const K = KINDS[rp.kind]
   const warn = (inp.warnings || []).map(w => `<li>${esc(w)}</li>`).join("")
-  setTimeout(() => { fitCells(); fitPage() }, 0)        // 그려진 뒤 칸·종이 맞춤(이 함수는 HTML 문자열만 돌려준다)
+  setTimeout(() => requestAnimationFrame(() => layout()), 0)   // 그려진 뒤(다음 화면 그리기 때) 줄·칸·종이 맞춤 — HTML 문자열만 돌려주므로
   const years = [...new Set([...(rp.years || []), String(inp.year)])].sort().reverse()
   return `
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="보고서 종류">${Object.entries(KINDS).map(([k, v]) => `<button class="${rp.kind === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${rp.kind === k}" data-rp-act="kind" data-kind="${k}">${esc(v.tab)}</button>`).join("")}</div>
@@ -221,7 +297,7 @@ export async function onReportClick(e) {
       busy(true, "불러오는 중…")
       try { await loadReport() } finally { busy(false) }
       const doc = $("#rpDoc")
-      if (doc) { doc.innerHTML = state.report.html; fitCells(doc); fitPage() }
+      if (doc) { doc.innerHTML = state.report.html; layout(doc) }
       return true
     }
     const inp = state.report.inputs

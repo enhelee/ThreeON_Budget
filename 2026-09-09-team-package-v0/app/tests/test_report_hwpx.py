@@ -159,3 +159,11 @@ def test_preview_never_emits_runaway_sizes():
                 html = rp.preview_plan_html(f.read(), rp.normalize_inputs({}, "2025") | {"texts": rp.auto_texts(rp.normalize_inputs({}, "2025"))})
         sizes = [float(v) for v in re.findall(r"(-?\d+(?:\.\d+)?)px", html)]
         assert sizes and max(sizes) < 2000 and min(sizes) > -500
+
+
+def test_preview_page_text_area_and_inline_tables():
+    """글자 영역 = 용지 폭 − 좌우 여백, «글자처럼 취급» 표는 줄 안 표 — 여백을 두 번 더해 표가 쏠렸다(2026-10-29)."""
+    html = _preview(_inputs())
+    w, right, left = (float(x) for x in re.search(r'rp-page" style="width:([\d.]+)px;padding:56px ([\d.]+)px 72px ([\d.]+)px', html).groups())
+    assert abs(w + left + right - 793.71) < 1           # A4 59528 / 75
+    assert html.count("display:inline-table") == html.count('class="rp-tbl"')
