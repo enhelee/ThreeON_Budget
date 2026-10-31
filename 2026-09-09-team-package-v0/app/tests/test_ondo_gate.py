@@ -91,12 +91,16 @@ def test_on_of_ondo_is_ci_red_everywhere():
     assert "W * 0.3" in left or "cx" in left, "B안: 글자는 카드 왼쪽 빈 곳 가운데"
 
 
-def test_favicon_is_thermometer_svg():
+def test_favicon_is_on_logo():
+    """탭 아이콘 = 입체 «ON» 로고(O 의 오른쪽이 N 의 왼쪽 기둥, 빨강→금빛 금속). grace 가 이미지 생성으로 만든 1254px 원본을
+    잘라 32·64·180px 로 줄였다(2026-10-31) — 벡터로는 금속 느낌이 안 났다."""
     html = _read(APP, "web", "index.html")
-    assert 'rel="icon"' in html and "favicon.svg" in html, "탭 아이콘(온도계, 2026-10-28 grace 3번)"
-    svg = _read(SRC, "assets", "favicon.svg")
-    assert "#9DB3E0" in svg and "#E58F79" in svg and "#0B1020" in svg, "수은은 파랑→산호(10/28 grace — CI 빨강은 탭에서 너무 셌다)"
-
+    for size in ("32", "64", "180"):
+        png = os.path.join(SRC, "assets", f"favicon-{size}.png")
+        with open(png, "rb") as f:
+            assert f.read(8) == b"\x89PNG\r\n\x1a\n", png
+        assert f"favicon-{size}.png" in html
+    assert not os.path.exists(os.path.join(SRC, "assets", "favicon.svg"))
 
 def test_gate_matches_main_palette_and_fades_into_main():
     """오프닝 → 메인이 이어지게(10/28): 장면 색은 메인 팔레트(파랑·산호), 로그인하면 밝게 풀리며 메인이 떠오른다."""
