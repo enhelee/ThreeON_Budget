@@ -92,13 +92,12 @@ def test_on_of_ondo_is_ci_red_everywhere():
 
 
 def test_favicon_is_on_logo():
-    """탭 아이콘 = 발표 오프닝의 입체 «ON» 로고(빨강 O·은색 N, 2026-10-31 grace)."""
+    """탭 아이콘 = 발표 오프닝 입체 «ON» 로고를 다시 그린 벡터(빨강 O·은색 N, 2026-10-31 grace) — 작게 줄여도 선명하게."""
     html = _read(APP, "web", "index.html")
-    assert 'rel="icon"' in html and "favicon.png" in html
-    png = os.path.join(SRC, "assets", "favicon.png")
-    with open(png, "rb") as f:
-        assert f.read(8) == b"\x89PNG\r\n\x1a\n"
-    assert not os.path.exists(os.path.join(SRC, "assets", "favicon.svg")), "옛 온도계 파비콘은 지웠다"
+    assert 'rel="icon"' in html and "favicon.svg" in html
+    svg = _read(SRC, "assets", "favicon.svg")
+    assert 'id="red"' in svg and 'id="silver"' in svg and "<circle" in svg, "빨간 O(원)·은색 N(경로)"
+    assert not os.path.exists(os.path.join(SRC, "assets", "favicon.png")), "캡처 그림은 쓰지 않는다(화질)"
 
 def test_gate_matches_main_palette_and_fades_into_main():
     """오프닝 → 메인이 이어지게(10/28): 장면 색은 메인 팔레트(파랑·산호), 로그인하면 밝게 풀리며 메인이 떠오른다."""
