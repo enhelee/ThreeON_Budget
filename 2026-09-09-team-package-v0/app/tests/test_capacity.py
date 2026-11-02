@@ -79,3 +79,42 @@ def test_defaults_match_user_capacity_file():
     assert {s: t["start"] for s, t in targets.items()} == {"양산지사": 2023, "대구지사": 2024, "청주지사": 2025, "수원사업소": 2029}
     ev = capacity.usage_events(capacity.default_rules(), cap)
     assert set(zip(ev["사업장"], ev["연도"])) == {("양산지사", 2023), ("대구지사", 2024), ("청주지사", 2025), ("수원사업소", 2029)}
+
+
+# ── 적용시작연도가 기준연도 뒤인 대상(수원 2029) — 2026-11-02 ──────────────────────────────
+# 전에는 새 용량 값이 기준연도부터 10년 내내 들어갔다(수원 2026년에도 136MW). 이제 시작 해 전엔 지금 설비 값.
+
+def test_usage_events_keep_history_for_future_switch():
+    cap = capacity.default_capacity()
+    ev = capacity.usage_events(capacity.default_rules(), cap, base_year=2026)
+    assert ("수원사업소", 2029) not in set(zip(ev["사업장"], ev["연도"]))     # 2026 기준이면 수원 과거 실적은 지금 설비 것
+    assert ("청주지사", 2025) in set(zip(ev["사업장"], ev["연도"]))         # 이미 바뀐 지사는 그대로 뺀다
+
+
+def test_apply_keeps_current_rows_until_switch_year():
+    refs, acts, grades = _world()
+    rules = pd.DataFrame([("가지사", "기준", None, 100, "", ""), ("나지사", "기준", None, 500, "", ""),
+                          ("다지사", "대상", 2029, 270, "2027~2028", "")], columns=capacity.RULE_COLS)
+    std = pd.DataFrame([{"사업장": "다지사", "예산과목": ACC1, "등급": "간이", "표준금액": 2.0, "방식출처": "자동추천"}])
+    out, _, targets = capacity.apply_capacity(std, acts, grades, capacity.default_capacity(), rules, base_year=2026)
+    d = out[out["사업장"] == "다지사"].set_index(["예산과목", "등급"])["표준금액"]
+    assert d[(ACC1, "간이")] == 2.0                                           # 2026~2028 은 지금 설비 값
+    assert d[(ACC1, capacity.EXCLUDED)] == pytest.approx(20e5 * 0.7)          # 정비제외 해(시작 전)는 그대로 표에
+    later = targets["다지사"]["rows"].set_index(["예산과목", "등급"])["표준금액"]
+    assert later[(ACC1, "간이")] == pytest.approx((20 + 0.2 * 270) * 1e5 * 0.7)   # 2029 부터 쓸 값은 따로
+    assert capacity.EXCLUDED not in set(targets["다지사"]["rows"]["등급"])
+
+
+def test_site_table_switches_standard_at_start_year():
+    from budget import forecast_calc as fc
+    grade_hist = pd.DataFrame({"사업장": ["다지사"], "연도": [2026], "등급": ["간이"]})
+    std = pd.DataFrame([{"사업장": "다지사", "구분": "손익", "예산과목": ACC1, "등급": "간이", "표준금액": 100.0}])
+    switch = {"다지사": {"start": 2029, "lookup": {("다지사", ACC1, "간이"): 500.0}, "overhaul": None}}
+    empty = lambda cols: pd.DataFrame(columns=cols)
+    table = fc.compute_site_table("다지사", grade_hist, std, empty(["사업장", "연도", "항목", "금액"]), {},
+                                  empty(["사업장", "연도", "예산과목", "금액"]),
+                                  pd.DataFrame([{"팩터명": "물가", "연간비율": 0.0, "활성": True}]),
+                                  empty(["사업장", "연도", "예산과목", "금액", "사유"]), empty(["사업장", "지사유형", "금액"]),
+                                  base_year=2026, switch=switch)
+    row = table[table["예산과목"] == ACC1].iloc[0]
+    assert [row[y] for y in (2026, 2028, 2029, 2035)] == [100.0, 100.0, 500.0, 500.0]

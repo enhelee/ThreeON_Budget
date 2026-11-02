@@ -348,7 +348,7 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                         budget_lookup: dict = None, base_year: int = BASE_YEAR,
                         years: list = None, contracts_df: pd.DataFrame = None,
                         cri_df: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                        overhaul: dict = None) -> pd.DataFrame:
+                        overhaul: dict = None, switch: dict = None) -> pd.DataFrame:
     """한 지사의 기준연도~+9년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
 
     표준화 대상 계정과목(SITE_TABLE_LINES의 "표준화:" 항목)의 당해년도(BASE_YEAR) 금액은
@@ -358,7 +358,9 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     HQ_CATEGORY_TO_ACCOUNT에 있는 계정만 값이 있고(hq_amount_by_site_acct), 나머지 계정은 0이라
     그대로 더해도 무해하다. 다음년도부터는 종전대로 표준화 금액에 팩터를 복리로 곱해 예측한다.
     overhaul = {"years": {지사: {연도…}}, "amount": {지사: 1회 금액}} 에 그 지사가 있으면 A급정비
-    (외주비-열원정기점검)는 표준금액 대신 «정비 해에만 1회 금액 × 팩터»다(기준연도 계획본이 있으면 계획본)."""
+    (외주비-열원정기점검)는 표준금액 대신 «정비 해에만 1회 금액 × 팩터»다(기준연도 계획본이 있으면 계획본).
+    switch = {지사: {"start": 연도, "lookup": {(사업장,예산과목,등급): 표준금액}, "overhaul": 1회 금액|None}} 에
+    그 지사가 있으면 start 해부터 표준금액(과 A급정비 1회 금액)을 그 값으로 바꾼다 — 설비를 새로 짓는 지사(수원 2029)."""
     base_year = int(base_year)
     years = list(years) if years else forecast_years(base_year)
     site_grades = grade_hist[grade_hist["사업장"] == site]
@@ -366,6 +368,7 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     latest_known_grade = benchmark.get_current_grade(site, grade_hist)
 
     std_lookup = _standard_lookup(standard_df)
+    sw = (switch or {}).get(site)
     budget_lookup = budget_lookup or {}
     hot_parts_lookup = {
         (r["사업장"], r["연도"], r["항목"]): r["금액"] for _, r in hot_parts_df.iterrows()
@@ -418,16 +421,19 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                 if budget_amount is not None:
                     site_amount = budget_amount
                 elif account == A_OVERHAUL_ACCOUNT and overhaul and site in overhaul["years"]:
-                    site_amount = (overhaul["amount"].get(site, 0.0) * mult
-                                   if year in overhaul["years"][site] else 0.0)
+                    once = overhaul["amount"].get(site, 0.0)
+                    if sw and year >= sw["start"] and sw.get("overhaul") is not None:
+                        once = sw["overhaul"]
+                    site_amount = once * mult if year in overhaul["years"][site] else 0.0
                 else:
                     # 등급 이력이 없는 지사는 benchmark 가 등급을 «표준» 으로 두고 표를 만든다.
                     # v2 는 지사 목록이 등급 이력에서 나와 이 경로가 없었지만, 여기서는 지사가
                     # dept_config 에서 오므로 등급 없는 지사가 정상 입력이다 — 그때 0 이 되면
                     # 기준연도 이후 10년이 통째로 비어 보인다(6-6 실측).
-                    base = std_lookup.get((site, account, grade)) if grade else None
+                    lookup = sw["lookup"] if sw and year >= sw["start"] else std_lookup
+                    base = lookup.get((site, account, grade)) if grade else None
                     if base is None:
-                        base = std_lookup.get((site, account, "표준"), 0.0)
+                        base = lookup.get((site, account, "표준"), 0.0)
                     site_amount = base * mult
                 # 26년은 지사 자체 예산(예산계획/표준화)에 본사 원가분배 마스터 표의 배분액을 더한다 -
                 # "총원가배분(전체) = 본사 + 지사"라 두 금액은 서로 다른 부서코드에 잡힌 별도 예산이며
@@ -493,7 +499,7 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                        investment_df: pd.DataFrame, budget_df: pd.DataFrame = None,
                        base_year: int = BASE_YEAR, years: list = None, contracts_df: pd.DataFrame = None,
                        cri_rules: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                       overhaul: dict = None) -> dict:
+                       overhaul: dict = None, switch: dict = None) -> dict:
     """지사별 표를 한 번에 계산. 반환: {사업장: DataFrame}"""
     hq_amount = hq_amount_by_site_account(hq_master_df)
     hq_temp_alloc = allocate_hq_temp_projects(hq_temp_df, hq_ratio_df)
@@ -504,6 +510,7 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
         site: compute_site_table(site, grade_hist, standard_df, hot_parts_df, hq_amount,
                                   hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup,
                                   base_year=base_year, years=years, contracts_df=contracts_df,
-                                  cri_df=cri_df, invest_plan_df=invest_plan_df, overhaul=overhaul)
+                                  cri_df=cri_df, invest_plan_df=invest_plan_df, overhaul=overhaul,
+                                  switch=switch)
         for site in sites
     }
