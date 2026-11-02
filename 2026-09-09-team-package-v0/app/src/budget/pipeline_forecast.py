@@ -199,7 +199,7 @@ def capacity_inputs(conn, base_year):
     """(설비 현황, 용량 규칙, 구조변화 + 용량 대상 «실적사용시작») — 표가 비어 있으면 capacity.py 기본값."""
     cap = fs.load_table(conn, base_year, "site_capacity")
     rules = fs.load_table(conn, base_year, "capacity_rule")
-    events = pd.concat([fs.load_table(conn, base_year, "site_event"), capacity.usage_events(rules, cap)],
+    events = pd.concat([fs.load_table(conn, base_year, "site_event"), capacity.usage_events(rules, cap, base_year)],
                        ignore_index=True)
     return cap, rules, events
 
@@ -220,7 +220,7 @@ def _standard(conn, base_year):
         item_alias=alias, rules=fs.load_table(conn, base_year, "benchmark_rule"),
         events=events, budget_lookup=budget_lookup, window=window)
     std, model, targets = capacity.apply_capacity(std, benchmark.prepare_actuals(actuals, alias, events),
-                                                  grade, cap_table, cap_rules)
+                                                  grade, cap_table, cap_rules, base_year=base_year)
     return std, actuals, years_used, grade, {"model": model, "targets": targets, "events": events}
 
 
@@ -336,6 +336,8 @@ def capacity_view(conn, base_year):
     targets = []
     for site, t in cap["targets"].items():
         rows = std[(std["사업장"] == site) & (std["방식출처"] == "용량규칙")]
+        if "rows" in t:                 # 시작이 기준연도 뒤 — 표엔 정비제외 줄만, 등급별 값은 따로
+            rows = pd.concat([rows, t["rows"]], ignore_index=True)
         by_grade = rows.groupby("등급")["표준금액"].sum().to_dict()
         targets.append({"사업장": site, "용량MW": t["mw"], "적용시작연도": t["start"],
                         "정비제외연도": sorted(t["excluded"]),
@@ -384,8 +386,17 @@ def forecast_frames(conn, base_year):
     overhaul = overhaul_plan(conn, base_year, sites, actuals)
     if overhaul and cap["model"]:
         mi = {s: v for s, a, g, v in zip(std["사업장"], std["예산과목"], std["등급"], std["표준금액"])
-              if s in targets and a == forecast_calc.A_OVERHAUL_ACCOUNT and g == "MI"}
+              if s in targets and "rows" not in targets[s] and a == forecast_calc.A_OVERHAUL_ACCOUNT and g == "MI"}
         overhaul["amount"].update(mi)
+    # 적용시작연도가 기준연도 뒤인 대상(수원 2029): 시작 해부터만 용량 환산 표준금액·A급정비 1회 금액
+    switch = {}
+    for s, t in targets.items():
+        if "rows" in t:
+            later = t["rows"]
+            mi = later[(later["예산과목"] == forecast_calc.A_OVERHAUL_ACCOUNT) & (later["등급"] == "MI")]["표준금액"]
+            switch[s] = {"start": int(t["start"]),
+                         "lookup": {(r["사업장"], r["예산과목"], r["등급"]): r["표준금액"] for _, r in later.iterrows()},
+                         "overhaul": float(mi.iloc[0]) if len(mi) else None}
     # 정비제외 해(수원 2027~28)는 계산에만 등급 «정비제외» — 저장된 등급 이력은 그대로
     excl = capacity.excluded_grades(targets)
     grade_calc = grade
@@ -401,7 +412,7 @@ def forecast_frames(conn, base_year):
         contracts_df=fs.load_table(conn, base_year, "regular_contract"),
         cri_rules=fs.load_table(conn, base_year, "cri_rule"),
         invest_plan_df=fs.load_table(conn, base_year, "investment_plan"),
-        overhaul=overhaul)
+        overhaul=overhaul, switch=switch)
     cri = forecast_calc.cri_events(grade, fs.load_table(conn, base_year, "cri_rule"),
                                    fs.load_factors(conn, base_year), years)
     return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,

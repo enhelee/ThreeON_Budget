@@ -128,11 +128,17 @@ def _clean_rules(rules: pd.DataFrame, capacity: pd.DataFrame):
     return refs, targets
 
 
-def usage_events(rules: pd.DataFrame, capacity: pd.DataFrame) -> pd.DataFrame:
-    """대상 지사의 적용시작연도 → «실적사용시작»(그 전 실적은 지금 설비와 맞지 않는다)."""
+def _future(target: dict, base_year) -> bool:
+    """적용시작연도가 기준연도 뒤 — 아직 지금 설비로 돌아가는 지사(수원 2029, 2026 기준)."""
+    return base_year is not None and bool(target["start"]) and int(target["start"]) > int(base_year)
+
+
+def usage_events(rules: pd.DataFrame, capacity: pd.DataFrame, base_year=None) -> pd.DataFrame:
+    """대상 지사의 적용시작연도 → «실적사용시작»(그 전 실적은 지금 설비와 맞지 않는다).
+    시작이 기준연도 뒤면 넣지 않는다 — 그 지사 과거 실적은 아직 지금 설비 것이라 시작 전 해의 표준금액이 된다."""
     _, targets = _clean_rules(rules, capacity)
     rows = [{"사업장": s, "연도": t["start"], "유형": "실적사용시작", "예산과목": "", "비고": "용량 환산 대상"}
-            for s, t in targets.items() if t["start"]]
+            for s, t in targets.items() if t["start"] and not _future(t, base_year)]
     return pd.DataFrame(rows, columns=["사업장", "연도", "유형", "예산과목", "비고"])
 
 
@@ -217,8 +223,11 @@ def standard_rows(model: dict, site: str, target: dict) -> pd.DataFrame:
 
 
 def apply_capacity(std: pd.DataFrame, prepared: pd.DataFrame, grade_hist: pd.DataFrame,
-                   capacity: pd.DataFrame, rules: pd.DataFrame):
-    """표준금액 표에서 대상 지사 줄을 용량 환산 값으로 바꾼다(수동수정 줄은 그대로). → (std, model, targets)"""
+                   capacity: pd.DataFrame, rules: pd.DataFrame, base_year=None):
+    """표준금액 표에서 대상 지사 줄을 용량 환산 값으로 바꾼다(수동수정 줄은 그대로). → (std, model, targets)
+
+    적용시작연도가 기준연도 뒤인 대상(_future)은 표의 지금 설비 줄을 그대로 두고, 시작 해부터 쓸 용량 환산 줄을
+    targets[지사]["rows"] 로 따로 돌려준다(전망 표가 해마다 고른다). 정비제외 줄은 시작 전 해라 표에 넣는다."""
     refs, targets = _clean_rules(rules, capacity)
     if not refs or not targets:
         return std, None, targets
@@ -227,10 +236,18 @@ def apply_capacity(std: pd.DataFrame, prepared: pd.DataFrame, grade_hist: pd.Dat
         return std, model, targets
     keep = std[~std["사업장"].isin(targets) | (std["방식출처"] == "수동수정")] if not std.empty else std
     manual = {(r["사업장"], r["예산과목"], r["등급"]) for _, r in keep.iterrows() if r["방식출처"] == "수동수정"}
+    future = {s for s, t in targets.items() if _future(t, base_year)}
+    if future and not std.empty:
+        keep = pd.concat([keep, std[std["사업장"].isin(future) & (std["방식출처"] != "수동수정")]], ignore_index=True)
     new = [standard_rows(model, s, t) for s, t in targets.items()]
     new = pd.concat([n for n in new if not n.empty], ignore_index=True) if any(not n.empty for n in new) else pd.DataFrame()
     if not new.empty and manual:
         new = new[[(s, a, g) not in manual for s, a, g in zip(new["사업장"], new["예산과목"], new["등급"])]]
+    if not new.empty and future:
+        later = new["사업장"].isin(future) & (new["등급"] != EXCLUDED)
+        for s in future:
+            targets[s]["rows"] = new[later & (new["사업장"] == s)].reset_index(drop=True)
+        new = new[~later]
     out = pd.concat([keep, new], ignore_index=True) if not new.empty else keep
     return out, model, targets
 
