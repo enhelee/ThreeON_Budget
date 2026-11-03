@@ -329,6 +329,10 @@ def init_db(conn):
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 설비 TEXT NOT NULL, 구분 TEXT,
         용량MW REAL, 준공연도 INTEGER, 비고 TEXT,
         PRIMARY KEY(base_year, 사업장, 설비))""")
+    # 생산자물가지수(연도 → 지수) — 과거 실적을 기준연도 가치로 바꿔 표준화(2026-11-03). 빈 해는 전망 물가로 채움.
+    cur.execute("""CREATE TABLE IF NOT EXISTS price_index(
+        base_year TEXT NOT NULL, 연도 INTEGER NOT NULL, 지수 REAL NOT NULL, 비고 TEXT,
+        PRIMARY KEY(base_year, 연도))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS hot_parts_contract(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 계약방식 TEXT, 계약기간 TEXT, 비고 TEXT,
         PRIMARY KEY(base_year, 사업장))""")

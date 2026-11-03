@@ -11,6 +11,7 @@ if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)
 
 from budget import db as dbm   # noqa: E402
+from budget import forecast_store as fs   # noqa: E402
 from tests.test_forecast_import import hot_parts_workbook, hq_master_workbook   # noqa: E402
 
 
@@ -153,6 +154,7 @@ def test_import_preview_does_not_save(client):
 def test_benchmark_and_table_read_locked_runs(client):
     conn = _conn()
     try:
+        fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
         _seed_run(conn, "2023", "손익", [("화성지사", "수선유지비-열원경상정비", 1000.0, "계획집행")])
         _seed_run(conn, "2025", "손익", [("화성지사", "수선유지비-열원경상정비", 1100.0, "계획집행")])
         dbm.lock_year(conn, "2023")

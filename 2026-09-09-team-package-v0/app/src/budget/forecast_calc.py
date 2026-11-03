@@ -192,6 +192,54 @@ def year_multiplier(year: int, factors_df: pd.DataFrame, base_year: int = BASE_Y
     return multiplier
 
 
+# ── 과거 실적의 기준연도 가치 환산(2026-11-03 팀장) ─────────────────────────────
+# 표준금액은 과거 실적의 평균인데, 실적은 그 해 금액(명목)이다. 생산자물가지수로 기준연도 가치로 바꾼 뒤
+# 표준화한다 — 환산 실적(y) = 실적(y) × 지수(기준연도) ÷ 지수(y). 손익·자본 모두 같은 지수(생산자물가지수).
+# 지수가 없는 해(기준연도처럼 아직 안 나온 해 포함)는 가까운 지수에서 전망 물가(팩터) 비율로 늘이거나 줄여 채운다.
+
+def fallback_rate(factors_df: pd.DataFrame, base_year: int = BASE_YEAR) -> float:
+    """지수 빈 해를 채울 연간 비율 = 활성 팩터 전부의 1년 배수 − 1 (기본 물가상승률 1.5%)."""
+    return year_multiplier(int(base_year) + 1, factors_df, int(base_year)) - 1.0
+
+
+def price_index_series(index_df: pd.DataFrame, years, rate: float) -> dict:
+    """{연도: (지수, 출처)} — 출처 «지수»(표에 적힌 값) | «대체»(빈 해를 rate 로 채운 값).
+    표가 비면 첫 해를 100 으로 두고 rate 로만 잇는다."""
+    years = sorted({int(y) for y in years})
+    known = {}
+    if index_df is not None and not index_df.empty:
+        for y, v in zip(index_df["연도"], index_df["지수"]):
+            try:
+                y, v = int(y), float(v)
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                known[y] = v
+    if not years:
+        return {}
+    lo, hi = min(years + list(known)), max(years + list(known))
+    out = {y: (v, "지수") for y, v in known.items()}
+    if not known:
+        return {y: (100.0 * (1 + rate) ** (y - lo), "대체") for y in range(lo, hi + 1)}
+    first, last = min(known), max(known)
+    for y in range(first - 1, lo - 1, -1):
+        out[y] = (out[y + 1][0] / (1 + rate), "대체")
+    for y in range(first + 1, hi + 1):
+        if y not in out:
+            out[y] = (out[y - 1][0] * (1 + rate), "대체")
+    return {y: out[y] for y in range(lo, hi + 1)}
+
+
+def restate_amounts(df: pd.DataFrame, series: dict, to_year: int, col: str = "금액") -> pd.DataFrame:
+    """df 의 금액을 to_year 가치로 — 금액 × 지수(to_year) ÷ 지수(그 해). series 는 price_index_series 결과."""
+    if df is None or df.empty or not series:
+        return df
+    to = series[int(to_year)][0]
+    df = df.copy()
+    df[col] = [float(a) * to / series[int(y)][0] for a, y in zip(df[col], df["연도"])]
+    return df
+
+
 def line_scope(label: str) -> str:
     """전망 표 행의 손익/자본 구분 — 팩터 적용구분을 고르는 데 쓴다."""
     return "손익" if label in PL_LINES else "자본"
