@@ -31,7 +31,8 @@ export default {
       borderRadius: { card: "16px", visual: "24px", control: "12px" },
       boxShadow: { float: "0 8px 24px rgba(0,0,0,0.10)" },
       fontFamily: {
-        hanan: ['"HananCha"', "Pretendard", '"Apple SD Gothic Neo"', '"Malgun Gothic"', "system-ui", "sans-serif"],
+        // 제목 글씨체. 이름은 옛 한난체 자리 그대로(font-hanan) — 2026-11-03 Wanted Sans 로 바꿈
+        hanan: ['"Wanted Sans"', "Pretendard", '"Apple SD Gothic Neo"', '"Malgun Gothic"', "system-ui", "sans-serif"],
         body: ["Pretendard", '"Apple SD Gothic Neo"', '"Malgun Gothic"', "system-ui", "sans-serif"],
       },
       transitionDuration: { DEFAULT: "180ms" },

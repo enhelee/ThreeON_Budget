@@ -75,6 +75,7 @@ def test_real_project_names(name, expect):
 
 
 def test_locked_machine_standard_excludes_hot_parts(conn):
+    fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _seed_run(conn, "2025", "자본", [("화성지사", MACHINE, "23년 고온부품 재생정비", 900.0),
                                      ("화성지사", MACHINE, "화성지사 전력감시시스템 UPGRADE", 100.0)])
     dbm.lock_year(conn, "2025")
@@ -94,13 +95,14 @@ def test_reference_merges_with_locked_years_locked_wins(conn):
 
 
 def test_learning_window_defaults_to_three_and_limits_unruled_cells(conn):
+    fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _save_ref(conn, [("화성지사", y, CHECK, float(y - 2000)) for y in range(2016, 2026)])
     fs.save_method_map(conn, "2026", pd.DataFrame([{"사업장": "화성지사", "예산과목": CHECK, "방식": "5개년 평균"}]))
     assert fs.learning_window(conn, "2026") == 3
     std = {r["예산과목"]: r for r in pf.run_benchmark(conn, "2026")["rows"]}
     assert std[CHECK]["표준금액"] == pytest.approx(24.0)                  # 2023~2025 만 남아 3개 평균
     fs.save_settings(conn, "2026", {"학습기간": "10", "모르는키": "x"})
-    assert fs.load_settings(conn, "2026") == {"학습기간": "10"}
+    assert fs.load_settings(conn, "2026") == {"학습기간": "10", "실적환산": "0"}   # 모르는 키는 버린다
     std = {r["예산과목"]: r for r in pf.run_benchmark(conn, "2026")["rows"]}
     assert std[CHECK]["표준금액"] == pytest.approx(23.0)                  # 2021~2025
 

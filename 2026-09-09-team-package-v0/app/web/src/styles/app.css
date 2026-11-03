@@ -11,10 +11,12 @@
    (Tailwind 3.4.17 고정 — package.json)
    ───────────────────────────────────────────────────────────── */
 
+/* 제목 글씨체 = Wanted Sans Bold(OFL-1.1, npm wanted-sans@1.0.3) — 2026-11-03 grace 가 한난체 대신 골랐다(딱딱하고 자간이 넓었다).
+   굵기 한 벌(700)만 두고 600~800 제목에 같이 쓴다. 외부 CDN 없이 앱이 직접 준다(사내망 이관 대비). */
 @font-face {
-  font-family: "HananCha";
-  src: url("/assets/fonts/HananCha-v1.woff2") format("woff2");
-  font-weight: 400 700;
+  font-family: "Wanted Sans";
+  src: url("/assets/fonts/WantedSans-Bold.woff2") format("woff2");
+  font-weight: 600 800;
   font-style: normal;
   font-display: swap;   /* 폰트가 늦어도 제목은 Pretendard 로 먼저 보인다 */
 }

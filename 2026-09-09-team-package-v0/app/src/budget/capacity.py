@@ -206,10 +206,11 @@ def _rows_for(site, mw, total, share, grade, note):
 
 
 def standard_rows(model: dict, site: str, target: dict) -> pd.DataFrame:
-    """대상 지사의 등급별 표준금액(과목별). 등급: MI·TI·HGPI·CI·간이·표준(=간이) [+ 정비제외]."""
+    """대상 지사의 등급별 표준금액(과목별). 등급: MI·HGPI(=TI)·CI·간이·표준(=간이) [+ 정비제외].
+    등급 이력의 TI 는 계산 전에 HGPI 로 바뀌므로(forecast_calc.canon_grade) TI 줄은 따로 만들지 않는다."""
     f, k, mw = model["fixed"], model["k"], target["mw"]
     rows = []
-    for grade in ("MI", "TI", "HGPI", "CI", "간이", "표준"):
+    for grade in ("MI", "HGPI", "CI", "간이", "표준"):
         g = GRADE_CLASS.get(grade, "간이" if grade == "표준" else grade)
         if g not in k or not model["shares"].get(g):
             continue
@@ -250,6 +251,38 @@ def apply_capacity(std: pd.DataFrame, prepared: pd.DataFrame, grade_hist: pd.Dat
         new = new[~later]
     out = pd.concat([keep, new], ignore_index=True) if not new.empty else keep
     return out, model, targets
+
+
+def fill_missing_grades(std: pd.DataFrame, model: dict, targets: dict) -> pd.DataFrame:
+    """표에 없는 등급을 용량 환산으로 채운다(2026-11-03 팀장: 삼송 MI · 수원 MI).
+    ① 기준 지사: 그 등급 이력이 없어 표준금액이 빈 칸(삼송은 MI 해가 한 번도 없었다)
+    ② 적용시작이 기준연도 뒤인 대상 지사: 시작 후 등급(targets[지사]["rows"]) 중 지금 표에 없는 것(수원 MI) —
+       시작 전 해에는 그 등급이 일정에 없으므로 전망 계산은 그대로다(시작 해부터는 rows 를 쓴다).
+    «표준»(= 간이 별칭)은 채우지 않는다. 지사별로 쓰지 않는 등급은 뒤에서 forecast_calc.prune_grades 가 뺀다."""
+    if not model or not model.get("k"):
+        return std
+    have = set(zip(std["사업장"], std["등급"])) if not std.empty else set()
+    add = []
+
+    def missing(rows, site, prefix):
+        if rows is None or rows.empty:
+            return
+        rows = rows[(rows["등급"] != "표준") & (rows["등급"] != EXCLUDED)]
+        rows = rows[[(site, g) not in have for g in rows["등급"]]].copy()
+        if rows.empty:
+            return
+        rows["비고"] = prefix + rows["비고"]
+        rows["근거"] = prefix + rows["근거"]
+        add.append(rows)
+
+    for site, mw in (model.get("refs") or {}).items():
+        missing(standard_rows(model, site, {"mw": mw, "excluded": set()}), site, "등급 이력 없음 · ")
+    for site, t in targets.items():
+        if "rows" in t:
+            missing(t["rows"], site, f"{t['start']}년 준공 후 · ")
+    if not add:
+        return std
+    return pd.concat([std, *add], ignore_index=True)
 
 
 def excluded_grades(targets: dict) -> pd.DataFrame:

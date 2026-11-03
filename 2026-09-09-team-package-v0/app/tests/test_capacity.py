@@ -118,3 +118,38 @@ def test_site_table_switches_standard_at_start_year():
                                   base_year=2026, switch=switch)
     row = table[table["예산과목"] == ACC1].iloc[0]
     assert [row[y] for y in (2026, 2028, 2029, 2035)] == [100.0, 100.0, 500.0, 500.0]
+
+
+# ── 빈 등급 채우기 · 쓰지 않는 등급 빼기(2026-11-03 팀장: 삼송 MI · 수원 MI · BSI · CI 지사) ─────────
+
+def test_fill_missing_grades_for_ref_without_history_and_future_target():
+    """기준 지사 가지사는 MI 해가 없다 → 용량 환산 MI 로 채운다. 2029 시작 대상 다지사는 시작 후 MI 를 표에 보인다."""
+    refs, acts, grades = _world()
+    grades = grades[~((grades["사업장"] == "가지사") & (grades["등급"] == "MI"))]      # 가지사 MI 이력 없음
+    rules = pd.DataFrame([("가지사", "기준", None, 100, "", ""), ("나지사", "기준", None, 500, "", ""),
+                          ("다지사", "대상", 2029, 270, "", "")], columns=capacity.RULE_COLS)
+    std = pd.DataFrame([
+        {"사업장": "가지사", "예산과목": ACC1, "등급": "간이", "표준금액": 1.0, "방식출처": "자동추천", "비고": "", "근거": ""},
+        {"사업장": "다지사", "예산과목": ACC1, "등급": "간이", "표준금액": 2.0, "방식출처": "자동추천", "비고": "", "근거": ""},
+    ])
+    out, model, targets = capacity.apply_capacity(std, acts, grades, capacity.default_capacity(), rules, base_year=2026)
+    out = capacity.fill_missing_grades(out, model, targets)
+    ga = out[out["사업장"] == "가지사"].groupby("등급")["표준금액"].sum()
+    assert ga["간이"] == 1.0                                                    # 있던 칸은 그대로
+    assert ga["MI"] == pytest.approx(model["fixed"] + model["k"]["MI"] * 100)   # 빈 MI = 고정분 + 단가 × 100MW
+    mi = out[(out["사업장"] == "가지사") & (out["등급"] == "MI")]
+    assert set(mi["방식출처"]) == {"용량규칙"} and all(n.startswith("등급 이력 없음") for n in mi["비고"])
+    da = out[out["사업장"] == "다지사"]
+    assert da[da["등급"] == "간이"]["표준금액"].tolist() == [2.0]                # 시작 전 값은 그대로
+    assert da[da["등급"] == "MI"]["표준금액"].sum() == pytest.approx((20 + 0.6 * 270) * 1e5)
+    assert all(n.startswith("2029년 준공 후") for n in da[da["등급"] == "MI"]["비고"])
+    assert "표준" not in set(out["등급"])
+
+
+def test_prune_grades_drops_bsi_and_ci_outside_ci_sites():
+    from budget import forecast_calc as fc
+    std = pd.DataFrame([{"사업장": s, "등급": g, "표준금액": 1.0} for s, g in
+                        (("광교지사", "BSI"), ("광교지사", "CI"), ("삼송지사", "CI"), ("파주지사", "CI"),
+                         ("파주지사", "MI"), ("수원사업소", "CI"))])
+    out = fc.prune_grades(std)
+    assert set(zip(out["사업장"], out["등급"])) == {("광교지사", "CI"), ("삼송지사", "CI"), ("파주지사", "MI")}

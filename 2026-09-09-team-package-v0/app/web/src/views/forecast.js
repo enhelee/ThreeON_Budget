@@ -20,7 +20,8 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 //   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+// 표준화(옛 «표준화 (3단계)» 탭)는 5번 표준화 · 5-1 표준화 세부 메뉴로 떼어 냈다(2026-11-03).
+const TABS = [["manage", "기준정보 (가정)"], ["table", "중장기 전망"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급", ["grade_plan", "grades", "site_grade_eq"]],
                      ["factor", "고온부품", ["hot_parts", "hot_parts_contract", "factors"]],
@@ -28,13 +29,27 @@ const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
                      ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan"]],
                      ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]],
-                     ["learn", "학습 기간·백테스트", ["settings"]]]
+                     ["learn", "학습 기간·물가 환산·백테스트", ["settings", "price_index"]]]
 const BENCH_VIEWS = [["std", "표준금액"], ["rules", "산정 규칙"], ["regular", "정기비용 분리"]]
 const TAG_LABEL = {기타: "기타(표준화)", LTSA: "LTSA", CRI: "CRI", 고온부품재생: "고온부품재생"}
 const HOT_ITEMS = ["고온부품재생", "신품구매"]
 export const METHODS = ["등급별 평균", "최근실적", "3개년 평균", "5개년 평균"]
 const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
 export const TOTAL = "__total__"
+// 같은 정비등급의 다른 이름 — 한 등급으로 묶어 «HGPI/TI» 로 보인다(2026-11-03 팀장: HGPI = TI).
+//   계산은 서버가 TI 를 HGPI 로 읽어 한 등급으로 낸다(forecast_calc.SAME_GRADE). 화면은 이름만 묶어 적는다.
+export const SAME_GRADES = {"HGPI/TI": ["HGPI", "TI"]}
+const GRADE_ALIAS = Object.fromEntries(Object.entries(SAME_GRADES).flatMap(([k, list]) => list.map(g => [g, k])))
+export const gradeKey = g => GRADE_ALIAS[g] || g
+
+/** 표준화 결과의 과거 실적 환산 한 줄 — «2026년 가치로 환산(생산자물가지수 7개년 · 전망 물가로 채움 3개년)» */
+export function restateNote(b) {
+  const r = b?.restate
+  if (!r) return ""
+  if (!r.on) return "과거 실적은 그 해 금액 그대로(물가 환산 끔)"
+  const idx = r.years.filter(y => y.출처 === "지수").length, fill = r.years.length - idx
+  return `과거 실적을 ${r.base_year}년 가치로 환산(생산자물가지수 ${idx}개년${fill ? ` · 전망 물가로 채움 ${fill}개년` : ""})`
+}
 
 const num = v => (v === null || v === undefined) ? "" : v
 
@@ -70,15 +85,16 @@ function panel(title, help, body, key) {
 
 // ── 헤더: 기준연도 · 탭 ──────────────────────────────────────
 
-function header() {
+/** 기준연도 선택기 + 안내 말풍선(+ 6번이면 하위 탭). 5 · 5-1 · 6 세 화면이 같이 쓴다 — 기준연도 한 벌. */
+export function header({stage = "STAGE 6", title = "중장기 전망", tabs = true} = {}) {
   const fc = state.fc
   const years = [...new Set([...fc.baseYears, fc.baseYear])].filter(Boolean).sort()
   const locked = fc.lockedYears?.length ? fc.lockedYears.join("·") : "없음"
   return `
   <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
     <div>
-      <p class="text-sm font-semibold text-ink">STAGE 5</p>
-      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 표준화 · 중장기 전망</h2>
+      <p class="text-sm font-semibold text-ink">${esc(stage)}</p>
+      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(title)}</h2>
     </div>
     <div class="flex flex-wrap items-end gap-2">
       <label class="block"><span class="field-label">전망 기준연도</span>
@@ -91,7 +107,7 @@ function header() {
         body: `마감된 ${esc(locked)}년 실적으로 표준금액을 만들고, ${esc(fc.baseYear)}년 기준으로 10개년을 전망해요.`})
     : charSay({who: "yc", tone: "warn", title: "아직 마감된 연도가 없어요.",
         body: "2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면, 그 숫자로 전망을 시작해요."})}
-  <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
+  ${tabs ? `<div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>` : ""}`
 }
 
 // ── 기준정보(가정) 탭 ────────────────────────────────────────
@@ -377,8 +393,27 @@ function learnBody(d) {
         ${state.fc.dirty.has("settings") ? '<button class="btn-primary" data-action="fc-relearn" title="학습 기간을 저장하고 표준금액·전망을 다시 계산한 뒤 백테스트로 그 기간의 오차를 보여 줍니다">재학습</button>' : ""}
         ${chosen ? `<p class="pb-2 text-sm text-sub">최근 ${esc(win)}개년 백테스트 · 과목 합계 오차 <b class="text-ink">${pct(chosen.account)}</b> · 지사 3년 누적 <b class="text-ink">${pct(chosen.site3)}</b>${best && String(best.window) !== win ? ` · 가장 작은 기간 = 최근 ${esc(best.window)}개년 (${pct(best.account)})` : ""}</p>` : ""}
       </div>`, "settings")}
+    ${priceIndexPanel(d)}
     ${panel("백테스트", "평가 단위 = 과목 합계 · 지사 3년 누적 (칸 하나는 사람 연예산도 44~64% 틀림) · 마감 실적 + 참고 엑셀 실적", `
       <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-action="fc-backtest">백테스트 실행</button></div>${btBody}`)}`
+}
+
+/** 과거 실적 기준연도 환산(2026-11-03) — 켬/끔 + 생산자물가지수 표. 빈 해는 전망 물가(팩터)로 채운다. */
+function priceIndexPanel(d) {
+  const on = String(d.settings?.실적환산 ?? "1") !== "0"
+  const rows = d.price_index || []
+  const by = Number(state.fc.baseYear)
+  const rate = (d.factors || []).filter(f => f.활성).reduce((m, f) => m * (1 + Number(f.연간비율 || 0)), 1) - 1
+  const missing = !rows.some(r => Number(r.연도) === by)
+  return panel("과거 실적 물가 환산 (생산자물가지수)", "표준금액을 만들기 전에 과거 실적을 기준연도 가치로 바꿉니다 · 환산 실적 = 실적 × 지수(기준연도) ÷ 지수(그 해) · 손익·자본 같은 지수 · 백테스트도 같은 조건(시험 연도 가치로)", `
+    <div class="flex flex-wrap items-end gap-3 p-5 pb-0">
+      <label class="block"><span class="field-label">과거 실적 환산</span>${sel(["1", "0"], on ? "1" : "0", 'data-fcsetting="실적환산"', {"1": `켬 — ${by}년 가치로 환산`, "0": "끔 — 그 해 금액 그대로"})}</label>
+      <button class="btn-secondary" data-fcimport="price-index" title="«생산자물가지수» 시트가 있는 엑셀(표준화 참고 엑셀 V3 등)에서 연도별 지수를 읽습니다">엑셀에서 지수 가져오기</button>
+      ${state.fc.dirty.has("settings") ? '<button class="btn-primary" data-action="fc-relearn" title="설정을 저장하고 표준금액·전망을 다시 계산한 뒤 백테스트를 보여 줍니다">재학습</button>' : ""}
+    </div>
+    <p class="px-5 pt-3 text-xs text-sub">${rows.length ? `지수 ${rows.length}개년 입력됨` : '<span class="text-warn">지수가 아직 없습니다 — 모든 해를 전망 물가로 환산합니다.</span>'} · 빈 해(${missing ? `기준연도 ${by}년 포함, ` : ""}지수가 아직 안 나온 해 등)는 가까운 지수에서 연 ${(rate * 100).toFixed(1)}%(전망 물가 팩터)로 채웁니다 · 출처: 한국은행 ECOS «생산자물가지수(기본분류) 총지수», 연간</p>
+    ${longTable("price_index", [{f: "연도", label: "연도", type: "int"}, {f: "지수", label: "지수 (예: 2020=100)", type: "num"}, {f: "비고", label: "비고"}],
+      rows, "지수가 없습니다 — 엑셀에서 가져오거나 행을 추가하세요.")}`, "price_index")
 }
 
 function cmpTable(rows, cols, onlyDiff) {
@@ -457,7 +492,8 @@ function manageBody() {
 // ── 가져오기 미리보기 ────────────────────────────────────────
 
 const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정비등급 양식)",
-                      "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율"}
+                      "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율",
+                      "price-index": "생산자물가지수"}
 
 function previewPanel() {
   const p = state.fc.preview
@@ -525,7 +561,7 @@ function regularBreakdownBody(d) {
 }
 
 /** 무거운 계산이 끝나기 전 자리 — 화면 위(기준연도·탭)는 먼저 보이고 이 칸만 기다린다. */
-function computingHtml(text) {
+export function computingHtml(text) {
   return `<section class="panel flex items-center gap-3 p-6 text-sm text-sub" aria-busy="true"><span class="fc-spin" aria-hidden="true"></span>${esc(text)}</section>`
 }
 
@@ -548,7 +584,9 @@ function benchSiteGroups(rows, filtered) {
     const warn = list.filter(r => r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3).length
     // 접기 단추는 줄 맨 앞 + 왼쪽에 붙임(sticky) — 좁은 화면에서 표가 가로로 넘쳐도 단추가 화면 밖으로 밀리지 않게
     const btn = filtered ? "" : `<button class="btn-secondary min-h-[32px] shrink-0 px-3 text-xs" data-fcbopen="${esc(site)}" aria-expanded="${open}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`
-    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="9"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${btn}<b class="text-ink">${esc(site)}</b><span class="text-sub">${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></div></td></tr>`
+    const note = state.fc.bench?.site_notes?.[site]
+    const tag = note ? `<span class="std-tag">${esc(note)}</span>` : ""
+    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="9"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${btn}<b class="text-ink">${esc(site)}</b>${tag}<span class="text-sub">${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></div></td></tr>`
     return {head, list: open ? list : []}
   })
 }
@@ -562,15 +600,15 @@ function benchStd() {
   const base = b.rows.filter(r => g === "all" || groups[r.사업장] === g)
   const siteList = [...new Set(base.map(r => r.사업장))]
   const acctList = [...new Set(base.map(r => r.예산과목))].sort()
-  const gradeList = [...new Set(base.map(r => r.등급))].sort()
+  const gradeList = [...new Set(base.map(r => gradeKey(r.등급)))].sort()
   const q = (f.q || "").trim().toLowerCase()
-  const rows = base.filter(r => (!f.site || r.사업장 === f.site) && (!f.account || r.예산과목 === f.account) && (!f.grade || r.등급 === f.grade)
+  const rows = base.filter(r => (!f.site || r.사업장 === f.site) && (!f.account || r.예산과목 === f.account) && (!f.grade || gradeKey(r.등급) === f.grade)
     && (!q || [r.사업장, r.예산과목, r.등급, r.산출방식, r.방식출처, r.추천사유, r.근거, r.비고].some(x => String(x ?? "").toLowerCase().includes(q))))
   const filtered = !!(f.site || f.account || f.grade || q)
   const ed = state.fc.benchEdits
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
-    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)} 천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
+    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)} 천원 → 표준금액 ${b.rows.length.toLocaleString()}행${restateNote(b) ? ` · ${esc(restateNote(b))}` : ""}`
     : '<span class="text-warn">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
   return `
   <article class="panel overflow-hidden">
@@ -598,7 +636,7 @@ function benchStd() {
         const mch = mk in ed.methods, ach = ak in ed.overrides
         return `<tr>
           <td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
-          <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
+          <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(gradeKey(r.등급))}</td>
           <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" || r.방식출처 === "용량규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
           <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
           <td class="table-cell text-right text-sub">${r.재무팀금액 == null ? "—" : fmt(r.재무팀금액)}</td>
@@ -702,9 +740,18 @@ function refYears(used) {
   return ` · 참고 실적 ${ys[0]}${ys.length > 1 ? `~${ys[ys.length - 1]}` : ""}`
 }
 
+/** 5-1 표준화 세부 — 예전 6번 «표준화 (3단계)» 탭 내용 그대로(표준금액 · 산정 규칙 · 정기비용 분리). */
+export function renderStandardDetail() {
+  return `
+  <div class="space-y-6">
+    ${header({stage: "STAGE 5-1", title: "표준화 세부", tabs: false})}
+    ${benchBody()}
+  </div>`
+}
+
 export function renderForecast() {
-  const tab = state.fc.tab || "manage"
-  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : manageBody()
+  const tab = state.fc.tab === "table" ? "table" : "manage"
+  const body = tab === "table" ? tableBody() : manageBody()
   return `
   <div class="space-y-6">
     ${header()}

@@ -15,7 +15,7 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_backtest, forecast_export, forecast_import, forecast_reference
+from . import config_store, forecast_backtest, forecast_calc, forecast_export, forecast_import, forecast_reference
 from . import forecast_store as fs, pipeline_forecast as pf
 from . import benchmark as bm, db as dbm, uploads, viewcache
 
@@ -44,12 +44,13 @@ SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site
                "benchmark-rule": "benchmark_rule", "actual-tag": "actual_tag",
                "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan",
                "site-capacity": "site_capacity", "capacity-rule": "capacity_rule",
-               "hot-parts-contract": "hot_parts_contract"}
+               "hot-parts-contract": "hot_parts_contract", "price-index": "price_index"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,
     "hot-parts": forecast_import.hot_parts_from_workbook,
     "hq-master": forecast_import.hq_master_from_workbook,
+    "price-index": forecast_import.price_index_from_workbook,
 }
 
 
@@ -344,9 +345,11 @@ def make_router(conn_factory, clean_json) -> APIRouter:
             def compute():
                 fs.bind_site_resolvers(conn, by)
                 actuals, locked, ref_years = pf.actuals_with_reference(conn, by)
+                years = sorted({int(y) for y in actuals["연도"]}) if not actuals.empty else []
                 runs = forecast_backtest.compare_windows(
-                    actuals, fs.load_grade_history(conn, by), (2, 3, 5, 10),
-                    fs.load_table(conn, by, "site_grade_eq"), pf.site_groups(conn, by))
+                    actuals, forecast_calc.canon_grades(fs.load_grade_history(conn, by)), (2, 3, 5, 10),
+                    fs.load_table(conn, by, "site_grade_eq"), pf.site_groups(conn, by),
+                    series=pf.price_series(conn, by, years))
                 return clean_json({"base_year": str(by), "window": fs.learning_window(conn, by),
                                    "sources": {"마감": locked, "참고": ref_years}, "runs": runs})
             return _cached_view("backtest", conn, by, compute)

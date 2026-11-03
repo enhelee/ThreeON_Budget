@@ -290,7 +290,7 @@
 /* 합계 열 머리는 «지사명» 줄 오른쪽 끝 — 바로 아래 합계 숫자와 한 열로 읽히게 */
 .fv-rowcap.fv-totcap{grid-column:auto;padding-right:.25rem;text-align:right;white-space:nowrap;color:#0D0D0D}
 .fv-present .fv-scope-name{font-size:3rem}
-/* ── 검토 큐(2026-10-27, views/review.js) ─────────────────────────────
+/* ── 검토 대기(2026-10-27, views/review.js) ─────────────────────────────
    색은 한난 토큰만 쓴다: 잉크(#0D0D0D) 곡선 · ok(#16794A) 진행·덮은 구간 · 선(#E5E5E5) 격자. */
 .rq-segs{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;border-radius:12px;background:#F2F2F2}
 .rq-seg{padding:.3rem .7rem;border-radius:10px;font-size:.8rem;font-weight:600;color:#5D5D5D}
@@ -612,3 +612,113 @@ img.char-img{object-fit:contain;display:inline-block}
 @keyframes chat-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(194,59,43,.35)}50%{box-shadow:0 0 0 6px rgba(194,59,43,0)}}
 @media (prefers-reduced-motion:reduce){.chat-mic--on{animation:none}}
 .chat-voice-note{margin:0;padding:0 1rem .5rem;font-size:.6875rem;color:var(--sub)}
+/* 하위 메뉴(5-1 표준화 세부) — 펼친 사이드바에서만 들여 쓴다(접힌 띠는 .sb-collapsed 규칙이 가운데로 모은다) */
+#sidebar .nav-sub{position:relative;padding-left:2.15rem;font-size:13px}
+/* 하위 메뉴(3-1·3-2·5-1)는 위 메뉴에 가는 «ㄴ» 선으로 이어 붙인다(2026-11-03 grace «메뉴 UI 도 어울리게») */
+#sidebar .nav-sub::before{content:"";position:absolute;left:1.3rem;top:-.35rem;height:calc(50% + .35rem);width:.6rem;border-left:1.5px solid #C9D0DD;border-bottom:1.5px solid #C9D0DD;border-bottom-left-radius:7px;pointer-events:none}
+#sidebar .nav-sub .nav-tag{width:auto;min-width:1.95rem;height:1.45rem;padding:0 .35rem;font-size:10.5px;border-radius:7px}
+.sb-collapsed #sidebar .nav-sub::before{display:none}
+
+/* 5번 표준화 한눈에 보기(views/standard.js) — 지사 × 정비등급 표, 칸마다 총액 · 손익+자본 누적 막대 · 손익·자본 숫자.
+   막대 조각 사이 2px 틈, 끝은 둥글게. 글자는 늘 잉크색(색은 막대·칩에만) */
+.std-chip{display:inline-block;width:.55rem;height:.55rem;margin-right:.3rem;border-radius:2px;vertical-align:baseline}
+.std-heat{width:100%;border-collapse:separate;border-spacing:2px;font-size:13px}
+.std-heat thead th{position:sticky;top:0;background:var(--subtle);padding:.5rem .5rem;font-weight:700;color:var(--ink);text-align:center;white-space:nowrap}
+.std-heat .std-site{position:sticky;left:0;z-index:1;background:#fff;padding:.35rem .75rem;text-align:left;font-weight:600;color:var(--ink);white-space:nowrap}
+.std-heat thead .std-site{background:var(--subtle);font-weight:700;color:#5B6478}
+.std-heat .std-group{padding:.75rem .75rem .25rem;text-align:left;font-size:12px;font-weight:700;color:#98A0B0;background:#fff}
+.std-cell{min-width:8.5rem;border-radius:4px;background:var(--subtle);vertical-align:top}
+.std-cell button{display:flex;flex-direction:column;gap:.3rem;width:100%;padding:.45rem .6rem;text-align:left;color:var(--ink);font-variant-numeric:tabular-nums;border-radius:4px}
+.std-cell button:hover{outline:2px solid var(--navy);outline-offset:-2px}
+.std-tot{font-size:14px;font-weight:700;line-height:1.2}
+.std-bar{display:flex;gap:2px;height:6px}
+.std-bar i{display:block;min-width:2px;height:100%}
+.std-bar i:first-child{border-radius:3px 0 0 3px}
+.std-bar i:last-child{border-radius:0 3px 3px 0}
+.std-bar i:only-child{border-radius:3px}
+.std-sub{font-size:11px;line-height:1.2;color:#5B6478;white-space:nowrap}
+.std-sep{display:inline-block;width:.6rem}
+.std-cell--none{background:transparent;color:#C5CBD6;text-align:center;vertical-align:middle}
+
+/* ── 맨 위 줄 단순화(2026-11-03 grace): 마감 자물쇠 표시 · 이름 메뉴(누르면 로그아웃) ── */
+.year-lock.hidden{display:none}
+.year-lock{display:inline-flex;align-items:center;gap:.25rem;padding:.3rem .65rem;border-radius:999px;background:#F4F6FA;border:1px solid #E3E7EF;font-size:12.5px;font-weight:700;color:#5B6478;white-space:nowrap}
+.op-menu{position:relative}
+.op-menu__name{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .85rem;border-radius:999px;border:1px solid #E3E7EF;background:#fff;font-size:13px;font-weight:700;color:var(--navy);white-space:nowrap}
+.op-menu__name::-webkit-details-marker{display:none}
+.op-menu__name::after{content:"▾";font-size:10px;color:#98A0B0}
+.op-menu__panel{position:absolute;right:0;top:calc(100% + 6px);min-width:140px;padding:.35rem;border-radius:12px;background:#fff;border:1px solid #E3E7EF;box-shadow:0 10px 30px rgba(11,16,32,.12);z-index:40}
+.op-menu__item{display:block;width:100%;text-align:left;padding:.5rem .7rem;border-radius:8px;font-size:13px;font-weight:600;color:var(--ink,#1A2236);background:none;border:0;cursor:pointer}
+.op-menu__item:hover{background:#F4F6FA}
+
+/* ── 단계 안내 줄(1단계 예산 계획, 2026-11-03) — 지금 할 단계가 은은하게 반짝 ── */
+.step-guide{display:flex;flex-wrap:wrap;gap:.5rem;list-style:none;margin:0;padding:0}
+.step-guide__item{display:flex;align-items:center;gap:.5rem;padding:.55rem .95rem;border-radius:999px;background:#fff;border:1px solid #E3E7EF;font-size:13.5px;font-weight:600;color:#7A8294}
+.step-guide__item.is-done{color:var(--navy)}
+.step-guide__item.is-done .step-guide__no{background:var(--status-good,#31876F);color:#fff}
+.step-guide__item.is-now{border-color:var(--navy);color:var(--navy);animation:stepPulse 1.8s ease-in-out infinite}
+.step-guide__item.is-now .step-guide__no{background:var(--navy);color:#fff}
+.step-guide__no{display:grid;place-items:center;width:1.4rem;height:1.4rem;border-radius:999px;background:#EEF1F6;font-size:12px;font-weight:800}
+.step-guide__next{display:flex;align-items:center;gap:.5rem;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
+@keyframes stepPulse{50%{box-shadow:0 0 0 6px rgba(11,16,32,.07)}}
+/* 얇은 업로드 칸 + 캐릭터가 가리키는 안내 */
+.drop-zone.drop-zone--slim{display:flex;align-items:center;gap:.9rem;width:100%;height:auto;min-height:0;padding:1rem 1.1rem}
+.drop-zone--slim:not(:disabled):hover,.drop-zone.is-drag{border-color:var(--navy);background:#F4F6FA}
+.drop-zone__icon{display:grid;place-items:center;flex:none;width:2.6rem;height:2.6rem;border-radius:12px;background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(11,16,32,.08)}
+.plan-hint{display:flex;align-items:center;gap:.5rem;margin:.7rem 0 0 .4rem;font-size:13px;font-weight:600;color:var(--navy)}
+.plan-hint__char{width:34px;height:34px;object-fit:contain}
+.plan-hint__bubble{padding:.35rem .7rem;border-radius:12px;background:#EEF2FA}
+.plan-hint__arrow{font-size:18px;font-weight:800;animation:hintBob 1.2s ease-in-out infinite}
+@keyframes hintBob{50%{transform:translateY(-5px)}}
+/* 사용법 둘러보기(components/tour.js) */
+.tour{position:fixed;inset:0;z-index:90}
+.tour__ring{position:fixed;border-radius:16px;box-shadow:0 0 0 9999px rgba(11,16,32,.45);outline:2px solid #fff;transition:all .25s ease;pointer-events:none}
+.tour__bubble{position:fixed;width:min(340px,calc(100vw - 24px));padding:1rem 1.1rem;border-radius:16px;background:#fff;box-shadow:0 20px 50px rgba(11,16,32,.25)}
+.tour__text{font-size:14px;line-height:1.55;color:var(--ink,#1A2236);font-weight:600}
+.tour__foot{display:flex;align-items:center;gap:.5rem;margin-top:.8rem}
+.tour__count{margin-right:auto;font-size:12px;color:#98A0B0}
+.tour__skip{background:none;border:0;font-size:13px;color:#7A8294;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.step-guide__item.is-now,.plan-hint__arrow{animation:none}.tour__ring{transition:none}}
+.file-dl{display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .6rem;border-radius:999px;border:1px solid #E3E7EF;font-size:12px;font-weight:600;color:var(--navy);background:#fff;white-space:nowrap}
+.file-dl::before{content:"⬇";font-size:11px}
+.file-dl:hover{border-color:var(--navy)}
+
+/* ── 단계 화면 공통(components/stage.js, 2026-11-03) ── */
+.analyze-box{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:1rem;padding:1rem 1.1rem;border-radius:14px;background:#F4F6FA;border:1px solid transparent}
+.analyze-box.is-now{border-color:var(--navy);animation:stepPulse 1.8s ease-in-out infinite}
+.match-card{position:relative;overflow:hidden;padding:1.3rem 1.4rem 1.2rem 1.6rem;border-radius:18px;background:#fff;border:1px solid #E3E7EF}
+.match-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px}
+.match-card--pl::before{background:var(--chart-profit,#718CBF)}.match-card--cap::before{background:var(--chart-capital,#ADB7C9)}
+.match-card__k{font-size:15px;font-weight:700;color:var(--navy)}
+.match-card__v{margin-top:.5rem;font-size:38px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:var(--navy);font-family:"Wanted Sans",Pretendard,sans-serif}
+.match-card__u{margin-left:.35rem;font-size:16px;font-weight:700;color:#7A8294}
+.match-card__sub{margin-top:.5rem;font-size:13px;color:#5B6478}
+.next-cta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding:1.2rem 1.4rem;border-radius:18px;background:#fff;border:1px dashed #C9D0DD}
+.next-cta.is-ready{border:1px solid var(--navy);background:linear-gradient(90deg,#fff,#EEF2FA)}
+.next-cta__k{font-size:12px;font-weight:700;letter-spacing:.08em;color:#98A0B0}
+.next-cta__desc{margin-top:.2rem;font-size:14.5px;font-weight:600;color:var(--ink,#1A2236)}
+.next-cta__btn{display:inline-flex;align-items:center;gap:.5rem;padding:.85rem 1.4rem;border-radius:999px;border:0;background:var(--navy);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+.next-cta:not(.is-ready) .next-cta__btn{background:#C9D0DD}
+.next-cta.is-ready .next-cta__btn{animation:stepPulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.analyze-box.is-now,.next-cta.is-ready .next-cta__btn{animation:none}}
+
+/* 지사 옆 작은 딱지 — 준공 후 묶음 편입 예정 등(views/standard.js siteTag) */
+.std-tag{display:inline-block;margin-left:.4rem;padding:.05rem .4rem;border:1px solid var(--line-strong, #C5CBD6);border-radius:9999px;font-size:10.5px;font-weight:600;line-height:1.4;color:#5B6478;background:#fff;vertical-align:middle;white-space:nowrap}
+
+/* 5 표준화 — 설명은 접어 두고(이 표 읽는 법), 전체보기면 옆 스크롤 없이 한 화면에(2026-11-03 grace) */
+.std-about{margin-top:.6rem}
+.std-about summary{cursor:pointer;width:fit-content;font-size:13px;font-weight:600;color:#5B6478}
+.std-about summary:hover{color:var(--navy)}
+.std-about__list{margin:.6rem 0 0;padding:.75rem 1rem;list-style:none;display:grid;gap:.35rem;border-radius:12px;background:var(--subtle);font-size:13px;line-height:1.55;color:#5B6478}
+.std-about__list b{display:inline-block;min-width:5.2rem;color:var(--ink)}
+.std-fit .std-scroll{overflow-x:visible}
+.std-fit .std-heat{table-layout:fixed;font-size:12px}
+.std-fit .std-heat .std-site{width:8.5rem;white-space:normal;padding:.25rem .5rem}
+.std-fit .std-heat thead th{white-space:normal;padding:.4rem .2rem}
+.std-fit .std-cell{min-width:0}
+.std-fit .std-cell button{gap:.2rem;padding:.3rem .4rem}
+.std-fit .std-sub{display:none}
+.std-fit .std-tag{display:block;margin:.15rem 0 0;width:fit-content;white-space:normal}
+
+/* 메뉴가 화면보다 길면 메뉴만 따로 스크롤(2026-11-03 grace — 6번까지 안 내려가던 문제) */
+#sidebar .sb-nav{scrollbar-width:thin;scrollbar-color:#C5CBD6 transparent;margin-right:-.5rem;padding-right:.5rem}

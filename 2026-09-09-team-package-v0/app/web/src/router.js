@@ -1,3 +1,4 @@
+import { maybeStartTour } from "./components/tour.js"
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
@@ -12,7 +13,8 @@ import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
 import { renderReview } from "./views/review.js"
-import { renderForecast } from "./views/forecast.js"
+import { renderForecast, renderStandardDetail } from "./views/forecast.js"
+import { renderStandard } from "./views/standard.js"
 import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
@@ -30,18 +32,22 @@ import { loadReport, reportYear } from "./views/report.js"
 // 플래그를 두지 않는 이유가 이것이다.
 
 const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "branches",
-                   detail: "detail", review: "review", stats: "stats", forecast: "forecast", settings: "settings"};
+                   detail: "detail", review: "review", stats: "stats", standard: "standard", stddetail: "standard-detail",
+                   forecast: "forecast", settings: "settings"};
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
-// 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
+// 6번 탭의 하위 탭도 주소에 담는다(#/forecast/table). 3-1 지사 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
-const FC_TABS = ["manage", "bench", "table"];
+// 예전 «표준화 (3단계)» 탭(#/forecast/bench)은 5-1 표준화 세부로 떼어 냈다(2026-11-03) — 옛 링크는 그리로 보낸다.
+const FC_TABS = ["manage", "table"];
+// 표준화 두 화면(5 · 5-1)은 6번과 같은 기준연도·가정(state.fc)을 쓴다 — 자료 받기·이벤트 처리가 같다.
+export const FC_VIEWS = ["standard", "stddetail", "forecast"];
 // 4번 통계·설정 탭도 주소에 담는다(#/stats/compare · #/settings/history) — 새로고침·링크 공유에 그 탭이 남게.
 //   첫 탭(손익·연도·학습)은 주소를 짧게 두려고 생략한다. 통계 탭 이름은 주소용 영문으로 바꿔 적는다.
 const STATS_HASH = {손익: "", 자본: "capital", compare: "compare", report: "report"};
 const HASH_STATS = {"": "손익", capital: "자본", compare: "compare", report: "report"};
 const SETTINGS_TABS = ["year", "master", "data", "history"];
 
-/** 화면(+지사) → 주소 조각. 3+ 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
+/** 화면(+지사) → 주소 조각. 3-1 지사 상세는 지사가 곧 화면의 내용이라 주소에 같이 담는다. */
 export function viewHash(view, branch) {
   const h = VIEW_HASH[view] || "home";
   if (h === "detail" && branch) return `#/detail/${encodeURIComponent(branch)}`;
@@ -55,6 +61,7 @@ export function viewHash(view, branch) {
 export function parseHash(hash = location.hash) {
   const m = /^#\/([^/]+)\/?(.*)$/.exec(hash);
   if (!m) return null;
+  if (m[1] === "forecast" && m[2] === "bench") return {view: "stddetail", branch: "", tab: ""};
   const view = HASH_VIEW[m[1]];
   if (!view) return null;
   let branch = "";
@@ -98,6 +105,7 @@ export function bootRoute() {
 export function renderPage() {
   const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
                      branches: renderBranches, detail: renderDetail, review: renderReview, stats: renderStats,
+                     standard: renderStandard, stddetail: renderStandardDetail,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
   const hf = $("#helpFab");
@@ -109,6 +117,7 @@ export function renderPage() {
   if (state.view === "home") observeHomeForecast();
   // 메인에 들어올 때마다 매칭이가 가운데에서 인사하고 오른쪽 아래로 — 누르면 도움말 버튼과 같은 길로 대화를 연다
   maybeFabIntro(() => document.querySelector(".help-fab__btn")?.click());
+  maybeStartTour(state.view);                 // 처음 온 화면이면 사용법 둘러보기
 }
 
 /** 본문은 그대로 두고 머리(연도 목록·마감 배지·분석 버튼·불러오기 실패 배너)만 새로 그린다 —
@@ -120,7 +129,8 @@ export function renderChrome() {
   if (lk) lk.innerHTML = lockBadgeHtml();
   const ys = $("#yearSelect");
   const years = state.years.length ? state.years : [state.year];
-  if (ys) ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("");
+  if (ys) ys.innerHTML = years.map(y => `<option value="${esc(y)}" ${String(y) === String(state.year) ? "selected" : ""}>${esc(y)}년</option>`).join("")
+    + `<option value="__add">＋ 연도 추가…</option>`;   // 1년에 한 번 쓰는 기능이라 버튼 대신 목록 맨 아래(2026-11-03)
   syncAnalyzeButton();
 }
 
@@ -136,7 +146,7 @@ function renderWhenIdle() {
 }
 
 // 메인의 중장기 전망 패널은 화면 중간 아래에 있다 — 전망 계산은 무거워(운영 첫 계산 수십 초) 서버를
-// 붙잡고 다른 화면 요청까지 늦춘다(2026-10-27 실측: 3+ 상세를 여는 동안 33초). 패널이 화면에 들어올 때만 받는다.
+// 붙잡고 다른 화면 요청까지 늦춘다(2026-10-27 실측: 3-1 지사 상세를 여는 동안 33초). 패널이 화면에 들어올 때만 받는다.
 let fcObserver = null;
 function observeHomeForecast() {
   if (state.fc.table || state.fc.homeLoading) return;
@@ -238,7 +248,7 @@ async function settle(jobs, limit = SETTLE_LIMIT) {
 }
 
 export async function navigate(view, opts = {}) {
-  // 3+ 상세는 주소가 지사까지 담는다. 주소에서 온 호출("branch" 키가 있는 경우)은
+  // 3-1 지사 상세는 주소가 지사까지 담는다. 주소에서 온 호출("branch" 키가 있는 경우)은
   // 그 값이 곧 진실이다 - 지사가 적혀 있으면 불러오고, 비어 있으면 선택을 푼다.
   // 키가 없는 내부 호출(changeYear 등)은 보던 지사를 그대로 둔다.
   // ⚠ 주소로 바로 들어온 첫 진입(#/detail/동탄지사)은 아직 연도가 없다 — 연도 없이 상세를 부르면
@@ -282,24 +292,28 @@ export async function navigate(view, opts = {}) {
   if (view === "home" || view === "branches" || view === "detail") {
     jobs.push(["현황", loadStatus], ["지사 목록", loadBranches]);
   }
-  // 메인 «다음 할 일»은 검토 큐 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27) — 화면 아래쪽이라 뒤에서.
-  if (view === "home") later.push(["서버 정보", loadHealth], ["검토 큐", loadReviewBrief]);
-  if (view === "review") jobs.push(["현황", loadStatus], ["검토 큐", loadReviewQueue]);
-  if (view === "forecast") {
-    // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
+  // 메인 «다음 할 일»은 검토 대기 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27) — 화면 아래쪽이라 뒤에서.
+  if (view === "home") later.push(["서버 정보", loadHealth], ["검토 대기", loadReviewBrief]);
+  if (view === "review") jobs.push(["현황", loadStatus], ["검토 대기", loadReviewQueue]);
+  if (FC_VIEWS.includes(view)) {
+    // 기준연도 · 가정 · (화면에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
     // 표준화 결과·정기비용 분리는 무겁다(운영 첫 계산 수 초~수십 초) — 위를 먼저 그리고 그 칸만 «계산 중».
-    if (state.fc.tab === "bench") {
-      state.fc.bench = null; state.fc.regular = null;
-      state.fc.benchLoading = true; state.fc.regularLoading = true;
-      later.push(["표준화 결과", () => loadForecastBench().finally(() => { state.fc.benchLoading = false; })],
-                 ["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
+    // 정기비용 분리는 5-1 세부에서만 쓴다.
+    if (view !== "forecast") {
+      state.fc.bench = null; state.fc.benchLoading = true;
+      later.push(["표준화 결과", () => loadForecastBench().finally(() => { state.fc.benchLoading = false; })]);
+      if (view === "stddetail") {
+        state.fc.regular = null; state.fc.regularLoading = true;
+        later.push(["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
+      }
     }
-    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
-    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
-    if ((state.fc.tab || "manage") === "manage" && (state.fc.manageTab || "grades") === "grades") jobs.push(["정비등급 양식", loadForecastGradePlan]);
-    if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
+    const fcTab = state.fc.tab === "table" ? "table" : "manage";
+    if (view === "forecast" && fcTab === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
+    if (view === "forecast" && fcTab === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
+    if (view === "forecast" && fcTab === "manage" && (state.fc.manageTab || "grades") === "grades") jobs.push(["정비등급 양식", loadForecastGradePlan]);
+    if (view === "forecast" && fcTab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래
@@ -406,8 +420,12 @@ export function syncAnalyzeButton() {
   // (2026-10-18 Aside 검토 — 연도와 무관한 별칭 변경이 마감 연도에도 미반영으로 잡혔다).
   const locked = state.yearLocked === true;
   const n = locked ? 0 : (state.pending?.total || 0);
-  label.textContent = locked ? "마감됨" : n ? "분석 반영" : "분석 실행";
+  label.textContent = n ? "분석 반영" : "분석 실행";
   btn.disabled = locked;
+  // 마감 연도는 누를 수 없는 회색 버튼 대신 연도 옆 «🔒 마감» 표시만(2026-11-03 grace — 버튼처럼 보여 헷갈렸다)
+  btn.hidden = locked;
+  const lk = $("#yearLock");
+  if (lk) { lk.classList.toggle("hidden", !locked); lk.title = `${state.year}년은 마감(잠금) 상태 — 분석·수정하려면 설정에서 마감을 해제하세요`; }
   btn.classList.toggle("btn-pending", n > 0);
   btn.title = locked ? `${state.year}년은 마감(잠금) 상태 — 분석하려면 설정에서 마감을 해제하세요`
     : n ? `저장된 변경 ${n}건을 분석에 반영합니다` : "손익·자본 매칭 분석 실행";

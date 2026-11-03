@@ -25,7 +25,7 @@ def ask(q, view="home", year="2025", provider=None):
 
 
 def test_normalize_and_year():
-    assert ce.normalize("  검토 큐, 열어 줘!") == "검토큐열어줘"
+    assert ce.normalize("  검토 대기, 열어 줘!") == "검토대기열어줘"
     assert ce.find_year("25년 동탄") == "2025"
     assert ce.find_year("2024 손익") == "2024"
     assert ce.find_year("작년 실적", "2025") == "2024"
@@ -49,15 +49,16 @@ def test_normalize_and_year():
     ("새 연도는 어떻게 만들어?", "help.howto", "#/settings/master"),
     ("예산 계획 양식 다운받을 수 있어?", "help.howto", "plan_template"),
     ("계획 양식 받을 수 있어?", "help.howto", "plan_template"),
-    ("검토 큐 열어줘", "nav.goto", "#/review"),
+    ("검토 대기 열어줘", "nav.goto", "#/review"),
     ("변경 이력 보여줘", "nav.goto", "#/settings/history"),
     ("전년 대비 보여줘", "nav.goto", "#/stats/compare"),
-    ("3+ 상세 열어줘", "nav.goto", "#/detail"),
-    ("표준화 열어줘", "nav.goto", "#/forecast/bench"),
+    ("3-1 지사 상세 열어줘", "nav.goto", "#/detail"),
+    ("표준화 열어줘", "nav.goto", "#/standard"),
+    ("표준화 세부 열어줘", "nav.goto", "#/standard-detail"),
     ("실적 집계로 가자", "nav.goto", "#/collect"),
-    ("검토 큐", "nav.goto", "#/review"),
+    ("검토 대기", "nav.goto", "#/review"),
     # 말로 물을 때(음성 → 글자) 흔한 높임·띄어쓰기 — «가 주세요»·«보여 주세요»
-    ("검토 큐로 가 주세요", "nav.goto", "#/review"),
+    ("검토 대기로 가 주세요", "nav.goto", "#/review"),
     ("중장기 전망 보여 주세요", "nav.goto", "#/forecast/table"),
     ("메인으로 가 줘", "nav.goto", "#/home"),
     ("올해 어디까지 했어?", "status.progress", None),
@@ -92,7 +93,7 @@ def test_fallback_chips_are_understood():
 
 def test_screen_hashes_match_router():
     src = open(os.path.join(APP_DIR, "web", "src", "router.js"), encoding="utf-8").read()
-    view_hash = dict(re.findall(r'(\w+): "(\w+)"', src.split("const VIEW_HASH = {", 1)[1].split("};", 1)[0]))
+    view_hash = dict(re.findall(r'(\w+): "([\w-]+)"', src.split("const VIEW_HASH = {", 1)[1].split("};", 1)[0]))
     known = set(view_hash.values())
     for hash_, _, _ in kb.SCREENS:
         parts = hash_[2:].split("/")
@@ -165,7 +166,7 @@ def _audit_count():
 
 def test_api_chat_answers_and_is_not_audited(client):
     before = _audit_count()
-    r = client.post("/api/chat", json={"question": "검토 큐 열어줘", "context": {"view": "review", "year": "2025"}})
+    r = client.post("/api/chat", json={"question": "검토 대기 열어줘", "context": {"view": "review", "year": "2025"}})
     assert r.status_code == 200
     body = r.json()
     assert body["answer"]["intent"] == "nav.goto" and body["answer"]["engine"] == "rule"
@@ -191,7 +192,7 @@ def test_api_chat_suggestions(client):
 
 
 def test_no_menu_numbers_in_answers():
-    """사이드바 번호(«4 통계», «3+ 상세»)는 대화에서 읽기 어색하다 — 화면 이름만 쓴다(10/27 사용자 의견)."""
+    """사이드바 번호(«4 통계», «3-1 지사 상세»)는 대화에서 읽기 어색하다 — 화면 이름만 쓴다(10/27 사용자 의견)."""
     import re as _re
     texts = [f["text"] for f in kb.FAQ] + [link[0] for f in kb.FAQ for link in f["links"]] + [n for _, n, _ in kb.SCREENS]
     for t in texts:
@@ -203,7 +204,7 @@ def test_ops_questions_removed():
 
 
 def test_nav_moves_right_away_and_help_points_at_button():
-    nav = ask("검토 큐 열어줘")
+    nav = ask("검토 대기 열어줘")
     assert nav["go"] == "#/review"
     lock = ask("마감은 어떻게 해?")
     assert "go" not in lock                                  # 사용법은 버튼만 — 사람이 누를 때 간다

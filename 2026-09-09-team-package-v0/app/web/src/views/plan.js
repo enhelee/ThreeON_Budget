@@ -1,32 +1,32 @@
 import { lockedSay } from "../components/characters.js"
-import { yearPicker } from "../components/widgets.js"
+import { fileList, nextStep, slimDrop, stepGuide } from "../components/stage.js"
 import { state } from "../state.js"
-import { esc, fmt } from "../util.js"
+import { esc } from "../util.js"
 
+// 1단계 화면(2026-11-03 grace «처음 보면 뭘 하라는지 모르겠다»): 위에 세 단계 안내(지금 할 단계가 반짝),
+// 파일이 없으면 캐릭터가 업로드 칸을 가리키고, 처음 온 사람에게는 사용법 둘러보기(components/tour.js).
+// 화면 안 연도 고르기 칸은 맨 위 줄과 같은 기능이라 뺐다. 조각은 components/stage.js(2단계와 같이 쓴다).
 export function renderBudget() {
   const ds = (state.status?.datasets || []).filter(d => d.kind === "plan" && String(d.year) === String(state.year));
   const locked = !!state.status?.locked;
   return `
-    <div class="space-y-6">
-      <section><p class="text-sm font-semibold text-ink">STAGE 1</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 계획 등록</h2></section>
+    <div class="space-y-5">
+      <section class="flex flex-wrap items-end justify-between gap-3"><div><p class="text-sm font-semibold text-ink">STAGE 1</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 계획 등록</h2></div>
+        <button type="button" class="btn-secondary" data-action="tour" data-tour="budget">사용법 보기</button></section>
       ${locked ? lockedSay("업로드가 차단됩니다.") : ""}
-      <section class="panel p-5">${yearPicker("bp")}</section>
-      <section class="grid gap-6 xl:grid-cols-[1fr_.75fr]">
-        <article class="panel p-6"><h3 class="section-title">계획본 업로드 — <span class="text-ink">${esc(state.year)}년</span>으로 등록</h3>
-          <button class="drop-zone flex w-full flex-col items-center justify-center px-6 text-center ${locked ? "cursor-not-allowed opacity-50" : "hover:border-ink"}" data-action="pick-plan" ${locked ? 'disabled aria-disabled="true" title="마감된 연도 — 설정 탭에서 해제 후 업로드"' : ""}>
-            <span class="grid h-12 w-12 place-items-center rounded-card bg-white text-ink"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4L8 8M5 14v5h14v-5"/></svg></span>
-            <span class="mt-4 font-bold text-ink">계획 Excel(xlsx) 선택 — 여러 개 가능</span>
-            <span class="mt-1 text-sm text-ink">손익·자본·건설공사를 함께 고르면 한 계획으로 합쳐 흡수됩니다</span></button>
+      ${stepGuide(["계획 엑셀 올리기", "올라간 파일 확인", "다음 단계로"], ds.length ? 3 : 1, "예산 계획 단계")}
+      <section class="grid gap-5 xl:grid-cols-[1fr_.85fr]">
+        <article class="panel p-5"><h3 class="section-title">① 계획 엑셀 올리기 <span class="text-base font-semibold text-sub">· ${esc(state.year)}년</span></h3>
+          ${slimDrop({action: "pick-plan", drop: "plan", title: "계획 엑셀 선택 또는 끌어다 놓기",
+                      sub: "손익·자본·건설공사 파일을 함께 고르면 한 계획으로 합쳐져요 (.xlsx)", locked, empty: !ds.length, hint: "여기를 눌러 계획 엑셀을 올려요"})}
           <input id="planFile" class="hidden" type="file" accept=".xlsx" multiple>
         </article>
-        <article class="panel p-6"><h3 class="section-title">이 연도의 계획 데이터셋</h3>
-          <div class="dataset-box">${ds.length ? `<ul class="space-y-2 text-sm">${ds.map((d, i) => `<li class="flex items-center justify-between gap-3 rounded-control ${i === 0 ?"border border-line-strong bg-base" : "bg-base"} p-3"><div><p class="font-semibold text-ink">${esc(d.label)}</p><p class="text-xs text-sub">${d.row_count.toLocaleString()}행 · ${fmt(d.total_amount)} 천원 · ${esc(d.uploaded_at)}</p></div>${i === 0 ? '<span class="badge bg-subtle text-ink">사용중</span>' : '<span class="badge bg-subtle text-sub">이전본</span>'}</li>`).join("")}</ul>` : `<p class="grid h-full place-items-center text-sm text-sub">${esc(state.year)}년 계획이 아직 없습니다.</p>`}</div>
-          <ul class="mt-3 space-y-0.5 text-xs text-sub">
-            <li>* 가장 최근 업로드된 자료가 사용됩니다.</li>
-            <li>* 나누어서 작성된 자료는 하나의 자료로 병합하여 업로드하여 주시기 바랍니다.</li>
-          </ul>
+        <article class="panel p-5 plan-files"><h3 class="section-title">② 올라간 계획 파일</h3>
+          <div class="mt-4">${fileList(ds, {emptyText: `${esc(state.year)}년 계획 파일이 아직 없어요. 왼쪽에서 올리면 여기에 보여요.`, showAmount: true})}</div>
         </article>
       </section>
+      ${nextStep({view: "collect", label: "실적 집계로", ready: ds.length > 0,
+                  desc: ds.length ? "계획이 올라갔어요. 이제 ERP 전표(zrfm2)를 올려 실적을 모아요." : "계획 엑셀을 먼저 올린 뒤 넘어가요."})}
     </div>`;
 }
 

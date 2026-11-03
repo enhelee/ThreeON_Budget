@@ -14,6 +14,7 @@ import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, PICK_SORTS, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 import { rqChange, rqClick, rqKey } from "./review_actions.js"
+import { startTour } from "./components/tour.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -37,7 +38,7 @@ async function saveAlias(kind, mapping, msg) {
 document.addEventListener("click", async e => {
   // 5번 탭(전망)의 클릭은 forecast_actions.js 가 맡는다 — 이 파일을 더 키우지 않기 위해서다.
   if (await fcClick(e)) return;
-  if (await rqClick(e)) return;                   // 검토 큐 — review_actions.js
+  if (await rqClick(e)) return;                   // 검토 대기 — review_actions.js
   if (await onReportClick(e)) return;             // 4번 한글 보고서 — views/report.js
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
@@ -68,7 +69,7 @@ document.addEventListener("click", async e => {
     await changeYear(gy.dataset.goyear);
     if (y0 !== null) window.scrollTo({top: y0, behavior: "instant"});
     return; }
-  // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
+  // 드릴다운: 통계 과목 → 지사 → 3-1 지사 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
   const st = e.target.closest("[data-stat-item]");
   if (st && !e.target.closest("button")) {
     state.statOpen = state.statOpen === st.dataset.statItem ? null : st.dataset.statItem;
@@ -83,7 +84,7 @@ document.addEventListener("click", async e => {
       const d = state.det;
       d.item = dr.dataset.drillItem || "";
       d.budget = dr.dataset.drillBudget || "all";
-      // 검토 큐에서 오면 사업명까지 정해져 있다 — 그 사업만 걸러 전표를 펼친다.
+      // 검토 대기에서 오면 사업명까지 정해져 있다 — 그 사업만 걸러 전표를 펼친다.
       const name = dr.dataset.drillName || "";
       d.q = name; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
       const hit = d.data.biz.map((b, idx) => ({b, key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}))
@@ -170,7 +171,7 @@ document.addEventListener("click", async e => {
   if (sttab) { await openStatsTab(sttab.dataset.stattab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
   if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
-  // 3+ 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.
+  // 3-1 지사 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.
   if (act === "det-back") { await navigate("detail", {branch: ""}); return; }
   const ps = e.target.closest("[data-pick-sort]");
   if (ps) {
@@ -202,6 +203,15 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-training") { state.trainingName = e.target.closest("[data-action]").dataset.name; $("#trainingFile").click(); return; }
   if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
+  if (act === "std-fit") {   // 5 표준화 표 — 옆으로 밀지 않고 한 화면에(전체보기)
+    state.stdFit = !state.stdFit
+    const btn = e.target.closest("[data-action]")
+    $("#stdPanel")?.classList.toggle("std-fit", state.stdFit)
+    btn.textContent = state.stdFit ? "원래 크기로" : "전체보기"
+    btn.setAttribute("aria-pressed", String(state.stdFit))
+    return;
+  }
+  if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
   if (act === "add-alias") {
@@ -453,6 +463,8 @@ document.addEventListener("click", async e => {
   }
   // 해제는 사유를 받는다 — 마감된 숫자는 대외 보고에 쓰인 값이라,
   // 나중에 «왜 그 해 숫자가 달라졌지»에 답할 수 있어야 한다.
+  // 마감 안내의 «설정에서 마감 해제» 바로가기 — 설정 › 연도 탭으로 바로(2026-11-03 grace)
+  if (act === "go-unlock") { state.settingsTab = "year"; await navigate("settings"); return; }
   if (act === "unlock-year") {
     const year = e.target.closest("[data-action]").dataset.year || state.year;
     const reason = prompt(`${year}년은 마감된 값입니다.\n` + "여는 이유를 적어 주세요 — 변경 이력에 남고, 다시 마감할 때까지 전 화면에 표시됩니다.");
@@ -528,7 +540,8 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   if (await fcChange(e)) return;                 // 5번 탭(전망) 입력 — forecast_actions.js
-  if (rqChange(e)) return;                       // 검토 큐 거르기·옮길 사업 — review_actions.js
+  if (rqChange(e)) return;                       // 검토 대기 거르기·옮길 사업 — review_actions.js
+  if (e.target.id === "yearSelect" && e.target.value === "__add") { e.target.value = state.year; addYearFromInput(null); return; }
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
   if (await onReportChange(e)) return;           // 한글 보고서 안의 «보고서 연도»
   // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
@@ -705,7 +718,7 @@ window.addEventListener("hashchange", () => setTimeout(() => { chatOnViewChange(
 
 // 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
 // (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
-// 화면 일부만 다시 그리는 곳(3+ 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
+// 화면 일부만 다시 그리는 곳(3-1 지사 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
 const CLICKABLE_ROW = "#page .clickable:not(button):not(a):not(input):not(select)";
 const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tabindex])`)
   .forEach(el => el.setAttribute("tabindex", "0"));
@@ -718,7 +731,7 @@ document.addEventListener("focusout", e => { onReportBlur(e); });
 document.addEventListener("keydown", e => {
   if (onReportKey(e)) return;
   if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
-  if (rqKey(e)) { e.preventDefault(); return; }   // 검토 큐 단축키 — review_actions.js
+  if (rqKey(e)) { e.preventDefault(); return; }   // 검토 대기 단축키 — review_actions.js
   if (e.key === "Escape" && chatIsOpen()) { closeChat(); renderPage(); syncFabMini(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(CLICKABLE_ROW)) {
     e.preventDefault(); e.target.click(); return;
@@ -738,7 +751,6 @@ $("#menuButton").addEventListener("click", openMenu);
 
 $("#backdrop").addEventListener("click", closeMenu);
 
-$("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
 
 // 게이트 폼은 views/gate.js 가 매번 새로 그리므로 직접 바인딩하지 않고 위임한다.
 // (예전 #loginForm 은 index.html 에 고정돼 있어 직접 바인딩했지만 이제 없다 —
@@ -818,3 +830,20 @@ window.addEventListener("hashchange", onHashChange);
 checkAuth()
   .then(ok => { if (ok) bootRoute(); })
   .catch(() => bootRoute());
+
+// 업로드 칸에 파일 끌어다 놓기(2026-11-03) — data-drop="plan|erp" 칸만. 마감 연도면 칸이 disabled 라 받지 않는다.
+document.addEventListener("dragover", e => {
+  const z = e.target.closest?.("[data-drop]");
+  if (!z || z.disabled) return;
+  e.preventDefault(); z.classList.add("is-drag");
+});
+document.addEventListener("dragleave", e => { e.target.closest?.("[data-drop]")?.classList.remove("is-drag"); });
+document.addEventListener("drop", e => {
+  const z = e.target.closest?.("[data-drop]");
+  if (!z) return;
+  e.preventDefault(); z.classList.remove("is-drag");
+  if (z.disabled) return;
+  const files = [...(e.dataTransfer?.files || [])].filter(f => /\.xlsx$/i.test(f.name));
+  if (!files.length) { toast("엑셀(.xlsx) 파일만 올릴 수 있어요."); return; }
+  uploadFile(z.dataset.drop, z.dataset.drop === "plan" ? files : files[0]);
+});

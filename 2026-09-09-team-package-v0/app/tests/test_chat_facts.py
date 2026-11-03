@@ -95,7 +95,7 @@ def test_ltsa_spelling():
 
 def test_other_questions_unchanged():
     assert ask("마감은 어떻게 해?")["intent"] == "help.howto"
-    assert ask("검토 큐 열어줘")["intent"] == "nav.goto"
+    assert ask("검토 대기 열어줘")["intent"] == "nav.goto"
     assert ask("올해 어디까지 했어?")["intent"] == "status.progress"
 
 

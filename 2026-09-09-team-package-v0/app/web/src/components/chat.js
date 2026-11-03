@@ -76,7 +76,7 @@ function render() {
     <div class="chat-log" id="chatLog" aria-live="polite">${log}</div>
     ${sugg ? `<div class="chat-sugg">${sugg}</div>` : ""}
     <form class="chat-form" data-chat-form>
-      <input id="chatInput" class="control" maxlength="300" autocomplete="off" placeholder="${VOICE_OK ? "예: 검토 큐로 가 줘 · 🎤 로 말해도 돼요" : "예: 마감은 어떻게 해?"}" aria-label="질문" ${chat.busy ? "disabled" : ""}>
+      <input id="chatInput" class="control" maxlength="300" autocomplete="off" placeholder="${VOICE_OK ? "예: 검토 대기로 가 줘 · 🎤 로 말해도 돼요" : "예: 마감은 어떻게 해?"}" aria-label="질문" ${chat.busy ? "disabled" : ""}>
       ${VOICE_OK ? `<button type="button" class="chat-mic${voice.on ? " chat-mic--on" : ""}" data-chat-mic
         aria-pressed="${voice.on}" aria-label="${voice.on ? "듣기 멈추기" : "말로 묻기"}" title="말로 묻기(내장 마이크 · 브라우저 음성 인식)" ${chat.busy ? "disabled" : ""}>🎤</button>` : ""}
       <button class="btn-primary" type="submit" ${chat.busy ? "disabled" : ""}>보내기</button>
