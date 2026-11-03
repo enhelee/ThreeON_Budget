@@ -173,8 +173,10 @@ def has_ltsa_detail(actuals_df: pd.DataFrame) -> bool:
 # ── 정기비용 성격 판정 (표준화 방향 1·4-4) ─────────────────────────────────────
 # 등급별 표준화에서 빼는 실적. 기계장치의 고온부품재생·LTSA·CRI 는 연도별 집행계획(고온부품·
 # 정기계약·CRI 규칙)으로 따로 잡고, 정기유지보수 안의 LTSA(동탄 GT·연료전지)도 같다.
+# 투자비(건설공사 3과목) 전표도 같다 — 기계장치와 서로 전용되는 주머니라 같은 판정을 쓴다(2026-11-03).
 REGULAR_EXCLUDED = {"기계장치": {"LTSA", "CRI", "고온부품재생"},
-                    "수선유지비-열원정기유지보수": {"LTSA"}}
+                    "수선유지비-열원정기유지보수": {"LTSA"},
+                    **{a: {"LTSA", "CRI", "고온부품재생"} for a in config_store.INVEST_ITEMS}}
 _RE_SPACE = re.compile(r"\s+")
 _RE_CRI = re.compile(r"(?<![A-Z])CRI(?![A-Z])")      # «CRITICAL» 같은 낱말 속 CRI 는 아님
 
@@ -186,7 +188,7 @@ def regular_type(account: str, name) -> str:
     n = _RE_SPACE.sub("", str(name or "")).upper()
     if "LTSA" in n or "장기유지보수" in n or "장기서비스" in n:
         return "LTSA"
-    if account == "기계장치":
+    if account == "기계장치" or account in config_store.INVEST_ITEMS:
         if _RE_CRI.search(n) or "로터" in n:
             return "CRI"
         if "고온부품" in n or (("재생" in n) and ("GT" in n or "가스터빈" in n)):

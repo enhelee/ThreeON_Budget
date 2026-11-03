@@ -62,6 +62,8 @@ const eok = v => { const x = (Number(v) || 0) / 1e5; return Math.abs(x) >= 100 ?
 
 export function renderCollect() {
   const ds = (state.status?.datasets || []).filter(d => d.kind === "erp" && String(d.year) === String(state.year));
+  // 투자비(건설공사 3과목) 전표 — zrfm2 에 계정이 없어 같은 양식으로 따로 올린다. 분석은 zrfm2 와 합쳐 자본 실적으로(2026-11-03 팀장)
+  const dsInv = (state.status?.datasets || []).filter(d => d.kind === "erp_invest" && String(d.year) === String(state.year));
   const runs = state.status?.runs || {};
   const locked = !!state.status?.locked;
   const lockAttr = locked ? 'disabled aria-disabled="true" title="마감된 연도 — 설정에서 해제 후 사용"' : "";
@@ -85,6 +87,9 @@ export function renderCollect() {
           ${slimDrop({action: "pick-erp", drop: "erp", title: "zrfm2 엑셀 선택 또는 끌어다 놓기",
                       sub: "SAP 에서 내려받은 zrfm2 파일 하나 (.xlsx)", locked, empty: !ds.length, hint: "여기를 눌러 zrfm2 엑셀을 올려요"})}
           <input id="erpFile" class="hidden" type="file" accept=".xlsx">
+          ${slimDrop({action: "pick-erp-invest", drop: "erp-invest", title: "투자비 전표 (선택) 선택 또는 끌어다 놓기",
+                      sub: "외주비-열원공사비·재료비-열원자재비·외주비-열원기술용역비 전표 — zrfm2 와 같은 양식 · 자본 실적으로 함께 매칭", locked, empty: false, hint: ""})}
+          <input id="erpInvestFile" class="hidden" type="file" accept=".xlsx">
           <div class="analyze-box ${now === 2 ? "is-now" : ""}">
             <div><p class="font-semibold text-ink">② 자동 매칭 분석 (${esc(state.year)}년)</p><p class="text-xs text-sub">손익·자본을 한 번에 실행해요 (약 1분) · 학습 DB 자동 적용</p></div>
             <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-40" data-action="analyze" ${lockAttr}>분석 실행</button>
@@ -92,6 +97,7 @@ export function renderCollect() {
         </article>
         <article class="panel p-5 plan-files"><h3 class="section-title">올라간 전표 파일</h3>
           <div class="mt-4">${fileList(ds, {emptyText: `${esc(state.year)}년 전표 파일이 아직 없어요. 왼쪽에서 올리면 여기에 보여요.`, showAmount: false})}</div>
+          ${dsInv.length ? `<h4 class="mt-5 text-sm font-semibold text-ink">투자비 전표</h4><div class="mt-2">${fileList(dsInv, {emptyText: "", showAmount: false})}</div>` : ""}
         </article>
       </section>
       <section class="match-results"><h3 class="section-title">③ 매칭 결과</h3><div class="mt-4 grid gap-4 md:grid-cols-2">${sums}</div></section>

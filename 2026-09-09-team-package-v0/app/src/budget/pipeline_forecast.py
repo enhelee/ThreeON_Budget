@@ -183,13 +183,19 @@ def actuals_with_reference(conn, base_year):
     같은 연도는 마감 실적이 이긴다 — 마감 = 대외 보고 확정값.
     설정 «투자비표준화»가 켜져 있으면 투자비 실적(investment_actual — 전표에 계정이 없어 실적 분석 엑셀에서
     가져온 건설공사 3과목)도 더한다. 그러면 투자비도 다른 과목처럼 표준금액이 생긴다.
-    그 안의 LTSA·CRI·고온부품재생은 기계장치처럼 뺀다 — 연도별 계획표(정기계약·CRI·고온부품)로 따로 잡혀서다."""
+    그 안의 LTSA·CRI·고온부품재생은 기계장치처럼 뺀다 — 연도별 계획표(정기계약·CRI·고온부품)로 따로 잡혀서다.
+    마감 실적에 투자비 전표(«투자비 전표» 업로드, 자본 실적)가 있는 해는 마감 실적이 이긴다 — 같은 돈을 두 번 세지 않게."""
     actuals, years_used = locked_actuals_detail(conn, base_year)
     if fs.invest_std_on(conn, base_year):
         inv = fs.load_table(conn, base_year, "investment_actual")
-        planned = benchmark.REGULAR_EXCLUDED["기계장치"]
-        inv = inv[(inv["금액"] != 0) & ~inv["사업명"].map(lambda n: benchmark.regular_type("기계장치", n) in planned)] \
-            if not inv.empty else inv
+        covered = set(actuals.loc[actuals["예산과목"].isin(config_store.INVEST_ITEMS), "연도"].astype(int)) \
+            if not actuals.empty else set()
+        if not inv.empty:
+            # LTSA·CRI·고온부품재생 사업은 여기서 바로 뺀다 — 표준화뿐 아니라 A급정비 1회 금액의 규모비(site_scales)에도
+            # 들어가지 않게(#109 동작 그대로. 남겨 두면 다른 지사 A급정비가 달라진다 — 2026-11-03 운영 실측 −6억)
+            kinds = [benchmark.regular_type(a, n) for a, n in zip(inv["예산과목"], inv["사업명"])]
+            planned = [k in benchmark.REGULAR_EXCLUDED.get(a, ()) for a, k in zip(inv["예산과목"], kinds)]
+            inv = inv[(inv["금액"] != 0) & ~inv["연도"].isin(covered) & ~pd.Series(planned, index=inv.index)]
         if not inv.empty:
             inv = inv.assign(유형="기타", 유형출처="투자비실적")[DETAIL_COLS]
             actuals = pd.concat([actuals, inv], ignore_index=True) if not actuals.empty else inv.reset_index(drop=True)
