@@ -57,7 +57,8 @@ export function rqSummarize(items) {
   return {total: items.length, open: curve.length, resolved: items.length - curve.length,
           high_open: items.filter(it => !it.resolved && it.risk === "높음").length,
           amount_total: total, amount_resolved: done, amount_open: total - done,
-          progress: total ? done / total : 1, n80: i80 < 0 ? curve.length : i80 + 1, cover_target: COVER, counts}
+          progress: total ? done / total : 1, n80: i80 < 0 ? curve.length : i80 + 1, cover_target: COVER, counts,
+          pair_open: items.filter(it => !it.resolved && it.pair).length}
 }
 
 export function isResolved(status) { return RESOLVED.has(status) }
@@ -111,7 +112,7 @@ export function rqFiltered() {
   const r = state.rq
   return (r.data?.items || []).filter(it =>
     (r.show === "all" || (r.show === "done" ? it.resolved : !it.resolved))
-    && (!r.reason || it.reasons.some(x => x.code === r.reason))
+    && (!r.reason || (r.reason === "pair" ? !!it.pair : it.reasons.some(x => x.code === r.reason)))
     && (!r.branch || it.branch === r.branch)
     && (r.budget === "all" || it.budget === r.budget))
 }
@@ -123,7 +124,7 @@ function filterHtml(sm, items) {
   const show = (v, label) => `<button class="rq-seg ${r.show === v ? "rq-seg--on" : ""}" data-rq="show" data-v="${v}">${label}</button>`
   return `
     <section class="panel flex flex-wrap items-center gap-3 p-4">
-      <div class="flex flex-wrap gap-2">${chip("", "전체", sm.open)}${RQ_REASONS.map(([c, l]) => chip(c, l, sm.counts?.[c] || 0)).join("")}</div>
+      <div class="flex flex-wrap gap-2">${chip("", "전체", sm.open)}${RQ_REASONS.map(([c, l]) => chip(c, l, sm.counts?.[c] || 0)).join("")}${chip("pair", "상쇄 짝", sm.pair_open || 0)}</div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <label class="text-sm text-sub">예산
           <select class="control ml-1 !w-auto" data-rq-sel="budget">
@@ -231,14 +232,59 @@ function suggestHtml(it, locked) {
   const recs = nominate.filter(v => v.suggest)
   const head = (t, extra = "") => `<div class="flex flex-wrap items-center justify-between gap-2"><h4 class="text-sm font-semibold text-ink">${t}</h4>${extra}</div>`
   const list = (rows, mode) => `<ul class="mt-2 space-y-2">${rows.map(v => voucherRow(v, it, locked, mode)).join("")}</ul>`
+  const pairBlock = pairListHtml(it, sg, locked)
   return `<div class="rq-sugg">
+      ${pairBlock ? `<div class="${nominate.length || sg.incoming.length ? "mb-4" : ""}">${pairBlock}</div>` : ""}
       ${nominate.length ? head(`이 줄의 큰 전표 ${fmt(nominate.length)}건 / 전체 ${fmt(sg.voucher_total)}건${recs.length ? ` · 추천 ${recs.length}건` : ""}`,
           recs.length > 1 && !locked ? `<button class="btn-primary rq-btn" data-rq="move-all" data-key="${esc(it.key)}">추천 ${recs.length}건 모두 옮기기</button>` : "")
         + list(nominate, "out") : ""}
       ${sg.incoming.length ? `<div class="${nominate.length ? "mt-4" : ""}">${head("같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표")}${list(sg.incoming, "in")}</div>` : ""}
-      ${!nominate.length && !sg.incoming.length ? '<p class="text-sm text-sub">옮길 만한 전표가 없어요.</p>' : ""}
-      <p class="mt-3 text-xs text-tri">추천 = 전표 글자가 다른 계획 사업 이름과 분명히 더 닮았을 때만(유사도 0.75↑, 설비·연도가 같을 때). 옮긴 전표는 상단 «분석 반영» 때 결과에 들어가요.</p>
+      ${!nominate.length && !sg.incoming.length && !(sg.pairs || []).length ? '<p class="text-sm text-sub">옮길 만한 전표가 없어요.</p>' : ""}
+      <p class="mt-3 text-xs text-tri">추천 = 전표 글자가 다른 계획 사업 이름과 분명히 더 닮았을 때만(유사도 0.75↑, 설비·연도가 같을 때). 짝 추천 = 같은 과목의 덜 쓴 줄 부족분과 금액이 맞거나(한 장, 또는 같은 계약 월별·분납 묶음의 합) 그 이름을 더 닮은 전표(부족분·초과분 안에서만). 옮긴 전표는 상단 «분석 반영» 때 결과에 들어가요.</p>
     </div>`
+}
+
+// 상쇄 짝 — 같은 지사·과목에서 반대 방향으로 벌어진 줄. 사유를 쓰기 전에 «전표가 섞였나»부터 보라는 표시.
+function pairHtml(it) {
+  const p = it.pair
+  if (!p) return ""
+  const verb = it.dir === "over" ? "덜" : "더"
+  const names = p.partners.map(x => `«${esc(x.name)}» ${fmt(x.gap)} 천원`).join(", ")
+  const more = p.partner_total > p.partners.length ? ` 외 ${fmt(p.partner_total - p.partners.length)}건` : ""
+  const tail = p.kind === "상쇄형" ? "과목 총액은 계획대로라 전표가 섞였을 가능성이 커요" : "과목 총액도 벌어져 일부만 섞였을 수 있어요"
+  return `<p class="mt-2 text-sm text-warn">같은 과목에서 ${names}${more} ${verb} 썼어요 — ${tail} (메울 수 있는 금액 ${fmt(p.offset)} 천원)</p>`
+}
+
+function pairListHtml(it, sg, locked) {
+  const pairs = sg.pairs || []
+  if (!pairs.length) {
+    return it.pair ? '<p class="text-sm text-sub">짝 줄로 옮길 만한 전표는 못 찾았어요 — 아래 전표를 직접 골라 옮기거나 사유를 적어 주세요.</p>' : ""
+  }
+  const dis = locked ? 'disabled title="마감 연도 — 재배정 불가"' : ""
+  const rows = pairs.map(m => {
+    const out = m.from === it.name
+    const text = m.텍스트 ? esc(m.텍스트) : '<span class="text-tri">(전표 글자 없음)</span>'
+    const btn = out
+      ? `<button class="btn-primary rq-btn" data-rq="move" data-key="${esc(it.key)}" data-id="${m.erp_row_id}" data-target="${esc(m.target)}" ${dis}>짝으로 옮기기</button>`
+      : `<button class="btn-primary rq-btn" data-rq="pull" data-key="${esc(it.key)}" data-id="${m.erp_row_id}" ${dis}>이리로 가져오기</button>`
+    return `<li class="rq-voucher rq-voucher--rec">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <span class="text-xs text-sub">${esc(m.전기일 || "")}</span>
+          <span class="min-w-0 flex-1 break-all text-ink">${text}</span>
+          <span class="font-semibold text-ink">${fmt(m.금액천원)}<span class="ml-0.5 text-xs text-tri">천원</span></span>
+        </div>
+        <div class="mt-1.5 flex flex-wrap items-center gap-2">
+          <span class="min-w-0 flex-1"><span class="rq-rec">${m.exact ? "금액 일치" : m.combo ? `묶음 합 ${m.combo}` : "짝 추천"}</span>
+            <span class="font-semibold text-ink">«${esc(m.from)}» → «${esc(m.target)}»</span>
+            <span class="block text-xs text-sub">${esc(m.why)}</span></span>
+          ${btn}
+        </div>
+      </li>`
+  }).join("")
+  const all = pairs.length > 1 && !locked
+    ? `<button class="btn-primary rq-btn" data-rq="pair-all" data-key="${esc(it.key)}">짝 추천 ${pairs.length}건 모두 옮기기</button>` : ""
+  return `<div class="flex flex-wrap items-center justify-between gap-2"><h4 class="text-sm font-semibold text-ink">상쇄 짝 추천 ${fmt(pairs.length)}건</h4>${all}</div>
+    <ul class="mt-2 space-y-2">${rows}</ul>`
 }
 
 function cardHtml(it, locked) {
@@ -251,6 +297,7 @@ function cardHtml(it, locked) {
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="badge ${it.risk === "높음" ? "bg-err-bg text-err" : "bg-subtle text-sub"}">${esc(it.risk)}</span>
             ${it.reasons.map(x => `<span class="badge ${REASON_CLS[x.code] || "bg-subtle text-ink"}">${esc(x.label)}</span>`).join("")}
+            ${it.pair ? `<span class="badge bg-warn-bg text-warn" title="같은 지사·과목에 반대 방향으로 벌어진 줄이 있어요">상쇄 짝 · ${esc(it.pair.kind)}</span>` : ""}
             ${st ? `<span class="badge ${st[1]}">${esc(st[0])}</span>` : ""}
           </div>
           <p class="mt-1.5 break-keep font-semibold text-ink">${esc(it.name)}</p>
@@ -261,6 +308,7 @@ function cardHtml(it, locked) {
           </div>
           ${bulletHtml(it)}
           <ul class="mt-2 space-y-0.5 text-sm text-ink">${it.reasons.map(x => `<li>${esc(x.text)}</li>`).join("")}</ul>
+          ${pairHtml(it)}
           ${it.ctx?.length ? `<ul class="mt-1 space-y-0.5 text-xs text-sub">${it.ctx.map(c => `<li>· ${esc(c)}</li>`).join("")}</ul>` : ""}
           ${it.note ? `<p class="mt-2 text-sm"><span class="font-semibold text-ink">사유</span> <span class="text-sub">${esc(it.note)}</span></p>` : ""}
           ${it.ack && it.status !== "approved" ? `<p class="mt-1 text-xs text-warn">승인 ${esc(it.ack.operator || "")} ${esc(it.ack.updated_at || "")} — 그때 실적 ${fmt(it.ack.actual)} 천원</p>` : ""}

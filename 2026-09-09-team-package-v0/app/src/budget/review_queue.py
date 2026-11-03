@@ -27,6 +27,7 @@ import re
 from rapidfuzz import fuzz
 
 from .alerts import HIGH_AMT, NEG_MIN
+from . import normalize
 from .db import is_variance, norm_text
 
 LOW_CONF = 0.8                 # 학습 자동확정 기준(LEARN_MIN_CONF)과 같은 선 — 그 아래는 사람이 본다
@@ -47,6 +48,13 @@ EQUIP_WORDS = {
     "SRF": ("SRF",), "DH": ("DH",), "보일러": ("보일러", "HRSG", "PLB", "BOILER"),
     "전기": ("전기",), "기계": ("기계",), "계측": ("계측", "제어"), "건축": ("건축", "건물"),
 }
+# 상쇄 짝(2026-10-27): 같은 지사×과목에서 더 쓴 줄 ↔ 덜 쓴 줄. 실측(로컬 2024·2025)으로 차이 줄의
+#   85~88%가 반대 방향 줄과 같은 그룹에 있었다 — 사유를 쓰기 전에 «전표가 섞였나»부터 본다.
+#   짝이 있다는 사실 자체가 근거라 글자 기준은 SUGGEST_MIN 보다 낮게 둔다.
+PAIR_MIN = 0.60                # 덜 쓴 줄 이름과 전표 글자 유사도가 이 이상이고
+PAIR_MARGIN = 0.05             #   지금 줄보다 이만큼 더 닮았을 때(금액이 부족분과 딱 맞으면 «덜 닮지 않음»이면 된다)
+PAIR_PARTNERS = 3
+COMBO_MAX_N = 12               # 묶음 합 찾기에 쓰는 묶음당 전표 수(큰 금액 순) — 2^12 조합까지만 본다              # 화면에 보일 짝 수
 _RE_YEAR = re.compile(r"(?<!\d)(?:20(\d{2})년?|'(\d{2})년?|(\d{2})년)")
 
 
@@ -138,8 +146,10 @@ def build_items(lines, basis=None, notes=None, acks=None, moved=None, alerts=Non
     """
     basis, notes, acks, moved = basis or {}, notes or {}, acks or {}, moved or set()
     ctx, over = _ctx_tags(alerts), _overload_keys(alerts)
+    merged = _merge_lines(lines)
+    gaps = _group_gaps(merged)
     items = []
-    for k, g in _merge_lines(lines).items():
+    for k, g in merged.items():
         plan, actual = g["plan"], g["actual"]
         bs = basis.get(k) or {}
         rs = _reasons(plan, actual, _num(bs.get("lowconf")), k in over)
@@ -175,6 +185,7 @@ def build_items(lines, basis=None, notes=None, acks=None, moved=None, alerts=Non
             "note": note, "ack": ack if ack else None,
             "status": status, "resolved": status in ("moved", "approved", "noted"),
             "needsNote": explainable,
+            "pair": _pair_of(k, gaps),
         })
     items.sort(key=lambda x: (x["resolved"], -x["score"], -x["amount"], x["key"]))
     n = 0
@@ -185,6 +196,69 @@ def build_items(lines, basis=None, notes=None, acks=None, moved=None, alerts=Non
         else:
             it["rank"] = None
     return items
+
+
+def plan_totals(rows):
+    """한 지사·과목의 분석 줄 → {사업명: {"name", "plan", "actual"}} (계획 사업만, 신규 제외, 빈 값은 0)."""
+    out = {}
+    for r in rows:
+        if str(r.get("구분") or "").startswith("신규"):
+            continue
+        c = out.setdefault(r["사업명"], {"name": r["사업명"], "plan": 0.0, "actual": 0.0})
+        c["plan"] += _num(r.get("연예산"))
+        c["actual"] += _num(r.get("실적금액"))
+    return out
+
+
+def _gaps(lines):
+    """{이름: {"plan","actual"}} → (더 쓴 {이름: 초과}, 덜 쓴 {이름: 부족}) — 차이(±20%p 밖) 줄만."""
+    over, under = {}, {}
+    for n, g in lines.items():
+        plan, actual = _num(g.get("plan")), _num(g.get("actual"))
+        if not is_variance(plan, actual):
+            continue
+        if actual > plan:
+            over[n] = actual - plan
+        elif actual < plan:
+            under[n] = plan - actual
+    return over, under
+
+
+def _group_gaps(merged):
+    """{(budget, 과목, 지사): {"over", "under", "normal"}} — normal = 그룹 총액이 계획의 ±20%p 안."""
+    groups = {}
+    for k, g in merged.items():
+        groups.setdefault(k[:3], {})[k[3]] = g
+    out = {}
+    for gk, lines in groups.items():
+        over, under = _gaps(lines)
+        plan = sum(_num(g["plan"]) for g in lines.values())
+        actual = sum(_num(g["actual"]) for g in lines.values())
+        out[gk] = {"over": over, "under": under, "normal": not is_variance(plan, actual)}
+    return out
+
+
+def _pair_of(k, gaps):
+    """이 줄과 반대 방향으로 벌어진 같은 그룹 줄 — 없으면 None.
+    kind  상쇄형: 그룹 총액은 계획대로(돈이 그룹 안에서 자리만 바뀐 모양) · 혼합: 총액도 벌어짐
+    offset 짝들로 메울 수 있는 금액 = min(내 갭, 짝 갭 합)."""
+    G = gaps.get(k[:3])
+    name = k[3]
+    if not G:
+        return None
+    if name in G["over"]:
+        mine, other = G["over"][name], G["under"]
+    elif name in G["under"]:
+        mine, other = G["under"][name], G["over"]
+    else:
+        return None
+    if not other:
+        return None
+    partners = sorted(other.items(), key=lambda x: (-x[1], x[0]))
+    return {"kind": "상쇄형" if G["normal"] else "혼합",
+            "partners": [{"name": n, "gap": round(v)} for n, v in partners[:PAIR_PARTNERS]],
+            "partner_total": len(partners),
+            "offset": round(min(mine, sum(other.values())))}
 
 
 def coverage_curve(items):
@@ -215,6 +289,7 @@ def summarize(items):
         "amount_open": round(total_amt - res_amt),
         "progress": round(res_amt / total_amt, 4) if total_amt else 1.0,
         "n80": n80, "cover_target": COVER_TARGET, "counts": counts,
+        "pair_open": sum(1 for it in items if not it["resolved"] and it.get("pair")),
     }
 
 
@@ -294,4 +369,113 @@ def suggest_incoming(name, sibling_vouchers):
             out.append({**v, "sim": round(s, 2), "cur_sim": round(cur, 2),
                         "why": f"전표 글자 유사도 {s:.2f} (지금 붙은 «{v.get('from')}» {cur:.2f})"})
     out.sort(key=lambda x: (-x["sim"], -abs(_num(x.get("금액천원")))))
+    return out
+
+
+def _combo_pick(vs, target):
+    """묶음 전표 중 합이 target(±ACK_TOL)인 2건 이상 조합 — 딱 하나일 때만 돌려준다(여럿이면 고를 근거가 없다)."""
+    vs = vs[:COMBO_MAX_N]
+    hits = []
+    for mask in range(1, 1 << len(vs)):
+        if mask & (mask - 1) == 0:          # 1건은 단건 금액 일치가 맡는다
+            continue
+        pick = [v for i, v in enumerate(vs) if mask >> i & 1]
+        if abs(sum(_num(v.get("금액천원")) for v in pick) - target) <= ACK_TOL:
+            hits.append(pick)
+            if len(hits) > 1:
+                return None
+    return hits[0] if hits else None
+
+
+def _combos(over, under, by_line, used):
+    """월별·분납 묶음(learn_key 같음 — 회차·월·연도만 다른 글자) 안에서 합이 부족분과 같은 조합.
+    yield (src, dst, [전표], sim, cur). 서로 다른 묶음은 섞지 않는다 — 우연히 합이 맞는 것을 막는다."""
+    for src in sorted(over):
+        series = {}
+        for v in by_line.get(src) or []:
+            k = normalize.learn_key(v.get("텍스트"))
+            if k and _num(v.get("금액천원")) > 0 and int(v.get("erp_row_id") or 0) not in used:
+                series.setdefault(k, []).append(v)
+        for vs in series.values():
+            if len(vs) < 2:
+                continue
+            text = vs[0].get("텍스트")
+            cur = _sim(text, src)
+            for dst in sorted(under, key=lambda d: (-under[d], d)):
+                if conflicts(text, dst):
+                    continue
+                s = _sim(text, dst)
+                if s < cur:
+                    continue
+                pick = _combo_pick(sorted(vs, key=lambda v: (-_num(v.get("금액천원")), int(v.get("erp_row_id") or 0))),
+                                   under[dst])
+                if pick:
+                    yield src, dst, pick, s, cur
+                    break
+
+
+def pair_moves(lines, by_line):
+    """한 지사·과목 안에서 «더 쓴 줄의 전표 → 덜 쓴 줄» 이동 추천.
+
+    lines   {사업명: {"plan", "actual"}} (천원, 계획 사업만)
+    by_line {사업명: [{erp_row_id, 텍스트, 금액천원, ...}]}
+    전표가 옮겨 갈 수 있는 조건 — 둘 다 차이 줄이고, 설비·연도가 충돌하지 않고,
+      금액이 받을 줄의 남은 부족분과 보낼 줄의 남은 초과분 안이며, 다음 중 하나(이 순서로 채운다):
+      ① 금액 일치: 남은 부족분과 금액이 같고(ACK_TOL), 글자가 지금 줄을 더 닮지 않았다
+      ② 묶음 합: 월별·분납 묶음 안에서 합이 남은 부족분과 같은 조합이 딱 하나(글자 조건은 ①과 같다)
+      ③ 글자: 받을 줄 이름 유사도 PAIR_MIN 이상, 지금 줄보다 PAIR_MARGIN 이상 더 닮았다
+    한 전표는 한 번만. 같은 단계 안에서는 유사도 큰 순.
+    반환: [{erp_row_id, from, target, 금액천원, 텍스트, 전기일, sim, cur_sim, exact, combo, why}]
+          combo = 묶음 번호(1부터, 같은 번호는 함께 옮길 전표) | None
+    """
+    over, under = _gaps(lines)
+    if not over or not under:
+        return []
+    cands = []
+    for src, excess in over.items():
+        for v in by_line.get(src) or []:
+            amt = _num(v.get("금액천원"))
+            if amt <= 0 or amt > excess + ACK_TOL:
+                continue
+            text = v.get("텍스트")
+            cur = _sim(text, src)
+            for dst, short in under.items():
+                if amt > short + ACK_TOL or conflicts(text, dst):
+                    continue
+                s = _sim(text, dst)
+                exact = abs(amt - short) <= ACK_TOL and s >= cur
+                if exact or (s >= PAIR_MIN and s >= cur + PAIR_MARGIN):
+                    cands.append((not exact, -s, -amt, int(v.get("erp_row_id") or 0), src, dst, v, s, cur, exact))
+    cands.sort(key=lambda c: c[:4])
+    left_over, left_under, used, out = dict(over), dict(under), set(), []
+
+    def take(v, src, dst, s, cur, exact, combo, why):
+        amt = _num(v.get("금액천원"))
+        rid = int(v.get("erp_row_id") or 0)
+        used.add(rid)
+        left_over[src] -= amt
+        left_under[dst] -= amt
+        out.append({"erp_row_id": rid, "from": src, "target": dst, "금액천원": round(amt),
+                    "텍스트": v.get("텍스트"), "전기일": v.get("전기일"),
+                    "sim": round(s, 2), "cur_sim": round(cur, 2), "exact": exact, "combo": combo,
+                    "why": why + f" · «{src}» 초과 {over[src]:,.0f} 천원"})
+
+    def fits(amt, src, dst):
+        return amt <= left_over[src] + ACK_TOL and amt <= left_under[dst] + ACK_TOL
+
+    for _, _, _, rid, src, dst, v, s, cur, exact in cands:          # ① 금액 일치
+        if exact and rid not in used and fits(_num(v.get("금액천원")), src, dst):
+            take(v, src, dst, s, cur, True, None, f"«{dst}» 부족분 {under[dst]:,.0f} 천원과 금액 일치")
+    n = 0
+    for src, dst, pick, s, cur in _combos(over, left_under, by_line, used):   # ② 묶음 합
+        total = sum(_num(v.get("금액천원")) for v in pick)
+        if any(int(v.get("erp_row_id") or 0) in used for v in pick) or not fits(total, src, dst):
+            continue
+        n += 1
+        for v in pick:
+            take(v, src, dst, s, cur, False, n,
+                 f"같은 계약 월별·분납 {len(pick)}건 합 {total:,.0f} 천원 = «{dst}» 부족분")
+    for _, _, _, rid, src, dst, v, s, cur, exact in cands:          # ③ 글자
+        if not exact and rid not in used and fits(_num(v.get("금액천원")), src, dst):
+            take(v, src, dst, s, cur, False, None, f"전표 글자 유사도 {s:.2f} (지금 줄 {cur:.2f})")
     return out

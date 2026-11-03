@@ -207,6 +207,12 @@ export async function rqClick(e) {
       await move(key, groups, `«${byKey(key)?.name}» 추천 일괄`)
       return true
     }
+    case "pair-all": {
+      const groups = {}
+      for (const m of r.sugg[key]?.pairs || []) (groups[m.target] ||= []).push(m.erp_row_id)
+      await move(key, groups, `«${byKey(key)?.name}» 상쇄 짝 일괄`)
+      return true
+    }
     case "pull": {
       const it = byKey(key)
       await move(key, {[it.name]: [Number(t.dataset.id)]}, `«${it.name}»(으)로 가져오기`)
