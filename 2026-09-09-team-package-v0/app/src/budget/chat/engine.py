@@ -211,7 +211,7 @@ class RuleEngine(ChatEngine):
         by = data.get("base_year")
         if not hit:
             return _card("yc", f"«{what}» 표준금액 줄이 없어요. 지사·예산과목 이름을 다시 확인해 주세요.", "std.basis", 1,
-                         [("표준화로", "#/forecast/bench")], ctx=f"{by}년 기준으로 봤어요")
+                         [("표준화 세부로", "#/standard-detail")], ctx=f"{by}년 기준으로 봤어요")
         table = [["지사", "예산과목", "등급", "표준금액(천원)", "산출방식", "방식출처", "추천사유·근거"]]
         for r in hit[:STD_TABLE_ROWS]:
             why = " / ".join(x for x in (str(r.get("추천사유") or "").strip(), str(r.get("근거") or r.get("비고") or "").strip()) if x)
@@ -219,7 +219,7 @@ class RuleEngine(ChatEngine):
                           r.get("산출방식") or "", r.get("방식출처") or "", why])
         more = f" 표는 앞 {STD_TABLE_ROWS}줄이고 나머지는 엑셀로 받아 보세요." if len(hit) > STD_TABLE_ROWS else ""
         card = _card("yc", f"«{what}» 표준금액 {len(hit):,}줄의 산출 근거예요.{more}", "std.basis", 1,
-                     [("표준화로", "#/forecast/bench")], ctx=f"{by}년 기준으로 봤어요", table=table,
+                     [("표준화 세부로", "#/standard-detail")], ctx=f"{by}년 기준으로 봤어요", table=table,
                      source="근거: 표준화(3단계) 계산 결과 — 산출방식·방식출처·추천사유·근거")
         params = urlencode([(k, v) for k, v in (("base_year", by), ("site", site), ("account", account), ("grade", grade)) if v])
         card["download"] = {"label": "엑셀로 받기", "url": f"/api/forecast/standard.xlsx?{params}"}

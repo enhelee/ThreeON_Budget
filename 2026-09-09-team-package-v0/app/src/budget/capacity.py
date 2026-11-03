@@ -206,10 +206,11 @@ def _rows_for(site, mw, total, share, grade, note):
 
 
 def standard_rows(model: dict, site: str, target: dict) -> pd.DataFrame:
-    """대상 지사의 등급별 표준금액(과목별). 등급: MI·TI·HGPI·CI·간이·표준(=간이) [+ 정비제외]."""
+    """대상 지사의 등급별 표준금액(과목별). 등급: MI·HGPI(=TI)·CI·간이·표준(=간이) [+ 정비제외].
+    등급 이력의 TI 는 계산 전에 HGPI 로 바뀌므로(forecast_calc.canon_grade) TI 줄은 따로 만들지 않는다."""
     f, k, mw = model["fixed"], model["k"], target["mw"]
     rows = []
-    for grade in ("MI", "TI", "HGPI", "CI", "간이", "표준"):
+    for grade in ("MI", "HGPI", "CI", "간이", "표준"):
         g = GRADE_CLASS.get(grade, "간이" if grade == "표준" else grade)
         if g not in k or not model["shares"].get(g):
             continue

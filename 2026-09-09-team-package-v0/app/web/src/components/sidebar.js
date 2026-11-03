@@ -11,9 +11,12 @@ import { charImg } from "./characters.js"
 // 매번 맞춰 주므로 여기서는 뼈대만 그린다.
 // ─────────────────────────────────────────────────────────────
 
+// 업무는 세 축(2026-11-03 팀장): ① 예산 실적 집계 → ② 표준화(정비등급별 표준금액) → ③ 중장기 예측
+//   (표준금액 + 사람이 넣는 돌발·신규사업). 그룹 이름이 곧 축이다.
+// sub = 바로 위 메뉴의 하위 메뉴(들여 쓴다).
 export const MENU = [
   {view: "home", tag: "H", label: "메인"},
-  {group: "업무 단계"},
+  {group: "① 예산 실적 집계"},
   // char = 그 화면을 맡은 캐릭터 — 메뉴 오른쪽 색 점(매칭이 청록·검토미 산호·예측이 보라)
   {view: "budget", tag: "1", label: "예산 계획", char: "mt"},
   {view: "collect", tag: "2", label: "실적 집계", char: "mt"},
@@ -21,7 +24,11 @@ export const MENU = [
   {view: "detail", tag: "3+", label: "실적분석(상세)", char: "gt"},
   {view: "review", tag: "✓", label: "검토 큐", char: "gt"},
   {view: "stats", tag: "4", label: "통계·내보내기", char: "gt"},
-  {view: "forecast", tag: "5", label: "중장기 예측", char: "yc"},
+  {group: "② 표준화"},
+  {view: "standard", tag: "5", label: "표준화", char: "yc"},
+  {view: "stddetail", tag: "5+", label: "표준화 세부", char: "yc", sub: true},
+  {group: "③ 중장기 예측"},
+  {view: "forecast", tag: "6", label: "중장기 예측", char: "yc"},
   {group: "관리"},
   {view: "settings", tag: "S", label: "설정"},
 ]
@@ -40,12 +47,14 @@ export const STAGES = [
    desc: "돈이 많이 걸린 사업부터 승인·사유·재배정으로 확인합니다."},
   {no: "04", view: "stats", title: "통계·내보내기", char: "gt",
    desc: "과목별 계획 대비 실적을 보고 재무팀 양식으로 내려받습니다."},
-  {no: "05", view: "forecast", title: "중장기 전망", char: "yc",
-   desc: "정비등급별 표준금액으로 10개년 소요를 전망합니다."},
+  {no: "05", view: "standard", title: "표준화", char: "yc",
+   desc: "마감된 실적으로 지사 × 정비등급별 표준금액을 만듭니다."},
+  {no: "06", view: "forecast", title: "중장기 전망", char: "yc",
+   desc: "표준금액에 돌발·신규사업을 더해 10개년 소요를 전망합니다."},
 ]
 
 function navButton(m) {
-  return `<button class="nav-button" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span></button>`
+  return `<button class="nav-button${m.sub ? " nav-sub" : ""}" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span></button>`
 }
 
 function groupLabel(text) {

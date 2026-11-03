@@ -50,7 +50,7 @@ function unmappedTotals() {
 // 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터 그림은 챗봇과 같은 한 벌(components/char_images.js).
 // 아래 알약은 업무 흐름 4단계 — 누르면 그 화면으로 간다(STAGE 카드와 같은 STAGES 에서 뽑는다).
 
-const HERO_STEPS = ["budget", "collect", "branches", "forecast"]
+const HERO_STEPS = ["budget", "collect", "branches", "standard", "forecast"]
 
 function headerStrip() {
   const steps = STAGES.filter(s => HERO_STEPS.includes(s.view))
