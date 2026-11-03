@@ -87,6 +87,83 @@ def match_faq(n):
     return best, best_score
 
 
+# ── 말로 묻기 보정(2026-11-03) ───────────────────────────────
+# 브라우저 안 Whisper 는 짧은 한국어 명령을 한 글자쯤 틀리게 적는다(«검토큐»→«검토키», «마감»→«말감»).
+# 말로 들어온 질문만, 앱 낱말(화면·사용법 키워드)과 자모 하나 차이인 조각을 그 낱말로 바꾼다.
+# 사람이 친 글자는 건드리지 않는다.
+_CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+_JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+_JONG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+
+
+def _jamo(s):
+    out = []
+    for ch in s:
+        o = ord(ch) - 0xAC00
+        if 0 <= o < 11172:
+            out += [_CHO[o // 588], _JUNG[o % 588 // 28]] + ([_JONG[o % 28]] if o % 28 else [])
+        else:
+            out.append(ch)
+    return out
+
+
+def _cho(s):
+    return "".join(_CHO[(ord(c) - 0xAC00) // 588] if "가" <= c <= "힣" else c for c in s)
+
+
+def _edit(a, b, cap):
+    """자모 편집 거리(cap 을 넘으면 cap+1)."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, y in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y))
+        if min(cur) > cap:
+            return cap + 1
+        prev = cur
+    return prev[-1]
+
+
+def _vocab():
+    words = set()
+    for _, _, keys in kb.SCREENS:
+        words.update(keys)
+    for item in kb.FAQ:
+        for k in item["keys"]:
+            words.update(k if isinstance(k, tuple) else (k,))
+    hangul = lambda w: len(w) >= 2 and all("가" <= c <= "힣" for c in w)
+    return sorted((w for w in words if hangul(w)), key=len, reverse=True)
+
+
+_VOCAB = None
+# 말끝·흔한 말은 앱 낱말로 바꾸지 않는다(«비교해줘»의 «해줘»가 «해제»가 되면 마감 해제 답이 나온다)
+_KEEP = {"해줘", "해요", "해주", "해서", "해도", "해봐", "해야", "하자", "줘요", "주세", "세요", "어때", "뭐야", "알려", "보여"}
+
+
+def voice_fix(n):
+    """정규화한 말 질문 n 에서 앱 낱말과 자모 1개(4글자 이상은 2개) 차이인 조각을 그 낱말로.
+    3글자 이하 낱말은 글자 수와 첫소리(초성)가 같을 때만 — «날씨»가 «날비»로 바뀌는 일을 막는다."""
+    global _VOCAB
+    if _VOCAB is None:
+        _VOCAB = _vocab()
+    for w in _VOCAB:
+        if w in n:
+            continue
+        cap = 2 if len(w) >= 4 else 1
+        wj = _jamo(w)
+        short = len(w) <= 3
+        for L in ((len(w),) if short else (len(w), len(w) + 1, len(w) - 1)):
+            hit = next((i for i in range(len(n) - L + 1)
+                        if n[i:i + L] not in _KEEP and (not short or _cho(n[i:i + L]) == _cho(w))
+                        and 0 < _edit(_jamo(n[i:i + L]), wj, cap) <= cap), None)
+            if hit is not None:
+                n = n[:hit] + w + n[hit + L:]
+                break
+    return n
+
+
 def match_screen(n):
     for hash_, name, keys in kb.SCREENS:
         if any(k in n for k in keys):
@@ -137,6 +214,8 @@ class RuleEngine(ChatEngine):
         view = ctx.get("view") or "home"
         q = (question or "").strip()[:MAX_LEN]
         n = normalize(q)
+        if ctx.get("voice"):
+            n = voice_fix(n)
         sugg = suggestions_for(view)
         if not n:
             return {"answer": _card("mt", "궁금한 걸 적어 주세요. 아래 질문을 눌러도 돼요.", "empty", 0), "suggestions": sugg}

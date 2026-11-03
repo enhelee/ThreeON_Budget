@@ -14,6 +14,7 @@ import { HELP, NAMES } from "./characters.js"
 // ─────────────────────────────────────────────────────────────
 
 import { CHAR_IMG } from "./char_images.js"
+import { prepareVoice, record, transcribe, voiceSupported } from "./voice.js"
 
 const ROLE = {mt: "실적·이동", gt: "검토", yc: "전망", hj: "사용법"}
 
@@ -78,7 +79,7 @@ function render() {
     <form class="chat-form" data-chat-form>
       <input id="chatInput" class="control" maxlength="300" autocomplete="off" placeholder="${VOICE_OK ? "예: 검토 큐로 가 줘 · 🎤 로 말해도 돼요" : "예: 마감은 어떻게 해?"}" aria-label="질문" ${chat.busy ? "disabled" : ""}>
       ${VOICE_OK ? `<button type="button" class="chat-mic${voice.on ? " chat-mic--on" : ""}" data-chat-mic
-        aria-pressed="${voice.on}" aria-label="${voice.on ? "듣기 멈추기" : "말로 묻기"}" title="말로 묻기(이 컴퓨터 안에서만 알아들어요)" ${chat.busy || voice.busy ? "disabled" : ""}>🎤</button>` : ""}
+        aria-pressed="${voice.on}" aria-label="${voice.on ? "듣기 멈추기" : "말로 묻기"}" title="말로 묻기(내장 마이크 · 이 컴퓨터 안에서만 알아들어요)" ${chat.busy || (voice.busy && !voice.on) ? "disabled" : ""}>🎤</button>` : ""}
       <button class="btn-primary" type="submit" ${chat.busy ? "disabled" : ""}>보내기</button>
     </form>
     ${voice.note ? `<p class="chat-voice-note" role="status">${esc(voice.note)}</p>` : ""}
@@ -108,7 +109,7 @@ export async function openChat() {
 }
 
 export function closeChat() {
-  voice.rec?.abort()
+  voice.rec?.stop()
   setOpen(false)
   render()
   document.querySelector(".help-fab__btn")?.focus()
@@ -158,16 +159,16 @@ function goTo(hash, focus) {
   spotlight(focus)
 }
 
-async function send(q) {
+async function send(q, {voice: byVoice = false} = {}) {
   q = (q || "").trim()
   if (!q || chat.busy) return
   chat.busy = true
-  chat.log.push({role: "me", text: q}, {role: "bot", thinking: true})
+  chat.log.push({role: "me", text: byVoice ? `🎤 ${q}` : q}, {role: "bot", thinking: true})
   render()
   let card
   try {
     const r = await api("/api/chat", {method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({question: q, context: {view: state.view, year: state.year}})})
+      body: JSON.stringify({question: q, context: {view: state.view, year: state.year, voice: byVoice}})})
     card = r.answer
     if (r.suggestions?.length) chat.suggestions = r.suggestions
   } catch (e) {
@@ -181,15 +182,12 @@ async function send(q) {
   if (card.go) goTo(card.go, "")            // «열어줘» — 버튼 없이 바로 옮긴다
 }
 
-// ── 말로 묻기(2026-11-03 grace) ─────────────────────────────
-// 브라우저 음성 인식 중 «기기 안에서만»(processLocally) 되는 것만 쓴다 — 목소리가 구글 등 바깥 서버로
-// 나가지 않게(사업명·금액을 말할 수 있으니 회사 정책상). 그게 안 되는 브라우저면 🎤 를 아예 그리지 않는다.
-// 처음 한 번은 한국어 음성 모델을 이 컴퓨터에 받는다(install). 알아들은 말은 글자로 바꿔 그대로 보낸다 —
+// ── 말로 묻기(2026-11-03 grace «맥·윈도우·데스크톱 어디서나 내장 마이크로») ──────
+// 내장 마이크로 녹음 → 브라우저 안 Whisper(voice.js·voice_worker.js)가 글자로 → 글자 질문과 똑같이 보낸다.
+// 목소리는 이 컴퓨터 밖으로 나가지 않는다. 처음 한 번 음성 모델(약 77MB)을 받아 브라우저에 저장한다.
 // «검토 큐로 가 줘»도 글자 질문과 같은 규칙 엔진이 받아 화면을 옮긴다.
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-const VOICE = {langs: ["ko-KR"], processLocally: true}
-const VOICE_OK = !!SR && "processLocally" in SR.prototype && typeof SR.available === "function"
-const voice = {on: false, busy: false, rec: null, note: ""}
+const VOICE_OK = voiceSupported()
+const voice = {on: false, busy: false, rec: null, note: "", ready: false}
 
 const setNote = t => { voice.note = t; render() }
 
@@ -198,55 +196,34 @@ async function toggleVoice() {
   if (voice.busy || chat.busy) return
   voice.busy = true
   try {
-    let st = "unavailable"
-    try { st = await SR.available(VOICE) } catch { /* 모름 = 못 씀 */ }
-    if (st === "downloadable" || st === "downloading") {
-      setNote("한국어 음성 모델을 이 컴퓨터에 받는 중이에요(처음 한 번만)…")
-      let ok = false
-      try { ok = await SR.install(VOICE) } catch { /* 아래에서 안내 */ }
-      if (!ok) { setNote("음성 모델을 받지 못했어요. 글자로 물어봐 주세요."); return }
-    } else if (st !== "available") {
-      setNote("이 브라우저에서는 컴퓨터 안 음성 인식을 쓸 수 없어요. 글자로 물어봐 주세요.")
-      return
+    if (!voice.ready) {
+      setNote("음성 모델을 이 컴퓨터에 받는 중이에요(처음 한 번만)…")
+      await prepareVoice(pct => {
+        const el = document.querySelector(".chat-voice-note")
+        if (el) el.textContent = `음성 모델을 이 컴퓨터에 받는 중이에요(처음 한 번만)… ${pct}%`
+      })
+      voice.ready = true
     }
-    listen()
-  } finally { voice.busy = false; render() }
-}
-
-function listen() {
-  const rec = new SR()
-  rec.lang = "ko-KR"
-  rec.processLocally = true
-  rec.interimResults = true
-  rec.continuous = false
-  let heard = ""
-  rec.onresult = e => {
-    let interim = ""
-    heard = ""
-    for (const r of e.results) (r.isFinal ? (heard += r[0].transcript) : (interim += r[0].transcript))
-    const inp = document.getElementById("chatInput")
-    if (inp) inp.value = heard + interim                    // 듣는 대로 입력칸에 보여 준다
-  }
-  rec.onerror = e => {
-    voice.note = e.error === "not-allowed" ? "마이크를 쓰려면 허락이 필요해요(주소창 왼쪽 아이콘 → 마이크 허용)."
-      : e.error === "no-speech" ? "말소리를 못 들었어요. 🎤 를 다시 누르고 말해 주세요."
-      : e.error === "aborted" ? "" : `음성 인식이 멈췄어요(${e.error}). 글자로 물어봐 주세요.`
-  }
-  rec.onend = () => {
-    voice.on = false
-    voice.rec = null
-    const q = heard.trim()
-    if (!q) { render(); return }
+    voice.on = true
+    voice.note = "듣고 있어요… 말을 마치면 알아서 멈춰요. (🎤 를 다시 누르면 바로 멈춤)"
+    voice.rec = record({onLevel: v => document.querySelector(".chat-mic")?.style.setProperty("--lv", v.toFixed(2))})
+    render()
+    const audio = await voice.rec.done
+    voice.on = false; voice.rec = null
+    if (!audio) { setNote("말소리를 못 들었어요. 🎤 를 다시 누르고 말해 주세요."); return }
+    setNote("알아듣는 중이에요…")
+    const q = (await transcribe(audio)).trim()
+    if (!q) { setNote("잘 못 알아들었어요. 다시 한 번 말해 주세요."); return }
     voice.note = ""
-    const inp = document.getElementById("chatInput")
-    if (inp) inp.value = ""
-    send(q)
-  }
-  voice.on = true
-  voice.rec = rec
-  voice.note = "듣고 있어요… 말을 마치면 알아서 보내요."
-  render()
-  try { rec.start() } catch { voice.on = false; voice.rec = null; setNote("음성 인식을 시작하지 못했어요.") }
+    voice.busy = false
+    send(q, {voice: true})          // 서버가 한 글자 틀린 앱 낱말을 고쳐 알아듣는다(engine.voice_fix)
+  } catch (e) {
+    voice.on = false; voice.rec = null
+    const m = String(e?.message || e)
+    setNote(/Permission|NotAllowed|denied/i.test(m) ? "마이크를 쓰려면 허락이 필요해요(주소창 왼쪽 아이콘 → 마이크 허용)."
+      : /NotFound|device/i.test(m) ? "마이크를 찾지 못했어요. 컴퓨터에 마이크가 켜져 있는지 확인해 주세요."
+      : `음성 인식이 안 됐어요(${m.slice(0, 80)}). 글자로 물어봐 주세요.`)
+  } finally { voice.busy = false; render() }
 }
 
 // 패널 안 이벤트는 여기서만 — main.js 의 큰 위임 핸들러와 섞지 않는다.

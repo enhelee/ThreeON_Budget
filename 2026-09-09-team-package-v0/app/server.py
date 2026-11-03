@@ -1916,7 +1916,8 @@ def chat(req: ChatReq):
     # context 는 본문 안쪽이라 연도 검증 미들웨어가 보지 않는다 — 여기서 모양을 강제한다.
     raw = req.context or {}
     ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
-           "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None}
+           "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None,
+           "voice": raw.get("voice") is True}          # 말로 물었으면 받아 적기 실수를 고쳐 알아듣는다
     return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard).answer(req.question, ctx))
 
 
