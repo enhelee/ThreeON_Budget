@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { charSay, lockedSay } from "../components/characters.js"
 import { fileList, nextStep, slimDrop, stepGuide } from "../components/stage.js"
 import { state } from "../state.js"
@@ -76,7 +77,7 @@ export function renderCollect() {
   return `
     <div class="space-y-5">
       <section class="flex flex-wrap items-end justify-between gap-3"><div><p class="text-sm font-semibold text-ink">STAGE 2</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적 집계와 사업 매칭</h2></div>
-        <button type="button" class="btn-secondary" data-action="tour" data-tour="collect">사용법 보기</button></section>
+        ${tourButton("collect")}</section>
       ${locked ? lockedSay("업로드·분석이 차단됩니다.") : matchingSay(ds, runs)}
       ${stepGuide(["ERP 전표(zrfm2) 올리기", "자동 매칭 분석 실행", "매칭 결과 확인"], now, "실적 집계 단계")}
       <section class="grid gap-5 xl:grid-cols-[1fr_.85fr]">

@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { rateBadge } from "../components/badges.js"
 import { amounts } from "../data.js"
 import { emptyState } from "../components/widgets.js"
@@ -145,7 +146,7 @@ export function renderBranches() {
   return `
     <div class="space-y-6">
       <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-ink">실적 분석</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">전체 지사 현황 — ${esc(state.year)}년</h2></div>
-        <button type="button" class="btn-secondary self-start xl:self-auto" data-action="tour" data-tour="branches">사용법 보기</button></section>
+        ${tourButton("branches", "self-start xl:self-auto")}</section>
       <section class="panel p-5 br-filters"><div class="flex flex-wrap items-end gap-3">
         <label class="block min-w-48 flex-1"><span class="field-label">지사명 검색</span><input class="control w-full" data-filter="search" value="${esc(state.search)}" placeholder="지사명을 입력하세요"></label>
         <label class="block"><span class="field-label">예산 구분</span><select class="control" data-filter="type"><option value="all" ${state.type === "all" ? "selected" : ""}>전체</option><option value="profit" ${state.type === "profit" ? "selected" : ""}>손익</option><option value="capital" ${state.type === "capital" ? "selected" : ""}>자본</option></select></label>

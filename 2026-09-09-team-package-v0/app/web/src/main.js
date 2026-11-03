@@ -14,7 +14,7 @@ import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, PICK_SORTS, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 import { rqChange, rqClick, rqKey } from "./review_actions.js"
-import { startTour } from "./components/tour.js"
+import { startTour, markTourClicked } from "./components/tour.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -211,7 +211,7 @@ document.addEventListener("click", async e => {
     btn.setAttribute("aria-pressed", String(state.stdFit))
     return;
   }
-  if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
+  if (act === "tour") { const b = e.target.closest("[data-action]"); markTourClicked(b); startTour(b.dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
   if (act === "add-alias") {

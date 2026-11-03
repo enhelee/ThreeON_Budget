@@ -260,7 +260,7 @@ def test_plan_page_guides_first_time_users():
     assert "올라간 계획 파일" in body and "지금 쓰는 파일" in stage and "데이터셋" not in body
     assert "slimDrop(" in body and 'drop: "plan"' in body and "drop-zone--slim" in stage, "얇은 업로드 칸, 끌어다 놓기"
     assert "yearPicker(" not in body, "화면 안 연도 칸은 맨 위 줄과 겹쳐 뺐다"
-    assert 'data-action="tour"' in body and "plan-hint" in stage
+    assert 'tourButton("budget")' in body and "plan-hint" in stage
     assert "/api/datasets/${d.id}/download" in stage, "올라간 파일 원본 내려받기"
     assert 'nextStep({view: "collect"' in body, "다음 단계는 맨 아래 따로 큰 버튼"
     tour = _read(SRC, "components", "tour.js")
@@ -280,14 +280,14 @@ def test_collect_page_same_guide_and_visible_results_in_eok():
 
 def test_branches_page_has_tour():
     br = _read(SRC, "views", "branches.js")
-    assert 'data-tour="branches"' in br and "br-scatter" in br and "br-filters" in br
+    assert 'tourButton("branches"' in br and "br-scatter" in br and "br-filters" in br
     tour = _read(SRC, "components", "tour.js")
     assert "branches:" in tour and ".br-scatter" in tour
 
 
 def test_stats_page_tour_explains_exports():
     st = _read(SRC, "views", "stats.js")
-    assert 'data-tour="stats"' in st and "stats-exports" in st and "stats-table" in st
+    assert 'tourButton("stats")' in st and "stats-exports" in st and "stats-table" in st
     tour = _read(SRC, "components", "tour.js").split("stats: [", 1)[1].split("],", 1)[0]
     for k in ('data-export="actual"', 'data-export="v1"', 'data-export="matched"'):
         assert k in tour, f"내보내기 버튼 설명 {k}"
@@ -325,3 +325,28 @@ def test_sub_menus_fold_under_parent():
     assert "setSubOpen(sub.dataset.sbSub" in _read(SRC, "main.js")
     css = _read(SRC, "styles", "custom.css")
     assert "#sidebar .nav-subs{display:none}" in css and "#sidebar .nav-subs.is-open{display:block}" in css
+
+
+def test_home_steps_follow_menu_and_character_colors():
+    """2026-11-03 grace: 메인 알약 = 메뉴 1~6 이름 그대로 · 사이 › (색은 뺐다)."""
+    home = _read(SRC, "views", "home.js")
+    assert "MENU.filter(m => m.view && /^\\d$/.test(m.tag))" in home
+    assert "home-step__arrow" in home and "home-step--" not in home, "색은 빼고 화살표만"
+
+
+def test_tour_button_red_dot_until_clicked():
+    """2026-11-03 grace 시안 3: 사용법 보기는 지금 모양, 그 화면에서 아직 안 눌렀으면 빨간 점."""
+    tour = _read(SRC, "components", "tour.js")
+    assert "ondo.tourBtn." in tour and '" is-new"' in tour
+    for f in ("plan", "collect", "branches", "stats"):
+        assert "tourButton(" in _read(SRC, "views", f + ".js"), f
+    assert "markTourClicked(b)" in _read(SRC, "main.js")
+    assert ".tour-btn.is-new::after" in _read(SRC, "styles", "custom.css")
+
+
+def test_tour_skip_points_to_replay_button():
+    """2026-11-03 grace: 둘러보기를 건너뛰면 [사용법 보기] 아래에 «나중에 여기서 다시 볼 수 있어요»."""
+    tour = _read(SRC, "components", "tour.js")
+    assert "laterHint(view)" in tour and "나중에 여기서 다시 볼 수 있어요" in tour
+    assert '.addEventListener("click", skip)' in tour
+    assert ".tour-later{" in _read(SRC, "styles", "custom.css")

@@ -42,6 +42,35 @@ const seenKey = view => `ondo.tour.${view}`
 function seen(view) { try { return localStorage.getItem(seenKey(view)) === "1" } catch { return true } }
 function markSeen(view) { try { localStorage.setItem(seenKey(view), "1") } catch {} }
 
+// 사용법 보기 버튼(2026-11-03 grace 시안 3): 지금 모양 그대로, 그 화면에서 한 번도 안 눌렀으면 오른쪽 위에 빨간 점.
+const clickedKey = view => `ondo.tourBtn.${view}`
+function clicked(view) { try { return localStorage.getItem(clickedKey(view)) === "1" } catch { return true } }
+export function tourButton(view, extra = "") {
+  return `<button type="button" class="btn-secondary tour-btn${clicked(view) ? "" : " is-new"}${extra ? ` ${extra}` : ""}" data-action="tour" data-tour="${view}"><span class="tour-btn__icon" aria-hidden="true">?</span>사용법 보기</button>`
+}
+export function markTourClicked(btn) {
+  try { localStorage.setItem(clickedKey(btn.dataset.tour), "1") } catch {}
+  btn.classList.remove("is-new")
+}
+
+/** 둘러보기를 건너뛴 사람에게 — [사용법 보기] 아래에 «나중에 여기서 다시 볼 수 있어요» 말풍선을 4초 띄운다(2026-11-03 grace). */
+function laterHint(view) {
+  const btn = document.querySelector(`[data-action="tour"][data-tour="${view}"]`)
+  if (!btn) return
+  document.querySelector(".tour-later")?.remove()
+  btn.scrollIntoView({block: "nearest", behavior: "instant"})
+  const r = btn.getBoundingClientRect()
+  const tip = document.createElement("div")
+  tip.className = "tour-later"
+  tip.setAttribute("role", "status")
+  tip.textContent = "나중에 여기서 다시 볼 수 있어요"
+  document.body.appendChild(tip)
+  tip.style.top = `${r.bottom + 10}px`
+  tip.style.left = `${Math.max(12, Math.min(r.right - tip.offsetWidth, innerWidth - tip.offsetWidth - 12))}px`
+  setTimeout(() => tip.classList.add("is-out"), 3600)
+  setTimeout(() => tip.remove(), 4000)
+}
+
 export function endTour() {
   if (!cur) return
   cur.el.remove(); window.removeEventListener("resize", cur.place); document.removeEventListener("keydown", cur.key)
@@ -83,8 +112,9 @@ export function startTour(view) {
     place()
   }
   el.querySelector(".tour__next").addEventListener("click", () => { if (++i >= steps.length) endTour(); else show() })
-  el.querySelector(".tour__skip").addEventListener("click", endTour)
-  const key = e => { if (e.key === "Escape") endTour() }
+  const skip = () => { endTour(); laterHint(view) }   // 건너뛰면 다시 볼 곳(사용법 보기)을 잠깐 알려 준다
+  el.querySelector(".tour__skip").addEventListener("click", skip)
+  const key = e => { if (e.key === "Escape") skip() }
   window.addEventListener("resize", place); document.addEventListener("keydown", key)
   cur = {el, view, place, key}
   show()

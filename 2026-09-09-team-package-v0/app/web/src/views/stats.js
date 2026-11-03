@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { rateBadge } from "../components/badges.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
@@ -29,7 +30,7 @@ const UNIT = '<span class="text-xs font-semibold text-tri">단위: 천원</span>
 export function renderStats() {
   const tab = state.statsTab || "손익";
   const title = `<section class="flex flex-wrap items-end justify-between gap-3"><div><p class="text-sm font-semibold text-ink">STAGE 4</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">통계 · 내보내기 — ${esc(state.year)}년</h2></div>
-    <button type="button" class="btn-secondary" data-action="tour" data-tour="stats">사용법 보기</button></section>
+    ${tourButton("stats")}</section>
     <div class="flex flex-wrap gap-2 stats-tabs" role="tablist">${STATS_TABS.map(([k, l]) => `<button class="${tab === k ? "btn-primary" : "btn-secondary"}" role="tab" aria-selected="${tab === k}" data-stattab="${k}">${esc(l)}</button>`).join("")}</div>`;
   if (tab === "compare") return `<div class="space-y-6">${title}${compareHtml()}</div>`;
   if (tab === "report") return `<div class="space-y-6">${title}${reportHtml()}</div>`;
