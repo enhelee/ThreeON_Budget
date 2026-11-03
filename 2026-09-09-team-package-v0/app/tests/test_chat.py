@@ -259,3 +259,8 @@ def test_voice_question_navigates_and_answers():
 def test_api_voice_flag_fixes_misheard_words(client):
     r = client.post("/api/chat", json={"question": "검토키로 가죠", "context": {"view": "home", "voice": True}})
     assert r.json()["answer"].get("go") == "#/review"
+
+
+def test_api_fact_question_without_analysis_does_not_break(client):
+    r = client.post("/api/chat", json={"question": "25년 파주지사 정기점검 얼마 들었어", "context": {"view": "home"}})
+    assert r.status_code == 200 and r.json()["answer"]["intent"] != "fact.cost"

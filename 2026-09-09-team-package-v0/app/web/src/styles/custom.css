@@ -368,6 +368,10 @@
 .chat-lines{margin:.35rem 0 0 1.1rem;padding:0}
 .chat-table{width:100%;margin:.45rem 0;border-collapse:collapse;background:var(--base);border-radius:8px;overflow:hidden;font-size:.75rem}
 .chat-table th,.chat-table td{padding:.3rem .5rem;border-bottom:1px solid var(--line-subtle);text-align:left}
+/* 사업 실적 표(chat/facts.py) — 숫자는 줄바꿈 없이 오른쪽, 사업명은 줄바꿈. 그래도 넘치면 표만 옆으로 밀기 */
+.chat-table{display:block;overflow-x:auto}
+.chat-table td{word-break:keep-all;overflow-wrap:anywhere}
+.chat-table td:first-child,.chat-table td:last-child{white-space:nowrap}
 .chat-table th{color:var(--sub);font-weight:600}
 .chat-links,.chat-ask{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
 .chat-go{font-size:.75rem;font-weight:700;color:var(--ink);background:var(--base);border:1px solid var(--line-strong);border-radius:8px;padding:.25rem .55rem;cursor:pointer}

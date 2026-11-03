@@ -19,7 +19,7 @@
 import re
 from urllib.parse import urlencode
 
-from . import kb
+from . import facts, kb
 
 ENGINE_NAME = "rule"
 MAX_LEN = 300
@@ -202,12 +202,14 @@ class ChatEngine:
 class RuleEngine(ChatEngine):
     name = ENGINE_NAME
 
-    def __init__(self, status_provider=None, std_provider=None):
+    def __init__(self, status_provider=None, std_provider=None, facts_provider=None):
         # status_provider(year) → {"year", "datasets", "runs", "pending", "locked"} | None
         #   서버가 넘긴다(DB 읽기만). 테스트는 가짜를 넘긴다.
         # std_provider() → {"base_year", "rows": [표준금액 행 dict…]} | None — 표준금액 근거 답에 쓴다.
         self.status_provider = status_provider
         self.std_provider = std_provider
+        # facts_provider() → {"lines": [사업 줄…], "depts": [...]} | None — «○○ 얼마 들었어»·«몇 년도에 한 적» 답(chat/facts.py)
+        self.facts_provider = facts_provider
 
     def answer(self, question, context=None):
         ctx = context or {}
@@ -228,8 +230,12 @@ class RuleEngine(ChatEngine):
         bare_screen = any(n == k for _, _, keys in kb.SCREENS for k in keys)   # «검토 큐»처럼 화면 이름만
 
         std_card = self._standard(q, n) if self.std_provider and any(c in n for c in STD_CUES) else None
+        fact_card = (self._fact(q, n, ctx) if self.facts_provider and facts.is_fact_question(n)
+                     and not status_cue else None)
         if std_card:
             card = std_card
+        elif fact_card:
+            card = fact_card
         elif status_cue:
             card = self._status(q, ctx)
         elif faq and howto_cue:
@@ -251,6 +257,21 @@ class RuleEngine(ChatEngine):
     def _nav(self, hash_, name):
         card = _card("mt", f"«{name}» 화면으로 갈게요.", "nav.goto", 1, [(f"{ro(name)} →", hash_)])
         card["go"] = hash_                       # 이동을 시키는 말 — 화면이 바로 옮긴다
+        return card
+
+    def _fact(self, q, n, ctx):
+        """사업 실적·이력 답. 질문에서 지사·낱말을 못 뽑으면 None(다른 답으로 넘긴다)."""
+        data = self.facts_provider()
+        base = ctx.get("year") or (max(data["years"]) if data and data.get("years") else None)
+        got = facts.answer(q, n, data, base)
+        if got is None:
+            return None
+        history = facts.is_history(n)
+        yrs = sorted({r[0] for r in (got["table"] or [])[1:]})
+        card = _card("mt", got["text"], "fact.history" if history else "fact.cost", got["found"],
+                     [("실적 분석으로 →", "#/branches")], ctx=got["ctx"], table=got["table"],
+                     source=(f"근거: {'·'.join(yrs)}년 최신 분석 결과의 사업별 실적(손익·자본) — 금액 단위 천원"
+                             if yrs else ""), mood="default" if got["found"] else "wow")
         return card
 
     def _fallback(self, n, view):

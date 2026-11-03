@@ -1909,6 +1909,36 @@ def _chat_standard():
         conn.close()
 
 
+_CHAT_FACTS = {"key": None, "data": None}
+
+
+def _chat_facts():
+    """«○○ 얼마 들었어»·«몇 년도에 한 적» 답 재료 — 연도·예산마다 최신 실행의 사업 줄(읽기만).
+    실행이 그대로면 지난번 것을 다시 쓴다(질문마다 수천 줄을 다시 읽지 않게)."""
+    conn = _conn()
+    try:
+        runs = dbm.latest_runs_all(conn)
+        key = tuple(sorted((y, b, r["id"]) for (y, b), r in runs.items()))
+        if _CHAT_FACTS["key"] == key:
+            return _CHAT_FACTS["data"]
+        lines = []
+        for (year, budget), r in runs.items():
+            for 처지사, 예산과목, 사업명, 연예산, 실적금액 in conn.execute(
+                    "SELECT 처지사, 예산과목, 사업명, 연예산, 실적금액 FROM biz_line WHERE run_id=?", (r["id"],)):
+                if 사업명:
+                    lines.append({"연도": str(year), "예산": budget, "처지사": 처지사 or "", "예산과목": 예산과목 or "",
+                                  "사업명": 사업명, "연예산": float(연예산 or 0), "실적금액": float(실적금액 or 0)})
+        data = {"lines": lines, "years": sorted({y for y, _ in runs}),
+                "depts": sorted({x["처지사"] for x in lines if x["처지사"]})}
+        _CHAT_FACTS.update(key=key, data=data)
+        return data
+    except Exception:
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+
 @app.post("/api/chat")
 def chat(req: ChatReq):
     if len(req.question or "") > chatm.engine.MAX_LEN:
@@ -1918,7 +1948,8 @@ def chat(req: ChatReq):
     ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
            "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None,
            "voice": raw.get("voice") is True}          # 말로 물었으면 받아 적기 실수를 고쳐 알아듣는다
-    return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard).answer(req.question, ctx))
+    return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard,
+                                         facts_provider=_chat_facts).answer(req.question, ctx))
 
 
 @app.get("/api/chat/suggestions")
