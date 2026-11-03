@@ -315,3 +315,13 @@ def test_sidebar_menu_scrolls_on_its_own():
     """2026-11-03 grace: 화면이 낮으면 6번 메뉴까지 안 내려가고 본문만 내려가던 문제 — 메뉴만 따로 스크롤."""
     nav = _read(SRC, "components", "sidebar.js").split("<nav", 1)[1].split(">", 1)[0]
     assert "overflow-y-auto" in nav and "min-h-0" in nav and "overscroll-contain" in nav
+
+
+def test_sub_menus_fold_under_parent():
+    """2026-11-03 grace: 3-1·3-2·5-1 은 위 메뉴 ▾ 를 눌러 펼친다(스크롤 없이 짧게). 지금 화면이 하위면 펼쳐 둔다."""
+    sb = _read(SRC, "components", "sidebar.js")
+    assert "data-sb-sub" in sb and 'class="nav-subs"' in sb and "${navHtml(MENU)}" in sb
+    assert "openActiveSub(state.view)" in _read(SRC, "router.js")
+    assert "setSubOpen(sub.dataset.sbSub" in _read(SRC, "main.js")
+    css = _read(SRC, "styles", "custom.css")
+    assert "#sidebar .nav-subs{display:none}" in css and "#sidebar .nav-subs.is-open{display:block}" in css

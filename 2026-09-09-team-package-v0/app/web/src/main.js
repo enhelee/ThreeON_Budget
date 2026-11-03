@@ -4,7 +4,7 @@ import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
-import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
+import { renderSidebar, renderHeaderBrand, setSubOpen } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
 import { onReportBlur, onReportChange, onReportClick, onReportFocus, onReportKey } from "./views/report.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
@@ -835,6 +835,8 @@ setSidebarOpen(sbStore.get() === "open");
   sb.addEventListener("focusin", () => { if (!pinned()) later(false, 0); });
   sb.addEventListener("focusout", e => { if (!pinned() && !sb.contains(e.relatedTarget)) later(true, 0); });
   sb.addEventListener("click", e => {
+    const sub = e.target.closest("[data-sb-sub]");
+    if (sub) { setSubOpen(sub.dataset.sbSub, sub.getAttribute("aria-expanded") !== "true"); return; }
     if (e.target.closest("[data-sb-fold]")) {
       clearTimeout(timer);
       const open = !pinned();
