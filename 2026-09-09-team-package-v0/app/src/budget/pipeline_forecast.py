@@ -204,11 +204,38 @@ def capacity_inputs(conn, base_year):
     return cap, rules, events
 
 
+def price_series(conn, base_year, years):
+    """과거 실적 환산에 쓸 {연도: (지수, 출처)} — 설정 «실적환산»이 꺼져 있으면 None.
+    years 와 기준연도를 모두 덮는다(지수 빈 해는 전망 물가로 채움, forecast_calc.price_index_series)."""
+    if not fs.restate_on(conn, base_year):
+        return None
+    rate = forecast_calc.fallback_rate(fs.load_factors(conn, base_year), int(base_year))
+    return forecast_calc.price_index_series(fs.load_table(conn, base_year, "price_index"),
+                                            [int(y) for y in years] + [int(base_year)], rate)
+
+
+def restate_summary(series, base_year, years) -> dict:
+    """화면용 — {on, base_year, years: [{연도, 배수, 출처}]} (실적이 있는 해만)."""
+    if not series:
+        return {"on": False, "base_year": str(base_year), "years": []}
+    to = series[int(base_year)][0]
+    return {"on": True, "base_year": str(base_year),
+            "years": [{"연도": y, "배수": to / series[y][0], "출처": series[y][1]} for y in sorted({int(v) for v in years})]}
+
+
 def _standard(conn, base_year):
     """표준금액 + 용량 환산(신규 발전설비 지사). 반환: std · actuals · years_used · grade · cap
     cap = {"model": 용량 규칙(기준 지사로 맞춘 고정분·등급별 단가·과목 비중·LOO), "targets": {지사: {mw, start, excluded}},
-           "events": 대상 지사 실적사용시작 포함 구조변화}"""
+           "events": 대상 지사 실적사용시작 포함 구조변화, "nominal": 환산 전 실적, "restate": 환산 요약}
+    actuals 는 설정 «실적환산»이 켜져 있으면 기준연도 가치로 바꾼 실적이다 — 표준금액·용량 환산·A급정비 1회 금액·
+    예측 범위가 모두 같은 기준을 쓴다(엑셀 내보내기의 실적 이력은 cap["nominal"] 그대로)."""
     actuals, years_used, ref_years = actuals_with_reference(conn, base_year)
+    nominal = actuals
+    data_years = sorted({int(y) for y in actuals["연도"]}) if not actuals.empty else []
+    series = price_series(conn, base_year, data_years)
+    if series:
+        actuals = forecast_calc.restate_amounts(actuals, series, int(base_year))
+    restate = restate_summary(series, base_year, data_years)
     years_used = years_used + [f"{y}(참고)" for y in ref_years]
     window = fs.learning_window(conn, base_year)
     # TI = HGPI — 등급이 걸린 입력은 계산 직전에 한 이름으로(forecast_calc.SAME_GRADE). 저장값은 그대로.
@@ -228,7 +255,8 @@ def _standard(conn, base_year):
     for t in targets.values():
         if "rows" in t:
             t["rows"] = forecast_calc.prune_grades(t["rows"])
-    return std, actuals, years_used, grade, {"model": model, "targets": targets, "events": events}
+    return std, actuals, years_used, grade, {"model": model, "targets": targets, "events": events,
+                                             "nominal": nominal, "restate": restate}
 
 
 def site_notes(conn, base_year, cap) -> dict:
@@ -380,7 +408,7 @@ def run_benchmark(conn, base_year):
     if not std.empty:
         std = std.sort_values(["사업장", "구분", "예산과목", "등급"]).reset_index(drop=True)
     return {"base_year": str(base_year), "years_used": years_used, "window": fs.learning_window(conn, base_year),
-            "site_notes": site_notes(conn, base_year, cap),
+            "site_notes": site_notes(conn, base_year, cap), "restate": cap["restate"],
             "population": {"rows": int(len(actuals)),
                            "total": float(actuals["금액"].sum()) if len(actuals) else 0.0},
             "has_ltsa": benchmark.has_ltsa_detail(actuals), "rows": records(std)}
@@ -390,8 +418,9 @@ def benchmark_frames(conn, base_year):
     """3단계 입력·결과를 DataFrame 으로 — 엑셀 양식(6-7)이 화면과 같은 계산을 쓴다.
     반환 dict: std · actuals · years_used · grade · sites"""
     fs.bind_site_resolvers(conn, base_year)
-    std, actuals, years_used, grade, _ = _standard(conn, base_year)
-    return {"std": std, "actuals": actuals, "years_used": years_used, "grade": grade,
+    std, _, years_used, grade, cap = _standard(conn, base_year)
+    # 양식의 실적 이력 칸은 그 해 금액 그대로(환산 전) — 표준금액만 기준연도 가치
+    return {"std": std, "actuals": cap["nominal"], "years_used": years_used, "grade": grade,
             "sites": forecast_sites(conn, base_year)}
 
 

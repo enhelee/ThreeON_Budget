@@ -1,7 +1,7 @@
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
-import { computingHtml, gradeKey, header, SAME_GRADES } from "./forecast.js"
+import { computingHtml, gradeKey, header, restateNote, SAME_GRADES } from "./forecast.js"
 
 // ─────────────────────────────────────────────────────────────
 // 5번 — 표준화 한눈에 보기  (#/standard)
@@ -116,7 +116,7 @@ function stdBody() {
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
       <h3 class="section-title">지사 × 정비등급 표준금액 · 손익 · 자본 · 총액</h3>
-      <p class="section-help">${esc(basis)} · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종 · 칸 = 그 지사가 그 등급인 해의 과목 표준금액 합 · ${esc(same)} · 칸을 누르면 «표준화 세부»</p>
+      <p class="section-help">${esc(basis)}${restateNote(b) ? ` · <b class="text-ink">${esc(restateNote(b))}</b>` : ""} · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종 · 칸 = 그 지사가 그 등급인 해의 과목 표준금액 합 · ${esc(same)} · 칸을 누르면 «표준화 세부»</p>
       <div class="mt-3">${legend()}</div>
     </div>
     ${table(m, siteGroups, b.site_notes)}

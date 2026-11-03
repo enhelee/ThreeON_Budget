@@ -21,9 +21,10 @@ const TABLE_URL = {grades: "grades", hot_parts: "hot-parts", factors: "factors",
                    site_history: "site-history", site_event: "site-event", site_grade_eq: "site-grade-eq",
                    benchmark_rule: "benchmark-rule", actual_tag: "actual-tag", regular_contract: "regular-contract",
                    cri_rule: "cri-rule", investment_plan: "investment-plan",
-                   site_capacity: "site-capacity", capacity_rule: "capacity-rule", hot_parts_contract: "hot-parts-contract"}
+                   site_capacity: "site-capacity", capacity_rule: "capacity-rule", hot_parts_contract: "hot-parts-contract",
+                   price_index: "price-index"}
 const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도", "적용시작연도", "준공연도"])
-const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가"])
+const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가", "지수"])
 // 비우면 «없음»(null)인 칸 — 0 과 뜻이 다르다(보정률 0 ≠ 보정 없음)
 const NULLABLE_FIELDS = new Set(["보정률", "조정액", "종료연도", "용량MW"])
 
@@ -47,6 +48,7 @@ const NEW_ROW = {
   investment_plan: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear) + 1, 금액: 0, 비고: ""}),
   site_capacity: () => ({사업장: firstSite(), 설비: "", 구분: "발전설비", 용량MW: null, 준공연도: null, 비고: ""}),
   capacity_rule: () => ({사업장: firstSite(), 역할: "대상", 적용시작연도: Number(state.fc.baseYear), 용량MW: null, 정비제외연도: "", 비고: ""}),
+  price_index: () => ({연도: Number(state.fc.baseYear) - 1, 지수: 0, 비고: "한국은행 생산자물가지수(총지수)"}),
 }
 
 const json = body => ({method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
@@ -210,6 +212,11 @@ async function applyPreview(mode) {
         const got = new Set(p.contract_rows.map(r => r.사업장))
         await put("hot-parts-contract", {rows: [...(d.hot_parts_contract || []).filter(r => !got.has(r.사업장)), ...p.contract_rows]})
       }
+    } else if (p.kind === "price-index") {
+      // 생산자물가지수 — «합치기»는 파일에 없는 해만 지금 값을 남기고, 파일에 있는 해는 파일 값으로
+      const got = new Set(p.rows.map(r => Number(r.연도)))
+      const keep = mode === "merge" ? (d.price_index || []).filter(r => !got.has(Number(r.연도))) : []
+      await put("price-index", {rows: [...keep, ...p.rows]})
     } else if (p.kind === "hq-master") {
       await put("hq-master", {columns: p.columns, rows: p.rows, ratio_rows: p.ratio_rows})
     }

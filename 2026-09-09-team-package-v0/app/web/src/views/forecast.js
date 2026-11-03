@@ -29,7 +29,7 @@ const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
                      ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan"]],
                      ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]],
-                     ["learn", "학습 기간·백테스트", ["settings"]]]
+                     ["learn", "학습 기간·물가 환산·백테스트", ["settings", "price_index"]]]
 const BENCH_VIEWS = [["std", "표준금액"], ["rules", "산정 규칙"], ["regular", "정기비용 분리"]]
 const TAG_LABEL = {기타: "기타(표준화)", LTSA: "LTSA", CRI: "CRI", 고온부품재생: "고온부품재생"}
 const HOT_ITEMS = ["고온부품재생", "신품구매"]
@@ -41,6 +41,15 @@ export const TOTAL = "__total__"
 export const SAME_GRADES = {"HGPI/TI": ["HGPI", "TI"]}
 const GRADE_ALIAS = Object.fromEntries(Object.entries(SAME_GRADES).flatMap(([k, list]) => list.map(g => [g, k])))
 export const gradeKey = g => GRADE_ALIAS[g] || g
+
+/** 표준화 결과의 과거 실적 환산 한 줄 — «2026년 가치로 환산(생산자물가지수 7개년 · 전망 물가로 채움 3개년)» */
+export function restateNote(b) {
+  const r = b?.restate
+  if (!r) return ""
+  if (!r.on) return "과거 실적은 그 해 금액 그대로(물가 환산 끔)"
+  const idx = r.years.filter(y => y.출처 === "지수").length, fill = r.years.length - idx
+  return `과거 실적을 ${r.base_year}년 가치로 환산(생산자물가지수 ${idx}개년${fill ? ` · 전망 물가로 채움 ${fill}개년` : ""})`
+}
 
 const num = v => (v === null || v === undefined) ? "" : v
 
@@ -384,8 +393,27 @@ function learnBody(d) {
         ${state.fc.dirty.has("settings") ? '<button class="btn-primary" data-action="fc-relearn" title="학습 기간을 저장하고 표준금액·전망을 다시 계산한 뒤 백테스트로 그 기간의 오차를 보여 줍니다">재학습</button>' : ""}
         ${chosen ? `<p class="pb-2 text-sm text-sub">최근 ${esc(win)}개년 백테스트 · 과목 합계 오차 <b class="text-ink">${pct(chosen.account)}</b> · 지사 3년 누적 <b class="text-ink">${pct(chosen.site3)}</b>${best && String(best.window) !== win ? ` · 가장 작은 기간 = 최근 ${esc(best.window)}개년 (${pct(best.account)})` : ""}</p>` : ""}
       </div>`, "settings")}
+    ${priceIndexPanel(d)}
     ${panel("백테스트", "평가 단위 = 과목 합계 · 지사 3년 누적 (칸 하나는 사람 연예산도 44~64% 틀림) · 마감 실적 + 참고 엑셀 실적", `
       <div class="flex flex-wrap gap-2 p-5 pb-0"><button class="btn-secondary" data-action="fc-backtest">백테스트 실행</button></div>${btBody}`)}`
+}
+
+/** 과거 실적 기준연도 환산(2026-11-03) — 켬/끔 + 생산자물가지수 표. 빈 해는 전망 물가(팩터)로 채운다. */
+function priceIndexPanel(d) {
+  const on = String(d.settings?.실적환산 ?? "1") !== "0"
+  const rows = d.price_index || []
+  const by = Number(state.fc.baseYear)
+  const rate = (d.factors || []).filter(f => f.활성).reduce((m, f) => m * (1 + Number(f.연간비율 || 0)), 1) - 1
+  const missing = !rows.some(r => Number(r.연도) === by)
+  return panel("과거 실적 물가 환산 (생산자물가지수)", "표준금액을 만들기 전에 과거 실적을 기준연도 가치로 바꿉니다 · 환산 실적 = 실적 × 지수(기준연도) ÷ 지수(그 해) · 손익·자본 같은 지수 · 백테스트도 같은 조건(시험 연도 가치로)", `
+    <div class="flex flex-wrap items-end gap-3 p-5 pb-0">
+      <label class="block"><span class="field-label">과거 실적 환산</span>${sel(["1", "0"], on ? "1" : "0", 'data-fcsetting="실적환산"', {"1": `켬 — ${by}년 가치로 환산`, "0": "끔 — 그 해 금액 그대로"})}</label>
+      <button class="btn-secondary" data-fcimport="price-index" title="«생산자물가지수» 시트가 있는 엑셀(표준화 참고 엑셀 V3 등)에서 연도별 지수를 읽습니다">엑셀에서 지수 가져오기</button>
+      ${state.fc.dirty.has("settings") ? '<button class="btn-primary" data-action="fc-relearn" title="설정을 저장하고 표준금액·전망을 다시 계산한 뒤 백테스트를 보여 줍니다">재학습</button>' : ""}
+    </div>
+    <p class="px-5 pt-3 text-xs text-sub">${rows.length ? `지수 ${rows.length}개년 입력됨` : '<span class="text-warn">지수가 아직 없습니다 — 모든 해를 전망 물가로 환산합니다.</span>'} · 빈 해(${missing ? `기준연도 ${by}년 포함, ` : ""}지수가 아직 안 나온 해 등)는 가까운 지수에서 연 ${(rate * 100).toFixed(1)}%(전망 물가 팩터)로 채웁니다 · 출처: 한국은행 ECOS «생산자물가지수(기본분류) 총지수», 연간</p>
+    ${longTable("price_index", [{f: "연도", label: "연도", type: "int"}, {f: "지수", label: "지수 (예: 2020=100)", type: "num"}, {f: "비고", label: "비고"}],
+      rows, "지수가 없습니다 — 엑셀에서 가져오거나 행을 추가하세요.")}`, "price_index")
 }
 
 function cmpTable(rows, cols, onlyDiff) {
@@ -464,7 +492,8 @@ function manageBody() {
 // ── 가져오기 미리보기 ────────────────────────────────────────
 
 const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정비등급 양식)",
-                      "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율"}
+                      "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율",
+                      "price-index": "생산자물가지수"}
 
 function previewPanel() {
   const p = state.fc.preview
@@ -579,7 +608,7 @@ function benchStd() {
   const ed = state.fc.benchEdits
   const nEdits = Object.keys(ed.methods).length + Object.keys(ed.overrides).length
   const info = b.years_used.length
-    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)} 천원 → 표준금액 ${b.rows.length.toLocaleString()}행`
+    ? `마감 연도 <b>${esc(b.years_used.filter(y => !String(y).endsWith("(참고)")).join("·") || "없음")}</b>${refYears(b.years_used)} · 실적 ${b.population.rows.toLocaleString()}행 · ${fmt(b.population.total)} 천원 → 표준금액 ${b.rows.length.toLocaleString()}행${restateNote(b) ? ` · ${esc(restateNote(b))}` : ""}`
     : '<span class="text-warn">마감된 연도의 분석 결과가 없습니다 — 2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면 여기 입력이 됩니다.</span>'
   return `
   <article class="panel overflow-hidden">
