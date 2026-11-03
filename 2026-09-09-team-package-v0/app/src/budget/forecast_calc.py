@@ -76,6 +76,24 @@ def canon_grade(value):
     return _SAME_GRADE_RE.sub(lambda m: SAME_GRADE[m.group(1)], value)
 
 
+# 표준금액을 만들지 않는 등급 · 그 등급이 있는 지사(2026-11-03 팀장).
+#   BSI = 일시적인 등급(2020년 한 번) — 표준금액이 필요 없다.
+#   CI = 이 지사들만 CI 정비를 한다(삼송은 2031 일정에 CI 가 있어 남김). 다른 지사의 CI 줄은 지운다.
+#   ⚠ 지사 이름을 코드에 둔 임시 기준 — 지사 구성이 바뀌면 여기를 고친다(나중에 기준정보 표로 옮길 것).
+DROP_GRADES = {"BSI"}
+GRADE_SITES = {"CI": {"광교지사", "동탄지사", "강남지사", "삼송지사"}}
+
+
+def prune_grades(std: pd.DataFrame) -> pd.DataFrame:
+    """표준금액 표에서 DROP_GRADES 줄과, GRADE_SITES 밖 지사의 그 등급 줄을 뺀다."""
+    if std is None or std.empty or "등급" not in std.columns:
+        return std
+    keep = ~std["등급"].isin(DROP_GRADES)
+    for grade, sites in GRADE_SITES.items():
+        keep &= ~((std["등급"] == grade) & ~std["사업장"].isin(sites))
+    return std[keep].reset_index(drop=True)
+
+
 def canon_grades(df: pd.DataFrame, cols=("등급",)) -> pd.DataFrame:
     """df 의 등급 열(들)을 canon_grade 로 바꾼 사본. 빈 표·열 없음은 그대로 돌려준다."""
     if df is None or df.empty:

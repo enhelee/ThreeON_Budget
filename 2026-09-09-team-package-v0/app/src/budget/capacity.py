@@ -253,6 +253,38 @@ def apply_capacity(std: pd.DataFrame, prepared: pd.DataFrame, grade_hist: pd.Dat
     return out, model, targets
 
 
+def fill_missing_grades(std: pd.DataFrame, model: dict, targets: dict) -> pd.DataFrame:
+    """표에 없는 등급을 용량 환산으로 채운다(2026-11-03 팀장: 삼송 MI · 수원 MI).
+    ① 기준 지사: 그 등급 이력이 없어 표준금액이 빈 칸(삼송은 MI 해가 한 번도 없었다)
+    ② 적용시작이 기준연도 뒤인 대상 지사: 시작 후 등급(targets[지사]["rows"]) 중 지금 표에 없는 것(수원 MI) —
+       시작 전 해에는 그 등급이 일정에 없으므로 전망 계산은 그대로다(시작 해부터는 rows 를 쓴다).
+    «표준»(= 간이 별칭)은 채우지 않는다. 지사별로 쓰지 않는 등급은 뒤에서 forecast_calc.prune_grades 가 뺀다."""
+    if not model or not model.get("k"):
+        return std
+    have = set(zip(std["사업장"], std["등급"])) if not std.empty else set()
+    add = []
+
+    def missing(rows, site, prefix):
+        if rows is None or rows.empty:
+            return
+        rows = rows[(rows["등급"] != "표준") & (rows["등급"] != EXCLUDED)]
+        rows = rows[[(site, g) not in have for g in rows["등급"]]].copy()
+        if rows.empty:
+            return
+        rows["비고"] = prefix + rows["비고"]
+        rows["근거"] = prefix + rows["근거"]
+        add.append(rows)
+
+    for site, mw in (model.get("refs") or {}).items():
+        missing(standard_rows(model, site, {"mw": mw, "excluded": set()}), site, "등급 이력 없음 · ")
+    for site, t in targets.items():
+        if "rows" in t:
+            missing(t["rows"], site, f"{t['start']}년 준공 후 · ")
+    if not add:
+        return std
+    return pd.concat([std, *add], ignore_index=True)
+
+
 def excluded_grades(targets: dict) -> pd.DataFrame:
     """정비제외 해 → 등급 «정비제외»(전망 계산에만 끼운다 — 저장된 등급 이력은 그대로)."""
     rows = [{"사업장": s, "연도": y, "등급": EXCLUDED} for s, t in targets.items() for y in sorted(t["excluded"])]

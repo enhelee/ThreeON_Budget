@@ -20,7 +20,8 @@ import { computingHtml, gradeKey, header, SAME_GRADES } from "./forecast.js"
 const COLOR = {손익: "var(--chart-profit)", 자본: "var(--chart-capital)"}
 const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
 // 가스터빈 등급(큰 정비 → 작은 정비) 다음 스팀터빈 A·B·C, 등급 이력이 없으면 «표준»
-const GRADE_ORDER = ["MI", "HGPI/TI", "CI", "BSI", "간이", "A", "B", "C", "표준"]
+// (BSI 는 일시적 등급이라 서버가 표준금액을 만들지 않는다 — forecast_calc.DROP_GRADES)
+const GRADE_ORDER = ["MI", "HGPI/TI", "CI", "간이", "A", "B", "C", "표준", "정비제외"]
 
 function gradeRank(g) {
   if (GRADE_ORDER.includes(g)) return GRADE_ORDER.indexOf(g)
@@ -79,7 +80,10 @@ function cellHtml(site, grade, c, max) {
     <span class="std-sub">${chip("손익")}${mil(c.손익)}<span class="std-sep"></span>${chip("자본")}${mil(c.자본)}</span></button></td>`
 }
 
-function table(m, siteGroups) {
+/** 지사 이름 옆 작은 딱지(수원 «2029년 준공 후 중대형CHP 편입 예정») — /api/forecast/benchmark site_notes */
+export const siteTag = (site, notes) => notes?.[site] ? `<span class="std-tag" title="${esc(notes[site])}">${esc(notes[site])}</span>` : ""
+
+function table(m, siteGroups, notes) {
   let lastGroup = null
   const body = m.sites.map(site => {
     const g = siteGroups[site] || "기타"
@@ -90,7 +94,7 @@ function table(m, siteGroups) {
       const c = m.cell[`${site}|${grade}`]
       return c ? cellHtml(site, grade, c, m.max) : `<td class="std-cell std-cell--none" aria-label="${esc(site)} ${esc(grade)} 없음">·</td>`
     }).join("")
-    return `${groupRow}<tr><th class="std-site" scope="row">${esc(site)}</th>${cells}</tr>`
+    return `${groupRow}<tr><th class="std-site" scope="row">${esc(site)}${siteTag(site, notes)}</th>${cells}</tr>`
   }).join("")
   return `<div class="overflow-x-auto"><table class="std-heat">
     <thead><tr><th class="std-site" scope="col">지사 / 정비등급</th>${m.grades.map(g => `<th scope="col">${esc(g)}</th>`).join("")}</tr></thead>
@@ -115,7 +119,7 @@ function stdBody() {
       <p class="section-help">${esc(basis)} · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종 · 칸 = 그 지사가 그 등급인 해의 과목 표준금액 합 · ${esc(same)} · 칸을 누르면 «표준화 세부»</p>
       <div class="mt-3">${legend()}</div>
     </div>
-    ${table(m, siteGroups)}
+    ${table(m, siteGroups, b.site_notes)}
   </article>`
 }
 
