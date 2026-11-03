@@ -192,9 +192,33 @@ const voice = {on: false, busy: false, rec: null, note: ""}
 
 const setNote = t => { voice.note = t; render() }
 
-function toggleVoice() {
+// 크롬은 크롬 설정에서 고른 마이크로 음성 인식을 한다 — 거기에 가상 장치(BlackHole·Zoom 등)가 잡혀 있으면
+// 소리가 하나도 안 들어가 «no-speech»만 난다(11/3 grace 맥북: 크롬=BlackHole, 맥 기본=내장 마이크).
+// 그래서 진짜 마이크를 직접 골라 그 소리를 음성 인식에 넘긴다(start(track), 크롬 137+). 못 하면 예전처럼.
+const VIRTUAL_MIC = /virtual|blackhole|zoom|soundflower|loopback|cable|teams|vb-audio|obs|krisp/i
+
+async function realMicTrack() {
+  if (!navigator.mediaDevices?.getUserMedia) return null
+  let s = await navigator.mediaDevices.getUserMedia({audio: true})      // 허락 + 이름 보이게
+  const first = s.getAudioTracks()[0]
+  if (first && !VIRTUAL_MIC.test(first.label)) return first
+  s.getTracks().forEach(t => t.stop())
+  const ins = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput")
+  const pick = ins.find(d => d.deviceId === "default" && !VIRTUAL_MIC.test(d.label))
+    || ins.find(d => /built-?in|내장|마이크|microphone/i.test(d.label) && !VIRTUAL_MIC.test(d.label))
+    || ins.find(d => !VIRTUAL_MIC.test(d.label))
+  if (!pick) return null
+  s = await navigator.mediaDevices.getUserMedia({audio: {deviceId: {exact: pick.deviceId}}})
+  return s.getAudioTracks()[0] || null
+}
+
+async function toggleVoice() {
   if (voice.on) { voice.rec?.stop(); return }
   if (chat.busy) return
+  let track = null
+  try { track = await realMicTrack() } catch (e) {
+    if (e?.name === "NotAllowedError") { setNote(/system/i.test(e.message) ? "맥 설정에서 브라우저의 마이크가 꺼져 있어요(시스템 설정 → 개인정보 보호 및 보안 → 마이크)." : "마이크를 쓰려면 허락이 필요해요(주소창 왼쪽 아이콘 → 마이크 허용)."); return }
+  }
   const rec = new SR()
   rec.lang = "ko-KR"
   rec.interimResults = true
@@ -217,6 +241,7 @@ function toggleVoice() {
       : e.error === "aborted" ? "" : `음성 인식이 멈췄어요(${e.error}). 글자로 물어봐 주세요.`
   }
   rec.onend = () => {
+    track?.stop()
     voice.on = false
     voice.rec = null
     const q = heard.trim()
@@ -230,7 +255,9 @@ function toggleVoice() {
   voice.rec = rec
   voice.note = "듣고 있어요… 말을 마치면 알아서 보내요. (🎤 를 다시 누르면 바로 멈춤)"
   render()
-  try { rec.start() } catch { voice.on = false; voice.rec = null; setNote("음성 인식을 시작하지 못했어요.") }
+  try {
+    if (track) { try { rec.start(track) } catch { track.stop(); track = null; rec.start() } } else rec.start()
+  } catch { track?.stop(); voice.on = false; voice.rec = null; setNote("음성 인식을 시작하지 못했어요.") }
 }
 
 // 패널 안 이벤트는 여기서만 — main.js 의 큰 위임 핸들러와 섞지 않는다.
