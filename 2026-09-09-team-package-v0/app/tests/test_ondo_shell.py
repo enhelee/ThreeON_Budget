@@ -305,10 +305,12 @@ def test_standard_explains_folded_and_fits_one_screen():
     std = _read(SRC, "views", "standard.js")
     body = _fn(std, "stdBody")
     assert '<details class="std-about">' in body and body.count("<li>") >= 4
-    assert 'data-action="std-fit"' in body and "state.stdFit" in body
-    assert 'act === "std-fit"' in _read(SRC, "main.js")
+    assert 'data-action="std-full"' in body, "전체보기 = 새 창"
+    assert "window.open(" in _fn(std, "openStandardWindow")
+    assert 'act === "std-full"' in _read(SRC, "main.js")
     css = _read(SRC, "styles", "custom.css")
-    assert ".std-fit .std-heat{table-layout:fixed" in css and ".std-fit .std-scroll{overflow-x:visible}" in css
+    assert ".std-full .std-heat{table-layout:fixed}" in css
+    assert ".std-tag{display:block;" in css, "편입 예정 딱지는 지사 이름 아래 줄"
 
 
 def test_sidebar_menu_scrolls_on_its_own():
@@ -350,3 +352,71 @@ def test_tour_skip_points_to_replay_button():
     assert "laterHint(view)" in tour and "나중에 여기서 다시 볼 수 있어요" in tour
     assert '.addEventListener("click", skip)' in tour
     assert ".tour-later{" in _read(SRC, "styles", "custom.css")
+
+
+def test_standard_page_has_tour():
+    """2026-11-03 grace: 5 표준화에도 사용법 둘러보기 — 표 읽는 법 · 칸 누르면 5-1 · 전체보기(새 창)."""
+    tour = _read(SRC, "components", "tour.js")
+    std_tour = tour.split("  standard: [", 1)[1].split("],", 1)[0]
+    assert ".std-heat thead" in std_tour and "5-1 표준화 세부" in std_tour and "std-full" in std_tour
+    assert 'tourButton("standard")' in _read(SRC, "views", "standard.js")
+
+
+def test_tour_text_breaks_per_sentence():
+    """2026-11-03 grace: 둘러보기 말풍선은 문장마다 줄을 나누고, 낱말 중간에서 끊지 않는다."""
+    assert '.replace(/([.?!]) +/g, "$1\\n")' in _read(SRC, "components", "tour.js")
+    assert ".tour__text{white-space:pre-line;word-break:keep-all;" in _read(SRC, "styles", "custom.css")
+
+
+def test_info_icon_opens_aligned_box_on_click():
+    """2026-11-03 grace 시안 1: ⓘ 는 누르면 설명 상자 · 이름 칸 | 설명 칸 두 열로 줄을 맞춘다(줄이 바뀌어도 설명 시작선)."""
+    fc = _read(SRC, "views", "forecast.js")
+    assert "aria-label=\"설명\">ⓘ</span>" not in fc and "cursor-help" not in fc, "마우스 올려 기다리는 title 설명은 없앴다"
+    assert "export function infoTip(" in fc and "infoTip(String(help)" in fc
+    assert "closeInfo()" in _read(SRC, "main.js")
+    css = _read(SRC, "styles", "custom.css")
+    assert ".info-pop__list--kv{grid-template-columns:4.6rem minmax(0,1fr)" in css
+    assert ".std-about__list li{display:grid;grid-template-columns:5.2rem minmax(0,1fr)" in css
+
+
+def test_site_note_tag_is_short():
+    """2026-11-03 grace: «2029년 준공 후 중대형CHP 편입 예정» 딱지는 «2029 편입 예정»으로 짧게(전체는 마우스 올리면)."""
+    import subprocess, json
+    std = _read(SRC, "views", "standard.js")
+    line = [l for l in std.splitlines() if l.startswith("const shortNote")][0]
+    js = line + '\nconsole.log(JSON.stringify([shortNote("2029년 준공 후 중대형CHP 편입 예정"), shortNote("기타 메모")]))'
+    out = subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout
+    assert json.loads(out) == ["2029 편입 예정", "기타 메모"]
+
+
+def test_grade_plan_names_aligned_without_ditto():
+    """2026-11-03 grace: 6 정비등급 양식 — «삼  송» 빈칸·〃 대신 지사 | 설비 두 열, 같은 지사 줄은 묶어 보이게."""
+    fc = _fn(_read(SRC, "views", "forecast.js"), "gradePlanTable")
+    assert 'text-tri">〃' not in fc and 'replace(/\\s+/g, "")' in fc and "gp-cont" in fc
+    assert ".gp-name{display:grid;grid-template-columns:minmax(4.5rem,max-content) auto" in _read(SRC, "styles", "custom.css")
+
+
+def test_grade_plan_paren_moves_to_unit():
+    """2026-11-03 grace: «청 주(신규CHP)» → 청주 | 신규CHP (대구와 같은 양식), 설비 칸 바깥 괄호도 뗀다."""
+    fc = _fn(_read(SRC, "views", "forecast.js"), "gradePlanTable")
+    assert "const paren = !unit && site.match(" in fc and 'unit = unit.replace(/^\\((.*)\\)$/, "$1")' in fc
+
+
+def test_forecast_page_has_tour():
+    """2026-11-03 grace: 6 중장기 예측에도 사용법 둘러보기 — 기준연도 · 탭 · 가정 묶음 · 저장 · 지사 · 내려받기."""
+    tour = _read(SRC, "components", "tour.js")
+    fc_tour = tour.split("  forecast: [", 1)[1].split("\n  ],", 1)[0]
+    for sel in ("[data-fcbase]", ".fc-tabs", ".fc-mtabs", "#fcSaveBtn", "[data-fcsite]", 'data-fcexport="longterm"'):
+        assert sel in fc_tour, sel
+    fc = _read(SRC, "views", "forecast.js")
+    assert 'tourButton("forecast")' in fc and "fc-tabs" in fc and "fc-mtabs" in fc
+
+
+def test_forecast_tour_explains_each_group():
+    """2026-11-03 grace: 기준정보 묶음 9개를 둘러보기 한 단계에서 이름 | 설명 두 열로."""
+    tour = _read(SRC, "components", "tour.js")
+    step = tour.split('{sel: ".fc-mtabs"', 1)[1].split("]},", 1)[0]
+    for name in ("참고 엑셀·대조", "정비등급", "고온부품", "설비용량·신규표준", "지사 연혁·구조변화",
+                 "정기계약·CRI·투자", "본사 배분·임시사업", "지사 돌발사업", "학습 기간·물가 환산·백테스트"):
+        assert f'["{name}", ' in step, name
+    assert ".tour__list{display:grid;grid-template-columns:max-content minmax(0,1fr)" in _read(SRC, "styles", "custom.css")

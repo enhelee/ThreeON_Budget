@@ -679,7 +679,7 @@ img.char-img{object-fit:contain;display:inline-block}
 .tour{position:fixed;inset:0;z-index:90}
 .tour__ring{position:fixed;border-radius:16px;box-shadow:0 0 0 9999px rgba(11,16,32,.45);outline:2px solid #fff;transition:all .25s ease;pointer-events:none}
 .tour__bubble{position:fixed;width:min(340px,calc(100vw - 24px));padding:1rem 1.1rem;border-radius:16px;background:#fff;box-shadow:0 20px 50px rgba(11,16,32,.25)}
-.tour__text{font-size:14px;line-height:1.55;color:var(--ink,#1A2236);font-weight:600}
+.tour__text{white-space:pre-line;word-break:keep-all;font-size:14px;line-height:1.6;color:var(--ink,#1A2236);font-weight:600}
 .tour__foot{display:flex;align-items:center;gap:.5rem;margin-top:.8rem}
 .tour__count{margin-right:auto;font-size:12px;color:#98A0B0}
 .tour__skip{background:none;border:0;font-size:13px;color:#7A8294;cursor:pointer}
@@ -708,22 +708,25 @@ img.char-img{object-fit:contain;display:inline-block}
 @media (prefers-reduced-motion:reduce){.analyze-box.is-now,.next-cta.is-ready .next-cta__btn{animation:none}}
 
 /* 지사 옆 작은 딱지 — 준공 후 묶음 편입 예정 등(views/standard.js siteTag) */
-.std-tag{display:inline-block;margin-left:.4rem;padding:.05rem .4rem;border:1px solid var(--line-strong, #C5CBD6);border-radius:9999px;font-size:10.5px;font-weight:600;line-height:1.4;color:#5B6478;background:#fff;vertical-align:middle;white-space:nowrap}
+.std-tag{display:block;width:fit-content;margin:.2rem 0 0;padding:.05rem .4rem;border:1px solid var(--line-strong, #C5CBD6);border-radius:9999px;font-size:10.5px;font-weight:600;line-height:1.4;color:#5B6478;background:#fff;white-space:nowrap}
 
 /* 5 표준화 — 설명은 접어 두고(이 표 읽는 법), 전체보기면 옆 스크롤 없이 한 화면에(2026-11-03 grace) */
 .std-about{margin-top:.6rem}
 .std-about summary{cursor:pointer;width:fit-content;font-size:13px;font-weight:600;color:#5B6478}
 .std-about summary:hover{color:var(--navy)}
-.std-about__list{margin:.6rem 0 0;padding:.75rem 1rem;list-style:none;display:grid;gap:.35rem;border-radius:12px;background:var(--subtle);font-size:13px;line-height:1.55;color:#5B6478}
-.std-about__list b{display:inline-block;min-width:5.2rem;color:var(--ink)}
-.std-fit .std-scroll{overflow-x:visible}
-.std-fit .std-heat{table-layout:fixed;font-size:12px}
-.std-fit .std-heat .std-site{width:8.5rem;white-space:normal;padding:.25rem .5rem}
-.std-fit .std-heat thead th{white-space:normal;padding:.4rem .2rem}
-.std-fit .std-cell{min-width:0}
-.std-fit .std-cell button{gap:.2rem;padding:.3rem .4rem}
-.std-fit .std-sub{display:none}
-.std-fit .std-tag{display:block;margin:.15rem 0 0;width:fit-content;white-space:normal}
+.std-about__list{margin:.6rem 0 0;padding:.75rem 1rem;list-style:none;display:grid;gap:.35rem;word-break:keep-all;border-radius:12px;background:var(--subtle);font-size:13px;line-height:1.55;color:#5B6478}
+.std-about__list li{display:grid;grid-template-columns:5.2rem minmax(0,1fr);column-gap:.5rem}
+.std-about__list b{color:var(--ink)}
+/* [전체보기] 새 창 — 표가 창 폭에 맞게 */
+.std-full-page{margin:0;background:var(--page,#F4F6FA)}
+.std-full{padding:1.25rem}
+.std-full .std-scroll{overflow-x:visible}
+.std-full .std-heat{table-layout:fixed}
+.std-full .std-heat .std-site{width:9rem}
+.std-full .std-heat thead th{white-space:normal}
+.std-full .std-cell{min-width:0}
+.std-full .std-cell button{cursor:default}
+.std-full .std-cell button:hover{outline:0}
 
 /* 메뉴가 화면보다 길면 메뉴만 따로 스크롤(2026-11-03 grace — 6번까지 안 내려가던 문제) */
 #sidebar .sb-nav{scrollbar-width:thin;scrollbar-color:#C5CBD6 transparent;margin-right:-.5rem;padding-right:.5rem}
@@ -757,3 +760,30 @@ img.char-img{object-fit:contain;display:inline-block}
 .tour-later.is-out{opacity:0}
 @keyframes tourLaterIn{from{opacity:0;transform:translateY(-4px)}}
 @media (prefers-reduced-motion:reduce){.tour-later{animation:none}}
+
+/* 제목 옆 ⓘ 설명 상자(views/forecast.js infoTip) — 이름 칸 | 설명 칸을 두 열로 맞춰 줄이 바뀌어도 설명 칸 시작선에 맞는다 */
+.info{position:relative;display:inline-block;vertical-align:middle;margin-left:.25rem}
+.info-btn{display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border-radius:999px;border:1.5px solid #8EA0C6;background:#EAF0FA;color:#26407A;font-size:11px;font-weight:800;font-family:Georgia,serif;font-style:italic;line-height:1;cursor:pointer}
+.info-btn:hover,.info-btn[aria-expanded="true"]{background:#DCE5F5;border-color:#26407A}
+.info-pop{position:absolute;left:-.6rem;top:calc(100% + 10px);z-index:45;display:block;width:min(360px,calc(100vw - 32px));padding:.8rem 2.2rem .8rem 1rem;border-radius:12px;background:#fff;border:1px solid #E3E7EF;box-shadow:0 10px 30px rgba(11,16,32,.12);font-size:13px;font-weight:400;line-height:1.6;color:#5B6478;text-align:left;white-space:normal;word-break:keep-all;letter-spacing:0}
+.info-pop[hidden]{display:none}
+.info-pop::before{content:"";position:absolute;top:-6px;left:1rem;width:10px;height:10px;background:#fff;border-left:1px solid #E3E7EF;border-top:1px solid #E3E7EF;transform:rotate(45deg)}
+.info-pop__x{position:absolute;top:.45rem;right:.5rem;width:1.5rem;height:1.5rem;border:0;border-radius:6px;background:none;color:#98A0B0;font-size:12px;cursor:pointer}
+.info-pop__x:hover{background:#F4F6FA;color:var(--navy)}
+.info-pop__list{display:grid;grid-template-columns:.8rem minmax(0,1fr);row-gap:.3rem}
+.info-pop__list--kv{grid-template-columns:4.6rem minmax(0,1fr);column-gap:.6rem}
+.info-pop__list b{color:var(--ink,#1A2236);font-weight:700}
+.info-pop__dot{color:#98A0B0}
+.info-pop.is-above::before{top:auto;bottom:-6px;transform:rotate(225deg)}
+/* 6 정비등급 양식 표 — 지사 | 설비 두 열, 같은 지사 줄은 하나로 묶어 보이게 */
+.gp-name{display:grid;grid-template-columns:minmax(4.5rem,max-content) auto;align-items:baseline;column-gap:.5rem;white-space:nowrap}
+.gp-name b{color:var(--ink,#1A2236);font-weight:700}
+.gp-name b.gp-rep{visibility:hidden}
+.gp-name > span{font-size:12.5px;color:#5B6478}
+tr.gp-cont{border-top-color:transparent!important}
+tr.gp-cont > td{padding-top:.15rem}
+/* 둘러보기 말풍선 안 목록(이름 칸 | 설명 칸) — 줄이 바뀌어도 설명 시작선에 맞춘다 */
+.tour__bubble--wide{width:min(600px,calc(100vw - 24px))}
+.tour__list{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.35rem .9rem;margin-top:.7rem;padding:.7rem .8rem;border-radius:10px;background:#F4F6FA;font-size:12.5px;line-height:1.55;color:#5B6478;word-break:keep-all}
+.tour__list[hidden]{display:none}
+.tour__list b{color:var(--ink,#1A2236);font-weight:700}
