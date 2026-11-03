@@ -190,11 +190,14 @@ def actuals_with_reference(conn, base_year):
         inv = fs.load_table(conn, base_year, "investment_actual")
         covered = set(actuals.loc[actuals["예산과목"].isin(config_store.INVEST_ITEMS), "연도"].astype(int)) \
             if not actuals.empty else set()
-        inv = inv[(inv["금액"] != 0) & ~inv["연도"].isin(covered)] if not inv.empty else inv
         if not inv.empty:
-            # 유형(LTSA·CRI·고온부품재생)은 마감 실적과 같은 판정 — prepare_actuals 의 drop_regular 가 뺀다
-            inv = inv.assign(유형=[benchmark.regular_type(a, n) for a, n in zip(inv["예산과목"], inv["사업명"])],
-                             유형출처="투자비실적")[DETAIL_COLS]
+            # LTSA·CRI·고온부품재생 사업은 여기서 바로 뺀다 — 표준화뿐 아니라 A급정비 1회 금액의 규모비(site_scales)에도
+            # 들어가지 않게(#109 동작 그대로. 남겨 두면 다른 지사 A급정비가 달라진다 — 2026-11-03 운영 실측 −6억)
+            kinds = [benchmark.regular_type(a, n) for a, n in zip(inv["예산과목"], inv["사업명"])]
+            planned = [k in benchmark.REGULAR_EXCLUDED.get(a, ()) for a, k in zip(inv["예산과목"], kinds)]
+            inv = inv[(inv["금액"] != 0) & ~inv["연도"].isin(covered) & ~pd.Series(planned, index=inv.index)]
+        if not inv.empty:
+            inv = inv.assign(유형="기타", 유형출처="투자비실적")[DETAIL_COLS]
             actuals = pd.concat([actuals, inv], ignore_index=True) if not actuals.empty else inv.reset_index(drop=True)
     ref = fs.load_table(conn, base_year, "reference_actual")
     if ref.empty:

@@ -283,7 +283,9 @@ def test_locked_invest_vouchers_win_over_uploaded_invest_actuals_for_same_year(c
     dbm.lock_year(conn, "2025")
     fs.save_table(conn, "2026", "investment_actual", pd.DataFrame(
         [{"사업장": "화성지사", "연도": y, "예산과목": acct, "사업명": f"배관 {y}", "금액": 300.0, "투자유형": ""}
-         for y in (2024, 2025)]))
+         for y in (2024, 2025)]
+        + [{"사업장": "화성지사", "연도": 2024, "예산과목": acct, "사업명": "GT LTSA 대금", "금액": 9000.0, "투자유형": ""}]))
     actuals, _, _ = pf.actuals_with_reference(conn, "2026")
     got = actuals[actuals["예산과목"] == acct].groupby("연도")["금액"].sum().to_dict()
     assert got == {2024: 300.0, 2025: 500.0}                          # 2025 = 마감 전표만, 2024 = 올린 표
+    # LTSA 사업은 실적 모집단에 아예 안 들어간다 — A급정비 규모비(site_scales)에도 섞이지 않게
