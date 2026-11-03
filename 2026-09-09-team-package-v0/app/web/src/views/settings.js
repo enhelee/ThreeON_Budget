@@ -54,6 +54,7 @@ export function renderSettings() {
   const ovs = state.overrides || {};
   const ovRows = ["손익", "자본"].flatMap(b => (ovs[b] || []).map(o => ({...o, budget: b})));
   const learned = state.learned || {};
+  const rules = state.corrRules || {};
   const edits = state.bizEdits || [];
   const tab = state.settingsTab || "year";
   const extra = settingsExtraParts();
@@ -90,6 +91,24 @@ export function renderSettings() {
         <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-sub">자동 확정</p><p class="mt-1 text-2xl font-bold">${(learned["자동확정"] || 0).toLocaleString()}건</p></div>
       </div>
       <p class="mt-4 text-xs text-tri">'학습 대기'는 재배정한 전표 중 아직 학습표에 없는 건수입니다(텍스트 없는 전표는 학습 대상이 아닙니다).</p>
+    </section>
+
+    <section class="panel p-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div><h3 class="section-title">📐 보정 규칙 (담당자 보정사전)</h3>
+        <p class="mt-2 text-xs text-sub">같은 지사·과목·전표텍스트면 정한 사업에 붙이거나(배정) 실적에서 뺍니다(제외). 회차·연도가 달라도 같은 규칙이 매년 다시 쓰입니다.</p></div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-primary" data-action="pick-corr-rules">규칙 파일 올리기</button>
+          <button class="btn-secondary" data-action="clear-corr-rules">규칙 비우기</button>
+        </div>
+      </div>
+      <div class="mt-5 grid gap-3 sm:grid-cols-3">
+        <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-sub">규칙 총계 (전체 연도 공용)</p><p class="mt-1 text-2xl font-bold">${(rules["총계"] || 0).toLocaleString()}건</p></div>
+        <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-ink">배정</p><p class="mt-1 text-2xl font-bold text-ink">${(rules["배정"] || 0).toLocaleString()}건</p></div>
+        <div class="rounded-control bg-subtle p-4"><p class="text-xs font-semibold text-sub">제외</p><p class="mt-1 text-2xl font-bold">${(rules["제외"] || 0).toLocaleString()}건</p></div>
+      </div>
+      <p class="mt-4 text-xs text-tri">양식: 지사·예산과목·전표텍스트·올바른사업명(«제외…»면 제외)·계획사업명(대응표 — 비면 올바른사업명). 파일을 올리면 규칙 전체가 바뀌고, 다음 분석부터 적용됩니다. 순서: 재배정 → 보정 규칙 → 학습 → 유사도. 계획에 없는 사업명은 건너뜁니다.</p>
+      <input id="corrRulesFile" class="hidden" type="file" accept=".xlsx">
     </section>
     ` : ""}
 

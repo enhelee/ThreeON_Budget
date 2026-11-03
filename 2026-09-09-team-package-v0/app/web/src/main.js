@@ -249,6 +249,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-master-item") $("#masterItemFile").click();
   if (act === "pick-master-dept") $("#masterDeptFile").click();
+  if (act === "pick-corr-rules") $("#corrRulesFile").click();
   if (act === "clear-sel") {
     state.det.sel.clear(); state.det.selBudget = null;
     state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
@@ -478,6 +479,12 @@ document.addEventListener("click", async e => {
     } catch (err) { toast(err.message); }
     return;
   }
+  if (act === "clear-corr-rules") {
+    if (!confirm("보정 규칙을 모두 지울까요? 다음 분석부터 규칙이 적용되지 않습니다.")) return;
+    try { await api("/api/corr-rules", {method: "DELETE"}); toast("보정 규칙을 비웠습니다"); await navigate("settings"); }
+    catch (err) { toast(err.message); }
+    return;
+  }
   if (act === "clear-learned") {
     if (!confirm("학습 DB를 모두 지울까요? 다음 분석부터 학습이 적용되지 않습니다.")) return;
     try { await api("/api/learned", {method: "DELETE"}); toast("학습 초기화 완료"); await navigate("settings"); }
@@ -574,6 +581,20 @@ document.addEventListener("change", async e => {
       fd.append("file", file);
       const r = await api(`/api/upload/master?kind=${kind}&year=${state.year}`, {method: "POST", body: fd});
       toast(r.notice);
+      await navigate("settings");
+    } catch (err) { toast(err.message); }
+    finally { busy(false); }
+    return;
+  }
+  if (e.target.id === "corrRulesFile" && e.target.files[0]) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    busy(true, "보정 규칙 저장 중...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await api("/api/corr-rules", {method: "POST", body: fd});
+      toast(r.notice + (r.skipped ? ` (사업명·텍스트 빈 줄 ${r.skipped}건 건너뜀)` : ""));
       await navigate("settings");
     } catch (err) { toast(err.message); }
     finally { busy(false); }

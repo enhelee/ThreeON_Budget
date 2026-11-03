@@ -16,6 +16,7 @@ import pandas as pd
 
 from . import config_store, org_structure, loaders, master_data, erp_loader
 from . import matching, excel_actual_writer, normalize
+from . import corr_rules as corr_rules_mod
 
 
 def _num(v):
@@ -45,13 +46,14 @@ def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
                       new_policy="group", zrfm2_src_path=None, overrides=None,
                       learned=None, biz_edits=None, attr_map=None, code_to_item=None,
                       deptcode_map=None, manual_biz=None, biz_deletes=None,
-                      make_files=True):
+                      make_files=True, corr_rules=None):
     """공용 코어 — DataFrame 입력(DB 기반 실행 포함).
 
     zrfm2_src_path가 있으면 원본 워크북에 주석을 달아 zrfm2_V1을 만들고,
     없으면(DB 모드) ERP DataFrame에서 zrfm2_V1을 새로 생성한다.
     overrides: {_erp_row -> 사업명} 수동 재배정(matching 참조).
     learned: {(과목, 텍스트정규) -> 사업명} 과년도 확정 학습 맵(matching 참조).
+    corr_rules: [보정 규칙 dict](db.list_corr_rules) — 그 해 별칭·마스터로 표기를 맞춰 매칭에 넘긴다.
     biz_edits: [{예산과목, 처지사, 사업명, fields}] — 관리자 사업 내용 수정.
         매칭 전 계획행에 적용(사업명·연예산 변경 포함, 빈칸 입력 허용).
     biz_deletes: [{예산과목, 처지사, 사업명}] — 관리자 사업 삭제. 매칭 전 계획행에서 제외
@@ -233,6 +235,8 @@ def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
         small_threshold=config_store.SMALL_AMOUNT_THOUSAND,
         selected_depts=plan_depts, budget_all=budget_all,
         other_budget_all=other_budget_all, overrides=overrides, learned=learned,
+        corr_rules=corr_rules_mod.to_match_map(
+            corr_rules or [], item_alias, master["code_to_item"], all_dept_names, dept_alias),
     )
 
     # 연도 검증
@@ -359,6 +363,7 @@ def run_actual_frames(plan_df, erp_df, master_path, conn, out_dir, year, budget,
             "임의귀속 계획행 실적(천원)": ambiguous_amt,
             "수동지정 전표수": res.get("manual_cnt", 0),
             "학습확정 전표수": res.get("learned_cnt", 0),
+            "보정규칙 전표수": res.get("rule_cnt", 0),
             "본사배분 전표수": res.get("hq_alloc_cnt", 0),
             "본사배분 실적(천원)": res.get("hq_alloc_amt", 0),
             "미반영(천원)": res.get("unreflected_amt", 0),

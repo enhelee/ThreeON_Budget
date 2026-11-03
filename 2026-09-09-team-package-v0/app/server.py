@@ -40,6 +40,7 @@ authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (D
 
 from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import corr_rules as corr_rules_mod   # noqa: E402
 from budget import excel_actual_writer, report_hwpx, report_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
@@ -1043,6 +1044,47 @@ def learned_clear():
     conn = _conn()
     try:
         dbm.clear_learned(conn)
+        return {"cleared": True}
+    finally:
+        conn.close()
+
+
+# ── 보정 규칙 (담당자 보정사전) ─────────────────────────────────────────
+# 조회는 건수만 돌려준다 — 사업명·전표텍스트를 화면·로그 밖으로 내보내지 않는다.
+
+@app.get("/api/corr-rules")
+def corr_rules_status():
+    conn = _conn()
+    try:
+        return {"stats": dbm.corr_rule_stats(conn)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/corr-rules")
+async def corr_rules_upload(file: UploadFile = File(...)):
+    """보정사전 엑셀(지사·예산과목·전표텍스트·올바른사업명·계획사업명)로 규칙을 통째로 갈아끼운다."""
+    data = await _read_upload(file)
+    try:
+        parsed = corr_rules_mod.parse_xlsx(data)
+    except Exception as e:
+        raise HTTPException(400, f"보정 규칙을 읽지 못했습니다: {e}")
+    conn = _conn()
+    try:
+        dbm.replace_corr_rules(conn, parsed["rules"])
+        stats_ = dbm.corr_rule_stats(conn)
+        return {"stats": stats_, "skipped": parsed["skipped"],
+                "notice": f"보정 규칙 {stats_['총계']}건(배정 {stats_['배정']} · 제외 {stats_['제외']}) 저장"
+                          " — 다시 분석하면 반영됩니다. 마감된 연도는 숫자가 바뀌지 않아요."}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/corr-rules")
+def corr_rules_clear():
+    conn = _conn()
+    try:
+        dbm.clear_corr_rules(conn)
         return {"cleared": True}
     finally:
         conn.close()
