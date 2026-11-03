@@ -15,7 +15,7 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 import pandas as pd
 
-from . import config_store, forecast_backtest, forecast_export, forecast_import, forecast_reference
+from . import config_store, forecast_backtest, forecast_calc, forecast_export, forecast_import, forecast_reference
 from . import forecast_store as fs, pipeline_forecast as pf
 from . import benchmark as bm, db as dbm, uploads, viewcache
 
@@ -345,7 +345,7 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 fs.bind_site_resolvers(conn, by)
                 actuals, locked, ref_years = pf.actuals_with_reference(conn, by)
                 runs = forecast_backtest.compare_windows(
-                    actuals, fs.load_grade_history(conn, by), (2, 3, 5, 10),
+                    actuals, forecast_calc.canon_grades(fs.load_grade_history(conn, by)), (2, 3, 5, 10),
                     fs.load_table(conn, by, "site_grade_eq"), pf.site_groups(conn, by))
                 return clean_json({"base_year": str(by), "window": fs.learning_window(conn, by),
                                    "sources": {"마감": locked, "참고": ref_years}, "runs": runs})

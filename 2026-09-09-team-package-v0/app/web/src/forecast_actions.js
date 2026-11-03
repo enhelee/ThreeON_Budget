@@ -1,7 +1,7 @@
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
 import { loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastRegular, loadForecastState } from "./data.js"
-import { navigate, renderPage } from "./router.js"
+import { FC_VIEWS, navigate, renderPage } from "./router.js"
 import { state } from "./state.js"
 import { $ } from "./util.js"
 import { TOTAL } from "./views/forecast.js"
@@ -68,7 +68,7 @@ function markDirty(key) {
 
 async function reload(withBench) {
   await loadForecastState()
-  if (withBench || state.fc.tab === "bench") await Promise.all([loadForecastBench(), loadForecastRegular()])
+  if (withBench || state.view === "standard" || state.view === "stddetail") await Promise.all([loadForecastBench(), loadForecastRegular()])
   if (state.fc.compare || state.fc.manageTab === "ref") await loadForecastCompare()
   if (state.fc.manageTab === "capacity") await loadForecastCapacity()
   if ((state.fc.manageTab || "grades") === "grades") await loadForecastGradePlan()
@@ -162,7 +162,7 @@ async function addBaseYear() {
   } finally { busy(false) }
   state.fc.baseYear = to
   state.fc.preview = null
-  await navigate("forecast")
+  await navigate(state.view)
 }
 
 // ── 가져오기 ─────────────────────────────────────────────────
@@ -318,7 +318,7 @@ export function fcKey(e) {
 // ── 이벤트 위임 ──────────────────────────────────────────────
 
 export async function fcClick(e) {
-  if (state.view !== "forecast") return false
+  if (!FC_VIEWS.includes(state.view)) return false
   const tab = e.target.closest("[data-fctab]")
   if (tab) { state.fc.tab = tab.dataset.fctab; state.fc.preview = null; await navigate("forecast"); return true }
   // 기준정보 안쪽 탭 — 다시 불러오지 않고 그리기만(손댄 값은 state.fc.data 에 남아 있다)
@@ -366,6 +366,15 @@ export async function fcClick(e) {
   }
   const bview = e.target.closest("[data-fcbview]")
   if (bview) { state.fc.benchView = bview.dataset.fcbview; renderPage(); return true }
+  // 5번 표준화 한눈에 보기 — 칸을 누르면 그 지사·등급(묶은 이름 HGPI/TI 그대로)으로 거른 5+ 세부로
+  const cell = e.target.closest("[data-stdcell]")
+  if (cell) {
+    const [site, grade] = cell.dataset.stdcell.split("|")
+    state.fc.benchView = "std"
+    state.fc.benchGroup = "all"
+    state.fc.benchFilter = {site, grade, account: "", q: ""}
+    await navigate("stddetail"); return true
+  }
   if (fvClick(e)) return true
   const add = e.target.closest("[data-fcadd]")
   if (add) {
@@ -408,11 +417,11 @@ export async function fcClick(e) {
 }
 
 export async function fcChange(e) {
-  if (state.view !== "forecast") return false
+  if (!FC_VIEWS.includes(state.view)) return false
   const t = e.target
   if (t.matches("[data-fcbase]")) {
     state.fc.baseYear = t.value; state.fc.preview = null; state.fc.dirty = new Set()
-    await navigate("forecast"); return true
+    await navigate(state.view); return true
   }
   if (t.id === "fcImportFile") {
     const f = t.files[0], kind = t.dataset.kind

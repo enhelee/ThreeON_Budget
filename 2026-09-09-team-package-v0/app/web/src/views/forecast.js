@@ -20,7 +20,8 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 //   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-const TABS = [["manage", "기준정보 (가정)"], ["bench", "표준화 (3단계)"], ["table", "중장기 전망 (4단계)"]]
+// 표준화(옛 «표준화 (3단계)» 탭)는 5번 표준화 · 5+ 표준화 세부 메뉴로 떼어 냈다(2026-11-03).
+const TABS = [["manage", "기준정보 (가정)"], ["table", "중장기 전망"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급", ["grade_plan", "grades", "site_grade_eq"]],
                      ["factor", "고온부품", ["hot_parts", "hot_parts_contract", "factors"]],
@@ -35,6 +36,11 @@ const HOT_ITEMS = ["고온부품재생", "신품구매"]
 export const METHODS = ["등급별 평균", "최근실적", "3개년 평균", "5개년 평균"]
 const GROUPS = ["중대형CHP", "소형CHP", "DH", "본사"]
 export const TOTAL = "__total__"
+// 같은 정비등급의 다른 이름 — 한 등급으로 묶어 «HGPI/TI» 로 보인다(2026-11-03 팀장: HGPI = TI).
+//   계산은 서버가 TI 를 HGPI 로 읽어 한 등급으로 낸다(forecast_calc.SAME_GRADE). 화면은 이름만 묶어 적는다.
+export const SAME_GRADES = {"HGPI/TI": ["HGPI", "TI"]}
+const GRADE_ALIAS = Object.fromEntries(Object.entries(SAME_GRADES).flatMap(([k, list]) => list.map(g => [g, k])))
+export const gradeKey = g => GRADE_ALIAS[g] || g
 
 const num = v => (v === null || v === undefined) ? "" : v
 
@@ -70,15 +76,16 @@ function panel(title, help, body, key) {
 
 // ── 헤더: 기준연도 · 탭 ──────────────────────────────────────
 
-function header() {
+/** 기준연도 선택기 + 안내 말풍선(+ 6번이면 하위 탭). 5 · 5+ · 6 세 화면이 같이 쓴다 — 기준연도 한 벌. */
+export function header({stage = "STAGE 6", title = "중장기 전망", tabs = true} = {}) {
   const fc = state.fc
   const years = [...new Set([...fc.baseYears, fc.baseYear])].filter(Boolean).sort()
   const locked = fc.lockedYears?.length ? fc.lockedYears.join("·") : "없음"
   return `
   <section class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
     <div>
-      <p class="text-sm font-semibold text-ink">STAGE 5</p>
-      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 표준화 · 중장기 전망</h2>
+      <p class="text-sm font-semibold text-ink">${esc(stage)}</p>
+      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(title)}</h2>
     </div>
     <div class="flex flex-wrap items-end gap-2">
       <label class="block"><span class="field-label">전망 기준연도</span>
@@ -91,7 +98,7 @@ function header() {
         body: `마감된 ${esc(locked)}년 실적으로 표준금액을 만들고, ${esc(fc.baseYear)}년 기준으로 10개년을 전망해요.`})
     : charSay({who: "yc", tone: "warn", title: "아직 마감된 연도가 없어요.",
         body: "2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면, 그 숫자로 전망을 시작해요."})}
-  <div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>`
+  ${tabs ? `<div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>` : ""}`
 }
 
 // ── 기준정보(가정) 탭 ────────────────────────────────────────
@@ -525,7 +532,7 @@ function regularBreakdownBody(d) {
 }
 
 /** 무거운 계산이 끝나기 전 자리 — 화면 위(기준연도·탭)는 먼저 보이고 이 칸만 기다린다. */
-function computingHtml(text) {
+export function computingHtml(text) {
   return `<section class="panel flex items-center gap-3 p-6 text-sm text-sub" aria-busy="true"><span class="fc-spin" aria-hidden="true"></span>${esc(text)}</section>`
 }
 
@@ -562,9 +569,9 @@ function benchStd() {
   const base = b.rows.filter(r => g === "all" || groups[r.사업장] === g)
   const siteList = [...new Set(base.map(r => r.사업장))]
   const acctList = [...new Set(base.map(r => r.예산과목))].sort()
-  const gradeList = [...new Set(base.map(r => r.등급))].sort()
+  const gradeList = [...new Set(base.map(r => gradeKey(r.등급)))].sort()
   const q = (f.q || "").trim().toLowerCase()
-  const rows = base.filter(r => (!f.site || r.사업장 === f.site) && (!f.account || r.예산과목 === f.account) && (!f.grade || r.등급 === f.grade)
+  const rows = base.filter(r => (!f.site || r.사업장 === f.site) && (!f.account || r.예산과목 === f.account) && (!f.grade || gradeKey(r.등급) === f.grade)
     && (!q || [r.사업장, r.예산과목, r.등급, r.산출방식, r.방식출처, r.추천사유, r.근거, r.비고].some(x => String(x ?? "").toLowerCase().includes(q))))
   const filtered = !!(f.site || f.account || f.grade || q)
   const ed = state.fc.benchEdits
@@ -598,7 +605,7 @@ function benchStd() {
         const mch = mk in ed.methods, ach = ak in ed.overrides
         return `<tr>
           <td class="table-cell font-semibold text-ink">${esc(r.사업장)}</td><td class="table-cell">${esc(r.구분)}</td>
-          <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(r.등급)}</td>
+          <td class="table-cell">${esc(r.예산과목)}</td><td class="table-cell">${esc(gradeKey(r.등급))}</td>
           <td class="px-2 py-1 ${mch ?"bg-warn-bg" : ""}">${r.방식출처 === "규칙" || r.방식출처 === "용량규칙" ? `<span class="text-sm text-ink">${esc(r.산출방식)}</span>` : sel(METHODS, ed.methods[mk] ?? (METHODS.includes(r.산출방식) ? r.산출방식 : METHODS[0]), `data-fcbench="method" data-key="${esc(mk)}"`)}</td>
           <td class="px-2 py-1 text-right ${ach ?"bg-warn-bg" : ""}"><input class="control fc-num" type="number" step="any" data-fcbench="amount" data-key="${esc(ak)}" value="${esc(ach ? ed.overrides[ak] : Math.round(r.표준금액))}"></td>
           <td class="table-cell text-right text-sub">${r.재무팀금액 == null ? "—" : fmt(r.재무팀금액)}</td>
@@ -702,9 +709,18 @@ function refYears(used) {
   return ` · 참고 실적 ${ys[0]}${ys.length > 1 ? `~${ys[ys.length - 1]}` : ""}`
 }
 
+/** 5+ 표준화 세부 — 예전 6번 «표준화 (3단계)» 탭 내용 그대로(표준금액 · 산정 규칙 · 정기비용 분리). */
+export function renderStandardDetail() {
+  return `
+  <div class="space-y-6">
+    ${header({stage: "STAGE 5+", title: "표준화 세부", tabs: false})}
+    ${benchBody()}
+  </div>`
+}
+
 export function renderForecast() {
-  const tab = state.fc.tab || "manage"
-  const body = tab === "bench" ? benchBody() : tab === "table" ? tableBody() : manageBody()
+  const tab = state.fc.tab === "table" ? "table" : "manage"
+  const body = tab === "table" ? tableBody() : manageBody()
   return `
   <div class="space-y-6">
     ${header()}

@@ -63,6 +63,8 @@ export const viewMeta = {
   detail: "실적분석(상세)",
   review: "검토 큐",
   stats: "통계·내보내기",
+  standard: "표준화",
+  stddetail: "표준화 세부",
   forecast: "중장기 예측",
   settings: "설정",
 };

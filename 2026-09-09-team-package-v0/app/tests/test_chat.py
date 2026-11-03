@@ -53,7 +53,8 @@ def test_normalize_and_year():
     ("변경 이력 보여줘", "nav.goto", "#/settings/history"),
     ("전년 대비 보여줘", "nav.goto", "#/stats/compare"),
     ("3+ 상세 열어줘", "nav.goto", "#/detail"),
-    ("표준화 열어줘", "nav.goto", "#/forecast/bench"),
+    ("표준화 열어줘", "nav.goto", "#/standard"),
+    ("표준화 세부 열어줘", "nav.goto", "#/standard-detail"),
     ("실적 집계로 가자", "nav.goto", "#/collect"),
     ("검토 큐", "nav.goto", "#/review"),
     ("올해 어디까지 했어?", "status.progress", None),
@@ -88,7 +89,7 @@ def test_fallback_chips_are_understood():
 
 def test_screen_hashes_match_router():
     src = open(os.path.join(APP_DIR, "web", "src", "router.js"), encoding="utf-8").read()
-    view_hash = dict(re.findall(r'(\w+): "(\w+)"', src.split("const VIEW_HASH = {", 1)[1].split("};", 1)[0]))
+    view_hash = dict(re.findall(r'(\w+): "([\w-]+)"', src.split("const VIEW_HASH = {", 1)[1].split("};", 1)[0]))
     known = set(view_hash.values())
     for hash_, _, _ in kb.SCREENS:
         parts = hash_[2:].split("/")

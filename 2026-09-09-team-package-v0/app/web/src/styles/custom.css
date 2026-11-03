@@ -579,3 +579,28 @@ img.char-img{object-fit:contain;display:inline-block}
 .loader-char{width:52px;height:52px;object-fit:contain;flex:none;animation:heroBob 2.4s ease-in-out infinite}
 .loader-text{font-size:14px;font-weight:600;color:var(--navy);line-height:1.45}
 @media (prefers-reduced-motion:reduce){.loader-merc,.loader-char{animation:none}.loader-merc{transform:none}}
+
+/* 하위 메뉴(5+ 표준화 세부) — 펼친 사이드바에서만 들여 쓴다(접힌 띠는 .sb-collapsed 규칙이 가운데로 모은다) */
+#sidebar .nav-sub{padding-left:1.75rem;font-size:13px}
+#sidebar .nav-sub .nav-tag{width:1.5rem;height:1.5rem;font-size:11px}
+
+/* 5번 표준화 한눈에 보기(views/standard.js) — 지사 × 정비등급 표, 칸마다 총액 · 손익+자본 누적 막대 · 손익·자본 숫자.
+   막대 조각 사이 2px 틈, 끝은 둥글게. 글자는 늘 잉크색(색은 막대·칩에만) */
+.std-chip{display:inline-block;width:.55rem;height:.55rem;margin-right:.3rem;border-radius:2px;vertical-align:baseline}
+.std-heat{width:100%;border-collapse:separate;border-spacing:2px;font-size:13px}
+.std-heat thead th{position:sticky;top:0;background:var(--subtle);padding:.5rem .5rem;font-weight:700;color:var(--ink);text-align:center;white-space:nowrap}
+.std-heat .std-site{position:sticky;left:0;z-index:1;background:#fff;padding:.35rem .75rem;text-align:left;font-weight:600;color:var(--ink);white-space:nowrap}
+.std-heat thead .std-site{background:var(--subtle);font-weight:700;color:#5B6478}
+.std-heat .std-group{padding:.75rem .75rem .25rem;text-align:left;font-size:12px;font-weight:700;color:#98A0B0;background:#fff}
+.std-cell{min-width:8.5rem;border-radius:4px;background:var(--subtle);vertical-align:top}
+.std-cell button{display:flex;flex-direction:column;gap:.3rem;width:100%;padding:.45rem .6rem;text-align:left;color:var(--ink);font-variant-numeric:tabular-nums;border-radius:4px}
+.std-cell button:hover{outline:2px solid var(--navy);outline-offset:-2px}
+.std-tot{font-size:14px;font-weight:700;line-height:1.2}
+.std-bar{display:flex;gap:2px;height:6px}
+.std-bar i{display:block;min-width:2px;height:100%}
+.std-bar i:first-child{border-radius:3px 0 0 3px}
+.std-bar i:last-child{border-radius:0 3px 3px 0}
+.std-bar i:only-child{border-radius:3px}
+.std-sub{font-size:11px;line-height:1.2;color:#5B6478;white-space:nowrap}
+.std-sep{display:inline-block;width:.6rem}
+.std-cell--none{background:transparent;color:#C5CBD6;text-align:center;vertical-align:middle}

@@ -37,7 +37,7 @@ def test_product_name_is_ondo_by_threeon():
 def test_every_work_menu_names_its_character():
     owners = dict(re.findall(r'view:\s*"(\w+)"[^}]*?char:\s*"(\w+)"', _menu_block()))
     expected = {"budget": "mt", "collect": "mt", "branches": "gt", "detail": "gt",
-                "review": "gt", "stats": "gt", "forecast": "yc"}
+                "review": "gt", "stats": "gt", "standard": "yc", "stddetail": "yc", "forecast": "yc"}
     assert owners == expected, f"메뉴별 담당 캐릭터가 다릅니다: {owners}"
     assert "nav-dot" not in _read(SRC, "components", "sidebar.js"), "메뉴 색 점은 뺐다(10/28 색 줄이기)"
 
@@ -129,7 +129,8 @@ def test_stage_cards_show_their_character():
     assert "CHAR_IMG[" in stage and "stage-card__char" in stage, "업무 단계 카드마다 담당 캐릭터 그림"
     side = _read(SRC, "components", "sidebar.js")
     owners = dict(re.findall(r'view: "(\w+)", title:[^}]*?char: "(\w+)"', side.split("export const STAGES", 1)[1]))
-    assert owners == {"budget": "hj", "collect": "mt", "branches": "gt", "review": "gt", "stats": "gt", "forecast": "yc"}, owners
+    assert owners == {"budget": "hj", "collect": "mt", "branches": "gt", "review": "gt", "stats": "gt",
+                      "standard": "yc", "forecast": "yc"}, owners
 
 
 def test_chart_plan_light_navy_and_actual_soft_coral():
@@ -201,3 +202,29 @@ def test_home_rate_badge_thresholds():
     assert "r > 100" in fn and "r >= 90" in fn
     home = _read(SRC, "views", "home.js")
     assert "homeRateBadge(" in home and "rateBadge(" not in home.replace("homeRateBadge(", "")
+
+
+def test_menu_follows_three_axes():
+    """2026-11-03 팀장: 업무는 세 축 — ① 예산 실적 집계 ② 표준화(+ 하위 «표준화 세부») ③ 중장기 예측."""
+    menu = _menu_block()
+    groups = re.findall(r'group:\s*"([^"]+)"', menu)
+    assert groups[:3] == ["① 예산 실적 집계", "② 표준화", "③ 중장기 예측"], groups
+    std = menu.split('"② 표준화"', 1)[1].split("group:", 1)[0]
+    assert 'view: "standard"' in std and 'view: "stddetail"' in std and "sub: true" in std
+    fc = _read(SRC, "views", "forecast.js")
+    assert '["bench",' not in fc.split("const TABS", 1)[1].split("\n", 1)[0], "6번 탭에서 표준화 탭은 뺐다"
+    router = _read(SRC, "router.js")
+    assert '"forecast" && m[2] === "bench"' in router, "옛 #/forecast/bench 링크는 표준화 세부로"
+
+
+def test_standard_overview_groups_hgpi_ti_and_shows_all_amounts():
+    """2026-11-03 팀장: HGPI 와 TI 는 같은 등급(한 칸) · 손익·자본·총액을 바꿔 보지 않고 한 칸에 함께."""
+    fc = _read(SRC, "views", "forecast.js")
+    assert re.search(r'SAME_GRADES\s*=\s*\{"HGPI/TI":\s*\["HGPI",\s*"TI"\]\}', fc)
+    assert "gradeKey(r.등급) === f.grade" in fc, "5+ 등급 거르기도 묶은 이름으로"
+    std = _read(SRC, "views", "standard.js")
+    assert '"HGPI/TI"' in std.split("const GRADE_ORDER", 1)[1].split("\n", 1)[0]
+    assert "/ d" in std, "한 지사에 HGPI·TI 가 다 있으면 더하지 않고 평균"
+    cell = _fn(std, "cellHtml")
+    assert "c.총액" in cell and "c.손익" in cell and "c.자본" in cell, "칸 하나에 총액·손익·자본"
+    assert "data-stdkind" not in std, "손익/자본/총액 바꾸기 버튼은 뺐다"

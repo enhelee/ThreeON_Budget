@@ -150,3 +150,38 @@ def test_run_forecast_with_nothing_still_returns_shape(conn):
     assert out["years"] == list(range(2027, 2037))
     assert out["notes"] == {"budget_plan_missing": True, "grade_empty": True, "actuals_empty": True}
     assert len(out["sites"]) > 0 and all(len(rows) == 20 for rows in out["tables"].values())  # 17 + 정기계약 2 + CRI 1
+
+
+# ---------------------------------------------------------------- TI = HGPI (2026-11-03 팀장)
+def test_canon_grade_maps_ti_token_to_hgpi():
+    from budget import forecast_calc as fc
+    assert fc.canon_grade("TI") == "HGPI"
+    assert fc.canon_grade("MI/TI") == "MI/HGPI" and fc.canon_grade("TI,CI") == "HGPI,CI"
+    assert fc.canon_grade("HGPI") == "HGPI" and fc.canon_grade("CI") == "CI"
+    assert fc.canon_grade("TIX") == "TIX" and fc.canon_grade(None) is None
+
+
+def test_ti_and_hgpi_are_one_grade_in_standard_and_forecast(conn):
+    """TI 해(2023) · HGPI 해(2024) 실적이 한 등급(HGPI)의 평균이 되고, 미래 TI 해도 그 금액을 쓴다.
+    저장된 등급 이력(TI)은 사람이 적은 그대로 남는다."""
+    acct = "수선유지비-열원경상정비"
+    for y, amt in (("2023", 1000.0), ("2024", 2000.0), ("2025", 5000.0)):
+        _seed_run(conn, y, "손익", [("화성지사", acct, amt, "계획집행")])
+        dbm.lock_year(conn, y)
+    fs.save_grade_history(conn, "2026", pd.DataFrame([
+        {"사업장": "화성지사", "연도": 2023, "등급": "TI"}, {"사업장": "화성지사", "연도": 2024, "등급": "HGPI"},
+        {"사업장": "화성지사", "연도": 2025, "등급": "MI"}, {"사업장": "화성지사", "연도": 2027, "등급": "TI"}]))
+    fs.save_method_map(conn, "2026", pd.DataFrame([{"사업장": "화성지사", "예산과목": acct, "방식": "등급별 평균"}]))
+    fs.save_factors(conn, "2026", pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.0, "활성": True}]))  # 등급만 보게
+
+    rows = [r for r in pf.run_benchmark(conn, "2026")["rows"] if r["사업장"] == "화성지사" and r["예산과목"] == acct]
+    by_grade = {r["등급"]: r["표준금액"] for r in rows}
+    assert "TI" not in by_grade, by_grade
+    assert by_grade["HGPI"] == pytest.approx(1500.0)          # (TI 1000 + HGPI 2000) / 2
+    assert by_grade["MI"] == pytest.approx(5000.0)
+
+    line = {r["예산과목"]: r for r in pf.run_forecast(conn, "2026")["tables"]["화성지사"]}[acct]
+    assert line["2027"] == pytest.approx(1500.0)              # 미래 TI 해 = HGPI 표준금액
+
+    saved = fs.load_grade_history(conn, "2026")
+    assert set(saved["등급"]) == {"TI", "HGPI", "MI"}         # 저장값은 그대로

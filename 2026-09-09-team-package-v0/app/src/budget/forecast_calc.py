@@ -62,6 +62,33 @@ ST_GRADE_VALUES = {"A", "B", "C"}
 VALID_GRADE_TOKENS = GT_GRADE_VALUES | ST_GRADE_VALUES
 
 
+# 같은 정비등급의 다른 이름 → 계산에 쓰는 이름(2026-11-03 팀장: TI = HGPI).
+#   저장된 입력(등급 이력·규칙·수동수정·참고 엑셀)은 사람이 적은 그대로 두고, 계산 직전에만 바꿔 읽는다
+#   (pipeline_forecast._standard 등). 화면은 «HGPI/TI» 로 묶어 보인다(web views/forecast.js SAME_GRADES).
+SAME_GRADE = {"TI": "HGPI"}
+_SAME_GRADE_RE = re.compile(r"(?<![0-9A-Za-z])(" + "|".join(map(re.escape, SAME_GRADE)) + r")(?![0-9A-Za-z])")
+
+
+def canon_grade(value):
+    """등급 문자열의 TI 토큰을 HGPI 로 — «MI/TI»·«TI,CI» 같은 묶음 표기도 토큰 단위로. 문자열이 아니면 그대로."""
+    if not isinstance(value, str):
+        return value
+    return _SAME_GRADE_RE.sub(lambda m: SAME_GRADE[m.group(1)], value)
+
+
+def canon_grades(df: pd.DataFrame, cols=("등급",)) -> pd.DataFrame:
+    """df 의 등급 열(들)을 canon_grade 로 바꾼 사본. 빈 표·열 없음은 그대로 돌려준다."""
+    if df is None or df.empty:
+        return df
+    present = [c for c in cols if c in df.columns]
+    if not present:
+        return df
+    df = df.copy()
+    for c in present:
+        df[c] = df[c].map(canon_grade)
+    return df
+
+
 SCHEDULE_PLACEHOLDER_TOKENS = {"", "-", "준공", "정비없음"}
 
 

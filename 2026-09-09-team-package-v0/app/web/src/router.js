@@ -11,7 +11,8 @@ import { renderBranches } from "./views/branches.js"
 import { renderCollect } from "./views/collect.js"
 import { renderDetail } from "./views/detail.js"
 import { renderReview } from "./views/review.js"
-import { renderForecast } from "./views/forecast.js"
+import { renderForecast, renderStandardDetail } from "./views/forecast.js"
+import { renderStandard } from "./views/standard.js"
 import { renderHome } from "./views/home.js"
 import { renderBudget } from "./views/plan.js"
 import { renderSettings } from "./views/settings.js"
@@ -29,11 +30,15 @@ import { loadReport, reportYear } from "./views/report.js"
 // 플래그를 두지 않는 이유가 이것이다.
 
 const VIEW_HASH = {home: "home", budget: "plan", collect: "collect", branches: "branches",
-                   detail: "detail", review: "review", stats: "stats", forecast: "forecast", settings: "settings"};
+                   detail: "detail", review: "review", stats: "stats", standard: "standard", stddetail: "standard-detail",
+                   forecast: "forecast", settings: "settings"};
 const HASH_VIEW = Object.fromEntries(Object.entries(VIEW_HASH).map(([v, h]) => [h, v]));
-// 5번 탭의 하위 탭도 주소에 담는다(#/forecast/bench). 3+ 상세의 지사와 같은 이유 — 특정 화면을
+// 6번 탭의 하위 탭도 주소에 담는다(#/forecast/table). 3+ 상세의 지사와 같은 이유 — 특정 화면을
 // 링크로 공유하고, 새로고침해도 보던 탭이 유지되게. 기본 탭(manage)은 주소를 짧게 두려고 생략한다.
-const FC_TABS = ["manage", "bench", "table"];
+// 예전 «표준화 (3단계)» 탭(#/forecast/bench)은 5+ 표준화 세부로 떼어 냈다(2026-11-03) — 옛 링크는 그리로 보낸다.
+const FC_TABS = ["manage", "table"];
+// 표준화 두 화면(5 · 5+)은 6번과 같은 기준연도·가정(state.fc)을 쓴다 — 자료 받기·이벤트 처리가 같다.
+export const FC_VIEWS = ["standard", "stddetail", "forecast"];
 // 4번 통계·설정 탭도 주소에 담는다(#/stats/compare · #/settings/history) — 새로고침·링크 공유에 그 탭이 남게.
 //   첫 탭(손익·연도·학습)은 주소를 짧게 두려고 생략한다. 통계 탭 이름은 주소용 영문으로 바꿔 적는다.
 const STATS_HASH = {손익: "", 자본: "capital", compare: "compare", report: "report"};
@@ -54,6 +59,7 @@ export function viewHash(view, branch) {
 export function parseHash(hash = location.hash) {
   const m = /^#\/([^/]+)\/?(.*)$/.exec(hash);
   if (!m) return null;
+  if (m[1] === "forecast" && m[2] === "bench") return {view: "stddetail", branch: "", tab: ""};
   const view = HASH_VIEW[m[1]];
   if (!view) return null;
   let branch = "";
@@ -97,6 +103,7 @@ export function bootRoute() {
 export function renderPage() {
   const renderers = {home: renderHome, budget: renderBudget, collect: renderCollect,
                      branches: renderBranches, detail: renderDetail, review: renderReview, stats: renderStats,
+                     standard: renderStandard, stddetail: renderStandardDetail,
                      forecast: renderForecast, settings: renderSettings};
   $("#page").innerHTML = renderers[state.view]();
   const hf = $("#helpFab");
@@ -282,21 +289,25 @@ export async function navigate(view, opts = {}) {
   // 메인 «다음 할 일»은 검토 큐 요약 한 줄로 알림·차이 사유를 대신한다(2026-10-27) — 화면 아래쪽이라 뒤에서.
   if (view === "home") later.push(["서버 정보", loadHealth], ["검토 큐", loadReviewBrief]);
   if (view === "review") jobs.push(["현황", loadStatus], ["검토 큐", loadReviewQueue]);
-  if (view === "forecast") {
-    // 기준연도 · 가정 · (탭에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
+  if (FC_VIEWS.includes(view)) {
+    // 기준연도 · 가정 · (화면에 따라) 표준화 결과 | 전망 표를 동시에. 첫 진입이라 기준연도를
     // 모르면 셋 다 base_year 없이 부르고 서버가 같은 기본값으로 계산한다(data.js fcQuery).
     jobs.push(["전망 기준연도", loadForecastMeta], ["전망 가정", loadForecastState]);
     // 표준화 결과·정기비용 분리는 무겁다(운영 첫 계산 수 초~수십 초) — 위를 먼저 그리고 그 칸만 «계산 중».
-    if (state.fc.tab === "bench") {
-      state.fc.bench = null; state.fc.regular = null;
-      state.fc.benchLoading = true; state.fc.regularLoading = true;
-      later.push(["표준화 결과", () => loadForecastBench().finally(() => { state.fc.benchLoading = false; })],
-                 ["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
+    // 정기비용 분리는 5+ 세부에서만 쓴다.
+    if (view !== "forecast") {
+      state.fc.bench = null; state.fc.benchLoading = true;
+      later.push(["표준화 결과", () => loadForecastBench().finally(() => { state.fc.benchLoading = false; })]);
+      if (view === "stddetail") {
+        state.fc.regular = null; state.fc.regularLoading = true;
+        later.push(["정기비용 분리", () => loadForecastRegular().finally(() => { state.fc.regularLoading = false; })]);
+      }
     }
-    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
-    if ((state.fc.tab || "manage") === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
-    if ((state.fc.tab || "manage") === "manage" && (state.fc.manageTab || "grades") === "grades") jobs.push(["정비등급 양식", loadForecastGradePlan]);
-    if (state.fc.tab === "table") jobs.push(["중장기 전망", loadForecastTable]);
+    const fcTab = state.fc.tab === "table" ? "table" : "manage";
+    if (view === "forecast" && fcTab === "manage" && state.fc.manageTab === "ref") jobs.push(["참고 엑셀 대조", loadForecastCompare]);
+    if (view === "forecast" && fcTab === "manage" && state.fc.manageTab === "capacity") jobs.push(["용량 규칙", loadForecastCapacity]);
+    if (view === "forecast" && fcTab === "manage" && (state.fc.manageTab || "grades") === "grades") jobs.push(["정비등급 양식", loadForecastGradePlan]);
+    if (view === "forecast" && fcTab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
   if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래

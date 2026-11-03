@@ -211,13 +211,15 @@ def _standard(conn, base_year):
     actuals, years_used, ref_years = actuals_with_reference(conn, base_year)
     years_used = years_used + [f"{y}(참고)" for y in ref_years]
     window = fs.learning_window(conn, base_year)
-    grade = fs.load_grade_history(conn, base_year)
+    # TI = HGPI — 등급이 걸린 입력은 계산 직전에 한 이름으로(forecast_calc.SAME_GRADE). 저장값은 그대로.
+    canon = forecast_calc.canon_grades
+    grade = canon(fs.load_grade_history(conn, base_year))
     budget_lookup = forecast_calc.budget_amount_by_site_account(budget_plan_for(conn, base_year))
     alias = config_store.load_item_alias(conn)
     cap_table, cap_rules, events = capacity_inputs(conn, base_year)
     std = benchmark.compute_standard_amounts(
-        actuals, grade, fs.load_method_map(conn, base_year), fs.load_overrides(conn, base_year),
-        item_alias=alias, rules=fs.load_table(conn, base_year, "benchmark_rule"),
+        actuals, grade, fs.load_method_map(conn, base_year), canon(fs.load_overrides(conn, base_year)),
+        item_alias=alias, rules=canon(fs.load_table(conn, base_year, "benchmark_rule"), ("등급", "참조등급")),
         events=events, budget_lookup=budget_lookup, window=window)
     std, model, targets = capacity.apply_capacity(std, benchmark.prepare_actuals(actuals, alias, events),
                                                   grade, cap_table, cap_rules, base_year=base_year)
@@ -229,7 +231,9 @@ def finance_compare(std, fin):
     std = std.copy()
     exact, mean = {}, {}
     if not fin.empty:
-        exact = {(r["사업장"], r["예산과목"], r["등급"]): float(r["표준금액"]) for _, r in fin.iterrows()}
+        # 재무팀 엑셀의 TI·HGPI 도 한 등급으로 — 같은 칸에 둘 다 있으면 평균
+        fin = forecast_calc.canon_grades(fin)
+        exact = fin.groupby(["사업장", "예산과목", "등급"])["표준금액"].mean().astype(float).to_dict()
         mean = fin.groupby(["사업장", "예산과목"])["표준금액"].mean().to_dict()
     vals = [exact.get((r["사업장"], r["예산과목"], r["등급"]), mean.get((r["사업장"], r["예산과목"])))
             for _, r in std.iterrows()]
@@ -292,7 +296,7 @@ def compare_reference(conn, base_year):
     """참고 엑셀과 대조 — ① 마감 연도 실적(지사×연도×예산과목) ② 표준금액(지사×예산과목×등급)."""
     fs.bind_site_resolvers(conn, base_year)
     ref_act = fs.load_table(conn, base_year, "reference_actual")
-    ref_std = fs.load_table(conn, base_year, "reference_standard")
+    ref_std = forecast_calc.canon_grades(fs.load_table(conn, base_year, "reference_standard"))   # 앱 표준금액과 같은 등급 이름으로
     detail, years_used = locked_actuals_detail(conn, base_year)
     actual_rows = []
     if not ref_act.empty and years_used:
