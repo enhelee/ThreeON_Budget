@@ -225,7 +225,7 @@ export function reportHtml() {
     <section class="panel p-5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div><h3 class="section-title">${esc(K.title(yy))}</h3>
-          <p class="mt-1 text-sm text-sub">${esc(K.desc)} 아래 문서에서 <span class="rp-legend rp-legend--edit">노란 칸</span>을 눌러 바로 고치세요. 나머지 숫자는 따라서 다시 계산됩니다.</p></div>
+          <p class="mt-1 text-sm text-sub">${esc(K.desc)} 아래 문서에서 <span class="rp-legend rp-legend--edit">노란 칸</span>을 눌러 바로 고치세요. 나머지 숫자는 따라서 다시 계산됩니다. <span class="rp-legend rp-legend--adj">모서리 표시</span>는 반올림 때문에 합계와 맞도록 1씩 맞춘 칸입니다(마우스를 올리면 실제 값).</p></div>
         <div class="flex flex-wrap items-center gap-2">
           <label class="text-sm text-sub">보고서 연도
             <select class="ml-1 rounded-lg border border-line px-2 py-1.5 text-sm" data-rp-year="1" aria-label="보고서 연도">${years.map(y => `<option value="${y}"${y === String(inp.year) ? " selected" : ""}>${y}년</option>`).join("")}</select></label>

@@ -12,7 +12,7 @@
 import re
 
 from . import report_hwpx as rh
-from .report_hwpx import E, Q, n0, n1, rate, sgn, tri, _num
+from .report_hwpx import A, E, Q, fit, n0, n1, rate, sgn, tri, _num, _r
 
 EOK = rh.EOK
 
@@ -183,6 +183,30 @@ def tot3(inputs, yy, budget, k):
     return inputs["over"].get(f"{yy}.{budget}.{k}", _sum(inputs, budget, yy, k))
 
 
+def shown_plan(inputs):
+    """붙임2 의 «보이는 숫자» — 18개 표와 문장이 같이 쓴다(2026-11-03 단수 조정).
+
+    m[예산][키][(연도, 배정|실적)] = (보이는 값, 조정량, 실제 값) — 과목 칸은 그 해·그 예산 합계(실제 합의
+    사사오입)에 맞춰 단수 조정. 점유율은 표마다 그 표에 있는 과목 기준이라 _fill_trend 가 맞춘다.
+    t3[(연도, 예산, 배정|실적)] = 손익·자본 합계(덮어쓴 값 포함)의 사사오입 — 표7·10·16·문장의 기준.
+    소계·합계·손익+자본·차액·증감은 모두 보이는 값끼리 계산한다."""
+    y = int(inputs["year"])
+    yrs, N = [str(y - 2), str(y - 1), str(y)], str(y + 1)
+    S = {"m": {}, "t3": {}}
+    for b in ("손익", "자본"):
+        rows = inputs["matrix"][b]
+        S["m"][b] = {r["key"]: {} for r in rows}
+        for yy in yrs + [N]:
+            for k in (("배정", "실적") if yy != N else ("배정",)):
+                vals = [r["v"].get(yy, {}).get(k, 0) or 0 for r in rows]
+                sh, _, ad = fit(vals)
+                for i, r in enumerate(rows):
+                    S["m"][b][r["key"]][(yy, k)] = (sh[i], ad[i], vals[i])
+                if yy != N:
+                    S["t3"][(yy, b, k)] = _r(tot3(inputs, yy, b, k))
+    return S
+
+
 def _chg(cur, prev, pct_fmt=n1):
     d = cur - prev
     if abs(rh._r(d)) < 0.5 and abs(rh._r(prev)) < 0.5:
@@ -199,22 +223,23 @@ def auto_texts(inputs):
     yy, ny = y % 100, (y + 1) % 100
     Y, P, N = str(y), str(y - 1), str(y + 1)
     T = lambda yr, b, k: tot3(inputs, yr, b, k)
-    act = {b: T(Y, b, "실적") for b in ("손익", "자본")}
-    pact = {b: T(P, b, "실적") for b in ("손익", "자본")}
+    S = shown_plan(inputs)
+    # 억원은 표에 보이는 값끼리 — 표의 손익 968 + 자본 497 과 문장의 총 1,465 가 어긋나지 않게. 비율(%)은 실제 값.
+    act = {b: S["t3"][(Y, b, "실적")] for b in ("손익", "자본")}
+    pact = {b: S["t3"][(P, b, "실적")] for b in ("손익", "자본")}
     tot, ptot = sum(act.values()), sum(pact.values())
     d = tot - ptot
     pct = lambda a, b: (a - b) / b * 100 if b else 0
-    plan = {b: T(Y, b, "배정") for b in ("손익", "자본")}
-    r_all = rate(sum(plan.values()), tot) or 0
-    rr = {b: rate(plan[b], act[b]) or 0 for b in plan}
-    nplan = {b: _sum(inputs, b, N, "배정") for b in ("손익", "자본")}
+    plan = {b: S["t3"][(Y, b, "배정")] for b in ("손익", "자본")}
+    real_plan = {b: T(Y, b, "배정") for b in ("손익", "자본")}
+    real_act = {b: T(Y, b, "실적") for b in ("손익", "자본")}
+    r_all = rate(sum(real_plan.values()), sum(real_act.values())) or 0
+    rr = {b: rate(real_plan[b], real_act[b]) or 0 for b in plan}
+    nplan = {b: sum(v[(N, "배정")][0] for v in S["m"][b].values()) for b in ("손익", "자본")}
     nd = sum(nplan.values()) - sum(plan.values())
 
-    def row(b, key):
-        return next(r for r in inputs["matrix"][b] if r["key"] == key)
-
     def grp(b, keys, yr, k="실적"):
-        return sum(row(b, kk)["v"][yr].get(k, 0) for kk in keys)
+        return sum(S["m"][b][kk][(yr, k)][0] for kk in keys)
 
     def ratio(cur, prev):
         """«(+19%)» — 전년이 0이면 비율 대신 «(신규)»."""
@@ -234,7 +259,7 @@ def auto_texts(inputs):
     a4 = ("전년대비 " + ", ".join(piece(g, grp("자본", ks, Y), grp("자본", ks, P), "억") for g, ks in gj.items())
           + f"로 총 자본예산 {n0(abs(act['자본'] - pact['자본']))}억 {'증가' if act['자본'] >= pact['자본'] else '감소'}"
           f"({sgn(pct(act['자본'], pact['자본']))}%)")
-    prev_rate = rate(T(P, "손익", "배정") + T(P, "자본", "배정"), ptot) or 0
+    prev_rate = rate(T(P, "손익", "배정") + T(P, "자본", "배정"), T(P, "손익", "실적") + T(P, "자본", "실적")) or 0
     a5 = (f"‘{yy}년 예산 집행률은 전체 {n0(r_all)}%(잔액: {n0(sum(plan.values()) - tot)}억원), "
           f"손익 {n0(rr['손익'])}%(잔액: {n0(plan['손익'] - act['손익'])}억원), "
           f"자본 {n0(rr['자본'])}%(잔액: {n0(plan['자본'] - act['자본'])}억원)로 과년도 대비 {'상승' if r_all >= prev_rate else '하락'}")
@@ -247,10 +272,11 @@ def auto_texts(inputs):
     def cause(b):
         out = []
         for r in inputs["matrix"][b]:
-            dd = r["v"][Y]["실적"] - r["v"][P]["실적"]
+            cy, py_ = S["m"][b][r["key"]][(Y, "실적")][0], S["m"][b][r["key"]][(P, "실적")][0]
+            dd = cy - py_
             if abs(dd) >= rh.BULLET_MIN_EOK:
                 out.append({"label": SHORT[r["key"]],
-                            "body": f"전년대비 {n0(abs(dd))}억{ratio(r['v'][Y]['실적'], r['v'][P]['실적'])} "
+                            "body": f"전년대비 {n0(abs(dd))}억{ratio(cy, py_)} "
                                     f"{'증가' if dd >= 0 else '감소'} — (원인 작성)"})
         return out
 
@@ -309,8 +335,14 @@ def _path(inputs, budget, key, yy, k):
     return f"matrix.{budget}.{i}.v.{yy}.{k}"
 
 
-def _fill_trend(tbl, inputs, budget, mk):
-    """표8·9 — 3개년 실적(점유율) + 전년대비 증감."""
+def _cellv(S, budget, key, yy, k, path):
+    """과목 칸 — (보이는 값, 칸). 단수 조정된 칸이면 표시를 단다."""
+    v, adj, real = S["m"][budget][key][(yy, k)]
+    return v, A(E(n0(v), path), adj, real)
+
+
+def _fill_trend(tbl, inputs, budget, mk, S):
+    """표8·9 — 3개년 실적(점유율) + 전년대비 증감. 소계·합계·증감은 보이는 값으로."""
     y = int(inputs["year"])
     yrs = [str(y - 2), str(y - 1), str(y)]
     m, rows = _walk(tbl, budget)
@@ -318,49 +350,68 @@ def _fill_trend(tbl, inputs, budget, mk):
         if (0, 2 + i) in m:
             rh.set_cell(m[(0, 2 + i)], (f"{yy}년", None), mk)
     items = [k for _, kind, k in rows if kind == "item"]
-    total = {yy: sum(_val(inputs, budget, k, yy, "실적") for k in items) for yy in yrs}
+    sv = lambda k, yy: S["m"][budget][k][(yy, "실적")][0]
+    shares = {}                                  # 점유율 = 이 표에 있는 과목의 합 기준, 합이 100%
+    for yy in yrs:
+        real = [_val(inputs, budget, k, yy, "실적") for k in items]
+        tot = sum(real)
+        pct = [v / tot * 100 if tot else 0 for v in real]
+        sh, _, ad = fit(pct, 0, 100) if tot else (pct, 0, [0] * len(pct))
+        shares[yy] = {k: (sh[i], ad[i], pct[i]) for i, k in enumerate(items)}
+    share = lambda k, yy: shares[yy][k]
     pend = []
     for r, kind, key in rows:
         if kind == "item":
-            vals = {yy: _val(inputs, budget, key, yy, "실적") for yy in yrs}
             pend.append(key)
+            ks = [key]
         elif kind == "sub":
-            vals = {yy: sum(_val(inputs, budget, k, yy, "실적") for k in pend) for yy in yrs}
-            pend = []
+            ks, pend = pend, []
         else:
-            vals = total
+            ks = items
+        vals = {yy: sum(sv(k, yy) for k in ks) for yy in yrs}
         for i, yy in enumerate(yrs):
             v = vals[yy]
-            txt = n0(v) if kind == "total" else f"{n0(v)} ({n0(v / total[yy] * 100) if total[yy] else 0}%)"
-            cell = E(txt, _path(inputs, budget, key, yy, "실적")) if kind == "item" else txt
+            if kind == "total":
+                cell = n0(v)
+            else:
+                sh = sum(share(k, yy)[0] for k in ks)
+                cell = f"{n0(v)} ({n0(sh)}%)"
+                if kind == "item":
+                    _, adj, real = S["m"][budget][key][(yy, "실적")]
+                    _, sadj, sreal = share(key, yy)
+                    cell = E(cell, _path(inputs, budget, key, yy, "실적"))
+                    cell = A(cell, adj, real) if adj else A(cell, sadj, sreal, unit="%p")
             rh.set_cell(m[(r, 2 + i)], cell, mk)
         rh.set_cell(m[(r, 5)], _chg(vals[yrs[2]], vals[yrs[1]]), mk)
 
 
-def _fill_exec(tbl, inputs, budget, mk):
-    """표11·12 — 당해 배정·실적·차액(실적−배정)·집행율."""
+def _fill_exec(tbl, inputs, budget, mk, S):
+    """표11·12 — 당해 배정·실적·차액(실적−배정)·집행율. 차액은 보이는 값의 차."""
     Y = inputs["year"]
     m, rows = _walk(tbl, budget)
     items = [k for _, kind, k in rows if kind == "item"]
     pend = []
     for r, kind, key in rows:
         if kind == "item":
-            p, a = _val(inputs, budget, key, Y, "배정"), _val(inputs, budget, key, Y, "실적")
             pend.append(key)
+            p, pc = _cellv(S, budget, key, Y, "배정", _path(inputs, budget, key, Y, "배정"))
+            a, ac = _cellv(S, budget, key, Y, "실적", _path(inputs, budget, key, Y, "실적"))
+            ks = [key]
         else:
             ks = pend if kind == "sub" else items
-            p = sum(_val(inputs, budget, k, Y, "배정") for k in ks)
-            a = sum(_val(inputs, budget, k, Y, "실적") for k in ks)
             if kind == "sub":
                 pend = []
-        rr = rate(p, a)
-        rh.set_cell(m[(r, 2)], E(n0(p), _path(inputs, budget, key, Y, "배정")) if kind == "item" else n0(p), mk)
-        rh.set_cell(m[(r, 3)], E(n0(a), _path(inputs, budget, key, Y, "실적")) if kind == "item" else n0(a), mk)
+            p = sum(S["m"][budget][k][(Y, "배정")][0] for k in ks)
+            a = sum(S["m"][budget][k][(Y, "실적")][0] for k in ks)
+            pc, ac = n0(p), n0(a)
+        rr = rate(sum(_val(inputs, budget, k, Y, "배정") for k in ks), sum(_val(inputs, budget, k, Y, "실적") for k in ks))
+        rh.set_cell(m[(r, 2)], pc, mk)
+        rh.set_cell(m[(r, 3)], ac, mk)
         rh.set_cell(m[(r, 4)], tri(a - p), mk)
         rh.set_cell(m[(r, 5)], f"{n0(rr)}%" if rr is not None else "-", mk)
 
 
-def _fill_plan(tbl, inputs, budget, mk):
+def _fill_plan(tbl, inputs, budget, mk, S):
     """표17·18 — 배정 Y-1·Y·Y+1 + 전년대비 증감."""
     y = int(inputs["year"])
     yrs = [str(y - 1), str(y), str(y + 1)]
@@ -371,15 +422,20 @@ def _fill_plan(tbl, inputs, budget, mk):
     items = [k for _, kind, k in rows if kind == "item"]
     for r, kind, key in rows:
         ks = [key] if kind == "item" else items
-        vals = [sum(_val(inputs, budget, k, yy, "배정") for k in ks) for yy in yrs]
+        vals = []
         for i, yy in enumerate(yrs):
-            cell = E(n0(vals[i]), _path(inputs, budget, key, yy, "배정")) if kind == "item" else n0(vals[i])
+            if kind == "item":
+                v, cell = _cellv(S, budget, key, yy, "배정", _path(inputs, budget, key, yy, "배정"))
+            else:
+                v = sum(S["m"][budget][k][(yy, "배정")][0] for k in ks)
+                cell = n0(v)
+            vals.append(v)
             rh.set_cell(m[(r, 2 + i)], cell, mk)
         rh.set_cell(m[(r, 5)], _chg(vals[2], vals[1]), mk)
 
 
-def _fill_three(tbl, inputs, mk):
-    """표7 — 3개년 배정·실적·실적률(손익·자본·합계). 손익·자본 칸은 덮어쓰기(over) 가능."""
+def _fill_three(tbl, inputs, mk, S):
+    """표7 — 3개년 배정·실적·실적률(손익·자본·합계). 손익·자본 칸은 덮어쓰기(over) 가능, 합계는 보이는 두 값의 합."""
     y = int(inputs["year"])
     yrs = [str(y - 2), str(y - 1), str(y)]
     m = rh._cells(tbl)
@@ -388,35 +444,33 @@ def _fill_three(tbl, inputs, mk):
         vals = {}
         for r0, b in ((2, "손익"), (4, "자본")):
             for j, k in enumerate(("배정", "실적")):
-                v = tot3(inputs, yy, b, k)
-                vals[(b, k)] = v
-                rh.set_cell(m[(r0, 1 + j + 2 * i)], E(n0(v), f"over.{yy}.{b}.{k}"), mk)
-            rr = rate(vals[(b, "배정")], vals[(b, "실적")])
+                vals[(b, k)] = S["t3"][(yy, b, k)]
+                rh.set_cell(m[(r0, 1 + j + 2 * i)], E(n0(vals[(b, k)]), f"over.{yy}.{b}.{k}"), mk)
+            rr = rate(tot3(inputs, yy, b, "배정"), tot3(inputs, yy, b, "실적"))
             rh.set_cell(m[(r0 + 1, 1 + 2 * i)], f"{n0(rr)}%" if rr is not None else "", mk)
-        p = vals[("손익", "배정")] + vals[("자본", "배정")]
-        a = vals[("손익", "실적")] + vals[("자본", "실적")]
-        rh.set_cell(m[(6, 1 + 2 * i)], n0(p), mk)
-        rh.set_cell(m[(6, 2 + 2 * i)], n0(a), mk)
-        rr = rate(p, a)
+        rh.set_cell(m[(6, 1 + 2 * i)], n0(vals[("손익", "배정")] + vals[("자본", "배정")]), mk)
+        rh.set_cell(m[(6, 2 + 2 * i)], n0(vals[("손익", "실적")] + vals[("자본", "실적")]), mk)
+        rr = rate(sum(tot3(inputs, yy, b, "배정") for b in ("손익", "자본")),
+                  sum(tot3(inputs, yy, b, "실적") for b in ("손익", "자본")))
         rh.set_cell(m[(7, 1 + 2 * i)], f"{n0(rr)}%" if rr is not None else "", mk)
 
 
-def _fill_exec_total(tbl, inputs, mk):
+def _fill_exec_total(tbl, inputs, mk, S):
     """표10 — 당해 손익·자본·합계 배정·실적·차액·집행율."""
     Y = inputs["year"]
     m = rh._cells(tbl)
     rows = [(1, ("손익",)), (2, ("자본",)), (3, ("손익", "자본"))]
     for r, bs in rows:
-        p = sum(tot3(inputs, Y, b, "배정") for b in bs)
-        a = sum(tot3(inputs, Y, b, "실적") for b in bs)
-        rr = rate(p, a)
+        p = sum(S["t3"][(Y, b, "배정")] for b in bs)
+        a = sum(S["t3"][(Y, b, "실적")] for b in bs)
+        rr = rate(sum(tot3(inputs, Y, b, "배정") for b in bs), sum(tot3(inputs, Y, b, "실적") for b in bs))
         rh.set_cell(m[(r, 1)], n0(p), mk)
         rh.set_cell(m[(r, 2)], n0(a), mk)
         rh.set_cell(m[(r, 3)], tri(a - p), mk)
         rh.set_cell(m[(r, 4)], f"{n0(rr)}%" if rr is not None else "-", mk)
 
 
-def _fill_plan_total(tbl, inputs, mk):
+def _fill_plan_total(tbl, inputs, mk, S):
     """표16 — 배정·실적률(Y-1, Y) + 배정 Y+1 · 증감(비율)."""
     y = int(inputs["year"])
     P, Y, N = str(y - 1), str(y), str(y + 1)
@@ -426,14 +480,13 @@ def _fill_plan_total(tbl, inputs, mk):
     for r, bs in ((2, ("손익",)), (3, ("자본",)), (4, ("손익", "자본"))):
         vals = {}
         for yy in (P, Y):
-            p = sum(tot3(inputs, yy, b, "배정") for b in bs)
-            a = sum(tot3(inputs, yy, b, "실적") for b in bs)
+            p = sum(S["t3"][(yy, b, "배정")] for b in bs)
             vals[yy] = p
             c = 1 if yy == P else 3
             rh.set_cell(m[(r, c)], n0(p), mk)
-            rr = rate(p, a)
+            rr = rate(sum(tot3(inputs, yy, b, "배정") for b in bs), sum(tot3(inputs, yy, b, "실적") for b in bs))
             rh.set_cell(m[(r, c + 1)], f"{n0(rr)}%" if rr is not None else "-", mk)
-        nv = sum(_sum(inputs, b, N, "배정") for b in bs)
+        nv = sum(v[(N, "배정")][0] for b in bs for v in S["m"][b].values())
         rh.set_cell(m[(r, 5)], n0(nv), mk)
         d = nv - vals[Y]
         rh.set_cell(m[(r, 6)], f"{tri(d)} ({sgn(d / vals[Y] * 100) if vals[Y] else '-'}%)", mk)
@@ -506,16 +559,17 @@ def fill_plan(sec, inputs, mk=None):
     sub_year(rh._cells(tops[12])[(0, 2)], [f"{ny:02d}"])
 
     _fill_grades(tops[5], inputs, [str(y - 2), str(y - 1), str(y)], mk)
-    _fill_three(tops[6], inputs, mk)
-    _fill_trend(tops[7], inputs, "손익", mk)
-    _fill_trend(tops[8], inputs, "자본", mk)
-    _fill_exec_total(tops[9], inputs, mk)
-    _fill_exec(tops[10], inputs, "손익", mk)
-    _fill_exec(tops[11], inputs, "자본", mk)
+    S = shown_plan(inputs)
+    _fill_three(tops[6], inputs, mk, S)
+    _fill_trend(tops[7], inputs, "손익", mk, S)
+    _fill_trend(tops[8], inputs, "자본", mk, S)
+    _fill_exec_total(tops[9], inputs, mk, S)
+    _fill_exec(tops[10], inputs, "손익", mk, S)
+    _fill_exec(tops[11], inputs, "자본", mk, S)
     _fill_grades(tops[14], inputs, [str(y), str(y + 1), str(y + 2)], mk)
-    _fill_plan_total(tops[15], inputs, mk)
-    _fill_plan(tops[16], inputs, "손익", mk)
-    _fill_plan(tops[17], inputs, "자본", mk)
+    _fill_plan_total(tops[15], inputs, mk, S)
+    _fill_plan(tops[16], inputs, "손익", mk, S)
+    _fill_plan(tops[17], inputs, "자본", mk, S)
 
     for ti, prefix in ((4, "box5"), (13, "box14")):
         box = [p for p in tops[ti].iter(Q("p")) if rh._text(p).strip()]

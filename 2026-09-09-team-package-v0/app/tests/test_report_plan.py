@@ -144,3 +144,22 @@ def test_preview_column_widths_and_distribute():
         html = rp.preview_plan_html(f.read(), _inputs())
     assert html.count("<colgroup>") == html.count('class="rp-tbl"') == 18
     assert html.count("rp-p rp-dist") == 46
+
+
+def test_plan_tables_add_up_after_rounding():
+    """과목 칸이 0.4 씩 깎이면 칸 합과 합계가 어긋났다 — 단수 조정으로 집행표(표11) 칸 합 = 합계,
+    표7·10 의 손익+자본 합계 = 보이는 두 값의 합, 문장 총액도 같은 값(2026-11-03)."""
+    inp = _inputs()
+    for r, v in zip(inp["matrix"]["손익"], (10.4, 20.4, 30.4, 0, 0, 0, 0, 0)):
+        r["v"]["2025"]["실적"] = v
+    inp["texts"] = rp.auto_texts(inp)
+    S = rp.shown_plan(inp)
+    shown = [S["m"]["손익"][r["key"]][("2025", "실적")][0] for r in inp["matrix"]["손익"]]
+    assert shown[:3] == [10, 20, 31] and sum(shown) == S["t3"][("2025", "손익", "실적")] == 61
+    text = _render(inp)
+    assert "\n31\n" in text and "\n61\n" in text
+    tot = S["t3"][("2025", "손익", "실적")] + S["t3"][("2025", "자본", "실적")]
+    assert f"총 {tot:,.0f}억원" in inp["texts"]["box5_0"]
+    with open(TEMPLATE, "rb") as f:
+        html = rp.preview_plan_html(f.read(), inp)
+    assert 'data-adj="+1억원"' in html

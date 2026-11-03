@@ -161,13 +161,26 @@ def _colgroup(tbl):
 
 
 def _attrs(slot):
-    """칸 정보 → HTML 속성. kind: num·text·count·date·label·body(고침) / calc(계산 — 못 고침)."""
+    """칸 정보 → HTML 속성. kind: num·text·count·date·label·body(고침) / calc(계산 — 못 고침).
+    adj 가 있으면 단수 조정 칸 — 반올림한 값들의 합이 합계와 맞도록 고친 칸(화면에 모서리 표시)."""
     if not slot:
         return ""
+    cls, title, extra = [], "", ""
     if slot.get("kind") == "calc":
-        return ' class="rp-calc" title="자동 계산 — 다른 칸을 고치면 따라 바뀝니다"'
-    a = f' class="rp-edit rp-{slot["kind"]}" contenteditable="plaintext-only" spellcheck="false" data-path="{escape(slot["path"])}" data-kind="{slot["kind"]}"'
-    return a
+        cls.append("rp-calc")
+        title = "자동 계산 — 다른 칸을 고치면 따라 바뀝니다"
+    else:
+        cls += ["rp-edit", f"rp-{slot['kind']}"]
+        extra = (f' contenteditable="plaintext-only" spellcheck="false"'
+                 f' data-path="{escape(slot["path"])}" data-kind="{slot["kind"]}"')
+    if slot.get("adj"):
+        cls.append("rp-adj")
+        real = f"(실제 {slot['real']})" if slot.get("real") else ""
+        title = f"단수 조정 {slot['adj']}{real} — 반올림한 값들을 더하면 합계와 맞도록 이 칸을 맞췄습니다"
+        extra += f' data-adj="{escape(slot["adj"])}"'
+    t = f' title="{escape(title)}"' if title else ""
+    return f' class="{" ".join(cls)}"{t}{extra}'
+
 
 
 class Renderer:

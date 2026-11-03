@@ -167,3 +167,50 @@ def test_preview_page_text_area_and_inline_tables():
     w, right, left = (float(x) for x in re.search(r'rp-page" style="width:([\d.]+)px;padding:56px ([\d.]+)px 72px ([\d.]+)px', html).groups())
     assert abs(w + left + right - 793.71) < 1           # A4 59528 / 75
     assert html.count("display:inline-table") == html.count('class="rp-tbl"')
+
+
+def test_fit_keeps_shown_parts_adding_up():
+    """단수 조정 — 보이는 값들의 합 = 실제 합의 사사오입. 나머지가 큰 칸부터, 딱 맞는 칸은 맨 나중."""
+    shown, total, adj = rh.fit([10.4, 20.4, 30.4, 0])
+    assert total == 61 and sum(shown) == 61 and adj == [0, 0, 1, 0]       # 동점이면 큰 칸
+    shown, total, adj = rh.fit([100.04, 200.04, 300.04], 1)
+    assert total == 600.1 and round(sum(shown), 1) == 600.1 and sum(1 for a in adj if a) == 1
+    shown, total, adj = rh.fit([12.0, 30.6, 30.6])                       # 12.0 = 사람이 넣은 딱 맞는 값
+    assert sum(shown) == total == 73 and adj[0] == 0
+    shown, total, adj = rh.fit([33.4, 33.3, 33.3], 0, 100)               # 점유율 합 100
+    assert sum(shown) == 100
+
+
+def test_tables_and_sentences_add_up_after_rounding():
+    """지사 유형 4칸 10.4·20.4·30.4·0 → 보이는 값 10·20·31·0, 합계 61(전에는 칸 합 60 ≠ 합계 61).
+    과목표 합계·잔액도 보이는 값끼리, 웹 미리보기에는 조정 칸 표시(2026-11-03)."""
+    inp = _inputs()
+    for g, v in zip(rh.GROUPS, (10.4, 20.4, 30.4, 0)):
+        inp["groups"]["손익"][g]["실적"] = v
+    for i, v in enumerate((100.04, 200.04, 300.04)):
+        inp["items"]["손익"][i]["실적"] = v
+    inp["texts"] = rh.auto_texts(inp)
+    cells = rh.perf_cells(inp)
+    row = [cells[3][(1, 1 + i)] for i in range(4)]
+    txt = [c[0] if isinstance(c, tuple) else c for c in row]
+    assert txt[2].startswith("31(") and cells[3][(1, 5)] == "61"
+    assert isinstance(row[2], tuple) and row[2][1]["adj"] == "+1억원"
+    shares = [int(re.search(r"\((\d+)%\)", t).group(1)) for t in txt]
+    assert sum(shares) == 100
+    son = cells[5]["rows"]
+    shown = [float(son[x["label"]][1][0] if isinstance(son[x["label"]][1], tuple) else son[x["label"]][1])
+             for x in inp["items"]["손익"]]
+    assert round(sum(shown), 1) == float(son["합 계"][1].replace(",", ""))
+    html = _preview(inp)
+    assert 'rp-adj' in html and 'data-adj="+1억원"' in html
+
+
+def test_sentence_change_uses_shown_numbers():
+    """문장의 증감 억원 = 표에 보이는 두 해 값의 차(실제 차를 반올림하면 1 어긋날 수 있다)."""
+    inp = _inputs()
+    inp["three"]["2024"]["손익"]["실적"] = 824.6                          # 표에는 825
+    for x in inp["items"]["손익"]:
+        x["실적"] = 0
+    inp["items"]["손익"][0]["실적"] = 985.4                               # 표에는 985 → 차 160(실제 160.8 → 161)
+    t = rh.auto_texts(inp)
+    assert "손익예산 985억원(+160억원" in t["box1"]
