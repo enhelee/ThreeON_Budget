@@ -57,6 +57,22 @@ function navButton(m) {
   return `<button class="nav-button${m.sub ? " nav-sub" : ""}" data-view="${m.view}" data-label="${esc(m.label)}"><span class="nav-tag grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs">${esc(m.tag)}</span><span class="nav-label">${esc(m.label)}</span></button>`
 }
 
+/** 메뉴 목록 → HTML. 하위 메뉴(sub)는 바로 위 메뉴 아래에 접어 두고(2026-11-03 grace: 스크롤 없이 짧게),
+ *  위 메뉴 오른쪽 ▾ 를 누르면 펼친다(main.js data-sb-sub). 지금 화면이 하위 메뉴면 router 가 펼쳐 둔다. */
+function navHtml(menu) {
+  const out = []
+  for (let i = 0; i < menu.length; i++) {
+    const m = menu[i]
+    if (m.group) { out.push(groupLabel(m.group)); continue }
+    const subs = []
+    while (menu[i + 1]?.sub) subs.push(menu[++i])
+    if (!subs.length) { out.push(navButton(m)); continue }
+    out.push(`<div class="nav-parent" data-parent="${m.view}">${navButton(m)}<button type="button" class="nav-sub-toggle" data-sb-sub="${m.view}" aria-expanded="false" aria-label="${esc(m.label)} 하위 메뉴 펼치기">▾</button></div>
+      <div class="nav-subs" data-sub-of="${m.view}">${subs.map(navButton).join("")}</div>`)
+  }
+  return out.join("\n      ")
+}
+
 function groupLabel(text) {
   return `<p class="nav-group px-3 pb-1 pt-5 text-xs font-semibold tracking-wider text-tri">${esc(text)}</p>`
 }
@@ -68,6 +84,18 @@ function groupLabel(text) {
  *  «메뉴 펼치기»로 펼친 채 고정할 수 있다(main.js). 접힌 동안 로고·글자는 숨기고 캐릭터 머리만
  *  남긴다(custom.css .sb-collapsed) — 대신 상단 머리글에 같은 표지(renderHeaderBrand)가 나온다.
  *  표지를 누르면 어디서든 메인으로 간다(button[data-view]). */
+export function setSubOpen(view, open) {
+  document.querySelector(`#sidebar .nav-subs[data-sub-of="${view}"]`)?.classList.toggle("is-open", open)
+  const t = document.querySelector(`#sidebar [data-sb-sub="${view}"]`)
+  if (t) { t.setAttribute("aria-expanded", String(open)); t.setAttribute("aria-label", t.getAttribute("aria-label").replace(/펼치기|접기/, open ? "접기" : "펼치기")) }
+}
+
+/** 지금 화면이 하위 메뉴면 그 묶음을 펼친다(고른 메뉴가 접혀 안 보이는 일이 없게). */
+export function openActiveSub(view) {
+  const box = document.querySelector(`#sidebar .nav-subs [data-view="${view}"]`)?.closest(".nav-subs")
+  if (box) setSubOpen(box.dataset.subOf, true)
+}
+
 export function renderSidebar() {
   return `
     <button type="button" class="sb-brand brand-link block w-full text-left" data-view="home" aria-label="메인으로 — 한국지역난방공사 ONDO by ThreeON">
@@ -77,7 +105,7 @@ export function renderSidebar() {
     </button>
 
     <nav class="sb-nav mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain" aria-label="주요 메뉴">
-      ${MENU.map(m => m.group ? groupLabel(m.group) : navButton(m)).join("\n      ")}
+      ${navHtml(MENU)}
     </nav>
 
     <button type="button" class="sb-fold" data-sb-fold aria-label="메뉴 접기"><span class="sb-fold__icon" aria-hidden="true">«</span><span class="sb-full sb-fold__text">메뉴 접기</span></button>`
