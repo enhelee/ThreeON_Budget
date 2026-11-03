@@ -214,6 +214,7 @@ document.addEventListener("click", async e => {
   if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
+  if (act === "pick-erp-invest") $("#erpInvestFile").click();
   if (act === "add-alias") {
     const kind = state.ycAliasKind || "dept";
     const src = $("#ycAliasSrc").value.trim(), dst = $("#ycAliasDst").value.trim();
@@ -571,6 +572,7 @@ document.addEventListener("change", async e => {
   }
   if (e.target.id === "planFile" && e.target.files.length) { uploadFile("plan", [...e.target.files]); e.target.value = ""; return; }
   if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
+  if (e.target.id === "erpInvestFile" && e.target.files[0]) { uploadFile("erp-invest", e.target.files[0]); e.target.value = ""; return; }
   if ((e.target.id === "masterItemFile" || e.target.id === "masterDeptFile") && e.target.files[0]) {
     const kind = e.target.id === "masterItemFile" ? "item" : "dept";
     const file = e.target.files[0];
@@ -854,7 +856,7 @@ checkAuth()
   .then(ok => { if (ok) bootRoute(); })
   .catch(() => bootRoute());
 
-// 업로드 칸에 파일 끌어다 놓기(2026-11-03) — data-drop="plan|erp" 칸만. 마감 연도면 칸이 disabled 라 받지 않는다.
+// 업로드 칸에 파일 끌어다 놓기(2026-11-03) — data-drop="plan|erp|erp-invest" 칸만. 마감 연도면 칸이 disabled 라 받지 않는다.
 document.addEventListener("dragover", e => {
   const z = e.target.closest?.("[data-drop]");
   if (!z || z.disabled) return;

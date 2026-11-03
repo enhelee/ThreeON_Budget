@@ -172,6 +172,34 @@ def test_plan_upload_merges_several_files_into_one_dataset(srv):
     assert len(plans) == 1 and plans[0]["label"] == "손익.xlsx + 자본.xlsx"
 
 
+def test_invest_voucher_upload_joins_capital_actuals(srv):
+    """투자비(건설공사 3과목) 전표를 zrfm2 양식으로 따로 올리면 그 해 자본 실적에 함께 매칭된다(2026-11-03 팀장)."""
+    _, client, _ = srv
+    loss = _xlsx_bytes(HDR_2324, [_row2324("화성지사", "수선유지비-열원정기점검", "화성 정기점검 보수공사", 10000)])
+    cons = _xlsx_bytes(HDR_2324, [_row2324("화성지사", "외주비-열원공사비", "화성 배관 교체공사", 50000)])
+    assert client.post("/api/upload/plan?year=2023",
+                       files=[("file", ("손익.xlsx", loss, XLSX)), ("file", ("건설공사.xlsx", cons, XLSX))]).status_code == 200
+    erp = _xlsx_bytes([f"h{i}" for i in range(1, 17)], ERP_ROWS, sheet="Sheet1")
+    assert client.post("/api/upload/erp?year=2023", files={"file": ("zrfm2.xlsx", erp, XLSX)}).status_code == 200
+    assert client.post("/api/analyze", json={"year": "2023"}).status_code == 200
+    cap = lambda: client.get("/api/status?year=2023").json()["runs"]["자본"]["summary"]
+    assert not cap().get("총 실적(천원)")                       # 투자비 전표 전 — 자본 실적 없음(건설공사는 실적 대상 밖)
+
+    inv = _xlsx_bytes([f"h{i}" for i in range(1, 17)],
+                      [[None, "", "외주비-열원공사비", "2023.010", "2023-06-01", "I1", 40_000_000,
+                        "화성 배관 교체공사", "화성지사", "(CHP)화성지사 기술부"]], sheet="Sheet1")
+    r = client.post("/api/upload/erp-invest?year=2023", files={"file": ("투자비전표.xlsx", inv, XLSX)})
+    assert r.status_code == 200, r.text
+    assert "외주비-열원공사비" in r.json()["실적반영켬"]               # 그 해 자본 실적 대상으로 켜짐
+    kinds = {d["kind"] for d in client.get("/api/status?year=2023").json()["datasets"]}
+    assert {"erp", "erp_invest"} <= kinds
+    assert client.post("/api/analyze", json={"year": "2023"}).status_code == 200
+    assert cap()["총 실적(천원)"] == 40000                         # zrfm2 와 합쳐 자본 실적으로 매칭
+    assert cap()["계획집행 행수"] >= 1
+    # 손익 실적은 그대로(투자비 전표는 손익에 섞이지 않는다)
+    assert client.get("/api/status?year=2023").json()["runs"]["손익"]["summary"]["총 실적(천원)"] == 13500
+
+
 def test_concurrent_downloads_build_files_once_and_stay_whole(srv, monkeypatch):
     server, client, _ = srv
     _analyzed(client)

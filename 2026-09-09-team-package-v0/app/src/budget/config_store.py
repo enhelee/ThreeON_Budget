@@ -168,6 +168,30 @@ def load_item_config(conn, year, budget):
              "포함": bool(r[3]), "실적반영": bool(r[4])} for r in rows]
 
 
+INVEST_ITEMS = ("외주비-열원공사비", "재료비-열원자재비", "외주비-열원기술용역비")
+
+
+def enable_invest_actuals(conn, year):
+    """투자비 전표를 올린 해 — 건설공사 3과목을 자본 실적 대상으로(실적반영 켬, 2026-11-03 팀장).
+    설정에 없는 과목은 시드 줄을 덧붙인다. 바뀐 과목 이름 목록을 돌려준다."""
+    items = load_item_config(conn, year, "자본")
+    seed = {x["과목"]: x for x in seed_item_config(year, "자본")}
+    have = {x["과목"] for x in items}
+    changed = []
+    for x in items:
+        if x["과목"] in INVEST_ITEMS and not (x["실적반영"] and x["포함"]):
+            x["실적반영"], x["포함"] = True, True
+            changed.append(x["과목"])
+    for name in INVEST_ITEMS:
+        if name not in have:
+            items.append({**seed.get(name, {"과목": name, "대분류": "건설공사", "심의대상": False}),
+                          "포함": True, "실적반영": True})
+            changed.append(name)
+    if changed:
+        save_item_config(conn, year, "자본", items)
+    return changed
+
+
 def save_item_config(conn, year, budget, items):
     items = normalize_item_config(items)
     conn.execute("DELETE FROM item_config WHERE year=? AND budget=?",

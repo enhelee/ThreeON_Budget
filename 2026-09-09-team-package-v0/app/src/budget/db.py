@@ -107,7 +107,7 @@ def init_db(conn):
     cur = conn.cursor()
     cur.execute("""CREATE TABLE IF NOT EXISTS dataset(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        kind TEXT NOT NULL,              -- 'plan' | 'erp'
+        kind TEXT NOT NULL,              -- 'plan' | 'erp' | 'erp_invest'(투자비 전표, zrfm2 양식 — 2026-11-03)
         year TEXT NOT NULL,
         label TEXT,
         uploaded_at TEXT NOT NULL,
@@ -469,13 +469,17 @@ def ingest_plan(conn, path, year, label=None):
     return {"dataset_id": ds_id, "rows": len(df), "total": total}
 
 
-def ingest_erp(conn, path, year, label=None):
+def ingest_erp(conn, path, year, label=None, kind="erp"):
+    """zrfm2 양식 전표 흡수. kind='erp_invest' 는 투자비(건설공사 3과목) 전표 — zrfm2 에 계정이 없어
+    같은 양식으로 따로 받는다(2026-11-03 팀장). 분석은 그 해 최신 zrfm2 + 최신 투자비 전표를 합쳐 쓴다."""
+    if kind not in ("erp", "erp_invest"):
+        raise ValueError(f"모르는 전표 종류: {kind}")
     df = erp_loader.load_erp(path)
     cur = conn.cursor()
     total = float(pd.to_numeric(df["금액천원"], errors="coerce").fillna(0).sum())
     cur.execute("INSERT INTO dataset(kind,year,label,uploaded_at,row_count,total_amount)"
-                " VALUES('erp',?,?,?,?,?)",
-                (str(year), label or os.path.basename(path), _now(), len(df), total))
+                " VALUES(?,?,?,?,?,?)",
+                (kind, str(year), label or os.path.basename(path), _now(), len(df), total))
     ds_id = cur.lastrowid
     rows = []
     for _, r in df.iterrows():
@@ -540,12 +544,14 @@ def load_plan_df(conn, year):
 
 
 def load_erp_df(conn, year):
+    """그 해 최신 zrfm2 + (있으면) 최신 투자비 전표. zrfm2 가 없으면 None — 분석은 zrfm2 가 있어야 돈다."""
     ds = _latest_dataset_id(conn, "erp", year)
     if ds is None:
         return None
+    ids = [ds] + [i for i in [_latest_dataset_id(conn, "erp_invest", year)] if i is not None]
     df = pd.read_sql_query(
         f"SELECT id AS _erp_row, {','.join(ERP_COLS)} FROM erp_row"
-        " WHERE dataset_id=? ORDER BY id", conn, params=(ds,))
+        f" WHERE dataset_id IN ({','.join('?' * len(ids))}) ORDER BY id", conn, params=tuple(ids))
     # 스키마 순서를 erp_loader와 동일하게
     return df[[c for c in erp_loader.ERP_COLUMNS]]
 
