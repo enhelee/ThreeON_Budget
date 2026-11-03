@@ -82,7 +82,7 @@
    '신규(소액집행)'=~77px, 확신도 배지 '학습 0.99'=50px. 여유를 조금 더 준 값. */
 .det-table th:nth-child(1){width:4rem}   /* 헤더 '구분 ↕'가 61px 필요 */
 .det-table th:nth-child(2){width:10.8rem}
-.det-table th:nth-child(3){width:5.2rem}
+.det-table th:nth-child(3){width:6.6rem}   /* 속성 열 = 전표 줄에선 전표번호(10자리) 자리 — 한 줄로 들어가게 */
 .det-table th:nth-child(5){width:6.2rem}
 .det-table th:nth-child(6){width:6.2rem}
 .det-table th:nth-child(7){width:8.4rem}
@@ -95,6 +95,7 @@
 .det-table td.text-right{white-space:nowrap}    /* 금액·날짜는 숫자 중간에서 끊기지 않게 */
 .det-table .badge{padding:.12rem .4rem;font-size:.68rem}
 .det-table .voucher-row td,.det-table .voucher-head td{white-space:normal}
+.det-table .voucher-row td.cell-doc{white-space:nowrap}   /* 전표 줄에서도 전표번호는 한 줄(2026-11-03 grace: 460005768 / 3 으로 끊김) */
 .swatch{display:inline-block;width:1rem;height:1rem;border-radius:.25rem;border:1.5px solid var(--line-strong);flex:none}
 
 /* ── 로그인 게이트 (Phase 2) ──────────────────────────────────────
