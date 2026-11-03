@@ -19,12 +19,12 @@
 import re
 from urllib.parse import urlencode
 
-from . import kb
+from . import facts, kb
 
 ENGINE_NAME = "rule"
 MAX_LEN = 300
 
-NAV_CUES = ("열어", "가자", "가줘", "이동", "보여줘", "보여줄래", "띄워", "켜줘", "으로가", "로가", "들어가")
+NAV_CUES = ("열어", "가자", "가줘", "가주", "보여주", "이동", "보여줘", "보여줄래", "띄워", "켜줘", "으로가", "로가", "들어가")
 HOWTO_CUES = ("어떻게", "방법", "하려면", "뭐야", "뭔가요", "뭐예요", "어디서", "언제", "왜", "알려", "하나요", "해야")
 STATUS_CUES = ("어디까지", "진행상황", "진행상태", "다음할일", "뭐해야", "뭘해야", "남은일", "얼마나했", "다했")
 # 표준금액이 어떻게 나왔는지 — 5번 표에서 뺀 «방식출처·추천사유·근거»를 예측이가 대신 말한다(2026-10-28)
@@ -87,6 +87,83 @@ def match_faq(n):
     return best, best_score
 
 
+# ── 말로 묻기 보정(2026-11-03) ───────────────────────────────
+# 브라우저 안 Whisper 는 짧은 한국어 명령을 한 글자쯤 틀리게 적는다(«검토큐»→«검토키», «마감»→«말감»).
+# 말로 들어온 질문만, 앱 낱말(화면·사용법 키워드)과 자모 하나 차이인 조각을 그 낱말로 바꾼다.
+# 사람이 친 글자는 건드리지 않는다.
+_CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+_JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+_JONG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+
+
+def _jamo(s):
+    out = []
+    for ch in s:
+        o = ord(ch) - 0xAC00
+        if 0 <= o < 11172:
+            out += [_CHO[o // 588], _JUNG[o % 588 // 28]] + ([_JONG[o % 28]] if o % 28 else [])
+        else:
+            out.append(ch)
+    return out
+
+
+def _cho(s):
+    return "".join(_CHO[(ord(c) - 0xAC00) // 588] if "가" <= c <= "힣" else c for c in s)
+
+
+def _edit(a, b, cap):
+    """자모 편집 거리(cap 을 넘으면 cap+1)."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    prev = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, y in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y))
+        if min(cur) > cap:
+            return cap + 1
+        prev = cur
+    return prev[-1]
+
+
+def _vocab():
+    words = set()
+    for _, _, keys in kb.SCREENS:
+        words.update(keys)
+    for item in kb.FAQ:
+        for k in item["keys"]:
+            words.update(k if isinstance(k, tuple) else (k,))
+    hangul = lambda w: len(w) >= 2 and all("가" <= c <= "힣" for c in w)
+    return sorted((w for w in words if hangul(w)), key=len, reverse=True)
+
+
+_VOCAB = None
+# 말끝·흔한 말은 앱 낱말로 바꾸지 않는다(«비교해줘»의 «해줘»가 «해제»가 되면 마감 해제 답이 나온다)
+_KEEP = {"해줘", "해요", "해주", "해서", "해도", "해봐", "해야", "하자", "줘요", "주세", "세요", "어때", "뭐야", "알려", "보여"}
+
+
+def voice_fix(n):
+    """정규화한 말 질문 n 에서 앱 낱말과 자모 1개(4글자 이상은 2개) 차이인 조각을 그 낱말로.
+    3글자 이하 낱말은 글자 수와 첫소리(초성)가 같을 때만 — «날씨»가 «날비»로 바뀌는 일을 막는다."""
+    global _VOCAB
+    if _VOCAB is None:
+        _VOCAB = _vocab()
+    for w in _VOCAB:
+        if w in n:
+            continue
+        cap = 2 if len(w) >= 4 else 1
+        wj = _jamo(w)
+        short = len(w) <= 3
+        for L in ((len(w),) if short else (len(w), len(w) + 1, len(w) - 1)):
+            hit = next((i for i in range(len(n) - L + 1)
+                        if n[i:i + L] not in _KEEP and (not short or _cho(n[i:i + L]) == _cho(w))
+                        and 0 < _edit(_jamo(n[i:i + L]), wj, cap) <= cap), None)
+            if hit is not None:
+                n = n[:hit] + w + n[hit + L:]
+                break
+    return n
+
+
 def match_screen(n):
     for hash_, name, keys in kb.SCREENS:
         if any(k in n for k in keys):
@@ -125,18 +202,22 @@ class ChatEngine:
 class RuleEngine(ChatEngine):
     name = ENGINE_NAME
 
-    def __init__(self, status_provider=None, std_provider=None):
+    def __init__(self, status_provider=None, std_provider=None, facts_provider=None):
         # status_provider(year) → {"year", "datasets", "runs", "pending", "locked"} | None
         #   서버가 넘긴다(DB 읽기만). 테스트는 가짜를 넘긴다.
         # std_provider() → {"base_year", "rows": [표준금액 행 dict…]} | None — 표준금액 근거 답에 쓴다.
         self.status_provider = status_provider
         self.std_provider = std_provider
+        # facts_provider() → {"lines": [사업 줄…], "depts": [...]} | None — «○○ 얼마 들었어»·«몇 년도에 한 적» 답(chat/facts.py)
+        self.facts_provider = facts_provider
 
     def answer(self, question, context=None):
         ctx = context or {}
         view = ctx.get("view") or "home"
         q = (question or "").strip()[:MAX_LEN]
         n = normalize(q)
+        if ctx.get("voice"):
+            n = voice_fix(n)
         sugg = suggestions_for(view)
         if not n:
             return {"answer": _card("mt", "궁금한 걸 적어 주세요. 아래 질문을 눌러도 돼요.", "empty", 0), "suggestions": sugg}
@@ -149,8 +230,12 @@ class RuleEngine(ChatEngine):
         bare_screen = any(n == k for _, _, keys in kb.SCREENS for k in keys)   # «검토 대기»처럼 화면 이름만
 
         std_card = self._standard(q, n) if self.std_provider and any(c in n for c in STD_CUES) else None
+        fact_card = (self._fact(q, n, ctx) if self.facts_provider and facts.is_fact_question(n)
+                     and not status_cue else None)
         if std_card:
             card = std_card
+        elif fact_card:
+            card = fact_card
         elif status_cue:
             card = self._status(q, ctx)
         elif faq and howto_cue:
@@ -172,6 +257,22 @@ class RuleEngine(ChatEngine):
     def _nav(self, hash_, name):
         card = _card("mt", f"«{name}» 화면으로 갈게요.", "nav.goto", 1, [(f"{ro(name)} →", hash_)])
         card["go"] = hash_                       # 이동을 시키는 말 — 화면이 바로 옮긴다
+        return card
+
+    def _fact(self, q, n, ctx):
+        """사업 실적·이력 답. 질문에서 지사·낱말을 못 뽑으면 None(다른 답으로 넘긴다)."""
+        data = self.facts_provider()
+        base = ctx.get("year") or (max(data["years"]) if data and data.get("years") else None)
+        got = facts.answer(q, n, data, base)
+        if got is None:
+            return None
+        history = facts.is_history(n)
+        yrs = sorted({r[0] for r in (got["table"] or [])[1:]})
+        card = _card("mt", got["text"], "fact.history" if history else "fact.cost", got["found"],
+                     [("실적 분석으로 →", "#/branches")], ctx=got["ctx"], table=got["table"],
+                     source=(f"근거: {'·'.join(yrs)}년 최신 분석 결과의 "
+                             f"{'전표(적요)와 그 전표가 붙은 사업' if got.get('basis') == '전표' else '사업별 실적(손익·자본)'}"
+                             " — 금액 단위 천원" if yrs else ""), mood="default" if got["found"] else "wow")
         return card
 
     def _fallback(self, n, view):

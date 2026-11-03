@@ -57,6 +57,10 @@ def test_normalize_and_year():
     ("표준화 세부 열어줘", "nav.goto", "#/standard-detail"),
     ("실적 집계로 가자", "nav.goto", "#/collect"),
     ("검토 대기", "nav.goto", "#/review"),
+    # 말로 물을 때(음성 → 글자) 흔한 높임·띄어쓰기 — «가 주세요»·«보여 주세요»
+    ("검토 대기로 가 주세요", "nav.goto", "#/review"),
+    ("중장기 전망 보여 주세요", "nav.goto", "#/forecast/table"),
+    ("메인으로 가 줘", "nav.goto", "#/home"),
     ("올해 어디까지 했어?", "status.progress", None),
 ])
 def test_intents(q, intent, faq_or_hash):
@@ -225,3 +229,39 @@ def test_focus_selectors_exist_in_screen_code():
                 assert f'data-{m.group(1)}="{m.group(2)}"' in src, one
             else:
                 assert f"data-{m.group(1)}" in src, one
+
+
+# ── 말로 묻기: 음성 인식이 한 글자 틀리게 받아 적어도 앱 낱말로 고쳐 알아듣는다(2026-11-03) ──
+@pytest.mark.parametrize("heard,want", [
+    ("검토키로 가죠", "검토큐로가죠"),
+    ("말감은 어떻게 해?", "마감은어떻게해"),
+    ("중장기 전망 보여주세요.", "중장기전망보여주세요"),
+])
+def test_voice_fix_snaps_to_app_words(heard, want):
+    assert ce.voice_fix(ce.normalize(heard)) == want
+
+
+@pytest.mark.parametrize("q", ["오늘 날씨 어때", "작년이랑 비교해줘", "동탄 지사 보여줘", "고마워"])
+def test_voice_fix_leaves_unrelated_words(q):
+    assert ce.voice_fix(ce.normalize(q)) == ce.normalize(q)
+
+
+def test_voice_question_navigates_and_answers():
+    eng = ce.RuleEngine()
+    nav = eng.answer("검토키로 가죠", {"view": "home", "voice": True})["answer"]
+    assert nav["intent"] == "nav.goto" and nav["go"] == "#/review"
+    howto = eng.answer("말감은 어떻게 해?", {"view": "home", "voice": True})["answer"]
+    assert howto["intent"] == "help.howto"
+    # 글자로 친 질문은 고치지 않는다(사람이 친 글자는 그대로)
+    typed = eng.answer("말감은 어떻게 해?", {"view": "home"})["answer"]
+    assert typed["text"] != howto["text"]
+
+
+def test_api_voice_flag_fixes_misheard_words(client):
+    r = client.post("/api/chat", json={"question": "검토키로 가죠", "context": {"view": "home", "voice": True}})
+    assert r.json()["answer"].get("go") == "#/review"
+
+
+def test_api_fact_question_without_analysis_does_not_break(client):
+    r = client.post("/api/chat", json={"question": "25년 파주지사 정기점검 얼마 들었어", "context": {"view": "home"}})
+    assert r.status_code == 200 and r.json()["answer"]["intent"] != "fact.cost"

@@ -6,6 +6,7 @@ import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
 import { helpFabHtml } from "./components/characters.js"
+import { maybeFabIntro } from "./components/fab_intro.js"
 import { loadErrorBannerHtml } from "./components/loaderror.js"
 import { lockBadgeHtml } from "./components/lockbanner.js"
 import { renderBranches } from "./views/branches.js"
@@ -114,6 +115,8 @@ export function renderPage() {
     b.classList.toggle("nav-button-active", b.dataset.view === state.view));
   renderChrome();
   if (state.view === "home") observeHomeForecast();
+  // 메인에 들어올 때마다 매칭이가 가운데에서 인사하고 오른쪽 아래로 — 누르면 도움말 버튼과 같은 길로 대화를 연다
+  maybeFabIntro(() => document.querySelector(".help-fab__btn")?.click());
   maybeStartTour(state.view);                 // 처음 온 화면이면 사용법 둘러보기
 }
 

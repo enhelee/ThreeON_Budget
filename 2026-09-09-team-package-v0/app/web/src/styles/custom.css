@@ -368,6 +368,10 @@
 .chat-lines{margin:.35rem 0 0 1.1rem;padding:0}
 .chat-table{width:100%;margin:.45rem 0;border-collapse:collapse;background:var(--base);border-radius:8px;overflow:hidden;font-size:.75rem}
 .chat-table th,.chat-table td{padding:.3rem .5rem;border-bottom:1px solid var(--line-subtle);text-align:left}
+/* 사업 실적 표(chat/facts.py) — 숫자는 줄바꿈 없이 오른쪽, 사업명은 줄바꿈. 그래도 넘치면 표만 옆으로 밀기 */
+.chat-table{display:block;overflow-x:auto}
+.chat-table td{word-break:keep-all;overflow-wrap:anywhere}
+.chat-table td:first-child,.chat-table td:last-child{white-space:nowrap}
 .chat-table th{color:var(--sub);font-weight:600}
 .chat-links,.chat-ask{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
 .chat-go{font-size:.75rem;font-weight:700;color:var(--ink);background:var(--base);border:1px solid var(--line-strong);border-radius:8px;padding:.25rem .55rem;cursor:pointer}
@@ -580,6 +584,34 @@ img.char-img{object-fit:contain;display:inline-block}
 .loader-text{font-size:14px;font-weight:600;color:var(--navy);line-height:1.45}
 @media (prefers-reduced-motion:reduce){.loader-merc,.loader-char{animation:none}.loader-merc{transform:none}}
 
+/* 매칭이 등장(components/fab_intro.js, 2026-11-03) — 메인에 들어올 때마다 가운데 인사 → 오른쪽 아래로 */
+.fab-intro{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1rem;background:rgba(13,13,13,.18);animation:fab-intro-in .35s ease both}
+.fab-intro__char{background:none;border:0;padding:0;cursor:pointer;animation:fab-intro-pop .55s cubic-bezier(.3,1.5,.5,1) both}
+.fab-intro__char img{display:block;width:min(11rem,40vw);height:auto;filter:drop-shadow(0 12px 24px rgba(0,0,0,.18))}
+.fab-intro__char:focus-visible{outline:2px solid var(--ink);outline-offset:6px;border-radius:18px}
+.fab-intro__bub{max-width:min(22rem,calc(100vw - 2rem));background:var(--base);border:1px solid var(--line);border-radius:16px;padding:.9rem 1.1rem;box-shadow:var(--shadow-float);text-align:center;font-size:.9rem;line-height:1.55;color:var(--ink);cursor:pointer;animation:fab-intro-in .4s .25s ease both}
+.fab-intro__bub p{margin:0}
+.fab-intro__hi{font-weight:800;font-size:1rem;margin-bottom:.2rem!important;color:#0F7E71}
+.fab-intro__where{margin-top:.35rem!important;font-size:.8rem;color:var(--sub)}
+.fab-intro--fly{background:transparent;transition:background .5s ease;pointer-events:none}
+.fab-intro--fly .fab-intro__bub{opacity:0;transition:opacity .2s ease}
+.fab-intro-on .help-fab{visibility:hidden}
+.help-fab__btn--hello .help-fab__img{animation:fab-hello .6s ease 3}
+@keyframes fab-intro-in{from{opacity:0}to{opacity:1}}
+@keyframes fab-intro-pop{from{opacity:0;transform:scale(.6) translateY(20px)}to{opacity:1;transform:none}}
+@keyframes fab-hello{0%,100%{transform:none}30%{transform:translateY(-8px) rotate(-6deg)}60%{transform:translateY(0) rotate(4deg)}}
+@media (prefers-reduced-motion:reduce){.fab-intro,.fab-intro__char,.fab-intro__bub{animation:none}}
+@media print{.fab-intro{display:none}}
+
+/* 말로 묻기(components/chat.js) — 브라우저 기본 음성 인식. 듣는 동안 빨간 테두리가 숨 쉰다 */
+.chat-mic{flex:none;width:2.5rem;border:1px solid var(--line-strong);border-radius:10px;background:var(--base);color:var(--ink);font-size:1.05rem;cursor:pointer}
+.chat-mic:hover{border-color:var(--ink)}
+.chat-mic:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.chat-mic:disabled{opacity:.5;cursor:default}
+.chat-mic--on{background:#FDEBE8;border-color:#C23B2B;color:#C23B2B;animation:chat-mic-pulse 1.2s ease-in-out infinite}
+@keyframes chat-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(194,59,43,.35)}50%{box-shadow:0 0 0 6px rgba(194,59,43,0)}}
+@media (prefers-reduced-motion:reduce){.chat-mic--on{animation:none}}
+.chat-voice-note{margin:0;padding:0 1rem .5rem;font-size:.6875rem;color:var(--sub)}
 /* 하위 메뉴(5-1 표준화 세부) — 펼친 사이드바에서만 들여 쓴다(접힌 띠는 .sb-collapsed 규칙이 가운데로 모은다) */
 #sidebar .nav-sub{position:relative;padding-left:2.15rem;font-size:13px}
 /* 하위 메뉴(3-1·3-2·5-1)는 위 메뉴에 가는 «ㄴ» 선으로 이어 붙인다(2026-11-03 grace «메뉴 UI 도 어울리게») */
