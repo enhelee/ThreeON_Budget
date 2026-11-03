@@ -1929,7 +1929,8 @@ def _chat_facts():
                     lines.append({"연도": str(year), "예산": budget, "처지사": 처지사 or "", "예산과목": 예산과목 or "",
                                   "사업명": 사업명, "연예산": float(연예산 or 0), "실적금액": float(실적금액 or 0)})
         data = {"lines": lines, "years": sorted({y for y, _ in runs}),
-                "depts": sorted({x["처지사"] for x in lines if x["처지사"]})}
+                "depts": sorted({x["처지사"] for x in lines if x["처지사"]}),
+                "vouchers": lambda years, dept: _chat_vouchers(runs, years, dept)}
         _CHAT_FACTS.update(key=key, data=data)
         return data
     except Exception:
@@ -1937,6 +1938,37 @@ def _chat_facts():
         return None
     finally:
         conn.close()
+
+
+_CHAT_VOUCHERS = {}
+
+
+def _chat_vouchers(runs, years, dept):
+    """사업명에 없는 공사를 전표 내용(적요)으로 찾을 때 — 실적에 들어간 전표(계획집행·신규)만, 지사로 거른다.
+    (실행 id, 지사)마다 한 번만 읽는다(새 분석이면 id 가 바뀌어 저절로 새로 읽힌다)."""
+    out = []
+    conn = None
+    try:
+        for (year, budget), r in runs.items():
+            if years and str(year) not in years:
+                continue
+            k = (r["id"], dept or "")
+            if k not in _CHAT_VOUCHERS:
+                conn = conn or _conn()
+                sql = ("SELECT e.사업명, e.금액천원, m.매칭사업명, m.구분 FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id"
+                       " WHERE m.run_id=? AND m.구분 IN ('계획집행','신규')" + (" AND m.처지사정규=?" if dept else ""))
+                rows = conn.execute(sql, (r["id"], dept) if dept else (r["id"],)).fetchall()
+                _CHAT_VOUCHERS[k] = [{"연도": str(year), "전표텍스트": t or "", "금액천원": float(a or 0),
+                                      "붙은사업": n or ("계획 외(신규)" if g == "신규" else "")} for t, a, n, g in rows if t]
+            out.extend(_CHAT_VOUCHERS[k])
+        return out
+    except Exception:
+        if conn:
+            conn.rollback()
+        return []
+    finally:
+        if conn:
+            conn.close()
 
 
 @app.post("/api/chat")

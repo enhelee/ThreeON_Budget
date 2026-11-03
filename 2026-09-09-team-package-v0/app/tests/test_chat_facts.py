@@ -110,3 +110,20 @@ def test_won_format():
     assert facts.won(280000) == "2.8억원"
     assert facts.won(8400) == "840만원"
     assert facts.won(5) == "5천원"
+
+
+VOUCHERS = [{"연도": "2025", "전표텍스트": "발전설비동 옥상방수 공사 1차 기성", "금액천원": 12000.0, "붙은사업": "건물 도장"},
+            {"연도": "2025", "전표텍스트": "발전설비동 옥상방수 공사 준공", "금액천원": 8000.0, "붙은사업": "건물 도장"},
+            {"연도": "2025", "전표텍스트": "사무동 도색", "금액천원": 3000.0, "붙은사업": "건물 도장"}]
+
+
+def test_work_name_not_in_plan_is_found_in_vouchers():
+    data = dict(DATA, vouchers=lambda years, dept: VOUCHERS if dept == "파주지사" else [])
+    e = ce.RuleEngine(facts_provider=lambda: data)
+    a = e.answer("파주지사 옥상방수공사에 얼마 들었어", {"view": "home", "year": "2025"})["answer"]
+    assert a["intent"] == "fact.cost" and "2장" in a["text"] and "2,000만원" in a["text"]
+    assert "«건물 도장»" in a["text"] and "전표" in a["source"]
+
+
+def test_work_tail_is_dropped():
+    assert facts.keywords("용인지사 옥상방수공사에 얼마 들었어", "용인지사") == ["옥상방수"]

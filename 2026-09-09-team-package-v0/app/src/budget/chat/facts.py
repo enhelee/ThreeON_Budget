@@ -33,6 +33,7 @@ PARTICLES = ("에서는", "에서", "에는", "으로", "할때", "했을때", "
 COST_CUES = ("얼마", "비용", "들었", "들어갔", "썼", "쓴돈", "쓰인", "금액", "집행액", "실적이", "돈")
 HISTORY_CUES = ("한적", "했었", "했던", "몇년도", "몇년에", "이력", "언제했", "있었어", "했나", "무슨공사", "어떤공사", "무슨사업", "어떤사업")
 ASK_STEMS = COST_CUES + HISTORY_CUES + ("몇년", "한적", "언제", "알려", "있어", "있었")
+WORK_TAILS = ("공사", "사업", "작업", "비용")
 TABLE_ROWS = 8
 
 
@@ -81,6 +82,10 @@ def keywords(q, dept=None):
                 if len(w) > len(p) + 1 and w.endswith(p):
                     w = w[: -len(p)]
                     break
+        for tail in WORK_TAILS:                          # «옥상방수공사» → «옥상방수»(사업명은 «옥상 방수 보수»일 수 있다)
+            if len(w) > len(tail) + 1 and w.endswith(tail):
+                w = w[: -len(tail)]
+                break
         if (not w or w in STOP or w in PARTICLES or w.isdigit()
                 or w.startswith(ASK_STEMS)):                 # «얼마야»·«한적있어»·«몇년도에»
             continue
@@ -146,6 +151,11 @@ def answer(q, n, data, base_year=None):
     rows = search(data["lines"], years, dept, words)
     scope = " · ".join(x for x in (dept or "전체 지사", "·".join(years) + "년" if years else "모든 연도") if x)
     looked = f"{scope} · «{' '.join(words)}» 들어간 사업으로 봤어요"
+    if not rows and data.get("vouchers"):
+        # 계획 사업명에 없는 공사(계획 외로 해서 다른 사업에 붙은 것 등) — 전표 내용까지 찾는다
+        found = _vouchers(data["vouchers"](years, dept), words, years, dept, scope)
+        if found:
+            return found
     if not rows:
         # 낱말을 하나씩 따로 찾으면 몇 건인지 — 어떤 낱말을 빼고 다시 물으면 될지 알려 준다
         alone = [f"«{w}» {len(search(data['lines'], years, dept, [w]))}건" for w in words] if len(words) > 1 else []
@@ -238,3 +248,28 @@ def _overview(lines, years, dept):
     return {"text": f"{dept}은(는) {', '.join(y + '년' for y in yrs)}에 실적이 있는 사업이 모두 {len(rows)}건이에요. "
                     f"공사 이름을 넣어 물어보면(예: «{dept} 정기점검 언제 했어?») 그 공사만 연도별로 보여 드려요.",
             "ctx": f"{dept} · 연도별로 봤어요", "table": table, "found": len(rows)}
+
+
+def _vouchers(vs, words, years, dept, scope):
+    """전표 내용(적요)에 낱말이 모두 든 전표 — 합계와 «어느 사업 실적에 들어갔는지»."""
+    hit = [v for v in vs or [] if all(_hit(_norm(v["전표텍스트"]), w) for w in words)]
+    if not hit:
+        return None
+    total = sum(v["금액천원"] or 0 for v in hit)
+    yrs = sorted({v["연도"] for v in hit})
+    into = {}
+    for v in hit:
+        into[v["붙은사업"]] = into.get(v["붙은사업"], 0) + (v["금액천원"] or 0)
+    where = sorted(into.items(), key=lambda kv: -abs(kv[1]))
+    who = dept or "전체 지사"
+    yr = f"{yrs[0]}년" if len(yrs) == 1 else f"{yrs[0]}~{yrs[-1]}년"
+    text = (f"«{' '.join(words)}»라는 이름의 계획 사업은 없지만, {who} {yr} 전표 내용에 들어간 게 {len(hit)}장, "
+            f"모두 {won(total)}이에요. 실적은 {', '.join(f'«{k}»' for k, _ in where[:2])}"
+            f"{' 등' if len(where) > 2 else ''}에 들어가 있어요.")
+    hit.sort(key=lambda v: (v["연도"], abs(v["금액천원"] or 0)), reverse=True)
+    head = ["연도", "전표 내용", "금액(천원)", "들어간 사업"]
+    table = [head] + [[v["연도"], v["전표텍스트"], f"{v['금액천원'] or 0:,.0f}", v["붙은사업"]] for v in hit[:TABLE_ROWS]]
+    if len(hit) > TABLE_ROWS:
+        text += f" 표는 최근·큰 순 {TABLE_ROWS}장만 보여 줘요."
+    return {"text": text, "ctx": f"{scope} · 전표 내용에서 «{' '.join(words)}»로 찾았어요", "table": table,
+            "found": len(hit), "basis": "전표"}

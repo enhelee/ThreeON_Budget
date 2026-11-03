@@ -270,8 +270,9 @@ class RuleEngine(ChatEngine):
         yrs = sorted({r[0] for r in (got["table"] or [])[1:]})
         card = _card("mt", got["text"], "fact.history" if history else "fact.cost", got["found"],
                      [("실적 분석으로 →", "#/branches")], ctx=got["ctx"], table=got["table"],
-                     source=(f"근거: {'·'.join(yrs)}년 최신 분석 결과의 사업별 실적(손익·자본) — 금액 단위 천원"
-                             if yrs else ""), mood="default" if got["found"] else "wow")
+                     source=(f"근거: {'·'.join(yrs)}년 최신 분석 결과의 "
+                             f"{'전표(적요)와 그 전표가 붙은 사업' if got.get('basis') == '전표' else '사업별 실적(손익·자본)'}"
+                             " — 금액 단위 천원" if yrs else ""), mood="default" if got["found"] else "wow")
         return card
 
     def _fallback(self, n, view):
