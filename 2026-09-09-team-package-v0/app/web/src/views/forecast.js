@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { charSay } from "../components/characters.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
@@ -73,12 +74,23 @@ function exportNote() {
 /** 접기 단추 — 오른쪽 위. 접으면 제목 한 줄만 남는다(2026-10-28 사용자 요청: 아래로 긴 내용은 한 줄로). */
 const foldBtn = (attr, open, what) => `<button class="btn-secondary min-h-[32px] shrink-0 px-3 text-xs" ${attr} aria-expanded="${open}" title="${open ? `${what} 한 줄로 접기` : `${what} 펼치기`}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`
 
+/** 제목 옆 ⓘ — 누르면 바로 아래에 설명 상자(2026-11-03 grace: 마우스를 올려 기다려야 보이던 것을 누르면 보이게).
+ *  items: 문자열이면 « · » 로 나눠 한 줄씩(• 글머리), [이름, 설명] 배열이면 이름 칸 | 설명 칸 두 열로 맞춘다.
+ *  열고 닫기는 main.js data-info. */
+export function infoTip(items, label = "설명 보기") {
+  const rows = typeof items === "string"
+    ? items.replace(/<[^>]+>/g, "").split(/\s+·\s+/).filter(Boolean).map(t => `<span class="info-pop__dot" aria-hidden="true">•</span><span>${esc(t)}</span>`)
+    : items.map(([k, v]) => `<b>${esc(k)}</b><span>${String(v).split(/\s+·\s+/).map(esc).join("<br>")}</span>`)
+  const cls = typeof items === "string" ? "info-pop__list" : "info-pop__list info-pop__list--kv"
+  return `<span class="info"><button type="button" class="info-btn" data-info aria-expanded="false" aria-label="${esc(label)}">i</button><span class="info-pop" role="dialog" hidden><button type="button" class="info-pop__x" data-info-close aria-label="닫기">✕</button><span class="${cls}">${rows.join("")}</span></span></span>`
+}
+
 function panel(title, help, body, key) {
   const dirty = key && state.fc.dirty.has(key)
   const open = !(state.fc.closedPanels || new Set()).has(title)
   return `<article class="panel overflow-hidden">
     <div class="flex items-start justify-between gap-3 ${open ? "border-b border-line p-5 sm:p-6" : "px-5 py-3 sm:px-6"}">
-      <div class="min-w-0"><h3 class="section-title">${esc(title)}${help ? ` <span class="cursor-help align-middle text-sm font-normal text-tri" title="${esc(String(help).replace(/<[^>]+>/g, ""))}" aria-label="설명">ⓘ</span>` : ""} ${dirty ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h3></div>
+      <div class="min-w-0"><h3 class="section-title">${esc(title)}${help ? ` ${infoTip(String(help), `${title} 설명 보기`)}` : ""} ${dirty ? '<span class="badge bg-warn-bg text-warn">저장 안 됨</span>' : ""}</h3></div>
       ${foldBtn(`data-fcpanel="${esc(title)}"`, open, "이 표")}
     </div>${open ? body : ""}</article>`
 }
@@ -107,7 +119,7 @@ export function header({stage = "STAGE 6", title = "중장기 전망", tabs = tr
         body: `마감된 ${esc(locked)}년 실적으로 표준금액을 만들고, ${esc(fc.baseYear)}년 기준으로 10개년을 전망해요.`})
     : charSay({who: "yc", tone: "warn", title: "아직 마감된 연도가 없어요.",
         body: "2단계에서 분석을 실행하고 설정에서 그 연도를 마감하면, 그 숫자로 전망을 시작해요."})}
-  ${tabs ? `<div class="flex flex-wrap gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}</div>` : ""}`
+  ${tabs ? `<div class="fc-tabs flex flex-wrap items-center gap-2">${TABS.map(([k, l]) => `<button class="${fc.tab === k ?"btn-primary" : "btn-secondary"}" data-fctab="${k}">${esc(l)}</button>`).join("")}<span class="ml-auto">${tourButton("forecast")}</span></div>` : ""}`
 }
 
 // ── 기준정보(가정) 탭 ────────────────────────────────────────
@@ -178,8 +190,15 @@ function gradePlanTable() {
     group = ln.group
     const first = ln.label !== label
     label = ln.label
-    const name = `${first ? `<b class="text-ink">${esc(ln.label)}</b>` : '<span class="text-tri">〃</span>'}${ln.unit ? ` <span class="text-xs text-sub">${esc(ln.unit)}</span>` : ""}`
-    return `${sep}<tr><td class="fc-stick table-cell bg-white">${name}</td>${gp.years.map(y => {
+    // 지사 이름 칸 | 설비 칸 두 열로 맞추고, 같은 지사 둘째 줄부터는 이름을 비우고 줄 구분선도 없앤다(2026-11-03 grace —
+    // 엑셀의 «삼  송»처럼 글자 사이 빈칸과 반복 표시가 어수선했다). 둘째 줄 이름은 자리만 남기고 숨긴다.
+    // «청 주(신규CHP)»처럼 괄호가 이름에 붙어 오면 설비 칸으로 옮기고, 설비 칸 바깥 괄호는 뗀다(대구 «신규CHP»와 같은 모양)
+    let site = String(ln.label || "").replace(/\s+/g, ""), unit = String(ln.unit || "").trim()
+    const paren = !unit && site.match(/^(.+?)\((.+)\)$/)
+    if (paren) [, site, unit] = paren
+    unit = unit.replace(/^\((.*)\)$/, "$1")
+    const name = `<span class="gp-name"><b class="${first ? "" : "gp-rep"}">${esc(site)}</b><span>${esc(unit)}</span></span>`
+    return `${sep}<tr class="${first ? "" : "gp-cont"}"><td class="fc-stick table-cell bg-white">${name}</td>${gp.years.map(y => {
       const v = ln.values[String(y)] || ""
       // 화면은 색 없이(2026-10-28 사용자 결정) — 색은 엑셀 내보내기에서만(바뀐 칸은 등급 색)
       return `<td class="px-1 py-1"><input class="control fc-grade text-center" data-fc="gp-cell" data-idx="${i}" data-year="${y}" value="${esc(v)}"></td>`
@@ -471,7 +490,7 @@ function manageBody() {
   if (!d) return emptyState("전망 가정을 불러오지 못했습니다.")
   const acct = accountsAll()
   const mt = state.fc.manageTab || "grades"
-  const tabs = `<div class="flex flex-wrap gap-2" role="tablist" aria-label="기준정보 묶음">${MANAGE_TABS.map(([k, l, keys]) => {
+  const tabs = `<div class="fc-mtabs flex flex-wrap gap-2" role="tablist" aria-label="기준정보 묶음">${MANAGE_TABS.map(([k, l, keys]) => {
     const dirty = keys.some(x => state.fc.dirty.has(x))
     return `<button class="${mt === k ? "btn-primary" : "btn-secondary"} min-h-[36px] px-4 text-xs" role="tab" aria-selected="${mt === k}" data-fcmtab="${k}">${esc(l)}${dirty ? ' <span class="h-1.5 w-1.5 rounded-full bg-warn" title="저장 안 됨"></span>' : ""}</button>`
   }).join("")}</div>`
@@ -624,7 +643,13 @@ function benchStd() {
   return `
   <article class="panel overflow-hidden">
     <div class="border-b border-line p-5 sm:p-6">
-      <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급) <span class="cursor-help align-middle text-sm font-normal text-tri" title="${esc(`${info.replace(/<[^>]+>/g, "")} · 학습 기간 ${b.window ? `최근 ${b.window}개년` : "전체"}(규칙 없는 칸) · 재무팀(참고 엑셀) 대비 ±30% 밖은 노랑 · 산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정» · 방식출처·추천사유는 예측이에게 «○○지사 ○○ 표준금액 근거»로 물어보세요`)}" aria-label="설명">ⓘ</span></h3>
+      <h3 class="section-title">표준금액 (지사 × 예산과목 × 정비등급) ${infoTip([
+        ["산출 방식", info.replace(/<[^>]+>/g, "")],
+        ["학습 기간", `${b.window ? `최근 ${b.window}개년` : "전체"} (산정 규칙이 없는 칸)`],
+        ["노란 칸", "재무팀 참고 엑셀과 ±30% 넘게 다른 칸"],
+        ["표시", "산출방식을 바꾸면 «사용자지정», 금액을 고치면 «수동수정»"],
+        ["근거 묻기", "예측이에게 «○○지사 ○○ 표준금액 근거»로 물어보세요"],
+      ], "표준금액 설명 보기")}</h3>
       ${b.years_used.length ? "" : `<p class="section-help">${info}</p>`}${b.has_ltsa ? "" : '<p class="section-help">ℹ️ 정기비용 유형이 없어 기계장치에서 LTSA·CRI·고온부품을 분리하지 못하고 총액을 씁니다.</p>'}
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <label class="block"><span class="field-label">지사그룹</span>

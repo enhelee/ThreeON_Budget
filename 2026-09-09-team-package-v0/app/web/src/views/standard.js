@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
@@ -81,7 +82,9 @@ function cellHtml(site, grade, c, max) {
 }
 
 /** 지사 이름 옆 작은 딱지(수원 «2029년 준공 후 중대형CHP 편입 예정») — /api/forecast/benchmark site_notes */
-export const siteTag = (site, notes) => notes?.[site] ? `<span class="std-tag" title="${esc(notes[site])}">${esc(notes[site])}</span>` : ""
+//  딱지에는 짧게(«2029 편입 예정»), 마우스를 올리면 전체 문장(2026-11-03 grace: 행이 길어져서).
+const shortNote = t => { const m = String(t).match(/(\d{4})년.*?(편입 예정)/); return m ? `${m[1]} ${m[2]}` : t }
+export const siteTag = (site, notes) => notes?.[site] ? `<span class="std-tag" title="${esc(notes[site])}">${esc(shortNote(notes[site]))}</span>` : ""
 
 function table(m, siteGroups, notes) {
   let lastGroup = null
@@ -113,13 +116,12 @@ function stdBody() {
   const basis = `마감 연도 ${closed.join("·") || "없음"}${ref.length ? ` · 참고 실적 ${ref[0]}${ref.length > 1 ? `~${ref[ref.length - 1]}` : ""}` : ""}`
   const same = Object.entries(SAME_GRADES).map(([k, list]) => `${list.join("·")} 는 같은 등급(${k})`).join(" · ")
   const restate = restateNote(b)
-  const fit = !!state.stdFit
   return `
-  <article class="panel overflow-hidden${fit ? " std-fit" : ""}" id="stdPanel">
+  <article class="panel overflow-hidden" id="stdPanel">
     <div class="border-b border-line p-5 sm:p-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h3 class="section-title">지사 × 정비등급 표준금액 · 손익 · 자본 · 총액</h3>
-        <button type="button" class="btn-secondary std-fit-btn" data-action="std-fit" aria-pressed="${fit}">${fit ? "원래 크기로" : "전체보기"}</button>
+        <div class="flex items-center gap-2">${tourButton("standard")}<button type="button" class="btn-secondary" data-action="std-full" title="새 창에서 표만 크게 봐요">전체보기 ↗</button></div>
       </div>
       <details class="std-about">
         <summary>이 표 읽는 법 · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종</summary>
@@ -143,4 +145,24 @@ export function renderStandard() {
     ${header({stage: "STAGE 5", title: "표준화 — 정비등급별 표준금액", tabs: false})}
     ${stdBody()}
   </div>`
+}
+
+/** [전체보기] — 표만 새 창에 크게(2026-11-03 grace: 이 화면 안이 아니라 다른 창으로).
+ *  지금 화면의 스타일시트를 그대로 가져가 같은 모양으로 그린다. 새 창은 보기 전용(칸 눌러 5-1 이동은 이 창에서). */
+export function openStandardWindow() {
+  const panel = document.getElementById("stdPanel")
+  if (!panel) return
+  const w = window.open("", "ondo-standard", `width=${screen.availWidth},height=${screen.availHeight},left=0,top=0`)
+  if (!w) return false
+  const css = [...document.querySelectorAll('link[rel="stylesheet"], style')].map(n => n.outerHTML).join("")
+  const body = panel.cloneNode(true)
+  body.querySelector('[data-action="std-full"]')?.parentElement?.remove()
+  body.querySelector(".std-about")?.setAttribute("open", "")
+  body.querySelectorAll("button[data-stdcell]").forEach(b => { b.disabled = true; b.removeAttribute("data-stdcell") })
+  w.document.open()
+  w.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><base href="${location.origin}/"><title>표준화 전체보기 · ONDO</title>${css}</head>
+    <body class="std-full-page"><main class="std-full">${body.outerHTML}</main></body></html>`)
+  w.document.close()
+  w.focus()
+  return true
 }

@@ -2,7 +2,7 @@ import { homeRateBadge } from "../components/badges.js"
 import { CHAR_IMG } from "../components/char_images.js"
 import { NAMES } from "../components/characters.js"
 import { openLockItems } from "../components/lockbanner.js"
-import { STAGES } from "../components/sidebar.js"
+import { MENU, STAGES } from "../components/sidebar.js"
 import { emptyState } from "../components/widgets.js"
 import { state } from "../state.js"
 import { fvModel } from "./forecast_viz.js"
@@ -50,10 +50,12 @@ function unmappedTotals() {
 // 숫자는 넣지 않는다 — 현황은 아래 카드의 몫. 캐릭터 그림은 챗봇과 같은 한 벌(components/char_images.js).
 // 아래 알약은 업무 흐름 4단계 — 누르면 그 화면으로 간다(STAGE 카드와 같은 STAGES 에서 뽑는다).
 
-const HERO_STEPS = ["budget", "collect", "branches", "standard", "forecast"]
+// 알약 = 사이드바 번호 메뉴 1~6 그대로(이름이 메뉴와 어긋나지 않게, 2026-11-03 grace).
+// 사이는 › 로 순서를 보인다(캐릭터 색 동그라미는 해 봤다가 뺐다).
+const heroSteps = () => MENU.filter(m => m.view && /^\d$/.test(m.tag))
 
 function headerStrip() {
-  const steps = STAGES.filter(s => HERO_STEPS.includes(s.view))
+  const steps = heroSteps()
   return `
   <section class="home-hero">
     <div class="home-hero__text">
@@ -62,7 +64,7 @@ function headerStrip() {
       <p class="home-hero__desc">예산 계획과 ERP 전표를 자동으로 맞춰 보고, 차이를 살피고, 정비등급별 표준금액으로 10년 뒤를 예보합니다.</p>
       <div class="home-hero__gauge" aria-hidden="true"><i></i><span><em>계획</em><em>집행</em><em>과열</em></span></div>
       <p class="home-hero__date">오늘 <time datetime="${today()}">${todayLong()}</time></p>
-      <div class="home-hero__steps">${steps.map(s => `<button type="button" data-view="${s.view}"><b>${esc(s.no)}</b>${esc(s.title)}</button>`).join("")}</div>
+      <div class="home-hero__steps" aria-label="업무 순서">${steps.map(s => `<button type="button" data-view="${s.view}" class="home-step"><b>${esc(s.tag)}</b>${esc(s.label)}</button>`).join(`<span class="home-step__arrow" aria-hidden="true">›</span>`)}</div>
     </div>
     <div class="home-hero__cast">
       ${["mt", "gt", "yc"].map(id => `<img class="home-hero__char home-hero__char--${id}" src="${CHAR_IMG[id].full}" alt="${NAMES[id]}" width="160" height="160">`).join("")}

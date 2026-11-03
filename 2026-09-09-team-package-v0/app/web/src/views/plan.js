@@ -1,3 +1,4 @@
+import { tourButton } from "../components/tour.js"
 import { lockedSay } from "../components/characters.js"
 import { fileList, nextStep, slimDrop, stepGuide } from "../components/stage.js"
 import { state } from "../state.js"
@@ -12,7 +13,7 @@ export function renderBudget() {
   return `
     <div class="space-y-5">
       <section class="flex flex-wrap items-end justify-between gap-3"><div><p class="text-sm font-semibold text-ink">STAGE 1</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">예산 계획 등록</h2></div>
-        <button type="button" class="btn-secondary" data-action="tour" data-tour="budget">사용법 보기</button></section>
+        ${tourButton("budget")}</section>
       ${locked ? lockedSay("업로드가 차단됩니다.") : ""}
       ${stepGuide(["계획 엑셀 올리기", "올라간 파일 확인", "다음 단계로"], ds.length ? 3 : 1, "예산 계획 단계")}
       <section class="grid gap-5 xl:grid-cols-[1fr_.85fr]">

@@ -3,6 +3,7 @@ import "./styles/app.css"
 import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
+import { openStandardWindow } from "./views/standard.js"
 import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand, setSubOpen } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
@@ -14,7 +15,7 @@ import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, PICK_SORTS, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 import { rqChange, rqClick, rqKey } from "./review_actions.js"
-import { startTour } from "./components/tour.js"
+import { startTour, markTourClicked } from "./components/tour.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -203,15 +204,8 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-training") { state.trainingName = e.target.closest("[data-action]").dataset.name; $("#trainingFile").click(); return; }
   if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
-  if (act === "std-fit") {   // 5 표준화 표 — 옆으로 밀지 않고 한 화면에(전체보기)
-    state.stdFit = !state.stdFit
-    const btn = e.target.closest("[data-action]")
-    $("#stdPanel")?.classList.toggle("std-fit", state.stdFit)
-    btn.textContent = state.stdFit ? "원래 크기로" : "전체보기"
-    btn.setAttribute("aria-pressed", String(state.stdFit))
-    return;
-  }
-  if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
+  if (act === "std-full") { if (openStandardWindow() === false) toast("새 창이 막혔어요 — 브라우저 주소창의 팝업 허용을 눌러 주세요."); return; }   // 5 표준화 표를 새 창에 크게
+  if (act === "tour") { const b = e.target.closest("[data-action]"); markTourClicked(b); startTour(b.dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
   if (act === "pick-erp-invest") $("#erpInvestFile").click();
@@ -848,6 +842,31 @@ setSidebarOpen(sbStore.get() === "open");
     if (!pinned() && e.target.closest("[data-view]")) later(true, 0);   // 접힌 띠에서 메뉴를 고르면 바로 접는다
   });
 }
+
+// 제목 옆 ⓘ 설명 상자(views/forecast.js infoTip) — 누르면 열고, ✕·바깥·Esc 로 닫는다. 한 번에 하나만.
+function closeInfo() {
+  document.querySelectorAll(".info-pop:not([hidden])").forEach(p => { p.hidden = true; p.previousElementSibling?.setAttribute("aria-expanded", "false") })
+}
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-info]")
+  if (btn) {
+    const pop = btn.nextElementSibling, open = pop.hidden
+    closeInfo()
+    if (open) {
+      // 화면 기준으로 띄운다 — 접힌 상자(overflow-hidden) 안에서도 잘리지 않게
+      pop.hidden = false; btn.setAttribute("aria-expanded", "true")
+      const r = btn.getBoundingClientRect(), w = pop.offsetWidth
+      const below = r.bottom + 10 + pop.offsetHeight < innerHeight
+      Object.assign(pop.style, {position: "fixed", left: `${Math.max(12, Math.min(r.left - 10, innerWidth - w - 12))}px`,
+        top: below ? `${r.bottom + 10}px` : `${Math.max(12, r.top - 10 - pop.offsetHeight)}px`})
+      pop.classList.toggle("is-above", !below)
+    }
+    return
+  }
+  if (e.target.closest("[data-info-close]") || !e.target.closest(".info-pop")) closeInfo()
+}, true)
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeInfo() })
+window.addEventListener("scroll", closeInfo, true)
 
 // 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
 window.addEventListener("hashchange", onHashChange);
