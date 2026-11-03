@@ -580,7 +580,7 @@ img.char-img{object-fit:contain;display:inline-block}
 .loader-text{font-size:14px;font-weight:600;color:var(--navy);line-height:1.45}
 @media (prefers-reduced-motion:reduce){.loader-merc,.loader-char{animation:none}.loader-merc{transform:none}}
 
-/* 매칭이 등장(components/fab_intro.js, 2026-11-03) — 메인에서 하루 한 번 가운데 인사 → 오른쪽 아래로 */
+/* 매칭이 등장(components/fab_intro.js, 2026-11-03) — 메인에 들어올 때마다 가운데 인사 → 오른쪽 아래로 */
 .fab-intro{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1rem;background:rgba(13,13,13,.18);animation:fab-intro-in .35s ease both}
 .fab-intro__char{background:none;border:0;padding:0;cursor:pointer;animation:fab-intro-pop .55s cubic-bezier(.3,1.5,.5,1) both}
 .fab-intro__char img{display:block;width:min(11rem,40vw);height:auto;filter:drop-shadow(0 12px 24px rgba(0,0,0,.18))}

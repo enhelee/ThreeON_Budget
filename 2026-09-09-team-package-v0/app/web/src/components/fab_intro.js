@@ -3,36 +3,32 @@ import { state } from "../state.js"
 
 // ─────────────────────────────────────────────────────────────
 // 매칭이 등장 — 처음 보는 사람이 오른쪽 아래 «물어보기»를 못 보고 지나치지 않게(2026-11-03 grace).
-// 메인 화면에서 하루 한 번: 화면 가운데에 크게 나와 인사 → 오른쪽 아래 자리로 날아가 앉는다.
-// 기억은 이 브라우저의 localStorage «ondo.fabIntro»(날짜) — 막힌 브라우저면 그냥 매번 보인다.
+// 메인 화면에 들어올 때마다(11/3 grace: 하루 한 번 → 매번): 가운데에 크게 나와 인사 → 오른쪽 아래로 날아가 앉는다.
+// 메인 안에서 다시 그릴 때(자료 받은 뒤 등)는 다시 나오지 않는다 — 다른 화면에서 메인으로 «들어올» 때만.
 // 누르면 바로 대화가 열리고, Esc·바깥을 누르면 바로 자리로 간다.
 // ─────────────────────────────────────────────────────────────
 
-const KEY = "ondo.fabIntro"
 const HOLD_MS = 2600, FLY_MS = 750, START_DELAY_MS = 900   // 입구(gate) 퇴장 650ms 뒤에 시작
 
-let started = false
+let started = false, lastView = ""
 
-const today = () => new Date().toLocaleDateString("sv-SE")   // YYYY-MM-DD(그 사람 시간대)
-const seenToday = () => { try { return localStorage.getItem(KEY) === today() } catch { return false } }
-const markSeen = () => { try { localStorage.setItem(KEY, today()) } catch { /* 저장 못 해도 화면은 동작 */ } }
-
-/** 메인 화면을 그린 뒤 부른다. 오늘 이미 봤거나, 입구 화면이 떠 있으면 아무것도 안 한다. */
+/** 화면을 그릴 때마다 부른다. 메인으로 막 들어왔을 때만 등장한다(입구 화면이 떠 있으면 들어온 뒤에). */
 export function maybeFabIntro(openChat) {
-  if (started || state.view !== "home" || seenToday()) return
+  const entered = state.view === "home" && lastView !== "home"
   if (document.getElementById("appShell")?.hidden) return     // 입구 뒤 — 들어온 뒤 다시 불린다
+  lastView = state.view
+  if (!entered || started) return
   started = true
   const busyOn = () => !document.getElementById("busy")?.classList.contains("hidden")   // «화면을 불러오는 중…»
   const go = () => {
     if (state.view !== "home" || document.getElementById("appShell")?.hidden) { started = false; return }
     if (busyOn()) { setTimeout(go, 300); return }        // 불러오기 창 위에 겹치지 않게 끝날 때까지
-    markSeen()
-    play(openChat)
+    play(openChat, () => { started = false })
   }
   setTimeout(go, START_DELAY_MS)
 }
 
-function play(openChat) {
+function play(openChat, onDone) {
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches
   const box = document.createElement("div")
   box.className = "fab-intro"
@@ -56,7 +52,11 @@ function play(openChat) {
     if (open) { land(); openChat?.(); return }
     fly()
   }
+  let landed = false
   const land = () => {
+    if (landed) return
+    landed = true
+    onDone()
     box.remove()
     document.body.classList.remove("fab-intro-on")
     const btn = document.querySelector(".help-fab__btn")
@@ -77,6 +77,8 @@ function play(openChat) {
     img.animate([{transform: "none"}, {transform: `translate(${dx}px, ${dy}px) scale(${s})`}],
                 {duration: FLY_MS, easing: "cubic-bezier(.5,-0.2,.3,1.2)", fill: "forwards"})
       .finished.then(land, land)
+    // 탭이 뒤로 가 있으면 애니메이션이 멈춰 finished 가 안 올 수 있다 — 그래도 버튼이 숨은 채 남지 않게
+    setTimeout(land, FLY_MS + 400)
   }
   const onKey = e => { if (e.key === "Escape") finish() }
 
