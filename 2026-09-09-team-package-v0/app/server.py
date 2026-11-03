@@ -437,7 +437,10 @@ async def _ingest(files: list, year: str, kind: str):
                 if kind == "plan":
                     info = dbm.ingest_plan(conn, tmps, year, label=label)
                 else:
-                    info = dbm.ingest_erp(conn, tmps[0], year, label=label)
+                    info = dbm.ingest_erp(conn, tmps[0], year, label=label, kind=kind)
+                    if kind == "erp_invest":
+                        # 투자비 전표를 올린 해는 건설공사 3과목을 자본 실적 대상으로 — 분석에 바로 들어간다
+                        info["실적반영켬"] = config_store.enable_invest_actuals(conn, year)
                 # 원본도 DB 에 붙여 둔다 — 같은 양식 그대로 다시 받게(2026-11-03 grace). 임시 파일은 아래에서 지운다.
                 dbm.save_dataset_files(conn, info["dataset_id"], originals)
             finally:
@@ -469,6 +472,17 @@ async def upload_erp(year: str, file: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(400, f"zrfm2 파일 흡수 실패: {e}")
+
+
+@app.post("/api/upload/erp-invest")
+async def upload_erp_invest(year: str, file: UploadFile = File(...)):
+    """투자비(건설공사 3과목) 전표 — zrfm2 와 같은 양식. 분석은 zrfm2 와 합쳐 자본 실적으로 매칭한다."""
+    try:
+        return _clean_json(await _ingest([file], year, "erp_invest"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"투자비 전표 흡수 실패: {e}")
 
 
 @app.post("/api/upload/master")

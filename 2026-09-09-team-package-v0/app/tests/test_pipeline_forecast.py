@@ -273,3 +273,17 @@ def test_investment_actual_fills_forecast_investment_only_when_switch_is_on(conn
     row = invest_row()
     assert row[2027] == pytest.approx(300.0)                           # 투자계획 없는 해 = 표준금액
     assert row[2028] == pytest.approx(50.0)                            # 투자계획이 있는 해는 그 값
+
+
+def test_locked_invest_vouchers_win_over_uploaded_invest_actuals_for_same_year(conn):
+    """투자비 전표가 마감 실적(자본)에 들어온 해는 예전에 올린 투자비 실적 표를 쓰지 않는다 — 두 번 세지 않게."""
+    fs.save_settings(conn, "2026", {"실적환산": "0", "투자비표준화": "1"})
+    acct = "외주비-열원공사비"
+    _seed_run(conn, "2025", "자본", [("화성지사", acct, 500.0, "계획집행")])
+    dbm.lock_year(conn, "2025")
+    fs.save_table(conn, "2026", "investment_actual", pd.DataFrame(
+        [{"사업장": "화성지사", "연도": y, "예산과목": acct, "사업명": f"배관 {y}", "금액": 300.0, "투자유형": ""}
+         for y in (2024, 2025)]))
+    actuals, _, _ = pf.actuals_with_reference(conn, "2026")
+    got = actuals[actuals["예산과목"] == acct].groupby("연도")["금액"].sum().to_dict()
+    assert got == {2024: 300.0, 2025: 500.0}                          # 2025 = 마감 전표만, 2024 = 올린 표
