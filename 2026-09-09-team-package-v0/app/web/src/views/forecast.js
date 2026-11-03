@@ -27,7 +27,7 @@ const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등
                      ["factor", "고온부품", ["hot_parts", "hot_parts_contract", "factors"]],
                      ["capacity", "설비용량·신규표준", ["site_capacity", "capacity_rule"]],
                      ["history", "지사 연혁·구조변화", ["site_history", "site_event"]],
-                     ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan", "investment_actual", "settings"]],
+                     ["regular", "정기계약·CRI·투자", ["regular_contract", "cri_rule", "investment_plan", "settings"]],
                      ["hq", "본사 배분·임시사업", ["hq_master", "hq_ratio", "hq_temp"]], ["surprise", "지사 돌발사업", ["surprise"]],
                      ["learn", "학습 기간·물가 환산·백테스트", ["settings", "price_index"]]]
 const BENCH_VIEWS = [["std", "표준금액"], ["rules", "산정 규칙"], ["regular", "정기비용 분리"]]
@@ -358,34 +358,20 @@ function regularBody(d) {
       {f: "지급시차", label: "지급시차(년)", type: "int"}, {f: "기준단가", label: "기준단가(천원)", type: "num"},
       {f: "단가기준연도", label: "단가기준연도", type: "int"}, {f: "활성", label: "활성", type: "bool"}, {f: "비고", label: "비고"}],
       d.cri_rule, "CRI 규칙이 없습니다 — 전망에 CRI 가 잡히지 않습니다."), "cri_rule")}
-  ${panel("투자계획", "기준연도 이후 투자비는 이 값만 사용 · 기준연도는 계획본(여기 같은 해 값이 있으면 이것)",
-    longTable("investment_plan", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "연도", label: "연도", type: "int"},
-      {f: "금액", label: "금액(천원)", type: "num"}, {f: "비고", label: "비고"}], d.investment_plan,
-      String(d.settings?.투자비표준화 ?? "0") === "1" ? "투자계획이 없습니다 — 기준연도 이후 투자비는 투자비 표준금액입니다."
-        : "투자계획이 없습니다 — 기준연도 이후 투자비는 0 입니다."), "investment_plan")}
-  ${investActualPanel(d)}`
+  ${investPlanPanel(d)}`
 }
 
-/** 투자비 실적(2026-11-03) — 건설공사 3과목은 전표에 계정이 없어 «예산 실적 분석» 엑셀에서 가져온다.
- *  켜면 다른 과목처럼 표준화해 기준연도 뒤 투자비를 채운다(투자계획에 값이 있는 해는 그 값). */
-function investActualPanel(d) {
+/** 투자계획 + «투자비 표준화» 스위치(2026-11-03). 투자비 실적은 앞으로 예산 계획/실적 업로드 화면에서 올린다 —
+ *  이 화면의 투자비 실적 가져오기 메뉴는 뺐고, 이미 올린 실적(investment_actual)은 그대로 쓴다. */
+function investPlanPanel(d) {
   const on = String(d.settings?.투자비표준화 ?? "0") === "1"
-  const rows = d.investment_actual || []
-  const byYear = {}
-  rows.forEach(r => { const y = r.연도; byYear[y] = byYear[y] || {n: 0, sum: 0}; byYear[y].n += 1; byYear[y].sum += Number(r.금액 || 0) })
-  const years = Object.keys(byYear).sort()
-  const summary = years.length ? years.map(y => `${esc(y)}년 ${byYear[y].n}건 · ${fmt(byYear[y].sum)}천원`).join(" / ")
-    : '<span class="text-warn">투자비 실적이 아직 없습니다 — «(25년) 자본예산 실적 분석» 엑셀을 해마다 가져오세요.</span>'
-  return panel("투자비 실적 (건설공사 3과목)", "외주비-열원공사비·재료비-열원자재비·외주비-열원기술용역비 · 전표(zrfm2)에 계정이 없어 실적 분석 엑셀에서 가져옴 · 켜면 다른 과목처럼 표준화(학습 기간·물가 환산 같음) · LTSA·CRI·고온부품재생 사업은 계획표로 따로 잡혀 제외 · 투자계획에 값이 있는 해는 그 값", `
+  return panel("투자계획", "기준연도 이후 투자비는 이 값 · 기준연도는 계획본(여기 같은 해 값이 있으면 이것) · «투자비 표준화»를 켜면 값이 없는 해는 투자비(건설공사 3과목) 실적으로 낸 표준금액", `
     <div class="flex flex-wrap items-end gap-3 p-5 pb-0">
-      <label class="block"><span class="field-label">투자비 표준화</span>${sel(["0", "1"], on ? "1" : "0", 'data-fcsetting="투자비표준화"', {"0": "끔 — 기준연도 뒤 투자비 = 투자계획만", "1": "켬 — 투자비 실적으로 표준금액"})}</label>
-      <button class="btn-secondary" data-fcimport="investment-actual" title="«(25년) 자본예산 실적 분석»처럼 파일 이름에 연도가 있는 실적 분석 엑셀에서 건설공사 3과목 사업별 실적을 읽습니다">실적 분석 엑셀 가져오기</button>
+      <label class="block"><span class="field-label">투자비 표준화</span>${sel(["0", "1"], on ? "1" : "0", 'data-fcsetting="투자비표준화"', {"0": "끔 — 기준연도 뒤 투자비 = 투자계획만", "1": "켬 — 투자계획 없는 해는 투자비 표준금액"})}</label>
     </div>
-    <p class="px-5 pt-3 text-xs text-sub">${summary}</p>
-    ${longTable("investment_actual", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "연도", label: "연도", type: "int"},
-      {f: "예산과목", label: "예산과목", type: "select", options: INVEST_ACCOUNTS}, {f: "사업명", label: "사업명"},
-      {f: "금액", label: "실적(천원)", type: "num"}, {f: "투자유형", label: "투자유형"}],
-      rows, "투자비 실적이 없습니다.")}`, "investment_actual")
+    ${longTable("investment_plan", [{f: "사업장", label: "지사", type: "select", options: sitesOpt(d)}, {f: "연도", label: "연도", type: "int"},
+      {f: "금액", label: "금액(천원)", type: "num"}, {f: "비고", label: "비고"}], d.investment_plan,
+      on ? "투자계획이 없습니다 — 기준연도 이후 투자비는 투자비 표준금액입니다." : "투자계획이 없습니다 — 기준연도 이후 투자비는 0 입니다.")}`, "investment_plan")
 }
 
 const pct = v => (v === null || v === undefined) ? "—" : `${(v * 100).toFixed(1)}%`
@@ -518,8 +504,7 @@ function manageBody() {
 
 const IMPORT_LABEL = {grades: "정비등급 이력(표준화 참고 엑셀)", schedule: "미래 정비등급(정비등급 양식)",
                       "hot-parts": "고온부품 계획", "hq-master": "본사 원가분배 마스터 + 배분비율",
-                      "price-index": "생산자물가지수", "investment-actual": "투자비 실적(실적 분석 엑셀)"}
-const INVEST_ACCOUNTS = ["외주비-열원공사비", "재료비-열원자재비", "외주비-열원기술용역비"]
+                      "price-index": "생산자물가지수"}
 
 function previewPanel() {
   const p = state.fc.preview
