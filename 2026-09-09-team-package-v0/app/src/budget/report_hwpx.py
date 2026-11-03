@@ -336,67 +336,164 @@ def totals(inputs):
     return {"three": three, "years": sorted(three), "cur": cur, "gsum": gsum}
 
 
+def fit(values, nd=0, total=None):
+    """단수 조정 — 칸마다 nd 자리로 사사오입하되, 보이는 값들의 합이 합계(실제 합의 사사오입, 또는 total)와
+    같도록 반올림에서 가장 많이 깎인(또는 올라간) 칸부터 한 단위씩 고친다(최대 나머지 방식).
+    이미 그 자리에 딱 맞는 값(사람이 고친 칸 등)은 나머지가 0 이라 맨 나중에야 고친다.
+    → (보이는 값들, 보이는 합계, 칸별 조정량)"""
+    vals = [v or 0 for v in values]
+    unit = 10 ** -nd
+    want = _r(sum(vals) if total is None else total, nd)
+    shown = [_r(v, nd) for v in vals]
+    adj = [0.0] * len(vals)
+    steps = int(round((want - sum(shown)) / unit))
+    if steps and vals:
+        sign = 1 if steps > 0 else -1
+        # 나머지는 소수 9자리에서 끊어 비교한다 — 0.4 와 0.39999… 같은 부동소수 찌꺼기가 동점 순서를 정하지 않게
+        order = sorted(range(len(vals)), key=lambda i: (-round((vals[i] - shown[i]) * sign, 9), -abs(vals[i])))
+        for k in range(abs(steps)):
+            i = order[k % len(vals)]
+            shown[i] = _r(shown[i] + sign * unit, nd)
+            adj[i] = _r(adj[i] + sign * unit, nd)
+    return shown, want, adj
+
+
+def A(cell, adj, real=None, nd=0, unit="억원"):
+    """조정된 칸이면 칸 정보에 표시를 단다(웹 미리보기에서 모서리 표시 — 파일에는 숫자만)."""
+    if not adj:
+        return cell
+    text, slot = cell if isinstance(cell, tuple) else (cell, {"kind": "calc"})
+    if slot is None:
+        return cell
+    slot = dict(slot)
+    slot["adj"] = f"{'+' if adj > 0 else '−'}{abs(adj):g}{unit}"
+    if real is not None:
+        slot["real"] = f"{real:,.{nd + 2}f}"
+    return (text, slot)
+
+
+def shown_perf(inputs):
+    """집행성과분석의 «보이는 숫자» — 표와 문장이 같이 쓴다.
+
+    손익·자본 합계는 실제 값의 사사오입, 그 아래 과목·지사 유형 칸은 단수 조정으로 그 합계에 맞추고,
+    손익+자본(합계 줄·지사 유형 합계)은 보이는 두 값의 합 — 어느 표에서 봐도 더한 값이 맞는다."""
+    t = totals(inputs)
+    S = {"three": {}, "items": {}, "groups": {}, "gsum": {}, "share": {}}
+    for yy, d in t["three"].items():
+        row = {}
+        for b in ("손익", "자본"):
+            if d.get(b):
+                row[b] = {k: _r(d[b][k]) for k in ("배정", "실적")}
+        if "손익" in row and "자본" in row:
+            row["합계"] = {k: row["손익"][k] + row["자본"][k] for k in ("배정", "실적")}
+        S["three"][yy] = row
+    for b in ("손익", "자본"):
+        xs = inputs["items"][b]
+        cols = {k: fit([x[k] for x in xs], 1) for k in ("배정", "실적")}
+        S["items"][b] = {"rows": [{k: (cols[k][0][i], cols[k][2][i], xs[i][k] or 0) for k in cols} for i in range(len(xs))],
+                         "total": {k: cols[k][1] for k in cols}}
+        g = inputs["groups"][b]
+        gc = {k: fit([g[x][k] for x in GROUPS]) for k in ("배정", "실적")}
+        S["groups"][b] = {"cols": {x: {k: (gc[k][0][i], gc[k][2][i], g[x][k]) for k in gc} for i, x in enumerate(GROUPS)},
+                          "total": {k: gc[k][1] for k in gc}}
+    S["gsum"] = {"cols": {x: {k: S["groups"]["손익"]["cols"][x][k][0] + S["groups"]["자본"]["cols"][x][k][0]
+                              for k in ("배정", "실적")} for x in GROUPS}}
+    S["gsum"]["total"] = {k: sum(S["gsum"]["cols"][x][k] for x in GROUPS) for k in ("배정", "실적")}
+    real = {"손익": {x: inputs["groups"]["손익"][x]["실적"] for x in GROUPS},
+            "자본": {x: inputs["groups"]["자본"][x]["실적"] for x in GROUPS}}
+    real["합계"] = {x: real["손익"][x] + real["자본"][x] for x in GROUPS}
+    for key, src in real.items():
+        tot = sum(src.values())
+        if tot:
+            pct = [src[x] / tot * 100 for x in GROUPS]
+            sh, _, ad = fit(pct, 0, 100)
+            S["share"][key] = {x: (sh[i], ad[i], pct[i]) for i, x in enumerate(GROUPS)}
+        else:
+            S["share"][key] = {x: (0, 0, 0) for x in GROUPS}
+    return S
+
+
 def E(text, path, kind="num"):
     """고칠 수 있는 칸 — (글자, 칸 정보). 그냥 글자는 계산 칸(화면에서 못 고침)."""
     return (text, {"path": path, "kind": kind})
 
 
 def perf_cells(inputs):
-    """표 번호(양식의 바깥 표 순서, 0부터) → {(행, 열): 글자 | (글자, 칸 정보)}."""
+    """표 번호(양식의 바깥 표 순서, 0부터) → {(행, 열): 글자 | (글자, 칸 정보)}. 숫자는 shown_perf 의 보이는 값."""
     t = totals(inputs)
+    S = shown_perf(inputs)
     three, years = t["three"], t["years"]
     cells = {}
 
-    # 표2(1): 3개년 배정·실적·실적률
+    # 표2(1): 3개년 배정·실적·실적률 — 손익·자본은 사사오입, 합계는 보이는 두 값의 합
     c = {}
     for k, yy in enumerate(years):
         c[(0, 1 + 2 * k)] = (f"{yy}년", None)
         for r0, key in ((2, "손익"), (4, "자본"), (6, "합계")):
             d = (three.get(yy) or {}).get(key)
+            sv = S["three"].get(yy, {}).get(key)
             for j, kk in enumerate(("배정", "실적")):
-                txt = n0(d[kk]) if d else ""
+                txt = n0(sv[kk]) if sv else ""
                 # 과년도 손익·자본만 고친다 — 올해는 과목표 합, 합계는 계산
                 c[(r0, 1 + j + 2 * k)] = E(txt, f"three.{yy}.{key}.{kk}") if key != "합계" and yy != inputs["year"] else txt
             rr = rate(d["배정"], d["실적"]) if d else None
             c[(r0 + 1, 1 + 2 * k)] = f"{n0(rr)}%" if rr is not None else ""
     cells[1] = c
 
-    # 표4(3): 지사 유형별 실적·점유율
-    g = inputs["groups"]
+    # 표4(3): 지사 유형별 실적·점유율 — 칸은 단수 조정, 점유율은 합이 100%
     cnt = inputs.get("group_counts") or {}
     c = {"counts": {(0, 1 + i): (g_, cnt[g_]) for i, g_ in enumerate(GROUPS) if g_ in cnt}}
-    for r0, src in ((1, g["손익"]), (2, g["자본"]), (3, t["gsum"])):
-        tot = sum(src[g_]["실적"] for g_ in GROUPS)
+    for r0, key in ((1, "손익"), (2, "자본"), (3, "합계")):
         for i, g_ in enumerate(GROUPS):
-            a = src[g_]["실적"]
-            c[(r0, 1 + i)] = f"{n0(a)}({n0(a / tot * 100) if tot else 0}%)"
-        c[(r0, 5)] = n0(tot)
+            sh, sadj, sreal = S["share"][key][g_]
+            if key == "합계":
+                a, aadj, areal = S["gsum"]["cols"][g_]["실적"], 0, None
+            else:
+                a, aadj, areal = S["groups"][key]["cols"][g_]["실적"]
+            cell = f"{n0(a)}({n0(sh)}%)"
+            if aadj:
+                cell = A(cell, aadj, areal)
+            elif sadj:
+                cell = A(cell, sadj, sreal, unit="%p")
+            c[(r0, 1 + i)] = cell
+        c[(r0, 5)] = n0(S["gsum"]["total"]["실적"] if key == "합계" else S["groups"][key]["total"]["실적"])
     cells[3] = c
 
-    # 표5(4): 지사 유형별 배정·실적·잔액·실적률
+    # 표5(4): 지사 유형별 배정·실적·잔액·실적률 — 잔액은 보이는 배정−실적
+    g = inputs["groups"]
     c = {"counts": {(0, 2 + i): (g_, cnt[g_]) for i, g_ in enumerate(GROUPS) if g_ in cnt}}
     for r0, b in ((1, "손익"), (5, "자본")):
-        src = g[b]
-        cols = [src[g_] for g_ in GROUPS] + [{k: sum(src[g_][k] for g_ in GROUPS) for k in ("배정", "실적")}]
-        for i, d in enumerate(cols):
-            rr = rate(d["배정"], d["실적"])
+        src, sg = g[b], S["groups"][b]
+        for i in range(len(GROUPS) + 1):
             gname = GROUPS[i] if i < len(GROUPS) else None
-            c[(r0, 2 + i)] = E(n0(d["배정"]), f"groups.{b}.{gname}.배정") if gname else n0(d["배정"])
-            c[(r0 + 1, 2 + i)] = E(n0(d["실적"]), f"groups.{b}.{gname}.실적") if gname else n0(d["실적"])
-            c[(r0 + 2, 2 + i)] = tri(d["배정"] - d["실적"])
+            if gname:
+                (p, padj, preal), (a, aadj, areal) = sg["cols"][gname]["배정"], sg["cols"][gname]["실적"]
+                d = src[gname]
+                c[(r0, 2 + i)] = A(E(n0(p), f"groups.{b}.{gname}.배정"), padj, preal)
+                c[(r0 + 1, 2 + i)] = A(E(n0(a), f"groups.{b}.{gname}.실적"), aadj, areal)
+            else:
+                p, a = sg["total"]["배정"], sg["total"]["실적"]
+                d = {k: sum(src[g_][k] for g_ in GROUPS) for k in ("배정", "실적")}
+                c[(r0, 2 + i)] = n0(p)
+                c[(r0 + 1, 2 + i)] = n0(a)
+            rr = rate(d["배정"], d["실적"])
+            c[(r0 + 2, 2 + i)] = tri(p - a)
             c[(r0 + 3, 2 + i)] = n1(rr) if rr is not None else "-"
     cells[4] = c
 
-    # 표6(5)·표7(6): 과목별 — 행은 양식의 이름으로 찾는다(render 쪽). 여기서는 이름 → 네 칸.
+    # 표6(5)·표7(6): 과목별(소수 한 자리) — 행은 양식의 이름으로 찾는다(render 쪽). 여기서는 이름 → 네 칸.
     for ti, budget in ((5, "손익"), (6, "자본")):
         rows = {}
-        for i, x in enumerate(inputs["items"][budget] + [{"label": "합 계", "배정": t["cur"][budget]["배정"], "실적": t["cur"][budget]["실적"]}]):
-            p, a = x["배정"] or 0, x["실적"] or 0
-            rr = rate(p, a)
-            total = x["label"] == "합 계"
-            rows[x["label"]] = [n1(p) if total else E(n1(p), f"items.{budget}.{i}.배정"),
-                                n1(a) if total else E(n1(a), f"items.{budget}.{i}.실적"),
+        si = S["items"][budget]
+        for i, x in enumerate(inputs["items"][budget]):
+            (p, padj, preal), (a, aadj, areal) = si["rows"][i]["배정"], si["rows"][i]["실적"]
+            rr = rate(x["배정"] or 0, x["실적"] or 0)
+            rows[x["label"]] = [A(E(n1(p), f"items.{budget}.{i}.배정"), padj, preal, 1),
+                                A(E(n1(a), f"items.{budget}.{i}.실적"), aadj, areal, 1),
                                 tri(p - a, n1), n1(rr) if rr is not None else "-"]
+        p, a = si["total"]["배정"], si["total"]["실적"]
+        rr = rate(t["cur"][budget]["배정"], t["cur"][budget]["실적"])
+        rows["합 계"] = [n1(p), n1(a), tri(p - a, n1), n1(rr) if rr is not None else "-"]
         cells[ti] = {"rows": rows}
     return cells
 
@@ -404,10 +501,13 @@ def perf_cells(inputs):
 def auto_texts(inputs):
     """숫자로 쓸 수 있는 문장 초안. 원인(왜 늘었나)은 사람이 쓴다 — 칸만 깔아 둔다."""
     t = totals(inputs)
+    S = shown_perf(inputs)
     y = int(inputs["year"])
     yy, py = y % 100, (y - 1) % 100
-    cur = t["three"][str(y)]
-    prev = t["three"].get(str(y - 1)) or {}
+    # 문장의 억원은 표에 보이는 값으로 계산한다 — 표의 986 − 824 와 문장의 증감(+162)이 어긋나지 않게
+    cur = S["three"][str(y)]
+    prev = S["three"].get(str(y - 1)) or {}
+    real = t["three"][str(y)]
 
     def chg(key):
         if not prev.get(key):
@@ -422,13 +522,12 @@ def auto_texts(inputs):
         d = cur["합계"]["실적"] - prev["합계"]["실적"]
         pct = d / prev["합계"]["실적"] * 100 if prev["합계"]["실적"] else 0
         box1 += f" 총액 기준 전년대비 {n0(abs(d))}억원({sgn(pct)}%) {'증가' if d >= 0 else '감소'}"
-    tot_rate = rate(cur["합계"]["배정"], cur["합계"]["실적"])
+    tot_rate = rate(real["합계"]["배정"], real["합계"]["실적"])
     box2 = f"배정예산 대비 실적률은 {n0(tot_rate or 0)}%으로 ’22년 예산표준화 및 지속적인 Rolling으로 90% 전후 예산집행 실적률 달성 중"
 
     gs = t["gsum"]
-    gtot = sum(gs[g]["실적"] for g in GROUPS) or 1
     top = max(GROUPS, key=lambda g: gs[g]["실적"])
-    share = gs[top]["실적"] / gtot * 100
+    share = S["share"]["합계"][top][0]                     # 표4 에 보이는 점유율 그대로
     s2_bullets = []
     ps = inputs.get("prev_group_share")
     if ps:
@@ -439,19 +538,20 @@ def auto_texts(inputs):
     floor = min(90, int(math.floor(min(rates) / 10) * 10)) if rates else 90
 
     def head(budget):
-        c = cur[budget]
+        c = real[budget]
         r = rate(c["배정"], c["실적"]) or 0
-        rem = c["배정"] - c["실적"]
+        rem = cur[budget]["배정"] - cur[budget]["실적"]
         s = f"예산 집행률은 약 {n0(r)}%로 계획대비 약 {n0(abs(rem))}억원 {'미집행' if rem >= 0 else '초과 집행'} 되었으며"
-        if prev.get(budget):
-            dp = r - (rate(prev[budget]["배정"], prev[budget]["실적"]) or 0)
+        pr = (t["three"].get(str(y - 1)) or {}).get(budget)
+        if pr:
+            dp = r - (rate(pr["배정"], pr["실적"]) or 0)
             s += f", 과년도 대비 {n0(abs(dp))}%p 실적률 {'개선' if dp >= 0 else '하락'}"
         return s
 
     def bullets(budget):
         out = []
-        for x in inputs["items"][budget]:
-            d = (x["실적"] or 0) - (x["배정"] or 0)
+        for x, sx in zip(inputs["items"][budget], S["items"][budget]["rows"]):
+            d = sx["실적"][0] - sx["배정"][0]
             if abs(d) >= BULLET_MIN_EOK:
                 out.append({"label": SHORT.get(x["label"], x["label"]),
                             "body": f"배정 대비 {sgn(d)}억원 — (원인 작성)"})
