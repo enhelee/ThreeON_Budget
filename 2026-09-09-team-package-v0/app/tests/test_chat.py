@@ -56,6 +56,10 @@ def test_normalize_and_year():
     ("표준화 열어줘", "nav.goto", "#/forecast/bench"),
     ("실적 집계로 가자", "nav.goto", "#/collect"),
     ("검토 큐", "nav.goto", "#/review"),
+    # 말로 물을 때(음성 → 글자) 흔한 높임·띄어쓰기 — «가 주세요»·«보여 주세요»
+    ("검토 큐로 가 주세요", "nav.goto", "#/review"),
+    ("중장기 전망 보여 주세요", "nav.goto", "#/forecast/table"),
+    ("메인으로 가 줘", "nav.goto", "#/home"),
     ("올해 어디까지 했어?", "status.progress", None),
 ])
 def test_intents(q, intent, faq_or_hash):

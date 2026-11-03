@@ -76,9 +76,12 @@ function render() {
     <div class="chat-log" id="chatLog" aria-live="polite">${log}</div>
     ${sugg ? `<div class="chat-sugg">${sugg}</div>` : ""}
     <form class="chat-form" data-chat-form>
-      <input id="chatInput" class="control" maxlength="300" autocomplete="off" placeholder="예: 마감은 어떻게 해?" aria-label="질문" ${chat.busy ? "disabled" : ""}>
+      <input id="chatInput" class="control" maxlength="300" autocomplete="off" placeholder="${VOICE_OK ? "예: 검토 큐로 가 줘 · 🎤 로 말해도 돼요" : "예: 마감은 어떻게 해?"}" aria-label="질문" ${chat.busy ? "disabled" : ""}>
+      ${VOICE_OK ? `<button type="button" class="chat-mic${voice.on ? " chat-mic--on" : ""}" data-chat-mic
+        aria-pressed="${voice.on}" aria-label="${voice.on ? "듣기 멈추기" : "말로 묻기"}" title="말로 묻기(이 컴퓨터 안에서만 알아들어요)" ${chat.busy || voice.busy ? "disabled" : ""}>🎤</button>` : ""}
       <button class="btn-primary" type="submit" ${chat.busy ? "disabled" : ""}>보내기</button>
     </form>
+    ${voice.note ? `<p class="chat-voice-note" role="status">${esc(voice.note)}</p>` : ""}
   </aside>`
   const lg = document.getElementById("chatLog")
   if (lg) lg.scrollTop = lg.scrollHeight
@@ -105,6 +108,7 @@ export async function openChat() {
 }
 
 export function closeChat() {
+  voice.rec?.abort()
   setOpen(false)
   render()
   document.querySelector(".help-fab__btn")?.focus()
@@ -177,12 +181,81 @@ async function send(q) {
   if (card.go) goTo(card.go, "")            // «열어줘» — 버튼 없이 바로 옮긴다
 }
 
+// ── 말로 묻기(2026-11-03 grace) ─────────────────────────────
+// 브라우저 음성 인식 중 «기기 안에서만»(processLocally) 되는 것만 쓴다 — 목소리가 구글 등 바깥 서버로
+// 나가지 않게(사업명·금액을 말할 수 있으니 회사 정책상). 그게 안 되는 브라우저면 🎤 를 아예 그리지 않는다.
+// 처음 한 번은 한국어 음성 모델을 이 컴퓨터에 받는다(install). 알아들은 말은 글자로 바꿔 그대로 보낸다 —
+// «검토 큐로 가 줘»도 글자 질문과 같은 규칙 엔진이 받아 화면을 옮긴다.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+const VOICE = {langs: ["ko-KR"], processLocally: true}
+const VOICE_OK = !!SR && "processLocally" in SR.prototype && typeof SR.available === "function"
+const voice = {on: false, busy: false, rec: null, note: ""}
+
+const setNote = t => { voice.note = t; render() }
+
+async function toggleVoice() {
+  if (voice.on) { voice.rec?.stop(); return }
+  if (voice.busy || chat.busy) return
+  voice.busy = true
+  try {
+    let st = "unavailable"
+    try { st = await SR.available(VOICE) } catch { /* 모름 = 못 씀 */ }
+    if (st === "downloadable" || st === "downloading") {
+      setNote("한국어 음성 모델을 이 컴퓨터에 받는 중이에요(처음 한 번만)…")
+      let ok = false
+      try { ok = await SR.install(VOICE) } catch { /* 아래에서 안내 */ }
+      if (!ok) { setNote("음성 모델을 받지 못했어요. 글자로 물어봐 주세요."); return }
+    } else if (st !== "available") {
+      setNote("이 브라우저에서는 컴퓨터 안 음성 인식을 쓸 수 없어요. 글자로 물어봐 주세요.")
+      return
+    }
+    listen()
+  } finally { voice.busy = false; render() }
+}
+
+function listen() {
+  const rec = new SR()
+  rec.lang = "ko-KR"
+  rec.processLocally = true
+  rec.interimResults = true
+  rec.continuous = false
+  let heard = ""
+  rec.onresult = e => {
+    let interim = ""
+    heard = ""
+    for (const r of e.results) (r.isFinal ? (heard += r[0].transcript) : (interim += r[0].transcript))
+    const inp = document.getElementById("chatInput")
+    if (inp) inp.value = heard + interim                    // 듣는 대로 입력칸에 보여 준다
+  }
+  rec.onerror = e => {
+    voice.note = e.error === "not-allowed" ? "마이크를 쓰려면 허락이 필요해요(주소창 왼쪽 아이콘 → 마이크 허용)."
+      : e.error === "no-speech" ? "말소리를 못 들었어요. 🎤 를 다시 누르고 말해 주세요."
+      : e.error === "aborted" ? "" : `음성 인식이 멈췄어요(${e.error}). 글자로 물어봐 주세요.`
+  }
+  rec.onend = () => {
+    voice.on = false
+    voice.rec = null
+    const q = heard.trim()
+    if (!q) { render(); return }
+    voice.note = ""
+    const inp = document.getElementById("chatInput")
+    if (inp) inp.value = ""
+    send(q)
+  }
+  voice.on = true
+  voice.rec = rec
+  voice.note = "듣고 있어요… 말을 마치면 알아서 보내요."
+  render()
+  try { rec.start() } catch { voice.on = false; voice.rec = null; setNote("음성 인식을 시작하지 못했어요.") }
+}
+
 // 패널 안 이벤트는 여기서만 — main.js 의 큰 위임 핸들러와 섞지 않는다.
 export function initChat() {
   const host = document.getElementById("chatHost")
   if (!host) return
   host.addEventListener("click", e => {
     if (e.target.closest("[data-chat-close]")) { closeChat(); return }
+    if (e.target.closest("[data-chat-mic]")) { toggleVoice(); return }
     const q = e.target.closest("[data-chat-q]")
     if (q) { send(q.dataset.chatQ); return }
     const go = e.target.closest("[data-chat-go]")
