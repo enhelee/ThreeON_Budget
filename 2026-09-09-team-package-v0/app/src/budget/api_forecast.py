@@ -44,13 +44,15 @@ SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site
                "benchmark-rule": "benchmark_rule", "actual-tag": "actual_tag",
                "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan",
                "site-capacity": "site_capacity", "capacity-rule": "capacity_rule",
-               "hot-parts-contract": "hot_parts_contract", "price-index": "price_index"}
+               "hot-parts-contract": "hot_parts_contract", "price-index": "price_index",
+               "investment-actual": "investment_actual"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,
     "hot-parts": forecast_import.hot_parts_from_workbook,
     "hq-master": forecast_import.hq_master_from_workbook,
     "price-index": forecast_import.price_index_from_workbook,
+    "investment-actual": forecast_import.investment_actual_from_workbook,
 }
 
 
@@ -280,6 +282,10 @@ def make_router(conn_factory, clean_json) -> APIRouter:
                 if df.empty:
                     df = IMPORTERS[kind](data, sites)
                 return clean_json({"kind": kind, "rows": pf.records(df), "eq_rows": pf.records(units)})
+            if kind == "investment-actual":
+                # 실적 분석 엑셀엔 연도 칸이 없다 — 파일 이름의 «(25년)»에서 읽는다
+                df, info = forecast_import.investment_actual_from_workbook(data, sites, file.filename or "", with_info=True)
+                return clean_json({"kind": kind, "rows": pf.records(df), "info": info})
             df = IMPORTERS[kind](data, sites)
             if kind == "hot-parts":
                 # 계약방식·계약기간도 같이 — 화면이 고온부품 표 지사 칸에 그대로 보인다

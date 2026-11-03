@@ -441,7 +441,7 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                         budget_lookup: dict = None, base_year: int = BASE_YEAR,
                         years: list = None, contracts_df: pd.DataFrame = None,
                         cri_df: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                        overhaul: dict = None, switch: dict = None) -> pd.DataFrame:
+                        overhaul: dict = None, switch: dict = None, invest_std: bool = False) -> pd.DataFrame:
     """한 지사의 기준연도~+9년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
 
     표준화 대상 계정과목(SITE_TABLE_LINES의 "표준화:" 항목)의 당해년도(BASE_YEAR) 금액은
@@ -573,13 +573,25 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
     else:
         # 표준화 방향(투자비는 표준화 대상이 아님): 기준연도 = 계획본(투자계획에 그 해 값이 있으면 그것),
         # 이후 = 투자계획에 적은 값만. 반복하지 않는다.
+        # invest_std(설정 «투자비표준화», 2026-11-03): 투자계획에 값이 없는 해는 투자비 3과목 표준금액(그 해 등급) × 자본 배수.
         plan = invest_plan_df[invest_plan_df["사업장"] == site] if not invest_plan_df.empty else invest_plan_df
         by_year = plan.groupby("연도")["금액"].sum().to_dict() if not plan.empty else {}
         for year in years:
             if year in by_year:
                 invest_row[year] = float(by_year[year])
+            elif year == base_year:
+                invest_row[year] = float(site_investment)
+            elif invest_std:
+                grade = grade_by_year.get(year, latest_known_grade)
+                lookups = [sw["lookup"], std_lookup] if sw and year >= sw["start"] else [std_lookup]
+                total = 0.0
+                for account in INVESTMENT_ACCOUNTS:
+                    base = next((lk[(site, account, g)] for lk in lookups for g in (grade, "표준")
+                                 if g and (site, account, g) in lk), 0.0)
+                    total += float(base)
+                invest_row[year] = total * mult_by_scope["자본"][year]
             else:
-                invest_row[year] = float(site_investment) if year == base_year else 0.0
+                invest_row[year] = 0.0
     rows.append(invest_row)
 
     return pd.DataFrame(rows)
@@ -592,7 +604,7 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                        investment_df: pd.DataFrame, budget_df: pd.DataFrame = None,
                        base_year: int = BASE_YEAR, years: list = None, contracts_df: pd.DataFrame = None,
                        cri_rules: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                       overhaul: dict = None, switch: dict = None) -> dict:
+                       overhaul: dict = None, switch: dict = None, invest_std: bool = False) -> dict:
     """지사별 표를 한 번에 계산. 반환: {사업장: DataFrame}"""
     hq_amount = hq_amount_by_site_account(hq_master_df)
     hq_temp_alloc = allocate_hq_temp_projects(hq_temp_df, hq_ratio_df)
@@ -604,6 +616,6 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                                   hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup,
                                   base_year=base_year, years=years, contracts_df=contracts_df,
                                   cri_df=cri_df, invest_plan_df=invest_plan_df, overhaul=overhaul,
-                                  switch=switch)
+                                  switch=switch, invest_std=invest_std)
         for site in sites
     }

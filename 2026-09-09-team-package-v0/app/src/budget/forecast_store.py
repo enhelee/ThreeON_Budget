@@ -35,7 +35,8 @@ TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_fact
           # 표준화 방향 반영(2026-10-26) — 아래 SPECS 가 모양을 정한다
           "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
           "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
-          "forecast_setting", "site_capacity", "capacity_rule", "hot_parts_contract", "price_index")
+          "forecast_setting", "site_capacity", "capacity_rule", "hot_parts_contract", "price_index",
+          "investment_actual")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
@@ -371,6 +372,10 @@ SPECS = {
     # 생산자물가지수(한국은행, 총지수) — 과거 실적 기준연도 환산(설정 «실적환산»). 빈 해는 전망 물가로 채운다.
     "price_index": dict(cols=["연도", "지수", "비고"], ints=["연도"], floats=["지수"],
                         key=["연도"], need=["연도", "지수"], order="연도"),
+    # 투자비(건설공사 3과목) 실적 — «예산 실적 분석» 엑셀에서. 설정 «투자비표준화»가 켜지면 다른 과목처럼 표준화한다.
+    "investment_actual": dict(cols=["사업장", "연도", "예산과목", "사업명", "금액", "투자유형"], ints=["연도"],
+                              floats=["금액"], key=["사업장", "연도", "예산과목", "사업명"],
+                              need=["사업장", "연도", "예산과목", "사업명"], order="연도, 사업장, 예산과목, 사업명"),
 }
 
 
@@ -425,7 +430,9 @@ def save_table(conn, base_year, name, df: pd.DataFrame) -> pd.DataFrame:
 # ── 설정 (키 → 값) — 백테스트 제안(2026-10-26) ────────────────────────────────
 # 키 → 기본값(문자열). 학습기간: 백테스트 2021~2025 에서 최근 3개년이 과목 합계 오차가 가장 작다.
 #   실적환산: 과거 실적을 생산자물가지수로 기준연도 가치로 바꿔 표준화(1=켬, 0=끔) — 기본 켬(2026-11-03 팀장)
-SETTING_KEYS = {"학습기간": "3", "실적환산": "1"}
+#   투자비표준화: 투자비 실적(investment_actual)을 표준화해 기준연도 뒤 투자비를 채움(1=켬, 0=끔) — 기본 끔.
+#     끄면 종전대로 기준연도 뒤 투자비 = 투자계획에 적은 값만(2026-11-03 팀장)
+SETTING_KEYS = {"학습기간": "3", "실적환산": "1", "투자비표준화": "0"}
 
 
 def load_settings(conn, base_year) -> dict:
@@ -457,6 +464,11 @@ def learning_window(conn, base_year) -> int:
 def restate_on(conn, base_year) -> bool:
     """과거 실적을 기준연도 가치로 환산하는가(설정 «실적환산», 기본 켬)."""
     return str(load_settings(conn, base_year)["실적환산"]).strip() not in ("0", "false", "끔", "")
+
+
+def invest_std_on(conn, base_year) -> bool:
+    """투자비 실적을 표준화해 기준연도 뒤 투자비를 채우는가(설정 «투자비표준화», 기본 끔)."""
+    return str(load_settings(conn, base_year)["투자비표준화"]).strip() not in ("0", "false", "끔", "")
 
 
 def list_base_years(conn) -> list:

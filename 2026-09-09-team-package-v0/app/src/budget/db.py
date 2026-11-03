@@ -351,6 +351,11 @@ def init_db(conn):
     cur.execute("""CREATE TABLE IF NOT EXISTS price_index(
         base_year TEXT NOT NULL, 연도 INTEGER NOT NULL, 지수 REAL NOT NULL, 비고 TEXT,
         PRIMARY KEY(base_year, 연도))""")
+    # 투자비(건설공사 3과목) 실적 — 전표(zrfm2)에 계정이 없어 «예산 실적 분석» 엑셀에서 가져온다(2026-11-03).
+    cur.execute("""CREATE TABLE IF NOT EXISTS investment_actual(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL, 예산과목 TEXT NOT NULL,
+        사업명 TEXT NOT NULL, 금액 REAL NOT NULL, 투자유형 TEXT,
+        PRIMARY KEY(base_year, 사업장, 연도, 예산과목, 사업명))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS hot_parts_contract(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 계약방식 TEXT, 계약기간 TEXT, 비고 TEXT,
         PRIMARY KEY(base_year, 사업장))""")

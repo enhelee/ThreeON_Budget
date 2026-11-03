@@ -102,7 +102,7 @@ def test_learning_window_defaults_to_three_and_limits_unruled_cells(conn):
     std = {r["예산과목"]: r for r in pf.run_benchmark(conn, "2026")["rows"]}
     assert std[CHECK]["표준금액"] == pytest.approx(24.0)                  # 2023~2025 만 남아 3개 평균
     fs.save_settings(conn, "2026", {"학습기간": "10", "모르는키": "x"})
-    assert fs.load_settings(conn, "2026") == {"학습기간": "10", "실적환산": "0"}   # 모르는 키는 버린다
+    assert fs.load_settings(conn, "2026") == {"학습기간": "10", "실적환산": "0", "투자비표준화": "0"}   # 모르는 키는 버린다
     std = {r["예산과목"]: r for r in pf.run_benchmark(conn, "2026")["rows"]}
     assert std[CHECK]["표준금액"] == pytest.approx(23.0)                  # 2021~2025
 
