@@ -11,7 +11,7 @@ import openpyxl
 import pytest
 
 from budget import db as dbm, pipeline_actual
-from budget.excel_actual_writer import ACTUAL_SHEET, DATA_START
+from budget.excel_actual_writer import FORM_DATA_START
 
 PLAN_HEADER = ["주관부서명", "부서코드", "처지사", "부서부", "속성",
                "예산코드", "예산과목", "사업명", "산출내역", "연예산"]
@@ -86,8 +86,8 @@ def test_other_budget_plan_rows_are_excluded(inputs):
     assert "미분류 과목(구성에 없음)" in reasons
 
     wb = openpyxl.load_workbook(res["output_path"])
-    items = {wb[ACTUAL_SHEET].cell(r, 2).value
-             for r in range(DATA_START, wb[ACTUAL_SHEET].max_row + 1)}
+    items = {wb.worksheets[0].cell(r, 2).value
+             for r in range(FORM_DATA_START, wb.worksheets[0].max_row + 1)}
     wb.close()
     assert "기계장치" not in items          # 자본 과목이 손익 산출물에 섞이지 않음
     assert "듣도보도못한과목" not in items
@@ -120,3 +120,34 @@ def test_output_filenames_carry_year(inputs):
     # 자본 실행이면 손익 계획행이 빠지고 기계장치만 남는다
     assert res["요약"]["계획행수"] == 1
     assert res["요약"]["총 실적(천원)"] == 20000
+
+
+def test_actual_workbook_follows_team_form(inputs):
+    """실적 집계표 = 팀 양식2(손익) — 시트 이름에 대상연도, A~I 만, 4행부터, 노란 실적 칸,
+    종합표 SUMIFS 가 새 시트 이름을 가리키고, 앱 분석 열은 (참고) 시트로(2026-10-31)."""
+    from budget.excel_actual_writer import FORM_HEADER_ROW, REF_SHEET
+    plan, erp, conn, out = inputs
+    res = pipeline_actual.run_actual(plan, erp, None, conn, out, "2023", "손익")
+    wb = openpyxl.load_workbook(res["output_path"])
+    assert wb.sheetnames == ["(작성필요)23년 계획 대비 실적", "(작성불필요)종합표", REF_SHEET, "(참고)검토리포트"]
+    ws = wb.worksheets[0]
+    assert ws.max_column == 9 and ws.cell(FORM_HEADER_ROW, 9).value == "최종 실적금액(B)"
+    assert ws.cell(FORM_DATA_START, 1).value == 1
+    assert ws.cell(FORM_DATA_START, 9).fill.fgColor.rgb == "FFFFFF00"
+    f = wb.worksheets[1]["I5"].value                   # 정기점검 × 동탄지사
+    assert f.startswith("=SUMIFS('(작성필요)23년 계획 대비 실적'!$I:$I") and "'25년" not in f
+    total = sum(ws.cell(r, 9).value or 0 for r in range(FORM_DATA_START, ws.max_row + 1))
+    assert total == res["요약"]["총 실적(천원)"]
+    assert wb[REF_SHEET].cell(1, 7).value == "집행구분"
+    wb.close()
+
+
+def test_form_templates_carry_no_data():
+    """레포의 양식 파일에는 실제 자료가 없어야 한다 — 사업 행 0, 숫자 칸은 양식 «예시)» 행(3행)뿐."""
+    from budget.excel_actual_writer import form_template
+    for budget in ("손익", "자본"):
+        wb = openpyxl.load_workbook(form_template(budget))
+        nums = [(ws.title, c.coordinate) for ws in wb for row in ws.iter_rows() for c in row
+                if isinstance(c.value, (int, float)) and not (ws is wb.worksheets[0] and c.row == 3)]
+        assert nums == [] and wb.worksheets[0].max_row == 4, budget
+        wb.close()

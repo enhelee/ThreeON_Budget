@@ -26,14 +26,16 @@ import re
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
+from openpyxl.styles import PatternFill
 
 from . import benchmark, forecast_calc
-from .forecast_import import site_sheet_map
+from .forecast_import import HOT_TEMPLATE, grade_plan_layout, is_grade_plan_sheet, site_sheet_map
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEMPLATE_DIR = os.path.join(APP_DIR, "templates")
 STD_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_표준화.xlsx")
 LT_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_중장기예산.xlsx")
+GRADE_TEMPLATE = os.path.join(TEMPLATE_DIR, "builtin_template_정비등급.xlsx")   # 사용자가 정한 정비등급 양식(2026-10-28)
 
 MILLION = 1000.0          # 천원 → 백만원
 
@@ -370,8 +372,10 @@ def fill_schedule_sheet(ws, grade_hist, site_names, base_year: int = forecast_ca
                 set_cell(ws, target, col, grade)
 
 
-def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
-    """'고온부품(NN)' 시트에 현재 계획을 되돌려 쓴다. 천원 그대로."""
+def fill_hot_parts_sheet(ws, hot_parts_df, site_names, contracts=None):
+    """'고온부품(NN)' 시트에 현재 계획을 되돌려 쓴다. 천원 그대로.
+    양식에 있는 지사 줄은 저장값이 없는 해를 0 으로 — 옛 양식 숫자가 «현재값»처럼 남지 않게.
+    contracts(계약방식·계약기간)가 있으면 B·C열도."""
     header_row, year_by_col = None, {}
     for r in range(1, 8):
         found = {}
@@ -387,6 +391,8 @@ def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
         return
     short_to_full = site_sheet_map(site_names)
     lookup = {(r["사업장"], int(r["연도"]), r["항목"]): float(r["금액"]) for _, r in hot_parts_df.iterrows()}
+    contract = {} if contracts is None or contracts.empty else \
+        {r["사업장"]: (str(r["계약방식"] or "").strip(), str(r["계약기간"] or "").strip()) for _, r in contracts.iterrows()}
     current, blank = None, 0
     r = header_row + 1
     while r <= ws.max_row:
@@ -402,9 +408,13 @@ def fill_hot_parts_sheet(ws, hot_parts_df, site_names):
             continue
         blank = 0
         for col, year in year_by_col.items():
-            amount = lookup.get((current, year, str(item).strip()))
-            if amount is not None:
-                set_cell(ws, r, col, round(amount, 3))
+            set_cell(ws, r, col, round(lookup.get((current, year, str(item).strip()), 0.0), 3))
+        if site_label and current in contract:
+            way, period = contract[current]
+            if way:
+                set_cell(ws, r, 2, way)
+            if period:
+                set_cell(ws, r, 3, period)
         r += 1
 
 
@@ -456,7 +466,7 @@ _SITE_ROW_LABELS = {
     ("", "기타기계장치"): "기계장치_기타기계장치",
     ("건가-외주비", "MI 및 A급 정비"): "외주비-열원정기점검",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("건설중인자산", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("건설중인자산", "재생고온부품"): "건설중인자산-재생고온부품",
     ("", "자산화예비품"): "건설중인자산-자산화예비품",
     ("자산", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -514,7 +524,7 @@ _TOTAL_COST_ROW_LABELS = {
     ("기계장치", "기타기계장치"): "기계장치_기타기계장치",
     ("건가-외주비", "MI 및 A급 정비"): "외주비-열원정기점검",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("건설중인자산", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("건설중인자산", "재생고온부품"): "건설중인자산-재생고온부품",
     ("건설중인자산", "자산화예비품"): "건설중인자산-자산화예비품",
     ("자산", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -578,7 +588,7 @@ _SUMMARY_ROW_LABELS = {
     ("기계장치", "고온부품재생+LTSA"): "기계장치_고온부품재생",
     ("", "기타기계장치"): "기계장치_기타기계장치",
     ("공구와기구", ""): "공구와기구-열원시설공기구",
-    ("예비품", "재생고온부품"): "건설중인자산_재생고온부품",
+    ("예비품", "재생고온부품"): "건설중인자산-재생고온부품",
     ("", "자산화예비품"): "건설중인자산-자산화예비품",
     ("", "저장품"): "저장품-열원(보수)",
     ("투자비", "열원공사비 등"): "투자비",
@@ -632,6 +642,119 @@ def _sheet_like(wb, pred):
     return next((n for n in wb.sheetnames if pred(n)), None)
 
 
+# 정비등급 양식의 칸 색 — 양식 그대로(TI·HGPI·CI 파랑, MI 노랑, 그 밖은 색 없음). 값이 바뀐 칸만 다시 칠한다.
+_GRADE_FILL = {"TI": "FF00B0F0", "HGPI": "FF00B0F0", "CI": "FF00B0F0", "MI": "FFFFFF00"}
+
+
+def fill_grade_plan_sheet(ws, grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR, units=None):
+    """정비등급 양식(한 해 한 열)에 저장된 미래 등급을 채운다.
+
+    설비 줄이 둘 이상인 지사는 설비별 등급(units)에서 같은 설비 이름으로, 없으면 대표 등급으로.
+    저장값이 없는 해의 등급 칸은 비운다 — 양식에 남은 옛 등급이 «현재값»처럼 보이지 않게.
+    «-»·«준공» 같은 표시는 등급이 아니라서 그대로 둔다."""
+    by = int(base_year)
+    lines = grade_plan_layout(ws, site_names)
+    # 연도 머리: 기준연도부터 다시 매긴다(2027 기준이면 2027~2036)
+    for r in range(1, ws.max_row + 1):
+        cols = sorted(c for c in range(1, ws.max_column + 1)
+                      if isinstance(ws.cell(row=r, column=c).value, (int, float)) and 2020 < ws.cell(row=r, column=c).value < 2050)
+        if len(cols) >= 2:
+            for i, c in enumerate(cols):
+                ws.cell(row=r, column=c).value = by + i
+    lines = [{**ln, "years": {c: by + i for i, c in enumerate(sorted(ln["years"]))}} for ln in lines]
+    g = grade_hist[grade_hist["연도"].astype(int) >= by] if not grade_hist.empty else grade_hist
+    rep = {(s, int(y)): v for s, y, v in zip(g["사업장"], g["연도"], g["등급"])}
+    u = units if units is not None and not units.empty else pd.DataFrame(columns=["사업장", "연도", "설비", "등급"])
+    unit = {(s, str(q), int(y)): v for s, q, y, v in zip(u["사업장"], u["설비"], u["연도"], u["등급"])}
+    site_lines = {}
+    for ln in lines:
+        site_lines.setdefault(ln["site"], []).append(ln)
+
+    def rep_line(lns):
+        """대표 등급을 받을 줄 — 가져오기와 같은 규칙(양식에 적힌 GT 어휘 줄 우선, 없으면 A/B/C 줄)."""
+        kinds = [forecast_calc._classify_grade_row({c: ws.cell(row=ln["row"], column=c).value for c in ln["years"]}) for ln in lns]
+        i = next((i for i, k in enumerate(kinds) if k == "GT"), None)
+        i = i if i is not None else next((i for i, k in enumerate(kinds) if k == "ST"), 0)
+        return lns[i]["row"]
+
+    for site, lns in site_lines.items():
+        rep_row = rep_line(lns)
+        for ln in lns:
+            has_unit = len(lns) > 1 and any(k[0] == site and k[1] == ln["unit"] for k in unit)
+            for col, year in ln["years"].items():
+                cell = ws.cell(row=ln["row"], column=col)
+                old = str(cell.value or "").strip()
+                if has_unit:
+                    val = unit.get((site, ln["unit"], year))
+                elif ln["row"] == rep_row:
+                    val = rep.get((site, year))
+                else:
+                    val = None
+                if val is None:
+                    if old in forecast_calc.VALID_GRADE_TOKENS:
+                        set_cell(ws, ln["row"], col, None)
+                        cell.fill = PatternFill(fill_type=None)
+                    continue
+                if str(val) != old:
+                    set_cell(ws, ln["row"], col, val)
+                    color = _GRADE_FILL.get(str(val))
+                    cell.fill = PatternFill("solid", fgColor=color) if color else PatternFill(fill_type=None)
+
+
+def _merged_text(ws, r, c):
+    from .forecast_import import _merged_value
+    return str(_merged_value(ws, r, c) or "").strip()
+
+
+def grade_plan_grid(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR, units=None,
+                    template_path: str = GRADE_TEMPLATE) -> dict:
+    """화면용 정비등급 표 — 엑셀 양식(사용자 확정) 줄 그대로. 양식에 저장값을 채운 뒤 줄마다 읽는다.
+    {"years": [...], "lines": [{row, group, label, unit, site, values: {연도: 글자}}]} — «-»·«준공»도 그대로 보인다."""
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    fill_grade_plan_sheet(ws, grade_hist, site_names, base_year, units)
+    lines = grade_plan_layout(ws, site_names)
+    years = sorted({y for ln in lines for y in ln["years"].values()})
+    out = []
+    for ln in lines:
+        out.append({"row": ln["row"], "group": ln["group"], "label": _merged_text(ws, ln["row"], 2) or _merged_text(ws, ln["row"], 1),
+                    "unit": str(ws.cell(row=ln["row"], column=3).value or "").strip(), "site": ln["site"],
+                    "values": {str(y): str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()}})
+    return {"years": years, "lines": out}
+
+
+def grade_plan_from_cells(cells, site_names, base_year: int = forecast_calc.BASE_YEAR, template_path: str = GRADE_TEMPLATE):
+    """화면 칸 [{row, year, grade}] → 양식에 써서 엑셀 가져오기와 같은 규칙으로 읽는다 → (대표 등급, 설비별 등급).
+    화면·올리기·내려받기가 한 양식·한 규칙을 쓰게(2026-10-28 사용자 요청)."""
+    from .forecast_import import grade_plan_from_workbook
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    layout = grade_plan_layout(ws, site_names)                       # 비우기 전에 — 빈 줄은 줄 목록에서 빠진다
+    by = int(base_year)
+    col_by_row = {ln["row"]: {by + i: c for i, c in enumerate(sorted(ln["years"]))} for ln in layout}
+    empty = pd.DataFrame(columns=["사업장", "연도", "등급"])
+    fill_grade_plan_sheet(ws, empty, site_names, base_year)          # 연도 머리를 기준연도로 · 옛 등급 비움
+    for cell in cells or []:
+        row, year = int(cell["row"]), int(cell["year"])
+        col = col_by_row.get(row, {}).get(year)
+        if col:
+            set_cell(ws, row, col, str(cell.get("grade") or "").strip() or None)
+    grades, units = grade_plan_from_workbook(_bytes(wb), site_names)
+    n = {}
+    for ln in layout:
+        n[ln["site"]] = n.get(ln["site"], 0) + 1
+    return grades, units, {s for s, k in n.items() if k > 1}
+
+
+def build_grade_plan_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,
+                              units=None, template_path: str = GRADE_TEMPLATE) -> bytes:
+    """«현재값이 채워진 정비등급 양식» — 사용자가 정한 양식 그대로, 등급 칸만 저장값으로."""
+    wb = load_workbook(template_path)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), wb.active)
+    fill_grade_plan_sheet(ws, grade_hist, site_names, base_year, units)
+    return _bytes(wb)
+
+
 def build_schedule_download(grade_hist, site_names, base_year: int = forecast_calc.BASE_YEAR,
                             template_path: str = LT_TEMPLATE) -> bytes:
     wb = load_workbook(template_path)
@@ -643,12 +766,13 @@ def build_schedule_download(grade_hist, site_names, base_year: int = forecast_ca
 
 
 def build_hot_parts_download(hot_parts_df, site_names, base_year: int = forecast_calc.BASE_YEAR,
-                             template_path: str = LT_TEMPLATE) -> bytes:
+                             template_path: str = HOT_TEMPLATE, contracts=None) -> bytes:
+    """«현재값이 채워진 고온부품 양식» — 사용자 양식(26~35년 전지사 고온부품) 그대로, 금액·계약 칸만 저장값."""
     wb = load_workbook(template_path)
     rebase_workbook_years(wb, base_year)
     name = _sheet_like(wb, lambda n: n.strip().startswith("고온부품"))
     if name:
-        fill_hot_parts_sheet(wb[name], hot_parts_df, site_names)
+        fill_hot_parts_sheet(wb[name], hot_parts_df, site_names, contracts)
     return _bytes(wb)
 
 

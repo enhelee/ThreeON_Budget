@@ -26,7 +26,7 @@ import os
 
 import pandas as pd
 
-from . import config_store, forecast_calc
+from . import capacity, config_store, forecast_calc
 from . import db as dbm
 
 # ── 표 이름과 v2 컬럼 ────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_fact
           # 표준화 방향 반영(2026-10-26) — 아래 SPECS 가 모양을 정한다
           "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
           "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
-          "forecast_setting")
+          "forecast_setting", "site_capacity", "capacity_rule", "hot_parts_contract", "price_index")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
@@ -358,12 +358,32 @@ SPECS = {
     "reference_standard": dict(cols=["사업장", "예산과목", "등급", "표준금액", "엑셀수식"], floats=["표준금액"],
                                key=["사업장", "예산과목", "등급"], need=["사업장", "예산과목", "등급"],
                                order="사업장, 예산과목, 등급"),
+    # 비어 있으면 capacity.py 기본값(사용자 엑셀 «한난_발전설비용량_261028»·기준 5개·대상 4개 지사)
+    "site_capacity": dict(cols=capacity.CAPACITY_COLS, opt_floats=["용량MW"], opt_ints=["준공연도"],
+                          key=["사업장", "설비"], need=["사업장", "설비"], order="사업장, 설비",
+                          default=capacity.default_capacity),
+    # 고온부품 지사별 계약방식·계약기간 — 비면 내장 양식(사용자 «26~35년 전지사 고온부품») 값
+    "hot_parts_contract": dict(cols=["사업장", "계약방식", "계약기간", "비고"], key=["사업장"], need=["사업장"],
+                               order="사업장", default=lambda: _hot_default()),
+    "capacity_rule": dict(cols=capacity.RULE_COLS, opt_ints=["적용시작연도"], opt_floats=["용량MW"],
+                          key=["사업장"], need=["사업장", "역할"], order="역할, 사업장",
+                          default=capacity.default_rules),
+    # 생산자물가지수(한국은행, 총지수) — 과거 실적 기준연도 환산(설정 «실적환산»). 빈 해는 전망 물가로 채운다.
+    "price_index": dict(cols=["연도", "지수", "비고"], ints=["연도"], floats=["지수"],
+                        key=["연도"], need=["연도", "지수"], order="연도"),
 }
+
+
+def _hot_default():
+    from .forecast_import import default_hot_contracts
+    return default_hot_contracts()
 
 
 def load_table(conn, base_year, name) -> pd.DataFrame:
     sp = SPECS[name]
     rows = _select(conn, name, base_year, sp["cols"], sp["order"])
+    if not rows and sp.get("default"):
+        return sp["default"]()
     df = _frame(rows, sp["cols"], ints=sp.get("ints", ()), floats=sp.get("floats", ()),
                 bools=sp.get("bools", ()))
     for c in sp.get("opt_ints", ()):
@@ -403,7 +423,9 @@ def save_table(conn, base_year, name, df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ── 설정 (키 → 값) — 백테스트 제안(2026-10-26) ────────────────────────────────
-SETTING_KEYS = {"학습기간": "3"}        # 키 → 기본값(문자열). 백테스트 2021~2025: 최근 3개년이 과목 합계 오차가 가장 작다
+# 키 → 기본값(문자열). 학습기간: 백테스트 2021~2025 에서 최근 3개년이 과목 합계 오차가 가장 작다.
+#   실적환산: 과거 실적을 생산자물가지수로 기준연도 가치로 바꿔 표준화(1=켬, 0=끔) — 기본 켬(2026-11-03 팀장)
+SETTING_KEYS = {"학습기간": "3", "실적환산": "1"}
 
 
 def load_settings(conn, base_year) -> dict:
@@ -430,6 +452,11 @@ def learning_window(conn, base_year) -> int:
         return max(0, int(load_settings(conn, base_year)["학습기간"]))
     except (TypeError, ValueError):
         return int(SETTING_KEYS["학습기간"])
+
+
+def restate_on(conn, base_year) -> bool:
+    """과거 실적을 기준연도 가치로 환산하는가(설정 «실적환산», 기본 켬)."""
+    return str(load_settings(conn, base_year)["실적환산"]).strip() not in ("0", "false", "끔", "")
 
 
 def list_base_years(conn) -> list:

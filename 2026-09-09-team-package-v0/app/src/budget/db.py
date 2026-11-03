@@ -119,6 +119,13 @@ def init_db(conn):
         주관부서명 TEXT, 부서코드 TEXT, 처지사 TEXT, 부서부 TEXT, 속성 TEXT,
         예산코드 TEXT, 예산과목 TEXT, 사업명 TEXT, 산출내역 TEXT, 연예산 REAL,
         src_row INTEGER)""")
+    # 올린 원본 엑셀(2026-11-03 grace «같은 양식으로 다시 받게»). 계획은 한 데이터셋에 파일 여럿(손익·자본·건설공사).
+    # 데이터셋을 지우면 같이 지운다(delete_dataset · scripts/prune_history.py).
+    cur.execute("""CREATE TABLE IF NOT EXISTS dataset_file(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dataset_id INTEGER NOT NULL REFERENCES dataset(id),
+        filename TEXT NOT NULL,
+        content BLOB NOT NULL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS erp_row(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dataset_id INTEGER NOT NULL REFERENCES dataset(id),
@@ -335,6 +342,22 @@ def init_db(conn):
     cur.execute("""CREATE TABLE IF NOT EXISTS forecast_setting(
         base_year TEXT NOT NULL, 키 TEXT NOT NULL, 값 TEXT NOT NULL,
         PRIMARY KEY(base_year, 키))""")
+    # 설비 현황(발전설비·기타 소형 용량)과 용량 환산 규칙(기준·대상 지사) — 2026-10-28. 비어 있으면 capacity.py 기본값.
+    cur.execute("""CREATE TABLE IF NOT EXISTS site_capacity(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 설비 TEXT NOT NULL, 구분 TEXT,
+        용량MW REAL, 준공연도 INTEGER, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장, 설비))""")
+    # 생산자물가지수(연도 → 지수) — 과거 실적을 기준연도 가치로 바꿔 표준화(2026-11-03). 빈 해는 전망 물가로 채움.
+    cur.execute("""CREATE TABLE IF NOT EXISTS price_index(
+        base_year TEXT NOT NULL, 연도 INTEGER NOT NULL, 지수 REAL NOT NULL, 비고 TEXT,
+        PRIMARY KEY(base_year, 연도))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS hot_parts_contract(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 계약방식 TEXT, 계약기간 TEXT, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장))""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS capacity_rule(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 역할 TEXT NOT NULL,
+        적용시작연도 INTEGER, 용량MW REAL, 정비제외연도 TEXT, 비고 TEXT,
+        PRIMARY KEY(base_year, 사업장))""")
     cur.execute("""CREATE TABLE IF NOT EXISTS reference_standard(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,
         등급 TEXT NOT NULL, 표준금액 REAL NOT NULL, 엑셀수식 TEXT,
@@ -364,7 +387,7 @@ def init_db(conn):
         예산과목 TEXT NOT NULL, 처지사 TEXT NOT NULL, 사업명 TEXT NOT NULL,
         note TEXT NOT NULL, operator TEXT, updated_at TEXT NOT NULL,
         PRIMARY KEY (year, budget, 예산과목, 처지사, 사업명))""")
-    # 검토 큐 승인(2026-10-27) — «이 줄은 봤고 이상 없다». 승인 때 실적(천원)을 같이 적어 두고,
+    # 검토 대기 승인(2026-10-27) — «이 줄은 봤고 이상 없다». 승인 때 실적(천원)을 같이 적어 두고,
     #   재분석으로 실적이 바뀌면 승인을 무효로 본다(review_queue.ACK_TOL). 숫자를 바꾸지 않아 마감 연도에도 쓴다.
     cur.execute("""CREATE TABLE IF NOT EXISTS review_ack(
         year TEXT NOT NULL, budget TEXT NOT NULL,
@@ -468,7 +491,21 @@ def list_datasets(conn, year=None):
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+def save_dataset_files(conn, dataset_id, files):
+    """files = [(파일 이름, bytes)] — 올린 원본을 그 데이터셋에 붙여 둔다."""
+    conn.executemany("INSERT INTO dataset_file(dataset_id,filename,content) VALUES(?,?,?)",
+                     [(dataset_id, name, data) for name, data in files])
+    conn.commit()
+
+
+def load_dataset_files(conn, dataset_id):
+    rows = conn.execute("SELECT filename, content FROM dataset_file WHERE dataset_id=? ORDER BY id",
+                        (dataset_id,)).fetchall()
+    return [(name, dbcore.as_bytes(data)) for name, data in rows]
+
+
 def delete_dataset(conn, dataset_id):
+    conn.execute("DELETE FROM dataset_file WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM plan_row WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM erp_row WHERE dataset_id=?", (dataset_id,))
     conn.execute("DELETE FROM dataset WHERE id=?", (dataset_id,))
@@ -1260,7 +1297,7 @@ def variance_notes(conn, year, dept=None):
 
 
 def set_review_ack(conn, year, budget, item, dept, name, actual, operator=None, ack=True):
-    """검토 큐 승인 저장(ack=False 면 취소). actual = 승인 시점 실적(천원)."""
+    """검토 대기 승인 저장(ack=False 면 취소). actual = 승인 시점 실적(천원)."""
     key = (str(year), budget, item, dept, name)
     if not ack:
         conn.execute("DELETE FROM review_ack WHERE year=? AND budget=? AND 예산과목=?"
