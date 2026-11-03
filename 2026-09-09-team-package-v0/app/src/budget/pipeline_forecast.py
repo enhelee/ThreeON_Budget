@@ -223,7 +223,27 @@ def _standard(conn, base_year):
         events=events, budget_lookup=budget_lookup, window=window)
     std, model, targets = capacity.apply_capacity(std, benchmark.prepare_actuals(actuals, alias, events),
                                                   grade, cap_table, cap_rules, base_year=base_year)
+    # 빈 등급은 용량 환산으로 채우고(삼송 MI·수원 MI), 쓰지 않는 등급(BSI · CI 없는 지사의 CI)은 뺀다
+    std = forecast_calc.prune_grades(capacity.fill_missing_grades(std, model, targets))
+    for t in targets.values():
+        if "rows" in t:
+            t["rows"] = forecast_calc.prune_grades(t["rows"])
     return std, actuals, years_used, grade, {"model": model, "targets": targets, "events": events}
+
+
+def site_notes(conn, base_year, cap) -> dict:
+    """지사 옆 작은 딱지 — 적용시작이 기준연도 뒤인 용량 환산 대상(수원 2029 개체).
+    편입될 묶음 = 용량 환산 기준 지사들의 묶음(가장 많은 것, 지금은 중대형CHP). → {지사: 문구}"""
+    targets = cap.get("targets") or {}
+    refs = (cap.get("model") or {}).get("refs") or {}
+    groups = site_groups(conn, base_year)
+    ref_groups = [groups.get(s) for s in refs if groups.get(s)]
+    into = max(set(ref_groups), key=ref_groups.count) if ref_groups else ""
+    out = {}
+    for s, t in targets.items():
+        if "rows" in t and t.get("start"):
+            out[s] = f"{t['start']}년 준공 후 {into} 편입 예정" if into and groups.get(s) != into else f"{t['start']}년 준공 예정"
+    return out
 
 
 def finance_compare(std, fin):
@@ -355,11 +375,12 @@ def capacity_view(conn, base_year):
 def run_benchmark(conn, base_year):
     """3단계 — 표준금액 표와 모집단 요약."""
     fs.bind_site_resolvers(conn, base_year)
-    std, actuals, years_used, _, _ = _standard(conn, base_year)
+    std, actuals, years_used, _, cap = _standard(conn, base_year)
     std = finance_compare(std, fs.load_table(conn, base_year, "reference_standard"))
     if not std.empty:
         std = std.sort_values(["사업장", "구분", "예산과목", "등급"]).reset_index(drop=True)
     return {"base_year": str(base_year), "years_used": years_used, "window": fs.learning_window(conn, base_year),
+            "site_notes": site_notes(conn, base_year, cap),
             "population": {"rows": int(len(actuals)),
                            "total": float(actuals["금액"].sum()) if len(actuals) else 0.0},
             "has_ltsa": benchmark.has_ltsa_detail(actuals), "rows": records(std)}

@@ -185,3 +185,12 @@ def test_ti_and_hgpi_are_one_grade_in_standard_and_forecast(conn):
 
     saved = fs.load_grade_history(conn, "2026")
     assert set(saved["등급"]) == {"TI", "HGPI", "MI"}         # 저장값은 그대로
+
+
+def test_site_notes_tag_future_capacity_target(monkeypatch):
+    """수원(2029 개체, 지금 소형CHP) 옆 딱지 — 용량 환산 기준 지사들의 묶음(중대형CHP)으로 편입 예정."""
+    cap = {"targets": {"수원사업소": {"start": 2029, "rows": pd.DataFrame()}, "청주지사": {"start": 2025}},
+           "model": {"refs": {"화성지사": 512, "파주지사": 516}}}
+    groups = {"수원사업소": "소형CHP", "화성지사": "중대형CHP", "파주지사": "중대형CHP", "청주지사": "중대형CHP"}
+    monkeypatch.setattr(pf, "site_groups", lambda conn, by: groups)
+    assert pf.site_notes(None, "2026", cap) == {"수원사업소": "2029년 준공 후 중대형CHP 편입 예정"}   # 이미 바뀐 청주는 딱지 없음

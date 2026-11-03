@@ -555,7 +555,9 @@ function benchSiteGroups(rows, filtered) {
     const warn = list.filter(r => r.재무팀대비 != null && Math.abs(r.재무팀대비) > 0.3).length
     // 접기 단추는 줄 맨 앞 + 왼쪽에 붙임(sticky) — 좁은 화면에서 표가 가로로 넘쳐도 단추가 화면 밖으로 밀리지 않게
     const btn = filtered ? "" : `<button class="btn-secondary min-h-[32px] shrink-0 px-3 text-xs" data-fcbopen="${esc(site)}" aria-expanded="${open}">${open ? "접기 ▴" : "펼치기 ▾"}</button>`
-    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="9"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${btn}<b class="text-ink">${esc(site)}</b><span class="text-sub">${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></div></td></tr>`
+    const note = state.fc.bench?.site_notes?.[site]
+    const tag = note ? `<span class="std-tag">${esc(note)}</span>` : ""
+    const head = `<tr class="bg-subtle"><td class="px-3 py-2 text-sm" colspan="9"><div class="sticky left-3 inline-flex max-w-[calc(100vw-8rem)] flex-wrap items-center gap-x-2 gap-y-1">${btn}<b class="text-ink">${esc(site)}</b>${tag}<span class="text-sub">${list.length}줄 · 표준금액 합 ${fmt(Math.round(total))} 천원${warn ? ` · <span class="text-warn">재무팀 대비 ±30% 밖 ${warn}줄</span>` : ""}</span></div></td></tr>`
     return {head, list: open ? list : []}
   })
 }
