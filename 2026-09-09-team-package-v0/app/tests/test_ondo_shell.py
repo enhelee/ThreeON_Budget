@@ -298,3 +298,20 @@ def test_sub_menus_are_numbered():
     for tag, label in (("3-1", "지사 상세"), ("3-2", "검토 대기"), ("5-1", "표준화 세부")):
         assert f'tag: "{tag}", label: "{label}"' in side
     assert "검토 큐" not in side and '"3+"' not in side
+
+
+def test_standard_explains_folded_and_fits_one_screen():
+    """2026-11-03 grace: 표 설명은 접고 펴기 + 항목별 줄 나눔 · [전체보기]면 옆 스크롤 없이 한 화면."""
+    std = _read(SRC, "views", "standard.js")
+    body = _fn(std, "stdBody")
+    assert '<details class="std-about">' in body and body.count("<li>") >= 4
+    assert 'data-action="std-fit"' in body and "state.stdFit" in body
+    assert 'act === "std-fit"' in _read(SRC, "main.js")
+    css = _read(SRC, "styles", "custom.css")
+    assert ".std-fit .std-heat{table-layout:fixed" in css and ".std-fit .std-scroll{overflow-x:visible}" in css
+
+
+def test_sidebar_menu_scrolls_on_its_own():
+    """2026-11-03 grace: 화면이 낮으면 6번 메뉴까지 안 내려가고 본문만 내려가던 문제 — 메뉴만 따로 스크롤."""
+    nav = _read(SRC, "components", "sidebar.js").split("<nav", 1)[1].split(">", 1)[0]
+    assert "overflow-y-auto" in nav and "min-h-0" in nav and "overscroll-contain" in nav

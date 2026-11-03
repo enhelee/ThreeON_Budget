@@ -96,7 +96,7 @@ function table(m, siteGroups, notes) {
     }).join("")
     return `${groupRow}<tr><th class="std-site" scope="row">${esc(site)}${siteTag(site, notes)}</th>${cells}</tr>`
   }).join("")
-  return `<div class="overflow-x-auto"><table class="std-heat">
+  return `<div class="std-scroll overflow-x-auto"><table class="std-heat">
     <thead><tr><th class="std-site" scope="col">지사 / 정비등급</th>${m.grades.map(g => `<th scope="col">${esc(g)}</th>`).join("")}</tr></thead>
     <tbody>${body}</tbody></table></div>`
 }
@@ -112,11 +112,25 @@ function stdBody() {
   const ref = used.filter(y => y.endsWith("(참고)")).map(y => parseInt(y, 10)).sort((x, y) => x - y)
   const basis = `마감 연도 ${closed.join("·") || "없음"}${ref.length ? ` · 참고 실적 ${ref[0]}${ref.length > 1 ? `~${ref[ref.length - 1]}` : ""}` : ""}`
   const same = Object.entries(SAME_GRADES).map(([k, list]) => `${list.join("·")} 는 같은 등급(${k})`).join(" · ")
+  const restate = restateNote(b)
+  const fit = !!state.stdFit
   return `
-  <article class="panel overflow-hidden">
+  <article class="panel overflow-hidden${fit ? " std-fit" : ""}" id="stdPanel">
     <div class="border-b border-line p-5 sm:p-6">
-      <h3 class="section-title">지사 × 정비등급 표준금액 · 손익 · 자본 · 총액</h3>
-      <p class="section-help">${esc(basis)}${restateNote(b) ? ` · <b class="text-ink">${esc(restateNote(b))}</b>` : ""} · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종 · 칸 = 그 지사가 그 등급인 해의 과목 표준금액 합 · ${esc(same)} · 칸을 누르면 «표준화 세부»</p>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h3 class="section-title">지사 × 정비등급 표준금액 · 손익 · 자본 · 총액</h3>
+        <button type="button" class="btn-secondary std-fit-btn" data-action="std-fit" aria-pressed="${fit}">${fit ? "원래 크기로" : "전체보기"}</button>
+      </div>
+      <details class="std-about">
+        <summary>이 표 읽는 법 · 지사 ${m.sites.length}곳 · 정비등급 ${m.grades.length}종</summary>
+        <ul class="std-about__list">
+          <li><b>기준 자료</b> ${esc(basis)}</li>
+          ${restate ? `<li><b>물가 환산</b> ${esc(restate)}</li>` : ""}
+          <li><b>칸 하나</b> 그 지사가 그 등급인 해의 과목 표준금액 합</li>
+          <li><b>같은 등급</b> ${esc(same)}</li>
+          <li><b>더 보기</b> 칸을 누르면 «5-1 표준화 세부»로 가요</li>
+        </ul>
+      </details>
       <div class="mt-3">${legend()}</div>
     </div>
     ${table(m, siteGroups, b.site_notes)}

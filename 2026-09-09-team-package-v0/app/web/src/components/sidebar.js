@@ -76,7 +76,7 @@ export function renderSidebar() {
       <span class="sb-full sb-desc">예산·실적 분석 · 발전플랜트 유지보수</span>
     </button>
 
-    <nav class="mt-6 flex-1 space-y-1" aria-label="주요 메뉴">
+    <nav class="sb-nav mt-6 min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain" aria-label="주요 메뉴">
       ${MENU.map(m => m.group ? groupLabel(m.group) : navButton(m)).join("\n      ")}
     </nav>
 
