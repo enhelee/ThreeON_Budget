@@ -210,3 +210,35 @@ def test_price_index_from_workbook_reads_vertical_horizontal_and_monthly():
     m = fi.price_index_from_workbook(_ppi_book([["2021.01", 104.0], ["2021.02", 106.0], ["2022.01", 113.0]]))
     assert dict(zip(m["연도"], m["지수"])) == {2021: 105.0, 2022: 113.0}
     assert "2개월 평균" in m.iloc[0]["비고"]
+
+
+# ---------------------------------------------------------------- 투자비 실적 (2026-11-03)
+def _invest_book(sheet="세부내역"):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(["[단위 : 천원, 부가세 별도]"])
+    ws.append(["연번", "예산과목", "속성", "주관부서명", "예산귀속\n부서명(처.지사)", "예산귀속\n부서명(팀)", "사업명",
+               "연예산(A)", "최종 실적금액(B)", "구 분", "투자유형"])
+    ws.append([1, "기계장치", "자산", "플랜트기술처", "화성지사", "팀", "기계 사업", 10, 10, "기계장치", "설비개선"])
+    ws.append([2, "외주비-열원공사비", "건가", "플랜트기술처", "화성지사", "팀", "배관 교체", 100, 120, "외주비", "기계/노후설비"])
+    ws.append([3, "외주비-열원공사비", "건가", "플랜트기술처", "화성지사", "팀", "배관 교체", 0, 30, "외주비", ""])
+    ws.append([4, "재료비-열원자재비", "건가", "플랜트기술처", "수원사업소", "팀", "자재", 5, 7, "외주비", "-"])
+    ws.append([5, "외주비-열원기술용역비", "건가", "플랜트기술처", "플랜트기술처", "팀", "본사 용역", 9, 9, "외주비", "기타"])
+    ws.append([6, "외주비-열원공사비", "건가", "플랜트기술처", "동탄지사", "팀", "실적 없음", 50, 0, "외주비", ""])
+    return _bytes(wb)
+
+
+def test_investment_actual_reads_three_accounts_with_year_from_file_name():
+    df, info = fi.investment_actual_from_workbook(_invest_book(), SITES, "(24년) 자본예산 실적 분석_260313.xlsx",
+                                                  with_info=True)
+    assert info["연도"] == 2024 and info["시트"] == ["세부내역"]
+    got = {(r.사업장, r.예산과목, r.사업명): (r.금액, r.투자유형) for r in df.itertuples()}
+    assert got == {("화성지사", "외주비-열원공사비", "배관 교체"): (150.0, "기계/노후설비"),   # 같은 사업명은 더한다
+                   ("수원사업소", "재료비-열원자재비", "자재"): (7.0, "")}
+    assert set(df["연도"]) == {2024}
+    assert info["건너뜀"] == 2                       # 본사 처(전망 지사 아님) · 실적 0
+    # 연도는 시트 이름에서도 — 파일 이름에 없을 때
+    assert fi.investment_actual_from_workbook(_invest_book("25년 계획 대비 실적"), SITES, "실적.xlsx")["연도"].tolist() == [2025, 2025]
+    with pytest.raises(ValueError):
+        fi.investment_actual_from_workbook(_invest_book(), SITES, "실적.xlsx")

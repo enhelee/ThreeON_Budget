@@ -22,7 +22,7 @@ const TABLE_URL = {grades: "grades", hot_parts: "hot-parts", factors: "factors",
                    benchmark_rule: "benchmark-rule", actual_tag: "actual-tag", regular_contract: "regular-contract",
                    cri_rule: "cri-rule", investment_plan: "investment-plan",
                    site_capacity: "site-capacity", capacity_rule: "capacity-rule", hot_parts_contract: "hot-parts-contract",
-                   price_index: "price-index"}
+                   price_index: "price-index", investment_actual: "investment-actual"}
 const INT_FIELDS = new Set(["연도", "시작연도", "종료연도", "지급시차", "단가기준연도", "적용시작연도", "준공연도"])
 const NUM_FIELDS = new Set(["금액", "연간비율", "계약체결금액", "표준금액", "기준단가", "지수"])
 // 비우면 «없음»(null)인 칸 — 0 과 뜻이 다르다(보정률 0 ≠ 보정 없음)
@@ -49,6 +49,7 @@ const NEW_ROW = {
   site_capacity: () => ({사업장: firstSite(), 설비: "", 구분: "발전설비", 용량MW: null, 준공연도: null, 비고: ""}),
   capacity_rule: () => ({사업장: firstSite(), 역할: "대상", 적용시작연도: Number(state.fc.baseYear), 용량MW: null, 정비제외연도: "", 비고: ""}),
   price_index: () => ({연도: Number(state.fc.baseYear) - 1, 지수: 0, 비고: "한국은행 생산자물가지수(총지수)"}),
+  investment_actual: () => ({사업장: firstSite(), 연도: Number(state.fc.baseYear) - 1, 예산과목: "외주비-열원공사비", 사업명: "", 금액: 0, 투자유형: ""}),
 }
 
 const json = body => ({method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})
@@ -217,6 +218,11 @@ async function applyPreview(mode) {
       const got = new Set(p.rows.map(r => Number(r.연도)))
       const keep = mode === "merge" ? (d.price_index || []).filter(r => !got.has(Number(r.연도))) : []
       await put("price-index", {rows: [...keep, ...p.rows]})
+    } else if (p.kind === "investment-actual") {
+      // 투자비 실적 — 파일 한 개 = 한 해. «합치기»는 파일에 있는 해만 파일 값으로 바꾸고 다른 해는 둔다
+      const got = new Set(p.rows.map(r => Number(r.연도)))
+      const keep = mode === "merge" ? (d.investment_actual || []).filter(r => !got.has(Number(r.연도))) : []
+      await put("investment-actual", {rows: [...keep, ...p.rows]})
     } else if (p.kind === "hq-master") {
       await put("hq-master", {columns: p.columns, rows: p.rows, ratio_rows: p.ratio_rows})
     }

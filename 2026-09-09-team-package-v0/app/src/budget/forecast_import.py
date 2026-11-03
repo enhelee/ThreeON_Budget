@@ -17,7 +17,7 @@ import re
 import pandas as pd
 from openpyxl import load_workbook
 
-from .forecast_calc import VALID_GRADE_TOKENS, _classify_grade_row
+from .forecast_calc import INVESTMENT_ACCOUNTS, VALID_GRADE_TOKENS, _classify_grade_row, normalize_account_name
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 HOT_PARTS_COLS = ["사업장", "연도", "항목", "금액"]
@@ -497,3 +497,77 @@ def price_index_from_workbook(data: bytes, site_names=None) -> pd.DataFrame:
     rows = [{"연도": y, "지수": round(sum(v) / len(v), 4), "비고": f"가져옴: {best['sheet']}" + (f" ({len(v)}개월 평균)" if len(v) > 1 else "")}
             for y, v in sorted(best.get("years", {}).items())]
     return pd.DataFrame(rows, columns=PRICE_INDEX_COLS)
+
+
+# ---------------------------------------------------------------- 투자비 실적 (2026-11-03)
+# 건설공사 3과목은 전표(zrfm2)에 실적 계정이 없다 — 팀이 해마다 만드는 «(25년) 자본예산 실적 분석» 엑셀의
+# 사업별 원자료 시트(연번·예산과목·…·사업명·연예산(A)·최종 실적금액(B)·구분·투자유형)에서 읽는다.
+INVEST_ACTUAL_COLS = ["사업장", "연도", "예산과목", "사업명", "금액", "투자유형"]
+_FILE_YEAR_RE = re.compile(r"\((\d{2})년\)|((?:19|20)\d{2})\s*년|(?<!\d)(\d{2})년")
+
+
+def _squash(v) -> str:
+    return re.sub(r"\s+", "", str(v)) if v is not None else ""
+
+
+def _year_from_name(name: str):
+    m = _FILE_YEAR_RE.search(name or "")
+    if not m:
+        return None
+    two, four, bare = m.groups()
+    return int(four) if four else 2000 + int(two or bare)
+
+
+def investment_actual_from_workbook(data: bytes, site_names=None, filename: str = "", with_info: bool = False):
+    """«예산 실적 분석» 엑셀 → 투자비 3과목(INVESTMENT_ACCOUNTS) 사업별 실적. 금액 천원.
+
+    연도: 파일 이름의 «(25년)» → 시트 이름의 «25년» 순. 실적 열이 없는 시트(계획 분석)는 건너뛴다.
+    site_names 를 주면 그 지사만 남긴다(본사 처 등은 전망 대상이 아니다). 같은 사업명은 더한다.
+    with_info=True 면 (표, {연도, 시트, 건너뛴 행 수}) 를 돌려준다."""
+    wb = _wb(data)
+    year = _year_from_name(os.path.basename(filename or "")) or next(
+        (y for y in (_year_from_name(n) for n in wb.sheetnames) if y), None)
+    if year is None:
+        raise ValueError("연도를 알 수 없습니다 — 파일 이름에 «(25년)»처럼 연도를 넣어 주세요.")
+    sites = [str(s) for s in site_names] if site_names else None
+    short = site_sheet_map(sites) if sites else {}
+    accounts = set(INVESTMENT_ACCOUNTS)
+    found, used, skipped = {}, [], 0
+    for name in wb.sheetnames:
+        grid = [list(r) for r in wb[name].iter_rows(values_only=True)]
+        hi = next((i for i, r in enumerate(grid[:8]) if {"사업명", "예산과목"} <= {_squash(v) for v in r}), None)
+        if hi is None:
+            continue
+        head = [_squash(v) for v in grid[hi]]
+        col = lambda pred: next((i for i, h in enumerate(head) if pred(h)), None)
+        c_acct, c_name = head.index("예산과목"), head.index("사업명")
+        c_site = col(lambda h: "처.지사" in h or "처지사" in h)
+        c_amt = col(lambda h: "실적" in h)
+        c_type = col(lambda h: h == "투자유형")
+        if c_site is None or c_amt is None:
+            continue
+        used.append(name)
+        for r in grid[hi + 1:]:
+            cell = lambda i: r[i] if i is not None and i < len(r) else None
+            acct = normalize_account_name(str(cell(c_acct) or "").strip())
+            if acct not in accounts or not cell(c_name):
+                continue
+            raw_site = _squash(cell(c_site))
+            site = raw_site if not sites or raw_site in sites else short.get(
+                raw_site.replace("지사", "").replace("사업소", ""))
+            try:
+                amt = float(cell(c_amt) or 0)
+            except (TypeError, ValueError):
+                amt = 0.0
+            if not site or not amt:
+                skipped += 1
+                continue
+            key = (site, year, acct, str(cell(c_name)).strip())
+            kind = str(cell(c_type) or "").strip()
+            kind = "" if kind == "-" else kind
+            old_amt, old_kind = found.get(key, (0.0, ""))
+            found[key] = (old_amt + amt, old_kind or kind)
+    rows = [{"사업장": k[0], "연도": k[1], "예산과목": k[2], "사업명": k[3], "금액": v[0], "투자유형": v[1]}
+            for k, v in sorted(found.items())]
+    df = pd.DataFrame(rows, columns=INVEST_ACTUAL_COLS)
+    return (df, {"연도": year, "시트": used, "건너뜀": skipped}) if with_info else df

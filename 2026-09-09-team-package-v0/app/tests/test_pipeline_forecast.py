@@ -246,3 +246,30 @@ def test_backtest_restates_training_years_to_target_year():
     real = fb.run(actuals, grades, 3, [2025], series=s)
     assert plain["account"] > 0.01                     # 그 해 금액 그대로면 최근실적 105 로 맞혀 4.5% 틀림
     assert real["account"] == pytest.approx(0.0, abs=1e-9)   # 2025 가치로 바꾸면 110 · 110 → 정확
+
+
+# ---------------------------------------------------------------- 투자비 실적 표준화(2026-11-03 팀장)
+def test_investment_actual_fills_forecast_investment_only_when_switch_is_on(conn):
+    fs.save_factors(conn, "2026", pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.0, "활성": True}]))
+    fs.save_settings(conn, "2026", {"실적환산": "0"})
+    acct = "외주비-열원공사비"
+    fs.save_table(conn, "2026", "investment_actual", pd.DataFrame(
+        [{"사업장": "화성지사", "연도": y, "예산과목": acct, "사업명": f"배관 {y}", "금액": 300.0, "투자유형": ""}
+         for y in (2023, 2024, 2025)]
+        + [{"사업장": "화성지사", "연도": 2025, "예산과목": acct, "사업명": "GT LTSA 대금", "금액": 9000.0, "투자유형": "LTSA"}]))
+    fs.save_table(conn, "2026", "investment_plan", pd.DataFrame([{"사업장": "화성지사", "연도": 2028, "금액": 50.0, "비고": ""}]))
+
+    def invest_row():
+        t = pf.forecast_frames(conn, "2026")["tables"]["화성지사"]
+        return t[t["예산과목"] == "투자비"].iloc[0]
+
+    assert not fs.invest_std_on(conn, "2026")                          # 기본 끔 — 종전대로
+    assert not [r for r in pf.run_benchmark(conn, "2026")["rows"] if r["예산과목"] == acct]
+    assert invest_row()[2027] == 0.0
+
+    fs.save_settings(conn, "2026", {"투자비표준화": "1"})
+    rows = [r for r in pf.run_benchmark(conn, "2026")["rows"] if r["사업장"] == "화성지사" and r["예산과목"] == acct]
+    assert rows and all(r["표준금액"] == pytest.approx(300.0) for r in rows)   # LTSA 사업은 계획표로 — 표준화에서 뺀다
+    row = invest_row()
+    assert row[2027] == pytest.approx(300.0)                           # 투자계획 없는 해 = 표준금액
+    assert row[2028] == pytest.approx(50.0)                            # 투자계획이 있는 해는 그 값
