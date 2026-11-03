@@ -287,3 +287,52 @@ def test_pending_counts_copy_year_and_master_upload(client, tmp_path):
         client.post("/api/upload/master?kind=dept&year=2023",
                     files={"file": ("m.xlsx", fh.read())})
     assert client.get("/api/pending?year=2023").json()["counts"]["기준정보"] > before
+
+
+def test_dataset_download_returns_absorbed_rows_as_xlsx(client):
+    """올린 계획을 엑셀로 다시 받는다(2026-11-03) — 원본 파일은 안 남기므로 DB 에 흡수된 행 그대로."""
+    import io as _io
+    import server
+    conn = server._conn()
+    try:
+        cur = conn.execute("INSERT INTO dataset(kind,year,label,uploaded_at,row_count,total_amount) VALUES('plan','2025','계획.xlsx','2026-11-03 10:00:00',2,30)")
+        ds = cur.lastrowid
+        for amt in (10, 20):
+            conn.execute("INSERT INTO plan_row(dataset_id,처지사,예산과목,사업명,연예산) VALUES(?,?,?,?,?)", (ds, "A지사", "수선유지비", "시험사업", amt))
+        conn.commit()
+    finally:
+        conn.close()
+    r = client.get(f"/api/datasets/{ds}/download")
+    assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"]
+    assert "%EC%98%AC%EB%9D%BC%EA%B0%84" in r.headers["content-disposition"]     # «올라간내용»
+    ws = openpyxl.load_workbook(_io.BytesIO(r.content)).active
+    rows = list(ws.iter_rows(values_only=True))
+    assert "연예산" in rows[0] and len(rows) == 3
+    assert client.get("/api/datasets/999999/download").status_code == 404
+
+
+def test_dataset_download_returns_original_upload(client):
+    """원본 그대로 저장·다시 받기(2026-11-03) — 한 개면 그 파일, 지우면 원본도 같이 지운다."""
+    import server
+    conn = server._conn()
+    try:
+        cur = conn.execute("INSERT INTO dataset(kind,year,label,uploaded_at,row_count,total_amount) VALUES('plan','2025','a.xlsx','2026-11-03 10:00:00',0,0)")
+        ds = cur.lastrowid
+        dbm.save_dataset_files(conn, ds, [("a.xlsx", b"PK\x03\x04original")])
+    finally:
+        conn.close()
+    r = client.get(f"/api/datasets/{ds}/download")
+    assert r.status_code == 200 and r.content == b"PK\x03\x04original"
+    conn = server._conn()
+    try:
+        dbm.save_dataset_files(conn, ds, [("b.xlsx", b"second")])
+    finally:
+        conn.close()
+    z = client.get(f"/api/datasets/{ds}/download")
+    assert z.headers["content-type"] == "application/zip"
+    conn = server._conn()
+    try:
+        dbm.delete_dataset(conn, ds); conn.commit()
+        assert dbm.load_dataset_files(conn, ds) == []
+    finally:
+        conn.close()

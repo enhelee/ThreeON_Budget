@@ -119,7 +119,7 @@ export function renderDetail() {
   const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
   if (!d.data) {
     return `<div class="space-y-6">
-      <section><p class="text-sm font-semibold text-ink">STAGE 3+</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2></section>
+      <section><p class="text-sm font-semibold text-ink">STAGE 3-1</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2></section>
       <section class="panel p-5"><label class="block max-w-sm"><span class="field-label">지사 선택</span>
       <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
       ${!(state.branches || []).length ? `<div class="mt-4">${charSay({who: "hj", title: "아직 자리를 찾은 전표가 없어요.", body: "분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.", action: `<button class="btn-secondary" data-view="collect">실적 집계로 가기</button>`})}</div>` : ""}</section>
@@ -130,9 +130,9 @@ export function renderDetail() {
   return `
     <div class="space-y-6">
       <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div><p class="text-sm font-semibold text-ink">STAGE 3+ · ${esc(state.year)}년</p>
+        <div><p class="text-sm font-semibold text-ink">STAGE 3-1 · ${esc(state.year)}년</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(d.branch)} — 사업별 실적 검토</h2></div>
-        <button class="btn-secondary" data-action="det-back" title="3+ 지사 카드 목록으로">← 지사 목록</button>
+        <button class="btn-secondary" data-action="det-back" title="3-1 지사 카드 목록으로">← 지사 목록</button>
       </section>
       ${pendingBarHtml()}
       ${locked ? "" : reviewBannerHtml()}

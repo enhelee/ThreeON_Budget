@@ -33,15 +33,15 @@ def test_tailwind_defines_hannan_tokens():
 def test_css_root_declares_brand_and_font_face():
     css = _read(WEB, "src", "styles", "app.css")
     assert "--BRAND: #FE0009" in css.upper().replace("--BRAND:#", "--BRAND: #"), "app.css :root 의 --brand 는 #FE0009"
-    assert "@font-face" in css and "HananCha" in css and "font-display: swap" in css
-    assert "/assets/fonts/HananCha-v1.woff2" in css
+    assert "@font-face" in css and '"Wanted Sans"' in css and "font-display: swap" in css
+    assert "/assets/fonts/WantedSans-Bold.woff2" in css, "제목 글씨체 Wanted Sans(2026-11-03 grace)"
     assert "prefers-reduced-motion" in css
 
 
 def test_font_subset_and_logo_are_shipped():
-    font = os.path.join(WEB, "public", "assets", "fonts", "HananCha-v1.woff2")
-    assert os.path.isfile(font), "한난체 서브셋 woff2 가 없습니다 — py scripts/make_hanan_font.py <HANAN.TTF>"
-    assert 50_000 < os.path.getsize(font) < 400_000, "서브셋 크기가 이상합니다(2,350자+ASCII 면 100~300KB)"
+    font = os.path.join(WEB, "public", "assets", "fonts", "WantedSans-Bold.woff2")
+    assert os.path.isfile(font), "제목 글씨체 Wanted Sans Bold woff2"
+    assert 300_000 < os.path.getsize(font) < 1_000_000
     with open(font, "rb") as f:
         assert f.read(4) == b"wOF2"
     svg = _read(WEB, "public", "assets", "kdhc-signature-ko.svg")

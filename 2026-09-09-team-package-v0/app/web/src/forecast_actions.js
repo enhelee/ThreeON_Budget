@@ -373,7 +373,7 @@ export async function fcClick(e) {
   }
   const bview = e.target.closest("[data-fcbview]")
   if (bview) { state.fc.benchView = bview.dataset.fcbview; renderPage(); return true }
-  // 5번 표준화 한눈에 보기 — 칸을 누르면 그 지사·등급(묶은 이름 HGPI/TI 그대로)으로 거른 5+ 세부로
+  // 5번 표준화 한눈에 보기 — 칸을 누르면 그 지사·등급(묶은 이름 HGPI/TI 그대로)으로 거른 5-1 세부로
   const cell = e.target.closest("[data-stdcell]")
   if (cell) {
     const [site, grade] = cell.dataset.stdcell.split("|")

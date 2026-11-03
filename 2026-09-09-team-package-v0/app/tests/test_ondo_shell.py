@@ -6,7 +6,7 @@
 - CI 빨강(#FE0009)은 로고에만 — 버튼·포커스·링크 강조는 남색(navy)과 캐릭터 색.
 - 사이드바는 어두운 얇은 띠(76px)가 기본이고 마우스를 올리면 잠깐 펼친다(10/26 방식).
   «메뉴 펼치기»로 펼친 채 고정할 수 있고, 고른 상태는 사람마다(localStorage) 기억한다.
-- 메뉴마다 담당 캐릭터 색 점: 매칭이(예산 계획·실적 집계) · 검토미(분석·상세·검토 큐·통계) · 예측이(중장기).
+- 메뉴마다 담당 캐릭터 색 점: 매칭이(예산 계획·실적 집계) · 검토미(분석·상세·검토 대기·통계) · 예측이(중장기).
 """
 import os
 import re
@@ -30,7 +30,9 @@ def test_product_name_is_ondo_by_threeon():
     for fn in ("renderSidebar", "renderHeaderBrand"):
         body = side.split(f"export function {fn}", 1)[1].split("\nexport function", 1)[0]
         text = re.sub(r"<[^>]+>", "", body)                      # <b>ON</b>DO 처럼 나눠 칠해도 글자는 ONDO
-        assert "ONDO" in text and "by ThreeON" in text, f"{fn}: 표지는 ONDO by ThreeON"
+        assert "ONDO" in text, f"{fn}: 표지는 ONDO"
+    side_text = re.sub(r"<[^>]+>", "", side.split("export function renderSidebar", 1)[1].split("\nexport function", 1)[0])
+    assert "by ThreeON" in side_text, "팀 이름 by ThreeON 은 사이드바에(맨 위 줄은 2026-11-03 단순화로 뺐다)"
     assert "ONDO" in _read(WEB, "index.html").split("<title>", 1)[1].split("</title>", 1)[0]
 
 
@@ -228,3 +230,71 @@ def test_standard_overview_groups_hgpi_ti_and_shows_all_amounts():
     cell = _fn(std, "cellHtml")
     assert "c.총액" in cell and "c.손익" in cell and "c.자본" in cell, "칸 하나에 총액·손익·자본"
     assert "data-stdkind" not in std, "손익/자본/총액 바꾸기 버튼은 뺐다"
+
+
+# ── 맨 위 줄 단순화(2026-11-03 grace): 9개 → 로고·ONDO·화면 제목·연도·이름 ─────────────
+def test_header_is_simple():
+    html = _read(WEB, "index.html")
+    header = html.split("<header", 1)[1].split("</header>", 1)[0]
+    assert "addYearBtn" not in header and "＋연도" not in header, "연도 추가 버튼은 연도 목록 맨 아래로"
+    assert 'id="yearLock"' in header and 'id="operatorMenu"' in header and 'id="logoutBtn"' in header.split('id="operatorMenu"', 1)[1]
+    brand = _read(SRC, "components", "sidebar.js").split("export function renderHeaderBrand", 1)[1].split("\nexport function", 1)[0]
+    assert "by ThreeON" not in brand and "header-brand__mascot" not in brand and "발전플랜트" not in brand
+    r = _read(SRC, "router.js")
+    assert '"__add"' in r and "btn.hidden = locked" in r
+    assert '=== "__add"' in _read(SRC, "main.js")
+
+
+def test_lock_notice_links_to_settings_unlock():
+    ch = _read(SRC, "components", "characters.js")
+    assert 'data-action="go-unlock"' in ch.split("export function lockedSay", 1)[1]
+    assert 'act === "go-unlock"' in _read(SRC, "main.js")
+
+
+# ── 1단계 예산 계획 화면 쉽게(2026-11-03 grace) ─────────────────────────────
+def test_plan_page_guides_first_time_users():
+    plan = _read(SRC, "views", "plan.js")
+    body = plan.split("export function renderBudget", 1)[1]
+    stage = _read(SRC, "components", "stage.js")
+    assert "stepGuide(" in body and "is-now" in stage, "세 단계 안내 — 지금 할 단계가 반짝"
+    assert "올라간 계획 파일" in body and "지금 쓰는 파일" in stage and "데이터셋" not in body
+    assert "slimDrop(" in body and 'drop: "plan"' in body and "drop-zone--slim" in stage, "얇은 업로드 칸, 끌어다 놓기"
+    assert "yearPicker(" not in body, "화면 안 연도 칸은 맨 위 줄과 겹쳐 뺐다"
+    assert 'data-action="tour"' in body and "plan-hint" in stage
+    assert "/api/datasets/${d.id}/download" in stage, "올라간 파일 원본 내려받기"
+    assert 'nextStep({view: "collect"' in body, "다음 단계는 맨 아래 따로 큰 버튼"
+    tour = _read(SRC, "components", "tour.js")
+    assert "budget:" in tour and "collect:" in tour and "localStorage" in tour and "건너뛰기" in tour
+    assert "maybeStartTour(" in _read(SRC, "router.js")
+    main = _read(SRC, "main.js")
+    assert 'act === "tour"' in main and '"drop"' in main
+
+
+def test_collect_page_same_guide_and_visible_results_in_eok():
+    col = _read(SRC, "views", "collect.js")
+    body = col.split("export function renderCollect", 1)[1].split("\n// ───", 1)[0]
+    assert "stepGuide(" in body and "slimDrop(" in body and "fileList(" in body and "yearPicker(" not in body
+    assert "match-card" in body and "억원" in body and "천원</span>" not in body, "매칭 결과는 크게, 억원"
+    assert 'nextStep({view: "detail"' in body and "다음 단계</p>" not in body, "다음 단계는 따로 큰 버튼"
+    assert "데이터셋" not in body
+
+def test_branches_page_has_tour():
+    br = _read(SRC, "views", "branches.js")
+    assert 'data-tour="branches"' in br and "br-scatter" in br and "br-filters" in br
+    tour = _read(SRC, "components", "tour.js")
+    assert "branches:" in tour and ".br-scatter" in tour
+
+
+def test_stats_page_tour_explains_exports():
+    st = _read(SRC, "views", "stats.js")
+    assert 'data-tour="stats"' in st and "stats-exports" in st and "stats-table" in st
+    tour = _read(SRC, "components", "tour.js").split("stats: [", 1)[1].split("],", 1)[0]
+    for k in ('data-export="actual"', 'data-export="v1"', 'data-export="matched"'):
+        assert k in tour, f"내보내기 버튼 설명 {k}"
+
+
+def test_sub_menus_are_numbered():
+    side = _read(SRC, "components", "sidebar.js")
+    for tag, label in (("3-1", "지사 상세"), ("3-2", "검토 대기"), ("5-1", "표준화 세부")):
+        assert f'tag: "{tag}", label: "{label}"' in side
+    assert "검토 큐" not in side and '"3+"' not in side

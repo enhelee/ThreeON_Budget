@@ -37,10 +37,11 @@ export function charSay({who, title, body = "", action = "", tone = "", compact 
   </section>`
 }
 
-/** 마감 연도 안내 — 1·2·3+ 화면이 같은 모양·같은 말로 쓴다. blocked = 그 화면에서 막히는 일. */
+/** 마감 연도 안내 — 1·2·3-1 화면이 같은 모양·같은 말로 쓴다. blocked = 그 화면에서 막히는 일. */
 export function lockedSay(blocked) {
   return charSay({who: "gt", tone: "warn", title: `${state.year}년은 마감(잠금) 상태예요.`,
-    body: `${blocked} 고치려면 설정 탭에서 마감을 해제하세요.`});
+    body: `${blocked} 고치려면 설정에서 마감을 해제하세요.`,
+    action: `<button type="button" class="btn-secondary shrink-0" data-action="go-unlock">설정에서 마감 해제 →</button>`});
 }
 
 // ── 도움말 — 오른쪽 아래 매칭이. 누르면 지금 화면에서 할 일 세 줄 ─────────────
@@ -54,7 +55,7 @@ export const HELP = {
            "주관부서예산 원본(손익·자본·건설공사)은 한 번에 같이 골라 올려요."],
   collect: ["zrfm2.XLSX 를 올려요. 파일 이름이 zrfm2 여야 해요.",
             "«분석 실행»을 누르면 손익·자본을 한 번에 매칭해요.",
-            "확신도가 낮은 전표는 실적분석(상세)에서 확인해요."],
+            "확신도가 낮은 전표는 지사 상세에서 확인해요."],
   branches: ["지사별 계획·실적·집행률을 한눈에 봐요.",
              "지사를 누르면 상세 화면으로 가요.",
              "검색창으로 지사를 찾을 수 있어요."],

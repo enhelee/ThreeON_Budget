@@ -62,7 +62,7 @@ export async function loadAlerts() {
   state.alerts = await api(`/api/alerts?year=${state.year}`);
 }
 
-// 검토 큐 — 사업 한 줄마다 이유를 모아 검토 금액 × 위험 가중으로 세운 목록(views/review.js).
+// 검토 대기 — 사업 한 줄마다 이유를 모아 검토 금액 × 위험 가중으로 세운 목록(views/review.js).
 //   연도가 바뀌면 줄별 추천 캐시는 버린다(같은 키라도 다른 해의 전표다).
 export async function loadReviewQueue() {
   const year = state.year;

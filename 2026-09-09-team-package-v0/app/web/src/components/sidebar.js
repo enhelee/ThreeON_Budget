@@ -21,12 +21,12 @@ export const MENU = [
   {view: "budget", tag: "1", label: "예산 계획", char: "mt"},
   {view: "collect", tag: "2", label: "실적 집계", char: "mt"},
   {view: "branches", tag: "3", label: "실적 분석", char: "gt"},
-  {view: "detail", tag: "3+", label: "실적분석(상세)", char: "gt"},
-  {view: "review", tag: "✓", label: "검토 큐", char: "gt"},
+  {view: "detail", tag: "3-1", label: "지사 상세", char: "gt", sub: true},
+  {view: "review", tag: "3-2", label: "검토 대기", char: "gt", sub: true},
   {view: "stats", tag: "4", label: "통계·내보내기", char: "gt"},
   {group: "② 표준화"},
   {view: "standard", tag: "5", label: "표준화", char: "yc"},
-  {view: "stddetail", tag: "5+", label: "표준화 세부", char: "yc", sub: true},
+  {view: "stddetail", tag: "5-1", label: "표준화 세부", char: "yc", sub: true},
   {group: "③ 중장기 예측"},
   {view: "forecast", tag: "6", label: "중장기 예측", char: "yc"},
   {group: "관리"},
@@ -42,8 +42,8 @@ export const STAGES = [
    desc: "ERP(zrfm2) 전표를 올려 계획 사업에 자동으로 붙입니다."},
   {no: "03", view: "branches", title: "실적 분석·표준화", char: "gt",
    desc: "지사별 집행률을 확인하고 재배정·수정으로 근거를 확정합니다."},
-  // 사이드바와 같은 순서·표기(2026-10-27 사용자 지적: 04·검토 큐가 빠져 번호가 어긋났다)
-  {no: "03 ✓", view: "review", title: "검토 큐", char: "gt",
+  // 사이드바와 같은 순서·표기(2026-10-27 사용자 지적: 04·검토 대기가 빠져 번호가 어긋났다)
+  {no: "03 ✓", view: "review", title: "검토 대기", char: "gt",
    desc: "돈이 많이 걸린 사업부터 승인·사유·재배정으로 확인합니다."},
   {no: "04", view: "stats", title: "통계·내보내기", char: "gt",
    desc: "과목별 계획 대비 실적을 보고 재무팀 양식으로 내려받습니다."},
@@ -89,7 +89,6 @@ export function renderHeaderBrand() {
   return `
     <img src="/assets/kdhc-signature-ko.svg" alt="" width="138" height="32" class="block h-8 w-auto">
     <span class="header-brand__text">
-      <span class="flex items-center gap-1.5 text-[15px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word ondo-word"><b>ON</b>DO</span><span class="text-[11px] font-medium text-tri">by ThreeON</span>${charImg("mt", "header-brand__mascot", {head: true})}</span>
-      <span class="block text-[12px] leading-4 text-sub">예산·실적 분석 · 발전플랜트 유지보수</span>
+      <span class="text-[17px] font-bold leading-5 tracking-tight text-ink"><span class="header-brand__word ondo-word"><b>ON</b>DO</span></span>
     </span>`
 }

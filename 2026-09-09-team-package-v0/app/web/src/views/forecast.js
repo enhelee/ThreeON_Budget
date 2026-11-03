@@ -20,7 +20,7 @@ import { baseYearRule, fcVizHtml } from "./forecast_viz.js"
 //   단위는 천원(앱 표준). v2 는 원·억원이었다.
 // ─────────────────────────────────────────────────────────────
 
-// 표준화(옛 «표준화 (3단계)» 탭)는 5번 표준화 · 5+ 표준화 세부 메뉴로 떼어 냈다(2026-11-03).
+// 표준화(옛 «표준화 (3단계)» 탭)는 5번 표준화 · 5-1 표준화 세부 메뉴로 떼어 냈다(2026-11-03).
 const TABS = [["manage", "기준정보 (가정)"], ["table", "중장기 전망"]]
 // 기준정보 안쪽 탭 — [키, 이름, 그 탭에 든 표(저장 안 된 표가 있으면 탭에 점)]
 const MANAGE_TABS = [["ref", "참고 엑셀·대조", []], ["grades", "정비등급", ["grade_plan", "grades", "site_grade_eq"]],
@@ -85,7 +85,7 @@ function panel(title, help, body, key) {
 
 // ── 헤더: 기준연도 · 탭 ──────────────────────────────────────
 
-/** 기준연도 선택기 + 안내 말풍선(+ 6번이면 하위 탭). 5 · 5+ · 6 세 화면이 같이 쓴다 — 기준연도 한 벌. */
+/** 기준연도 선택기 + 안내 말풍선(+ 6번이면 하위 탭). 5 · 5-1 · 6 세 화면이 같이 쓴다 — 기준연도 한 벌. */
 export function header({stage = "STAGE 6", title = "중장기 전망", tabs = true} = {}) {
   const fc = state.fc
   const years = [...new Set([...fc.baseYears, fc.baseYear])].filter(Boolean).sort()
@@ -740,11 +740,11 @@ function refYears(used) {
   return ` · 참고 실적 ${ys[0]}${ys.length > 1 ? `~${ys[ys.length - 1]}` : ""}`
 }
 
-/** 5+ 표준화 세부 — 예전 6번 «표준화 (3단계)» 탭 내용 그대로(표준금액 · 산정 규칙 · 정기비용 분리). */
+/** 5-1 표준화 세부 — 예전 6번 «표준화 (3단계)» 탭 내용 그대로(표준금액 · 산정 규칙 · 정기비용 분리). */
 export function renderStandardDetail() {
   return `
   <div class="space-y-6">
-    ${header({stage: "STAGE 5+", title: "표준화 세부", tabs: false})}
+    ${header({stage: "STAGE 5-1", title: "표준화 세부", tabs: false})}
     ${benchBody()}
   </div>`
 }
