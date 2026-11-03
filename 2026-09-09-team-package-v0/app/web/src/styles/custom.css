@@ -599,10 +599,12 @@ img.char-img{object-fit:contain;display:inline-block}
 @media (prefers-reduced-motion:reduce){.fab-intro,.fab-intro__char,.fab-intro__bub{animation:none}}
 @media print{.fab-intro{display:none}}
 
-/* 말로 묻기(components/chat.js·voice.js) — 내장 마이크 + 브라우저 안 Whisper. 듣는 동안 테두리가 목소리 크기만큼 커진다 */
+/* 말로 묻기(components/chat.js) — 브라우저 기본 음성 인식. 듣는 동안 빨간 테두리가 숨 쉰다 */
 .chat-mic{flex:none;width:2.5rem;border:1px solid var(--line-strong);border-radius:10px;background:var(--base);color:var(--ink);font-size:1.05rem;cursor:pointer}
 .chat-mic:hover{border-color:var(--ink)}
 .chat-mic:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .chat-mic:disabled{opacity:.5;cursor:default}
-.chat-mic--on{background:#FDEBE8;border-color:#C23B2B;color:#C23B2B;box-shadow:0 0 0 calc(2px + var(--lv,0) * 9px) rgba(194,59,43,.28);transition:box-shadow .08s linear}
+.chat-mic--on{background:#FDEBE8;border-color:#C23B2B;color:#C23B2B;animation:chat-mic-pulse 1.2s ease-in-out infinite}
+@keyframes chat-mic-pulse{0%,100%{box-shadow:0 0 0 0 rgba(194,59,43,.35)}50%{box-shadow:0 0 0 6px rgba(194,59,43,0)}}
+@media (prefers-reduced-motion:reduce){.chat-mic--on{animation:none}}
 .chat-voice-note{margin:0;padding:0 1rem .5rem;font-size:.6875rem;color:var(--sub)}
