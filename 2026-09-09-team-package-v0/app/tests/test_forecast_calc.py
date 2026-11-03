@@ -245,11 +245,33 @@ def test_compute_site_table_building_line_adds_hq_master_via_label_alias():
     empty_surprise = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액", "사유"])
     empty_investment = pd.DataFrame(columns=["사업장", "지사유형", "금액"])
     hq_amount = {("화성지사", "건물/구축물"): 242.0}  # 마스터 표 라벨은 "건물/구축물"(접두어 없음)
+    budget_lookup = {("화성지사", "수선유지비-건물/구축물"): 100.0}
+
+    table = lf.compute_site_table("화성지사", grade_hist, standard_df, empty_hot, hq_amount,
+                                   empty_temp_alloc, factors, empty_surprise, empty_investment,
+                                   budget_lookup)
+    row = table[table["예산과목"] == "수선유지비-건물/구축물"].iloc[0]
+    assert row[2026] == pytest.approx(100.0 + 242.0)
+
+
+def test_compute_site_table_hq_master_not_added_on_top_of_standard_amount():
+    """기준연도에 예산계획이 없어 표준금액(과거 실적)을 쓰면 본사 배분을 더하지 않는다 —
+    실적에 본사가 지사에 붙인 몫이 이미 들어 있어 두 번 더해진다(2026-11-03)."""
+    grade_hist = pd.DataFrame({"사업장": ["화성지사"], "연도": [2026], "등급": ["간이"]})
+    standard_df = pd.DataFrame([
+        {"사업장": "화성지사", "구분": "손익", "예산과목": "수선유지비-열원경상정비", "등급": "간이", "표준금액": 100.0},
+    ])
+    factors = pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.0, "활성": True}])
+    empty_hot = pd.DataFrame(columns=["사업장", "연도", "항목", "금액"])
+    empty_temp_alloc = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액"])
+    empty_surprise = pd.DataFrame(columns=["사업장", "연도", "예산과목", "금액", "사유"])
+    empty_investment = pd.DataFrame(columns=["사업장", "지사유형", "금액"])
+    hq_amount = {("화성지사", "수선유지비-열원경상정비"): 777.0}
 
     table = lf.compute_site_table("화성지사", grade_hist, standard_df, empty_hot, hq_amount,
                                    empty_temp_alloc, factors, empty_surprise, empty_investment)
-    row = table[table["예산과목"] == "수선유지비-건물/구축물"].iloc[0]
-    assert row[2026] == pytest.approx(100.0 + 242.0)
+    row = table[table["예산과목"] == "수선유지비-열원경상정비"].iloc[0]
+    assert row[2026] == pytest.approx(100.0)
 
 
 def test_compute_site_table_without_budget_lookup_behaves_as_before():
