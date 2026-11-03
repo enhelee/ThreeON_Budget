@@ -420,3 +420,9 @@ def test_forecast_tour_explains_each_group():
                  "정기계약·CRI·투자", "본사 배분·임시사업", "지사 돌발사업", "학습 기간·물가 환산·백테스트"):
         assert f'["{name}", ' in step, name
     assert ".tour__list{display:grid;grid-template-columns:max-content minmax(0,1fr)" in _read(SRC, "styles", "custom.css")
+
+
+def test_voucher_number_stays_one_line():
+    """2026-11-03 grace: 전표 줄의 «줄바꿈 허용»이 전표번호까지 끊던 것 — 전표번호만 한 줄로."""
+    css = _read(SRC, "styles", "custom.css")
+    assert ".det-table .voucher-row td.cell-doc{white-space:nowrap}" in css
