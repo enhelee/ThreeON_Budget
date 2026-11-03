@@ -672,3 +672,21 @@ img.char-img{object-fit:contain;display:inline-block}
 
 /* 지사 옆 작은 딱지 — 준공 후 묶음 편입 예정 등(views/standard.js siteTag) */
 .std-tag{display:inline-block;margin-left:.4rem;padding:.05rem .4rem;border:1px solid var(--line-strong, #C5CBD6);border-radius:9999px;font-size:10.5px;font-weight:600;line-height:1.4;color:#5B6478;background:#fff;vertical-align:middle;white-space:nowrap}
+
+/* 5 표준화 — 설명은 접어 두고(이 표 읽는 법), 전체보기면 옆 스크롤 없이 한 화면에(2026-11-03 grace) */
+.std-about{margin-top:.6rem}
+.std-about summary{cursor:pointer;width:fit-content;font-size:13px;font-weight:600;color:#5B6478}
+.std-about summary:hover{color:var(--navy)}
+.std-about__list{margin:.6rem 0 0;padding:.75rem 1rem;list-style:none;display:grid;gap:.35rem;border-radius:12px;background:var(--subtle);font-size:13px;line-height:1.55;color:#5B6478}
+.std-about__list b{display:inline-block;min-width:5.2rem;color:var(--ink)}
+.std-fit .std-scroll{overflow-x:visible}
+.std-fit .std-heat{table-layout:fixed;font-size:12px}
+.std-fit .std-heat .std-site{width:8.5rem;white-space:normal;padding:.25rem .5rem}
+.std-fit .std-heat thead th{white-space:normal;padding:.4rem .2rem}
+.std-fit .std-cell{min-width:0}
+.std-fit .std-cell button{gap:.2rem;padding:.3rem .4rem}
+.std-fit .std-sub{display:none}
+.std-fit .std-tag{display:block;margin:.15rem 0 0;width:fit-content;white-space:normal}
+
+/* 메뉴가 화면보다 길면 메뉴만 따로 스크롤(2026-11-03 grace — 6번까지 안 내려가던 문제) */
+#sidebar .sb-nav{scrollbar-width:thin;scrollbar-color:#C5CBD6 transparent;margin-right:-.5rem;padding-right:.5rem}

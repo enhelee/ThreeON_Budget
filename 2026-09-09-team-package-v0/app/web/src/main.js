@@ -203,6 +203,14 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-training") { state.trainingName = e.target.closest("[data-action]").dataset.name; $("#trainingFile").click(); return; }
   if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
+  if (act === "std-fit") {   // 5 표준화 표 — 옆으로 밀지 않고 한 화면에(전체보기)
+    state.stdFit = !state.stdFit
+    const btn = e.target.closest("[data-action]")
+    $("#stdPanel")?.classList.toggle("std-fit", state.stdFit)
+    btn.textContent = state.stdFit ? "원래 크기로" : "전체보기"
+    btn.setAttribute("aria-pressed", String(state.stdFit))
+    return;
+  }
   if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
