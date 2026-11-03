@@ -37,7 +37,8 @@ function play(openChat, onDone) {
     </button>
     <div class="fab-intro__bub" role="status">
       <p class="fab-intro__hi">안녕하세요, 매칭이예요!</p>
-      <p>궁금한 건 언제든 저한테 물어보세요. 🎤 말로 물어봐도 돼요.</p>
+      <p>궁금한 건 언제든 저한테 물어보세요.</p>
+      <p>🎤 말로 물어봐도 돼요.</p>
       <p class="fab-intro__where">저는 오른쪽 아래에 있을게요 ↘</p>
     </div>`
   document.body.append(box)
