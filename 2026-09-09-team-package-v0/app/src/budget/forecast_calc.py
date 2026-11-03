@@ -532,8 +532,12 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                 # "총원가배분(전체) = 본사 + 지사"라 두 금액은 서로 다른 부서코드에 잡힌 별도 예산이며
                 # 합쳐야 그 지사의 26년 총액이 된다(경상정비/정기유지보수/정기점검/지급수수료/
                 # 열원보완및개선처럼 HQ_CATEGORY_TO_ACCOUNT에 없는 계정은 본사 배분이 0이라 그대로 더해도 무해).
+                # 단, 지사 몫이 예산계획이 아니라 표준금액(과거 실적)이면 더하지 않는다 — 실적 전표에는
+                # 본사가 계약해 지사에 붙인 몫이 이미 찍혀 있어 두 번 더해진다(V5 26년 경상정비는
+                # 19개 지사 모두 본사 원가분배액과 같고, 표준금액 합도 그와 비슷하다. 2026-11-03).
                 hq_lookup_account = STANDARDIZED_ACCOUNT_TO_HQ_LABEL.get(account, account)
-                hq_part = hq_amount_by_site_acct.get((site, hq_lookup_account), 0.0) if year == base_year else 0.0
+                hq_part = (hq_amount_by_site_acct.get((site, hq_lookup_account), 0.0)
+                           if year == base_year and budget_amount is not None else 0.0)
                 amount = site_amount + hq_part
             elif source.startswith("고온부품:"):
                 item = source.split(":", 1)[1]
