@@ -146,7 +146,7 @@ class RuleEngine(ChatEngine):
         nav_cue = any(c in n for c in NAV_CUES)
         howto_cue = any(c in n for c in HOWTO_CUES)
         status_cue = any(c in n for c in STATUS_CUES)
-        bare_screen = any(n == k for _, _, keys in kb.SCREENS for k in keys)   # «검토 큐»처럼 화면 이름만
+        bare_screen = any(n == k for _, _, keys in kb.SCREENS for k in keys)   # «검토 대기»처럼 화면 이름만
 
         std_card = self._standard(q, n) if self.std_provider and any(c in n for c in STD_CUES) else None
         if std_card:
@@ -265,10 +265,10 @@ class RuleEngine(ChatEngine):
         elif n_learn:
             step, nxt = "learn", f"학습 대기 {n_learn:,}건이 있어요 — 검토를 마쳤다면 «AI 학습»을 눌러요."
         else:
-            step, nxt = "lock", "검토 큐를 마쳤다면 «연도 마감»을 하면 돼요."
+            step, nxt = "lock", "검토 대기를 마쳤다면 «연도 마감»을 하면 돼요."
         links = [STEP_LINK[step]]
         if step in ("apply", "learn", "lock") and not locked:
-            links.append(("검토 큐로", "#/review", "[data-rq-card]"))
+            links.append(("검토 대기로", "#/review", "[data-rq-card]"))
         return _card("hj", f"{y}년은 여기까지 했어요. {nxt}", "status.progress", 1, links,
                      ctx=f"{y}년으로 봤어요", table=rows, source=f"근거: {y}년 데이터셋·최신 분석·미반영 기록")
 
@@ -276,7 +276,7 @@ class RuleEngine(ChatEngine):
 def _faq_title(item):
     """fallback 칩에 쓸 짧은 질문 — 첫 번째 링크 대신 의도를 묻는 말로."""
     return {
-        "upload_plan": "계획은 어떻게 올려?", "analyze": "분석은 어떻게 해?", "review": "검토 큐는 어떻게 써?",
+        "upload_plan": "계획은 어떻게 올려?", "analyze": "분석은 어떻게 해?", "review": "검토 대기는 어떻게 써?",
         "variance_note": "차이 사유는 어떻게 넣어?", "reassign": "재배정은 어떻게 해?", "learn": "AI 학습은 뭐야?",
         "lock": "마감은 어떻게 해?", "unlock": "마감 해제는 어떻게 해?", "export": "실적 집계표 어디서 받아?",
         "forecast_setup": "전망은 어떻게 해?", "forecast_empty": "표준화 결과가 비어", "plan_template": "계획 양식 받을 수 있어?", "year_config": "새 연도는 어떻게 만들어?", "login": "작업자 이름은 왜 넣어?",

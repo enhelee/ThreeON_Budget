@@ -8,10 +8,10 @@ import { computingHtml, gradeKey, header, SAME_GRADES } from "./forecast.js"
 //
 // 지사 × 정비등급 표준금액을 한 장의 표로. 칸마다 손익 · 자본 · 총액을 한꺼번에 보인다(2026-11-03 팀장).
 //   숫자(굵게) = 총액 · 막대 = 손익(파랑) + 자본(회청) 누적, 길이는 가장 큰 칸의 총액 대비 · 아래 작은 숫자 = 손익·자본.
-//   자료는 5+ 표준화 세부와 같은 /api/forecast/benchmark(state.fc.bench) — 과목별 줄을 지사·등급으로 더한다.
+//   자료는 5-1 표준화 세부와 같은 /api/forecast/benchmark(state.fc.bench) — 과목별 줄을 지사·등급으로 더한다.
 //   HGPI 와 TI 는 같은 등급이라 한 칸(HGPI/TI)으로 묶는다(forecast.js SAME_GRADES). 서버 계산이 이미
 //   TI 를 HGPI 로 합쳐 내지만, 혹시 두 이름이 다 오면(옛 결과) 더하지 않고 평균을 낸다(칸 설명에 적는다).
-//   칸을 누르면 그 지사·등급으로 거른 5+ 세부 표로 간다(forecast_actions.js data-stdcell).
+//   칸을 누르면 그 지사·등급으로 거른 5-1 세부 표로 간다(forecast_actions.js data-stdcell).
 //
 //   단위: 자료는 천원, 칸에는 백만원으로 줄여 적는다(칸이 좁아서). 마우스를 올리면 천원 그대로.
 // ─────────────────────────────────────────────────────────────

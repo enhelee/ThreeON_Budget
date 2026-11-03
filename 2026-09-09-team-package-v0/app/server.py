@@ -19,7 +19,9 @@ import contextlib
 import glob
 import json
 import mimetypes
+import io
 import re
+import zipfile
 import threading
 import time
 from urllib.parse import quote
@@ -417,13 +419,15 @@ def app_redirect(path: str = ""):
 
 async def _ingest(files: list, year: str, kind: str):
     """files 는 UploadFile 목록. 계획은 여러 개(손익·자본·건설공사)를 한 데이터셋으로 합친다."""
-    tmps = []
+    tmps, originals = [], []
     try:
         for file in files:
             fd, tmp = tempfile.mkstemp(suffix=".xlsx")
             tmps.append(tmp)
+            data = await _read_upload(file)
+            originals.append((file.filename or os.path.basename(tmp), data))
             with os.fdopen(fd, "wb") as f:
-                f.write(await _read_upload(file))
+                f.write(data)
         label = " + ".join(f.filename for f in files)
         with _year_op(year, "자료 업로드"):
             conn = _conn()
@@ -433,13 +437,15 @@ async def _ingest(files: list, year: str, kind: str):
                     info = dbm.ingest_plan(conn, tmps, year, label=label)
                 else:
                     info = dbm.ingest_erp(conn, tmps[0], year, label=label)
+                # 원본도 DB 에 붙여 둔다 — 같은 양식 그대로 다시 받게(2026-11-03 grace). 임시 파일은 아래에서 지운다.
+                dbm.save_dataset_files(conn, info["dataset_id"], originals)
             finally:
                 conn.close()
         return info
     finally:
         for tmp in tmps:
             try:
-                os.remove(tmp)          # 보안: 원본 파일 미보관
+                os.remove(tmp)          # 서버 디스크에는 남기지 않는다(원본은 DB 의 dataset_file 에만)
             except OSError:
                 pass
 
@@ -506,6 +512,50 @@ def datasets():
         return _clean_json(dbm.list_datasets(conn))
     finally:
         conn.close()
+
+
+@app.get("/api/datasets/{ds_id}/download")
+def dataset_download(ds_id: int):
+    """올린 자료 내려받기(2026-11-03 grace «올라간 파일이 뭔지, 같은 양식으로 받게»).
+
+    원본을 저장해 둔 데이터셋(2026-11-03 이후 업로드)은 올린 엑셀 그대로 — 여러 개면 zip 하나로.
+    그 전에 올린 것은 원본이 없으므로 DB 에 흡수된 행을 표준 열 엑셀로 다시 만들어 준다."""
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT kind, year, label FROM dataset WHERE id=?", (ds_id,)).fetchone()
+        if not r:
+            raise HTTPException(404, "그 자료가 없습니다.")
+        kind, year, label = r
+        originals = dbm.load_dataset_files(conn, ds_id)
+        if originals:
+            xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            if len(originals) == 1:
+                name, data = originals[0]
+                return Response(data, media_type=xlsx,
+                                headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
+            zbuf = io.BytesIO()
+            with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
+                seen = set()
+                for name, data in originals:
+                    n, k = name, 1
+                    while n in seen:                     # 같은 이름 두 번 올린 경우
+                        k += 1; n = f"{os.path.splitext(name)[0]} ({k}){os.path.splitext(name)[1]}"
+                    seen.add(n); zf.writestr(n, data)
+            zname = f"{year}_{'계획' if kind == 'plan' else '실적'}_원본.zip"
+            return Response(zbuf.getvalue(), media_type="application/zip",
+                            headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(zname)}"})
+        cols, table = (dbm.PLAN_COLS, "plan_row") if kind == "plan" else (dbm.ERP_COLS, "erp_row")
+        df = pd.read_sql_query(f"SELECT {','.join(cols)} FROM {table} WHERE dataset_id=? ORDER BY id",
+                               conn, params=(ds_id,))
+    finally:
+        conn.close()
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xw:
+        df.to_excel(xw, index=False, sheet_name="계획" if kind == "plan" else "실적")
+    base = re.sub(r"\.xlsx?$", "", str(label or kind), flags=re.I)
+    name = f"{base}_{year}_올라간내용.xlsx"
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
 
 
 # ── 분석 실행 ───────────────────────────────────────────────────────────
@@ -1445,7 +1495,7 @@ def put_variance_note(req: VarianceNoteReq, request: Request):
         conn.close()
 
 
-# ── 검토 큐 (2026-10-27) ──────────────────────────────────────────────
+# ── 검토 대기 (2026-10-27) ──────────────────────────────────────────────
 #   사업 한 줄 = 검토 단위. 이유(차이·과다 귀속·음수·저확신)를 모으고 검토 금액 × 위험 가중으로 세운다.
 #   계산은 review_queue.py, 여기서는 DB 에서 재료를 모아 넘기기만 한다(분석 결과를 읽기만 한다).
 
@@ -1467,7 +1517,7 @@ def _rq_material(conn, year, runs):
 
 
 def _review_data(conn, year):
-    """검토 큐 계산(질의 15번 안팎 · 운영 1~3초) — 자료가 그대로면 캐시(viewcache)에서.
+    """검토 대기 계산(질의 15번 안팎 · 운영 1~3초) — 자료가 그대로면 캐시(viewcache)에서.
     버전에 차이 사유·승인도 넣는다(전망과 달리 큐의 처리 상태가 그것으로 바뀐다). 로그인·로그아웃만 뺀다."""
     def compute():
         runs = _latest_runs(conn, year)
@@ -1483,7 +1533,7 @@ def _review_data(conn, year):
 
 @app.get("/api/review-queue")
 def review_queue(year: str, brief: bool = False):
-    """검토 큐. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
+    """검토 대기. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
     conn = _conn()
     try:
         locked = dbm.is_locked(conn, year)
@@ -1549,7 +1599,7 @@ class ReviewAckReq(BaseModel):
 
 @app.put("/api/review-ack")
 def put_review_ack(req: ReviewAckReq, request: Request):
-    """검토 큐 «승인(이상 없음)». 숫자를 바꾸지 않아 마감 연도에도 받는다(차이 사유와 같은 이유).
+    """검토 대기 «승인(이상 없음)». 숫자를 바꾸지 않아 마감 연도에도 받는다(차이 사유와 같은 이유).
     승인 시점 실적을 서버가 최신 분석에서 읽어 적는다 — 재분석으로 실적이 바뀌면 큐가 다시 연다."""
     conn = _conn()
     try:
@@ -1596,7 +1646,7 @@ def _rq_line_vouchers(conn, year, budget, branch, item):
 
 @app.get("/api/review-explain")
 def review_explain(year: str, budget: str, branch: str, item: str, name: str):
-    """검토 큐 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
+    """검토 대기 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
     전년 같은 사업은 같은 예산·지사의 전년 최신 분석에서 이름(연도 글자 제외)으로 찾는다."""
     conn = _conn()
     try:
@@ -1622,7 +1672,7 @@ def review_explain(year: str, budget: str, branch: str, item: str, name: str):
 
 @app.get("/api/review-suggest")
 def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
-    """검토 큐 한 줄의 전표와 «추천 재배정».
+    """검토 대기 한 줄의 전표와 «추천 재배정».
 
     nominate   이 줄의 큰 전표 _RQ_VOUCHER_MAX 건 — 같은 지사·과목의 다른 계획 사업 중 전표 글자를 더 닮은 곳
     incoming   (덜 집행된 줄) 같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표 — «이리로 가져오기»
@@ -1744,7 +1794,7 @@ def stats(year: str):
                                             "사업수": 0, "미시행": 0, "_지사": {}})
                 g["계획"] += _amt(row["연예산"])
                 g["실적"] += _amt(row["실적금액"])
-                # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
+                # 드릴다운: 과목 숫자 → 지사별 → 3-1 지사 상세(그 과목) → 전표·매칭 근거
                 br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
                                            {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
                 br["계획"] += _amt(row["연예산"])

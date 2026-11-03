@@ -7,7 +7,7 @@ import { $ } from "./util.js"
 import { chipsFor, isResolved, rqFiltered, rqSort } from "./views/review.js"
 
 // ─────────────────────────────────────────────────────────────
-// 검토 큐 핸들러 — views/review.js 가 그린 DOM(data-rq=…)을 읽는다.
+// 검토 대기 핸들러 — views/review.js 가 그린 DOM(data-rq=…)을 읽는다.
 // main.js 의 click/change/keydown 리스너가 먼저 여기로 위임하고, 처리했으면(true) 멈춘다.
 //
 // 1클릭 흐름: 저장 API 를 부르고 → 그 줄을 «처리됨»으로 바꿔 바로 다시 그린다(줄이 빠지고
@@ -145,7 +145,7 @@ async function move(key, groups, label) {
     for (const [target, rows] of Object.entries(groups)) {
       await api("/api/override", {method: "POST", headers: JSON_HDR,
         body: JSON.stringify({year: state.year, budget: it.budget, erp_row_ids: rows, target_name: target,
-                              memo: `검토 큐 — ${label}`})})
+                              memo: `검토 대기 — ${label}`})})
     }
     delete state.rq.sugg[key]
     await loadPending()           // 헤더 «분석 반영 (N)» 배지

@@ -3,7 +3,7 @@ import { state } from "../state.js"
 import { esc, fmt } from "../util.js"
 
 // ─────────────────────────────────────────────────────────────
-// 검토 큐 (2026-10-27) — «어디부터 볼지»를 돈으로 정해 주는 작업대.
+// 검토 대기 (2026-10-27) — «어디부터 볼지»를 돈으로 정해 주는 작업대.
 //
 // 서버(/api/review-queue)가 사업 한 줄마다 이유(차이·과다 귀속·저확신·음수)를 모아
 // 검토 금액 × 위험 가중으로 줄 세워 준다. 이 화면은
@@ -186,7 +186,7 @@ function explainHtml(it) {
 }
 
 function detailBtn(it) {
-  return `<button class="rq-link" data-drill="${esc(it.branch)}" data-drill-item="${esc(it.item)}" data-drill-budget="${esc(it.budget)}" data-drill-name="${esc(it.name)}">3+ 상세 →</button>`
+  return `<button class="rq-link" data-drill="${esc(it.branch)}" data-drill-item="${esc(it.item)}" data-drill-budget="${esc(it.budget)}" data-drill-name="${esc(it.name)}">3-1 지사 상세 →</button>`
 }
 
 function voucherRow(v, it, locked, mode) {
@@ -281,8 +281,8 @@ export function renderReview() {
   const d = r.data
   const locked = !!(d?.locked ?? state.status?.locked)
   const title = `<section><p class="text-sm font-semibold text-ink">STAGE 3 · 검토</p>
-      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">검토 큐 — ${esc(state.year)}년</h2></section>`
-  if (!d) return `<div class="space-y-6">${title}<section class="panel p-6 text-sm text-sub">검토 큐를 불러오지 못했어요.</section></div>`
+      <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">검토 대기 — ${esc(state.year)}년</h2></section>`
+  if (!d) return `<div class="space-y-6">${title}<section class="panel p-6 text-sm text-sub">검토 대기를 불러오지 못했어요.</section></div>`
   if (!d.analyzed) {
     return `<div class="space-y-6">${title}<section class="panel p-6 text-sm text-sub">${esc(state.year)}년 분석 결과가 없어요 — 실적 집계에서 분석을 먼저 실행하세요.</section></div>`
   }
