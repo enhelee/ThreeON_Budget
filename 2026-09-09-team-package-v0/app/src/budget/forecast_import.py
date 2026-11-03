@@ -433,3 +433,67 @@ def hq_master_from_workbook(data: bytes, site_names, base_year: int = 2026) -> t
         r += 1
     ratio_df = pd.DataFrame(ratio_rows, columns=HQ_RATIO_COLS) if ratio_rows else empty_ratio
     return master_df, ratio_df
+
+
+# ---------------------------------------------------------------- 생산자물가지수 (2026-11-03)
+PRICE_INDEX_COLS = ["연도", "지수", "비고"]
+_YEAR_RE = re.compile(r"^\s*((?:19|20)\d{2})(?:\s*년)?(?:\s*[./-]\s*(\d{1,2})(?:\s*월)?)?\s*$")
+
+
+def _year_of(v):
+    """셀 값 → 연도(int) | None. 2016 · «2016년» · «2016.01»(월 자료) · 날짜 셀 모두."""
+    if hasattr(v, "year") and not isinstance(v, (int, float)):
+        return int(v.year)
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return int(v) if float(v).is_integer() and 1990 <= v <= 2060 else None
+    m = _YEAR_RE.match(str(v)) if v is not None else None
+    return int(m.group(1)) if m else None
+
+
+def _index_val(v):
+    """지수 셀 — 숫자(20~500, 2020=100 같은 지수 범위)만."""
+    if isinstance(v, bool) or v is None:
+        return None
+    try:
+        f = float(str(v).replace(",", "")) if not isinstance(v, (int, float)) else float(v)
+    except ValueError:
+        return None
+    return f if 20 <= f <= 500 else None
+
+
+def price_index_from_workbook(data: bytes, site_names=None) -> pd.DataFrame:
+    """엑셀에서 연도별 생산자물가지수. 시트 이름에 «물가»가 든 시트를 먼저(없으면 모든 시트) 읽는다.
+    두 모양을 다 본다 — ① 세로: 한 줄에 연도 + 그 오른쪽 첫 숫자 ② 가로: 연도가 늘어선 줄 + 그 아래 첫 숫자 줄.
+    월 자료(«2016.01» 등)면 해마다 평균. 더 많이 읽힌 모양을 쓴다. 표준화 참고 엑셀(V3)의 «생산자물가지수» 시트용."""
+    wb = _wb(data)
+    names = [n for n in wb.sheetnames if "물가" in n] or list(wb.sheetnames)
+    best = {}
+    for name in names:
+        grid = [list(r) for r in wb[name].iter_rows(values_only=True)]
+        vertical, horizontal = {}, {}
+        for row in grid:                                         # ① 세로
+            for i, v in enumerate(row):
+                y = _year_of(v)
+                if y is None:
+                    continue
+                val = next((x for x in (_index_val(c) for c in row[i + 1:]) if x is not None), None)
+                if val is not None:
+                    vertical.setdefault(y, []).append(val)
+                break
+        for ri, row in enumerate(grid):                          # ② 가로
+            cols = {i: _year_of(v) for i, v in enumerate(row) if _year_of(v) is not None}
+            if len(cols) < 3:
+                continue
+            for below in grid[ri + 1:ri + 6]:
+                vals = {cols[i]: _index_val(below[i]) for i in cols if i < len(below)}
+                vals = {y: v for y, v in vals.items() if v is not None}
+                if len(vals) >= 3:
+                    for y, v in vals.items():
+                        horizontal.setdefault(y, []).append(v)
+                    break
+        for found in (vertical, horizontal):
+            if len(found) > len(best.get("years", {})):
+                best = {"years": found, "sheet": name}
+    rows = [{"연도": y, "지수": round(sum(v) / len(v), 4), "비고": f"가져옴: {best['sheet']}" + (f" ({len(v)}개월 평균)" if len(v) > 1 else "")}
+            for y, v in sorted(best.get("years", {}).items())]
+    return pd.DataFrame(rows, columns=PRICE_INDEX_COLS)

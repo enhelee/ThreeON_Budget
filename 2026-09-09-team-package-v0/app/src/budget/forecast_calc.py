@@ -76,6 +76,24 @@ def canon_grade(value):
     return _SAME_GRADE_RE.sub(lambda m: SAME_GRADE[m.group(1)], value)
 
 
+# 표준금액을 만들지 않는 등급 · 그 등급이 있는 지사(2026-11-03 팀장).
+#   BSI = 일시적인 등급(2020년 한 번) — 표준금액이 필요 없다.
+#   CI = 이 지사들만 CI 정비를 한다(삼송은 2031 일정에 CI 가 있어 남김). 다른 지사의 CI 줄은 지운다.
+#   ⚠ 지사 이름을 코드에 둔 임시 기준 — 지사 구성이 바뀌면 여기를 고친다(나중에 기준정보 표로 옮길 것).
+DROP_GRADES = {"BSI"}
+GRADE_SITES = {"CI": {"광교지사", "동탄지사", "강남지사", "삼송지사"}}
+
+
+def prune_grades(std: pd.DataFrame) -> pd.DataFrame:
+    """표준금액 표에서 DROP_GRADES 줄과, GRADE_SITES 밖 지사의 그 등급 줄을 뺀다."""
+    if std is None or std.empty or "등급" not in std.columns:
+        return std
+    keep = ~std["등급"].isin(DROP_GRADES)
+    for grade, sites in GRADE_SITES.items():
+        keep &= ~((std["등급"] == grade) & ~std["사업장"].isin(sites))
+    return std[keep].reset_index(drop=True)
+
+
 def canon_grades(df: pd.DataFrame, cols=("등급",)) -> pd.DataFrame:
     """df 의 등급 열(들)을 canon_grade 로 바꾼 사본. 빈 표·열 없음은 그대로 돌려준다."""
     if df is None or df.empty:
@@ -172,6 +190,54 @@ def year_multiplier(year: int, factors_df: pd.DataFrame, base_year: int = BASE_Y
     for _, row in active.iterrows():
         multiplier *= (1 + float(row["연간비율"])) ** n
     return multiplier
+
+
+# ── 과거 실적의 기준연도 가치 환산(2026-11-03 팀장) ─────────────────────────────
+# 표준금액은 과거 실적의 평균인데, 실적은 그 해 금액(명목)이다. 생산자물가지수로 기준연도 가치로 바꾼 뒤
+# 표준화한다 — 환산 실적(y) = 실적(y) × 지수(기준연도) ÷ 지수(y). 손익·자본 모두 같은 지수(생산자물가지수).
+# 지수가 없는 해(기준연도처럼 아직 안 나온 해 포함)는 가까운 지수에서 전망 물가(팩터) 비율로 늘이거나 줄여 채운다.
+
+def fallback_rate(factors_df: pd.DataFrame, base_year: int = BASE_YEAR) -> float:
+    """지수 빈 해를 채울 연간 비율 = 활성 팩터 전부의 1년 배수 − 1 (기본 물가상승률 1.5%)."""
+    return year_multiplier(int(base_year) + 1, factors_df, int(base_year)) - 1.0
+
+
+def price_index_series(index_df: pd.DataFrame, years, rate: float) -> dict:
+    """{연도: (지수, 출처)} — 출처 «지수»(표에 적힌 값) | «대체»(빈 해를 rate 로 채운 값).
+    표가 비면 첫 해를 100 으로 두고 rate 로만 잇는다."""
+    years = sorted({int(y) for y in years})
+    known = {}
+    if index_df is not None and not index_df.empty:
+        for y, v in zip(index_df["연도"], index_df["지수"]):
+            try:
+                y, v = int(y), float(v)
+            except (TypeError, ValueError):
+                continue
+            if v > 0:
+                known[y] = v
+    if not years:
+        return {}
+    lo, hi = min(years + list(known)), max(years + list(known))
+    out = {y: (v, "지수") for y, v in known.items()}
+    if not known:
+        return {y: (100.0 * (1 + rate) ** (y - lo), "대체") for y in range(lo, hi + 1)}
+    first, last = min(known), max(known)
+    for y in range(first - 1, lo - 1, -1):
+        out[y] = (out[y + 1][0] / (1 + rate), "대체")
+    for y in range(first + 1, hi + 1):
+        if y not in out:
+            out[y] = (out[y - 1][0] * (1 + rate), "대체")
+    return {y: out[y] for y in range(lo, hi + 1)}
+
+
+def restate_amounts(df: pd.DataFrame, series: dict, to_year: int, col: str = "금액") -> pd.DataFrame:
+    """df 의 금액을 to_year 가치로 — 금액 × 지수(to_year) ÷ 지수(그 해). series 는 price_index_series 결과."""
+    if df is None or df.empty or not series:
+        return df
+    to = series[int(to_year)][0]
+    df = df.copy()
+    df[col] = [float(a) * to / series[int(y)][0] for a, y in zip(df[col], df["연도"])]
+    return df
 
 
 def line_scope(label: str) -> str:

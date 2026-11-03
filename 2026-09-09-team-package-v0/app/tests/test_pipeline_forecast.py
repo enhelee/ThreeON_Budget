@@ -117,6 +117,7 @@ def test_default_base_year_prefers_existing_state_then_locked_plus_one(conn):
 
 # ---------------------------------------------------------------- 실행
 def test_run_benchmark_and_forecast_end_to_end(conn):
+    fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _seed_run(conn, "2023", "손익", [("화성지사", "수선유지비-열원경상정비", 1000.0, "계획집행")])
     _seed_run(conn, "2025", "손익", [("화성지사", "수선유지비-열원경상정비", 1100.0, "계획집행")])
     dbm.lock_year(conn, "2023")
@@ -185,3 +186,63 @@ def test_ti_and_hgpi_are_one_grade_in_standard_and_forecast(conn):
 
     saved = fs.load_grade_history(conn, "2026")
     assert set(saved["등급"]) == {"TI", "HGPI", "MI"}         # 저장값은 그대로
+
+
+def test_site_notes_tag_future_capacity_target(monkeypatch):
+    """수원(2029 개체, 지금 소형CHP) 옆 딱지 — 용량 환산 기준 지사들의 묶음(중대형CHP)으로 편입 예정."""
+    cap = {"targets": {"수원사업소": {"start": 2029, "rows": pd.DataFrame()}, "청주지사": {"start": 2025}},
+           "model": {"refs": {"화성지사": 512, "파주지사": 516}}}
+    groups = {"수원사업소": "소형CHP", "화성지사": "중대형CHP", "파주지사": "중대형CHP", "청주지사": "중대형CHP"}
+    monkeypatch.setattr(pf, "site_groups", lambda conn, by: groups)
+    assert pf.site_notes(None, "2026", cap) == {"수원사업소": "2029년 준공 후 중대형CHP 편입 예정"}   # 이미 바뀐 청주는 딱지 없음
+
+
+# ---------------------------------------------------------------- 과거 실적 물가 환산(2026-11-03 팀장)
+def test_price_index_series_fills_gaps_with_forecast_rate():
+    from budget import forecast_calc as fc
+    idx = pd.DataFrame([{"연도": 2020, "지수": 100.0}, {"연도": 2022, "지수": 110.0}])
+    s = fc.price_index_series(idx, [2019, 2023, 2026], 0.02)
+    assert s[2020] == (100.0, "지수") and s[2022] == (110.0, "지수")
+    assert s[2021] == (pytest.approx(102.0), "대체")                # 앞 지수에서 전망 물가로 잇기
+    assert s[2019][0] == pytest.approx(100 / 1.02) and s[2026][0] == pytest.approx(110 * 1.02 ** 4)
+    df = fc.restate_amounts(pd.DataFrame([{"연도": 2020, "금액": 50.0}]), s, 2022)
+    assert df["금액"].tolist() == [pytest.approx(55.0)]              # 50 × 110/100
+    none = fc.price_index_series(pd.DataFrame(columns=["연도", "지수"]), [2024, 2026], 0.015)
+    assert none[2026][0] / none[2024][0] == pytest.approx(1.015 ** 2) and none[2024][1] == "대체"
+
+
+def test_standard_uses_base_year_value_by_default_and_switch_turns_it_off(conn):
+    acct = "수선유지비-열원경상정비"
+    for y, amt in (("2023", 1000.0), ("2025", 1100.0)):
+        _seed_run(conn, y, "손익", [("화성지사", acct, amt, "계획집행")])
+        dbm.lock_year(conn, y)
+    fs.save_method_map(conn, "2026", pd.DataFrame([{"사업장": "화성지사", "예산과목": acct, "방식": "최근실적"}]))
+    fs.save_factors(conn, "2026", pd.DataFrame([{"팩터명": "물가상승률", "연간비율": 0.02, "활성": True}]))
+    fs.save_table(conn, "2026", "price_index", pd.DataFrame([{"연도": 2023, "지수": 100.0, "비고": ""},
+                                                            {"연도": 2025, "지수": 110.0, "비고": ""}]))
+    assert fs.restate_on(conn, "2026")                                # 기본 켬
+    b = pf.run_benchmark(conn, "2026")
+    row = next(r for r in b["rows"] if r["사업장"] == "화성지사" and r["예산과목"] == acct)
+    assert row["표준금액"] == pytest.approx(1100.0 * (110 * 1.02) / 110)   # 2026 지수 없음 → 2025 지수 × 1.02
+    assert b["restate"]["on"] and {y["연도"]: y["출처"] for y in b["restate"]["years"]} == {2023: "지수", 2025: "지수"}
+    assert pf.benchmark_frames(conn, "2026")["actuals"]["금액"].sum() == pytest.approx(2100.0)   # 양식 실적 이력은 그 해 금액
+
+    fs.save_settings(conn, "2026", {"실적환산": "0"})
+    row = next(r for r in pf.run_benchmark(conn, "2026")["rows"] if r["사업장"] == "화성지사" and r["예산과목"] == acct)
+    assert row["표준금액"] == pytest.approx(1100.0)
+    assert pf.run_benchmark(conn, "2026")["restate"]["on"] is False
+
+
+def test_backtest_restates_training_years_to_target_year():
+    from budget import forecast_backtest as fb
+    from budget import forecast_calc as fc
+    acct = "수선유지비-열원경상정비"
+    actuals = pd.DataFrame([("화성지사", y, acct, a) for y, a in ((2023, 100.0), (2024, 105.0), (2025, 110.0))],
+                           columns=["사업장", "연도", "예산과목", "금액"])
+    grades = pd.DataFrame(columns=["사업장", "연도", "등급"])
+    s = fc.price_index_series(pd.DataFrame([{"연도": y, "지수": v} for y, v in ((2023, 100.0), (2024, 105.0), (2025, 110.0))]),
+                              [2023, 2024, 2025], 0.015)
+    plain = fb.run(actuals, grades, 3, [2025])
+    real = fb.run(actuals, grades, 3, [2025], series=s)
+    assert plain["account"] > 0.01                     # 그 해 금액 그대로면 최근실적 105 로 맞혀 4.5% 틀림
+    assert real["account"] == pytest.approx(0.0, abs=1e-9)   # 2025 가치로 바꾸면 110 · 110 → 정확

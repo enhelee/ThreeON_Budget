@@ -8,6 +8,8 @@
   칸별 오차         참고용(백테스트 42.8%)
 계획으로 받는 줄 — 기계장치 중 고온부품재·LTSA·CRI(«유형»), 건설중인자산-재생고온부품 — 은 평균으로 맞힐
 대상이 아니라 뺀다. A급정비(외주비-열원정기점검)는 일정 규칙으로 따로 잰다(설비별 등급이 있을 때).
+series(생산자물가 {연도: (지수, 출처)})를 주면 학습 실적을 «시험 연도» 가치로 바꿔 맞힌다(2026-11-03) —
+실제 전망이 과거 실적을 기준연도 가치로 바꾸는 것과 같은 조건. 시험 연도 실적은 그 해 금액 그대로.
 2026-10-26 다른 세션의 백테스트 브랜치에서 옮김 — 실적은 이 앱의 «마감 + 참고 엑셀» 모집단이다.
 """
 import pandas as pd
@@ -45,7 +47,7 @@ def _predict(train, grade_hist, target_year):
 
 
 def run(actuals: pd.DataFrame, grade_hist: pd.DataFrame, window: int, targets: list = None,
-        unit_grades: pd.DataFrame = None, site_groups: dict = None) -> dict:
+        unit_grades: pd.DataFrame = None, site_groups: dict = None, series: dict = None) -> dict:
     """한 학습 기간(window)으로 시험 연도마다 예측 → 지표 dict."""
     if actuals.empty:
         return {"window": window, "targets": [], "cell": None, "account": None, "site3": None, "overhaul": None}
@@ -57,6 +59,8 @@ def run(actuals: pd.DataFrame, grade_hist: pd.DataFrame, window: int, targets: l
     cells = []
     for t in targets:
         train = benchmark.recent_window(reg[reg["연도"] < t], window)
+        if series:
+            train = forecast_calc.restate_amounts(train, series, t)
         pred = _predict(train, grade_hist, t)
         act = reg[reg["연도"] == t].groupby(["사업장", "예산과목"])["금액"].sum().to_dict()
         for key in set(pred) | set(act):
@@ -64,7 +68,7 @@ def run(actuals: pd.DataFrame, grade_hist: pd.DataFrame, window: int, targets: l
                           "예측": pred.get(key, 0.0), "실적": act.get(key, 0.0)})
     df = pd.DataFrame(cells, columns=["연도", "사업장", "예산과목", "예측", "실적"])
     return {"window": window, "targets": targets, **_metrics(df),
-            "overhaul": _overhaul(actuals, unit_grades, site_groups or {}, targets)}
+            "overhaul": _overhaul(actuals, unit_grades, site_groups or {}, targets, series)}
 
 
 def _ratio(err, base):
@@ -87,7 +91,7 @@ def _metrics(df):
     return {"cell": cell, "account": account, "site3": site3, "by_account": by_acct}
 
 
-def _overhaul(actuals, unit_grades, site_groups, targets):
+def _overhaul(actuals, unit_grades, site_groups, targets, series=None):
     """A급정비 일정 규칙의 시험 — 총액 오차·맞힌 해·헛예측 칸."""
     if unit_grades is None or unit_grades.empty or not targets:
         return None
@@ -98,7 +102,8 @@ def _overhaul(actuals, unit_grades, site_groups, targets):
     pred_sum = act_sum = 0.0
     hits = events = false_pos = 0
     for t in targets:
-        amounts = forecast_calc.overhaul_amounts(actuals, sites, site_groups, before_year=t)
+        past = forecast_calc.restate_amounts(actuals, series, t) if series else actuals
+        amounts = forecast_calc.overhaul_amounts(past, sites, site_groups, before_year=t)
         for s in sites:
             p = amounts.get(s, 0.0) if t in years[s] else 0.0
             r = act.get((s, t), 0.0)
@@ -113,9 +118,9 @@ def _overhaul(actuals, unit_grades, site_groups, targets):
             "false_positive": false_pos}
 
 
-def compare_windows(actuals, grade_hist, windows=(2, 3, 5, 10), unit_grades=None, site_groups=None):
+def compare_windows(actuals, grade_hist, windows=(2, 3, 5, 10), unit_grades=None, site_groups=None, series=None):
     """학습 기간별 같은 시험 연도(최근 5개년)로 비교. 앞쪽 해는 학습 자료가 기간보다 짧으면 있는 만큼 쓴다
     — 2026-10-26 백테스트(2021~2025 대상)와 같은 방식이다."""
     years = sorted(int(y) for y in actuals["연도"].unique()) if not actuals.empty else []
     targets = years[1:][-5:]
-    return [run(actuals, grade_hist, w, targets, unit_grades, site_groups) for w in windows]
+    return [run(actuals, grade_hist, w, targets, unit_grades, site_groups, series) for w in windows]

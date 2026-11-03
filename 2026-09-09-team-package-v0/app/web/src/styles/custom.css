@@ -669,3 +669,6 @@ img.char-img{object-fit:contain;display:inline-block}
 .next-cta:not(.is-ready) .next-cta__btn{background:#C9D0DD}
 .next-cta.is-ready .next-cta__btn{animation:stepPulse 1.8s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.analyze-box.is-now,.next-cta.is-ready .next-cta__btn{animation:none}}
+
+/* 지사 옆 작은 딱지 — 준공 후 묶음 편입 예정 등(views/standard.js siteTag) */
+.std-tag{display:inline-block;margin-left:.4rem;padding:.05rem .4rem;border:1px solid var(--line-strong, #C5CBD6);border-radius:9999px;font-size:10.5px;font-weight:600;line-height:1.4;color:#5B6478;background:#fff;vertical-align:middle;white-space:nowrap}
