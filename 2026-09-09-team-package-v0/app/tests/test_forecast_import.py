@@ -185,3 +185,28 @@ def test_hq_master_parser_without_sheet_returns_empty_pair():
     master, ratio = fi.hq_master_from_workbook(_bytes(wb), SITES)
     assert master.empty and ratio.empty
     assert list(master.columns) == ["대분류", "중분류", "세부내역", "26년예산"]
+
+
+# ── 생산자물가지수 가져오기(2026-11-03) — 세로·가로·월 자료 ─────────────────────────
+def _ppi_book(rows, name="생산자물가지수"):
+    import io
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.active.title = "지사"
+    ws = wb.create_sheet(name)
+    for r in rows:
+        ws.append(r)
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()
+
+
+def test_price_index_from_workbook_reads_vertical_horizontal_and_monthly():
+    from budget import forecast_import as fi
+    v = fi.price_index_from_workbook(_ppi_book([["연도", "총지수"], [2019, 99.1], ["2020년", 100.0], [2021, 106.4]]))
+    assert dict(zip(v["연도"], v["지수"])) == {2019: 99.1, 2020: 100.0, 2021: 106.4}
+    h = fi.price_index_from_workbook(_ppi_book([["구분", 2019, 2020, 2021], ["총지수", 99.1, 100.0, 106.4]]))
+    assert dict(zip(h["연도"], h["지수"])) == {2019: 99.1, 2020: 100.0, 2021: 106.4}
+    m = fi.price_index_from_workbook(_ppi_book([["2021.01", 104.0], ["2021.02", 106.0], ["2022.01", 113.0]]))
+    assert dict(zip(m["연도"], m["지수"])) == {2021: 105.0, 2022: 113.0}
+    assert "2개월 평균" in m.iloc[0]["비고"]

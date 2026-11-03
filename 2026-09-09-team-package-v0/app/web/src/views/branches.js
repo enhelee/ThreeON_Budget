@@ -23,9 +23,9 @@ export function brResultsHtml() {
   else rows.sort((a, b) => (rateVal(b.plan, b.actual) ?? -Infinity) - (rateVal(a.plan, a.actual) ?? -Infinity));
   const tot = rows.reduce((a, r) => { a.plan += r.plan; a.actual += r.actual; return a; }, {plan: 0, actual: 0});
   return `
-      <section class="grid gap-4 sm:grid-cols-3"><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 계획</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 집행률</p><p class="mt-3 text-2xl font-bold">${fmtRate(tot.plan, tot.actual)}</p></article></section>
+      <section class="grid gap-4 sm:grid-cols-3 br-metrics"><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 지사</p><p class="mt-3 text-2xl font-bold">${rows.length}개</p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 계획</p><p class="mt-3 text-2xl font-bold">${fmt(tot.plan)} <span class="text-xs font-semibold text-tri">천원</span></p></article><article class="metric-card"><p class="text-sm font-semibold text-sub">조회 집행률</p><p class="mt-3 text-2xl font-bold">${fmtRate(tot.plan, tot.actual)}</p></article></section>
       ${rows.length ? brScatterHtml(rows) : ""}
-      <section class="panel mt-6 overflow-hidden">
+      <section class="panel mt-6 overflow-hidden br-table">
         <div class="flex items-center justify-between gap-3 border-b border-line px-5 py-3"><div><h3 class="section-title">지사별 계획·실적</h3><p class="text-xs text-tri">${rows.length}곳 · 합계 집행률 ${fmtRate(tot.plan, tot.actual)}${state.brTableOpen ? "" : " · 표를 접었습니다"}</p></div><button class="btn-secondary min-h-[36px] px-4 text-xs" data-brtable aria-expanded="${state.brTableOpen}" aria-controls="brTable">${state.brTableOpen ? "표 접기 ▲" : "표 펼치기 ▼"}</button></div>
         ${!state.brTableOpen ? "" : rows.length ? `<div class="overflow-x-auto" id="brTable"><table class="w-full"><thead class="table-head"><tr><th class="px-4 py-3">지사명</th><th class="px-4 py-3 text-right">계획·천원</th><th class="px-4 py-3 text-right">실적·천원</th><th class="px-4 py-3 text-right">잔액·천원</th><th class="px-4 py-3 text-right">집행률</th><th class="px-4 py-3 text-right">검토대상</th><th class="px-4 py-3 text-right" title="집행률이 계획 대비 ±20%p 를 벗어난 사업 중 사유를 적은 수 / 전체">차이 사유</th></tr></thead>
         <tbody class="divide-y divide-line-subtle">${rows.map(r => `<tr class="clickable hover:bg-subtle" data-branch="${esc(r.branch)}"><td class="table-cell font-semibold text-ink">${esc(r.branch)}</td><td class="table-cell text-right">${fmt(r.plan)}</td><td class="table-cell text-right">${fmt(r.actual)}</td><td class="table-cell text-right ${r.plan - r.actual < 0 ?"text-err" : ""}">${fmt(r.plan - r.actual)}</td><td class="table-cell text-right">${rateBadge(r.plan, r.actual)}</td><td class="table-cell text-right">${r.lowConf ? `<span class="badge bg-warn-bg text-warn">${r.lowConf}건</span>` : '<span class="text-xs text-tri">-</span>'}</td><td class="table-cell text-right">${varianceBadge(r)}</td></tr>`).join("")}
@@ -110,7 +110,7 @@ function brScatterHtml(rows) {
   const labels = [];
   for (const p of [...pts].sort((a, b) => b.plan - a.plan)) {
     const cx = sx(p.plan), cy = sy(Math.max(p.act, lo));
-    s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억 · 실적 ${p.act.toFixed(1)}억 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
+    s += `<g class="clickable sc-pt" data-branch="${esc(p.name)}"><title>${esc(p.name)} — 계획 ${p.plan.toFixed(1)}억원 · 실적 ${p.act.toFixed(1)}억원 · 집행률 ${p.rate.toFixed(1)}% (클릭: 상세)</title><circle cx="${cx}" cy="${cy}" r="14" fill="transparent"/>${scMark(cx, cy, p.rate)}</g>`;
     if (!labeled.has(p.name)) continue;
     const txt = `${p.name} ${p.rate.toFixed(0)}%`, tw = txt.length * 10.5, th = 14;
     // 띠 바깥쪽으로 먼저 — 계획보다 더 쓴 지사(대각선 위)는 왼쪽 위, 덜 쓴 지사(아래)는 오른쪽 아래부터 찾는다.
@@ -133,19 +133,20 @@ function brScatterHtml(rows) {
   s += labels.join("");
   const over = pts.filter(p => p.rate > 120).length, under = pts.filter(p => p.rate < 80).length;
   return `
-      <section class="panel mt-6 p-5 sm:p-6">
+      <section class="panel mt-6 p-5 sm:p-6 br-scatter">
         <div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="section-title">계획 대비 실적 분포</h3><p class="section-help">점을 누르면 해당 지사의 상세 분석 화면으로 이동합니다.</p></div>
         <div class="flex gap-2"><span class="badge bg-err-bg text-err">▲ 120% 초과 ${over}곳</span><span class="badge bg-warn-bg text-warn">▼ 80% 미만 ${under}곳</span></div></div>
         <div class="mt-4 overflow-x-auto"><svg viewBox="0 0 ${W} ${H}" class="mx-auto block w-full min-w-[640px]" style="max-height:68vh" role="img" aria-label="지사별 계획 대비 실적 산점도">${s}</svg></div>
-        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span><span class="inline-flex items-center gap-1.5"><svg viewBox="0 0 22 6" class="h-1.5 w-6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="#0D0D0D" stroke-width="2" stroke-dasharray="5 3"/></svg>집행률 100%</span>${floored ? `<span>바닥선 = 실적 ${num(lo)}억 미만(0원 포함) ${floored}곳</span>` : ""}</div>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">${scLegend(121, "120% 초과")}${scLegend(100, "80~120%")}${scLegend(79, "80% 미만")}<span><span class="mr-1.5 inline-block h-3 w-5 rounded-sm align-[-2px]" style="background:rgba(22,121,74,.16);outline:1px dashed rgba(22,121,74,.55)"></span>±20% 적정 범위</span><span class="inline-flex items-center gap-1.5"><svg viewBox="0 0 22 6" class="h-1.5 w-6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" stroke="#0D0D0D" stroke-width="2" stroke-dasharray="5 3"/></svg>집행률 100%</span>${floored ? `<span>바닥선 = 실적 ${num(lo)}억원 미만(0원 포함) ${floored}곳</span>` : ""}</div>
       </section>`;
 }
 
 export function renderBranches() {
   return `
     <div class="space-y-6">
-      <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-ink">실적 분석</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">전체 지사 현황 — ${esc(state.year)}년</h2></div></section>
-      <section class="panel p-5"><div class="flex flex-wrap items-end gap-3">
+      <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p class="text-sm font-semibold text-ink">실적 분석</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">전체 지사 현황 — ${esc(state.year)}년</h2></div>
+        <button type="button" class="btn-secondary self-start xl:self-auto" data-action="tour" data-tour="branches">사용법 보기</button></section>
+      <section class="panel p-5 br-filters"><div class="flex flex-wrap items-end gap-3">
         <label class="block min-w-48 flex-1"><span class="field-label">지사명 검색</span><input class="control w-full" data-filter="search" value="${esc(state.search)}" placeholder="지사명을 입력하세요"></label>
         <label class="block"><span class="field-label">예산 구분</span><select class="control" data-filter="type"><option value="all" ${state.type === "all" ? "selected" : ""}>전체</option><option value="profit" ${state.type === "profit" ? "selected" : ""}>손익</option><option value="capital" ${state.type === "capital" ? "selected" : ""}>자본</option></select></label>
         <label class="block"><span class="field-label">정렬</span><select class="control" data-filter="sort"><option value="rateDesc" ${state.sort === "rateDesc" ? "selected" : ""}>집행률 높은 순</option><option value="rateAsc" ${state.sort === "rateAsc" ? "selected" : ""}>집행률 낮은 순</option><option value="planDesc" ${state.sort === "planDesc" ? "selected" : ""}>예산 금액 큰 순</option><option value="branchAsc" ${state.sort === "branchAsc" ? "selected" : ""}>지사명 순</option></select></label>
@@ -154,4 +155,4 @@ export function renderBranches() {
     </div>`;
 }
 
-// ───────────────────────── 3+ 실적분석(상세) ─────────────────────────
+// ───────────────────────── 3-1 지사 상세 ─────────────────────────

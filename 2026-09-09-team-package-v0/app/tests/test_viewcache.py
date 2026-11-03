@@ -32,7 +32,7 @@ def test_version_ignores_session_notes_and_rejected_writes(tmp_path):
                          ("/api/review-ack", 200), ("/api/override", 423)):
         dbm.add_audit(conn, "a", "POST", path, status, "")
     assert viewcache.data_version(conn) == base                      # 숫자는 그대로
-    # 검토 큐는 사유·승인으로 상태가 바뀐다 — 그 버전에는 들어간다(로그인만 뺀다)
+    # 검토 대기는 사유·승인으로 상태가 바뀐다 — 그 버전에는 들어간다(로그인만 뺀다)
     assert viewcache.data_version(conn, ignore=viewcache.SESSION_PATHS) > base
     dbm.add_audit(conn, "a", "POST", "/api/override", 200, "")
     assert viewcache.data_version(conn) > base                       # 재배정은 숫자를 바꾼다

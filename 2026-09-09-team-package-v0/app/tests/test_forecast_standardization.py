@@ -317,6 +317,7 @@ def conn(tmp_path):
 
 
 def test_locked_actuals_detail_tags_and_manual_override(conn):
+    fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _seed_run_named(conn, "2025", "자본", [("화성지사", "기계장치", "#1 GT 고온부품 재생", 900.0),
                                          ("화성지사", "기계장치", "급수펌프 교체", 300.0),
                                          ("화성지사", "기계장치", "밸브 정비", 70.0)])
@@ -336,6 +337,7 @@ def test_locked_actuals_detail_tags_and_manual_override(conn):
 
 
 def test_reference_fills_unlocked_years_and_compare(conn):
+    fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _seed_run_named(conn, "2025", "손익", [("화성지사", "수선유지비-열원정기점검", "정기점검", 950.0)])
     dbm.lock_year(conn, "2025")
     p = fr.parse_reference(reference_workbook(), ["화성지사", "파주지사"])

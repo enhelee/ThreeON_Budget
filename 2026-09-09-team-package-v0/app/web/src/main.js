@@ -3,9 +3,10 @@ import "./styles/app.css"
 import "./styles/custom.css"
 import { api, checkAuth, doLogin } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { injectCharacterSprite } from "./components/characters.js"
+import { chatIsOpen, chatOnViewChange, closeChat, initChat, toggleChat } from "./components/chat.js"
 import { renderSidebar, renderHeaderBrand } from "./components/sidebar.js"
 import { afterSave, loadDetail, loadOvBiz, loadYearConfig } from "./data.js"
+import { onReportBlur, onReportChange, onReportClick, onReportFocus, onReportKey } from "./views/report.js"
 import { addYearFromInput, bootRoute, changeYear, navigate, onHashChange, openSettingsTab, openStatsTab, renderPage, runAnalyze, syncHash, uploadFile } from "./router.js"
 import { state } from "./state.js"
 import { $, fmt } from "./util.js"
@@ -13,6 +14,7 @@ import { brResultsHtml } from "./views/branches.js"
 import { detResultsHtml, PICK_SORTS, unassignedName } from "./views/detail.js"
 import { fcChange, fcClick, fcKey } from "./forecast_actions.js"
 import { rqChange, rqClick, rqKey } from "./review_actions.js"
+import { startTour } from "./components/tour.js"
 
 // ───────────────────────── 상태 ─────────────────────────
 
@@ -36,7 +38,8 @@ async function saveAlias(kind, mapping, msg) {
 document.addEventListener("click", async e => {
   // 5번 탭(전망)의 클릭은 forecast_actions.js 가 맡는다 — 이 파일을 더 키우지 않기 위해서다.
   if (await fcClick(e)) return;
-  if (await rqClick(e)) return;                   // 검토 큐 — review_actions.js
+  if (await rqClick(e)) return;                   // 검토 대기 — review_actions.js
+  if (await onReportClick(e)) return;             // 4번 한글 보고서 — views/report.js
   const nav = e.target.closest("nav [data-view], [data-view].btn-secondary, button[data-view]");
   if (nav && nav.dataset.view) { navigate(nav.dataset.view); return; }
   // 메인 중장기 전망 패널 → 5번 탭 «한눈에 보기»(전사). 연도가 있으면 그 해 구성으로.
@@ -47,9 +50,26 @@ document.addEventListener("click", async e => {
     navigate("forecast", {tab: "table"});
     return;
   }
+  // 메인 손익·자본 카드 «예산과목별 보기» — 처음 펼칠 때 그 연도 /api/stats 를 받는다(4번 통계 탭과 같은 자료)
+  const ha = e.target.closest("[data-homeacct]");
+  if (ha) {
+    state.homeAcct = state.homeAcct === ha.dataset.homeacct ? null : ha.dataset.homeacct;
+    renderPage();
+    const y = state.year;
+    if (state.homeAcct && String(state.stats?._year) !== String(y)) {
+      try { state.stats = {...await api(`/api/stats?year=${y}`), _year: y}; } catch { state.stats = {budgets: {}, _year: y}; }
+      renderPage();
+    }
+    return;
+  }
   const gy = e.target.closest("[data-goyear]");
-  if (gy) { changeYear(gy.dataset.goyear); return; }
-  // 드릴다운: 통계 과목 → 지사 → 3+ 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
+  if (gy) {                                   // 펼친 과목 목록은 연도가 바뀌면 닫는다
+    state.homeAcct = null;
+    const y0 = state.view === "home" ? window.scrollY : null;   // 메인에서 연도를 바꿔도 보던 자리 그대로(10/28 grace)
+    await changeYear(gy.dataset.goyear);
+    if (y0 !== null) window.scrollTo({top: y0, behavior: "instant"});
+    return; }
+  // 드릴다운: 통계 과목 → 지사 → 3-1 지사 상세(그 과목만). 사업이 적으면 전표까지 펼쳐 둔다.
   const st = e.target.closest("[data-stat-item]");
   if (st && !e.target.closest("button")) {
     state.statOpen = state.statOpen === st.dataset.statItem ? null : st.dataset.statItem;
@@ -64,7 +84,7 @@ document.addEventListener("click", async e => {
       const d = state.det;
       d.item = dr.dataset.drillItem || "";
       d.budget = dr.dataset.drillBudget || "all";
-      // 검토 큐에서 오면 사업명까지 정해져 있다 — 그 사업만 걸러 전표를 펼친다.
+      // 검토 대기에서 오면 사업명까지 정해져 있다 — 그 사업만 걸러 전표를 펼친다.
       const name = dr.dataset.drillName || "";
       d.q = name; d.attr = ""; d.lowConf = false; d.varOnly = false; d.hideMissing = false;
       const hit = d.data.biz.map((b, idx) => ({b, key: `${b.budget}|${b.예산과목}|${b.사업명}|${idx}`}))
@@ -137,8 +157,9 @@ document.addEventListener("click", async e => {
 
   const act = e.target.closest("[data-action]")?.dataset.action;
   // 도움말·검토미 배너 — 상태만 바꾸고 다시 그린다(서버 왕복 없음)
-  if (act === "toggle-help") { state.helpOpen = !state.helpOpen; renderPage(); syncFabMini(); return; }
-  if (act === "close-help") { state.helpOpen = false; renderPage(); syncFabMini(); $(".help-fab__btn")?.focus(); return; }
+  // 오른쪽 아래 매칭이 → 대화 패널(components/chat.js). 패널 안 클릭은 chat.js 가 따로 받는다.
+  if (act === "toggle-help") { await toggleChat(); renderPage(); syncFabMini(); return; }
+  if (act === "close-help") { closeChat(); renderPage(); syncFabMini(); return; }
   if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
@@ -150,7 +171,7 @@ document.addEventListener("click", async e => {
   if (sttab) { await openStatsTab(sttab.dataset.stattab); return; }   // 그 탭 자료만 받는다(router.SETTINGS_JOBS)
   if (act === "toggle-guide") { state.det.guideOpen = !state.det.guideOpen; renderPage(); return; }
   if (act === "toggle-lowconf") { state.det.lowConf = !state.det.lowConf; renderPage(); return; }
-  // 3+ 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.
+  // 3-1 지사 상세 → 지사 카드 목록(같은 화면, 지사 선택만 푼다). 예전 «← 전체 지사»는 3번으로 가서 돌아올 길이 없었다.
   if (act === "det-back") { await navigate("detail", {branch: ""}); return; }
   const ps = e.target.closest("[data-pick-sort]");
   if (ps) {
@@ -182,6 +203,15 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-training") { state.trainingName = e.target.closest("[data-action]").dataset.name; $("#trainingFile").click(); return; }
   if (act === "add-year") addYearFromInput(e.target.closest("[data-action]").dataset.input);
+  if (act === "std-fit") {   // 5 표준화 표 — 옆으로 밀지 않고 한 화면에(전체보기)
+    state.stdFit = !state.stdFit
+    const btn = e.target.closest("[data-action]")
+    $("#stdPanel")?.classList.toggle("std-fit", state.stdFit)
+    btn.textContent = state.stdFit ? "원래 크기로" : "전체보기"
+    btn.setAttribute("aria-pressed", String(state.stdFit))
+    return;
+  }
+  if (act === "tour") { startTour(e.target.closest("[data-action]").dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
   if (act === "pick-erp") $("#erpFile").click();
   if (act === "add-alias") {
@@ -219,6 +249,7 @@ document.addEventListener("click", async e => {
   }
   if (act === "pick-master-item") $("#masterItemFile").click();
   if (act === "pick-master-dept") $("#masterDeptFile").click();
+  if (act === "pick-corr-rules") $("#corrRulesFile").click();
   if (act === "clear-sel") {
     state.det.sel.clear(); state.det.selBudget = null;
     state.det.ovDept = ""; state.det.ovTarget = ""; state.det.ovManual = "";
@@ -433,6 +464,8 @@ document.addEventListener("click", async e => {
   }
   // 해제는 사유를 받는다 — 마감된 숫자는 대외 보고에 쓰인 값이라,
   // 나중에 «왜 그 해 숫자가 달라졌지»에 답할 수 있어야 한다.
+  // 마감 안내의 «설정에서 마감 해제» 바로가기 — 설정 › 연도 탭으로 바로(2026-11-03 grace)
+  if (act === "go-unlock") { state.settingsTab = "year"; await navigate("settings"); return; }
   if (act === "unlock-year") {
     const year = e.target.closest("[data-action]").dataset.year || state.year;
     const reason = prompt(`${year}년은 마감된 값입니다.\n` + "여는 이유를 적어 주세요 — 변경 이력에 남고, 다시 마감할 때까지 전 화면에 표시됩니다.");
@@ -444,6 +477,12 @@ document.addEventListener("click", async e => {
       toast(`${year}년 마감 해제 — 작업이 끝나면 다시 마감하세요.`);
       await navigate(state.view);
     } catch (err) { toast(err.message); }
+    return;
+  }
+  if (act === "clear-corr-rules") {
+    if (!confirm("보정 규칙을 모두 지울까요? 다음 분석부터 규칙이 적용되지 않습니다.")) return;
+    try { await api("/api/corr-rules", {method: "DELETE"}); toast("보정 규칙을 비웠습니다"); await navigate("settings"); }
+    catch (err) { toast(err.message); }
     return;
   }
   if (act === "clear-learned") {
@@ -508,8 +547,10 @@ document.addEventListener("click", async e => {
 
 document.addEventListener("change", async e => {
   if (await fcChange(e)) return;                 // 5번 탭(전망) 입력 — forecast_actions.js
-  if (rqChange(e)) return;                       // 검토 큐 거르기·옮길 사업 — review_actions.js
+  if (rqChange(e)) return;                       // 검토 대기 거르기·옮길 사업 — review_actions.js
+  if (e.target.id === "yearSelect" && e.target.value === "__add") { e.target.value = state.year; addYearFromInput(null); return; }
   if (e.target.id === "yearSelect" || e.target.dataset.yearpick) { changeYear(e.target.value); return; }
+  if (await onReportChange(e)) return;           // 한글 보고서 안의 «보고서 연도»
   // 「연도 기준정보」 표 편집 — 상태에만 담고, 저장 버튼에서 한 번에 보낸다.
   const yc = e.target.closest("[data-yc]");
   if (yc) {
@@ -540,6 +581,20 @@ document.addEventListener("change", async e => {
       fd.append("file", file);
       const r = await api(`/api/upload/master?kind=${kind}&year=${state.year}`, {method: "POST", body: fd});
       toast(r.notice);
+      await navigate("settings");
+    } catch (err) { toast(err.message); }
+    finally { busy(false); }
+    return;
+  }
+  if (e.target.id === "corrRulesFile" && e.target.files[0]) {
+    const file = e.target.files[0];
+    e.target.value = "";
+    busy(true, "보정 규칙 저장 중...");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await api("/api/corr-rules", {method: "POST", body: fd});
+      toast(r.notice + (r.skipped ? ` (사업명·텍스트 빈 줄 ${r.skipped}건 건너뜀)` : ""));
       await navigate("settings");
     } catch (err) { toast(err.message); }
     finally { busy(false); }
@@ -676,23 +731,29 @@ export function closeMenu() {
 
 // 도움말은 늘 캐릭터만 작게(custom.css .fab-mini) — 표 끝 열을 가리지 않게. 말풍선을 열 때만 글자도 보인다.
 //   (2026-10-26 사용자 결정: 늘 작게 + 본문 오른쪽 여백)
-const syncFabMini = () => document.body.classList.toggle("fab-mini", !state.helpOpen);
+const syncFabMini = () => document.body.classList.toggle("fab-mini", !chatIsOpen());
 syncFabMini();
+initChat();
+// 화면을 옮기면 패널의 추천 질문을 그 화면 것으로(navigate 가 주소를 맞춘 뒤).
+window.addEventListener("hashchange", () => setTimeout(() => { chatOnViewChange(); syncFabMini(); }, 0));
 
 // 클릭으로 이동·펼치는 표 행·연도 표지(.clickable)는 tr·span 이라 키보드로 닿지 않았다
 // (2026-10-18 Aside 검토 — 접근성). 새로 그려지는 것까지 탭으로 닿게 하고 Enter·Space 로 누른다.
-// 화면 일부만 다시 그리는 곳(3+ 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
+// 화면 일부만 다시 그리는 곳(3-1 지사 상세 결과표)이 있어 렌더 때 한 번이 아니라 관찰자로 붙인다.
 const CLICKABLE_ROW = "#page .clickable:not(button):not(a):not(input):not(select)";
 const markClickable = () => document.querySelectorAll(`${CLICKABLE_ROW}:not([tabindex])`)
   .forEach(el => el.setAttribute("tabindex", "0"));
 new MutationObserver(markClickable).observe($("#page"), {childList: true, subtree: true});
 
+// 한글 보고서 문서 칸 — 들어갈 때 처음 글자 기억, 나갈 때 반영(focusin/out 은 거품이 오른다)
+document.addEventListener("focusin", onReportFocus);
+document.addEventListener("focusout", e => { onReportBlur(e); });
+
 document.addEventListener("keydown", e => {
+  if (onReportKey(e)) return;
   if (fcKey(e)) { e.preventDefault(); return; }   // 5번 탭 발표 모드 — forecast_actions.js
-  if (rqKey(e)) { e.preventDefault(); return; }   // 검토 큐 단축키 — review_actions.js
-  if (e.key === "Escape" && state.helpOpen) {
-    state.helpOpen = false; renderPage(); $(".help-fab__btn")?.focus(); return;
-  }
+  if (rqKey(e)) { e.preventDefault(); return; }   // 검토 대기 단축키 — review_actions.js
+  if (e.key === "Escape" && chatIsOpen()) { closeChat(); renderPage(); syncFabMini(); return; }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(CLICKABLE_ROW)) {
     e.preventDefault(); e.target.click(); return;
   }
@@ -711,7 +772,6 @@ $("#menuButton").addEventListener("click", openMenu);
 
 $("#backdrop").addEventListener("click", closeMenu);
 
-$("#addYearBtn").addEventListener("click", () => addYearFromInput(null));
 
 // 게이트 폼은 views/gate.js 가 매번 새로 그리므로 직접 바인딩하지 않고 위임한다.
 // (예전 #loginForm 은 index.html 에 고정돼 있어 직접 바인딩했지만 이제 없다 —
@@ -737,29 +797,52 @@ $("#trainingFile").addEventListener("change", async e => {
 // 401 을 만나는 시점에 게이트로 넘어가게 한다.
 // 사이드바는 모든 화면에서 같으므로 부팅 때 한 번만 그린다.
 // (활성 표시는 renderPage() 가 화면마다 맞춘다)
-// 캐릭터 그림(<symbol>)은 사이드바·화면이 <use> 로 가져다 쓰므로 그보다 먼저 심는다.
-injectCharacterSprite();
 $("#sidebar").innerHTML = renderSidebar();
 $("#headerBrand").innerHTML = renderHeaderBrand();
 
-// 데스크톱 사이드바 — 누르지 않아도 마우스를 올리면 펼치고 떼면 접는다(2026-10-26 사용자 요청).
-// 스치기만 해도 펼쳐지지 않게 들어올 때 잠깐 기다리고, 나갈 때도 조금 늦게 접는다.
-// Tab 으로 메뉴에 들어와도 펼친다. 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
+// 데스크톱 사이드바 — 번호만 남은 어두운 띠가 기본이고, 마우스를 올리거나 Tab 으로 들어오면 본문 위로
+// 잠깐 펼친다(2026-10-26 요청). «메뉴 펼치기»로 펼친 채 고정할 수 있다(2026-10-27 grace 결정).
+// 고른 상태는 사람마다 기억한다(localStorage «ondo.sidebar» — 막힌 브라우저면 늘 띠로 시작).
+// 접힌 동안은 메뉴 이름을 title 로 띄운다. (모바일 드로어는 해당 없음)
+const SB_KEY = "ondo.sidebar";
+const sbStore = {
+  get() { try { return localStorage.getItem(SB_KEY); } catch { return null; } },
+  set(v) { try { localStorage.setItem(SB_KEY, v); } catch { /* 저장 못 해도 화면은 동작 */ } },
+}
 document.documentElement.classList.add("sb-rail");
 function setSidebarCollapsed(on) {
   document.documentElement.classList.toggle("sb-collapsed", on);
   $("#sidebar").querySelectorAll(".nav-button[data-label]").forEach(b => { b.title = on ? b.dataset.label : ""; });
 }
-setSidebarCollapsed(true);
+function setSidebarOpen(open) {
+  document.documentElement.classList.toggle("sb-open", open);
+  setSidebarCollapsed(!open);
+  const fold = $("#sidebar [data-sb-fold]");
+  if (fold) {
+    fold.setAttribute("aria-label", open ? "메뉴 접기" : "메뉴 펼치기");
+    fold.querySelector(".sb-fold__icon").textContent = open ? "«" : "»";
+    fold.querySelector(".sb-fold__text").textContent = open ? "메뉴 접기" : "메뉴 펼치기";
+  }
+}
+setSidebarOpen(sbStore.get() === "open");
 {
   const sb = $("#sidebar");
+  const pinned = () => document.documentElement.classList.contains("sb-open");
   let timer = null;
   const later = (on, ms) => { clearTimeout(timer); timer = setTimeout(() => setSidebarCollapsed(on), ms); };
-  sb.addEventListener("mouseenter", () => later(false, 120));
-  sb.addEventListener("mouseleave", () => later(true, 250));
-  sb.addEventListener("focusin", () => later(false, 0));
-  sb.addEventListener("focusout", e => { if (!sb.contains(e.relatedTarget)) later(true, 0); });
-  sb.addEventListener("click", e => { if (e.target.closest("[data-view]")) later(true, 0); });  // 메뉴를 고르면 바로 접는다
+  sb.addEventListener("mouseenter", () => { if (!pinned()) later(false, 120); });
+  sb.addEventListener("mouseleave", () => { if (!pinned()) later(true, 250); });
+  sb.addEventListener("focusin", () => { if (!pinned()) later(false, 0); });
+  sb.addEventListener("focusout", e => { if (!pinned() && !sb.contains(e.relatedTarget)) later(true, 0); });
+  sb.addEventListener("click", e => {
+    if (e.target.closest("[data-sb-fold]")) {
+      clearTimeout(timer);
+      const open = !pinned();
+      setSidebarOpen(open); sbStore.set(open ? "open" : "folded");
+      return;
+    }
+    if (!pinned() && e.target.closest("[data-view]")) later(true, 0);   // 접힌 띠에서 메뉴를 고르면 바로 접는다
+  });
 }
 
 // 뒤로가기·새로고침·주소 직접 입력 -> 해당 화면. (navigate() 가 맞춘 주소는 no-op)
@@ -768,3 +851,20 @@ window.addEventListener("hashchange", onHashChange);
 checkAuth()
   .then(ok => { if (ok) bootRoute(); })
   .catch(() => bootRoute());
+
+// 업로드 칸에 파일 끌어다 놓기(2026-11-03) — data-drop="plan|erp" 칸만. 마감 연도면 칸이 disabled 라 받지 않는다.
+document.addEventListener("dragover", e => {
+  const z = e.target.closest?.("[data-drop]");
+  if (!z || z.disabled) return;
+  e.preventDefault(); z.classList.add("is-drag");
+});
+document.addEventListener("dragleave", e => { e.target.closest?.("[data-drop]")?.classList.remove("is-drag"); });
+document.addEventListener("drop", e => {
+  const z = e.target.closest?.("[data-drop]");
+  if (!z) return;
+  e.preventDefault(); z.classList.remove("is-drag");
+  if (z.disabled) return;
+  const files = [...(e.dataTransfer?.files || [])].filter(f => /\.xlsx$/i.test(f.name));
+  if (!files.length) { toast("엑셀(.xlsx) 파일만 올릴 수 있어요."); return; }
+  uploadFile(z.dataset.drop, z.dataset.drop === "plan" ? files : files[0]);
+});

@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(APP, "src"))
 from budget import db as dbm, dbcore   # noqa: E402
 
 CHILD_OF_RUN = ("match_line", "biz_line")
-CHILD_OF_DATASET = ("plan_row", "erp_row")
+CHILD_OF_DATASET = ("plan_row", "erp_row", "dataset_file")
 
 
 def _ph(ids):

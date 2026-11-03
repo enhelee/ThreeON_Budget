@@ -119,7 +119,7 @@ export function renderDetail() {
   const branchOpts = (state.branches || []).map(r => `<option value="${esc(r.branch)}" ${r.branch === d.branch ? "selected" : ""}>${esc(r.branch)}</option>`).join("");
   if (!d.data) {
     return `<div class="space-y-6">
-      <section><p class="text-sm font-semibold text-ink">STAGE 3+</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2></section>
+      <section><p class="text-sm font-semibold text-ink">STAGE 3-1</p><h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">실적분석 (상세) — ${esc(state.year)}년</h2></section>
       <section class="panel p-5"><label class="block max-w-sm"><span class="field-label">지사 선택</span>
       <select class="control w-full" data-det="branch"><option value="">지사를 선택하세요</option>${branchOpts}</select></label>
       ${!(state.branches || []).length ? `<div class="mt-4">${charSay({who: "hj", title: "아직 자리를 찾은 전표가 없어요.", body: "분석 이력이 없습니다. 먼저 '실적 집계'에서 분석을 실행하세요.", action: `<button class="btn-secondary" data-view="collect">실적 집계로 가기</button>`})}</div>` : ""}</section>
@@ -130,9 +130,9 @@ export function renderDetail() {
   return `
     <div class="space-y-6">
       <section class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div><p class="text-sm font-semibold text-ink">STAGE 3+ · ${esc(state.year)}년</p>
+        <div><p class="text-sm font-semibold text-ink">STAGE 3-1 · ${esc(state.year)}년</p>
         <h2 class="mt-1 font-hanan text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">${esc(d.branch)} — 사업별 실적 검토</h2></div>
-        <button class="btn-secondary" data-action="det-back" title="3+ 지사 카드 목록으로">← 지사 목록</button>
+        <button class="btn-secondary" data-action="det-back" title="3-1 지사 카드 목록으로">← 지사 목록</button>
       </section>
       ${pendingBarHtml()}
       ${locked ? "" : reviewBannerHtml()}
@@ -258,7 +258,7 @@ export function detResultsHtml() {
     const vhead = !open || !b.전표.length ? "" : `
       <tr class="voucher-head">
         <td class="table-cell pl-6 text-xs font-bold text-sub" colspan="2">
-        ${locked ? "예산과목" : `<label class="flex items-center gap-2" title="이 사업의 전표 전체 선택/해제"><input type="checkbox" class="accent-brand" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>예산과목</span></label>`}</td>
+        ${locked ? "예산과목" : `<label class="flex items-center gap-2" title="이 사업의 전표 전체 선택/해제"><input type="checkbox" class="accent-navy" data-vall="${esc(key)}" data-vbudget="${esc(b.budget)}" ${allSel ? "checked" : ""}><span>예산과목</span></label>`}</td>
         <td class="table-cell text-xs font-bold text-sub">전표번호</td>
         <td class="table-cell text-xs font-bold text-sub">전표 텍스트(ERP)</td>
         <td class="table-cell text-right text-xs font-bold text-sub">전기일</td>
@@ -269,7 +269,7 @@ export function detResultsHtml() {
     const vrows = !open ? "" : vhead + b.전표.map(v => `
       <tr class="voucher-row">
         <td class="table-cell pl-6" colspan="2">
-        <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-brand" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
+        <label class="flex items-center gap-2">${locked ? "" : `<input type="checkbox" class="accent-navy" data-voucher="${v.erp_row_id}" data-vbudget="${esc(b.budget)}" ${d.sel.has(v.erp_row_id) ? "checked" : ""}>`}
         <span class="cell-item text-xs text-sub" title="${esc(v.과목 ?? b.예산과목)}">${esc(v.과목 ?? b.예산과목)}</span></label></td>
         <td class="table-cell cell-doc text-xs text-sub">${esc(v.전표번호 ?? "-")}</td>
         <td class="table-cell cell-name" title="${esc(v.텍스트 ?? "")}">${esc(v.텍스트 ?? "(텍스트 없음)")}</td>
@@ -314,7 +314,7 @@ export function detResultsHtml() {
         <td class="table-cell text-right">${rateCell(b, key)}</td>
         <td class="table-cell text-right">${gubunBadge(b.구분)}</td>
         <td class="table-cell text-right">${b.구분 === "계획집행" ? confBadge(b.확신도) : ""}</td>
-        ${locked ? "" : `<td class="table-cell text-center"><button class="mx-auto grid h-7 w-7 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-brand" title="사업 내용 수정" data-edit="${esc(key)}">✎</button></td>`}
+        ${locked ? "" : `<td class="table-cell text-center"><button class="mx-auto grid h-7 w-7 place-items-center rounded-lg bg-subtle text-sub hover:bg-subtle hover:text-mint-ink" title="사업 내용 수정" data-edit="${esc(key)}">✎</button></td>`}
       </tr>${noteRowHtml(b, key)}${editRow}${vrows}`;
   }).join("");
 
@@ -359,8 +359,8 @@ export function detResultsHtml() {
         </section>` : ""}
       <section class="panel mt-4 overflow-hidden">
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-4 py-2">
-          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
-          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-brand" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-navy" data-det-check="hideMissing" ${d.hideMissing ? "checked" : ""}>미시행 숨기기</label>
+          <label class="flex items-center gap-2 text-xs font-semibold text-sub"><input type="checkbox" class="accent-navy" data-det-check="varOnly" ${d.varOnly ? "checked" : ""}>사유 대상만(±20%p)</label>
           <button class="push-right text-xs font-semibold text-sub hover:text-ink" data-action="toggle-guide" aria-expanded="${!!d.guideOpen}" aria-controls="detGuide">? 표 보는 법</button>
         </div>
         ${guideHtml()}

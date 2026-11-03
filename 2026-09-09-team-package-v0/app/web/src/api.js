@@ -27,10 +27,10 @@ export async function api(path, opts = {}) {
 export async function checkAuth() {
   const st = await (await fetch("/api/auth/status")).json();
   state.auth = st;
-  const badge = $("#operatorBadge"), lo = $("#logoutBtn");
+  const badge = $("#operatorBadge"), menu = $("#operatorMenu");
   if (st.enabled) {
     if (!st.logged_in) { showGate(); return false; }
-    badge.textContent = `작업자 · ${st.operator}`; badge.classList.remove("hidden"); lo.classList.remove("hidden");
+    badge.textContent = st.operator; menu.classList.remove("hidden");   // 이름을 누르면 «로그아웃»(2026-11-03)
   }
   hideGate();                       // 인증됨 · 또는 인증 자체가 꺼진 사내망 모드
   return true;

@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
 """실적 산출물 작성: {연도}년 {손익|자본}예산_실적.xlsx + zrfm2_V1.
 
-- Sheet1: 사용자 분석본과 동일 포맷. 계획행(실적금액·집행구분 태깅) + 신규행 하단 추가.
-- 종합표: 계획본과 동일 레이아웃, SUMIFS로 실적금액(I열)을 지사별 집계.
-- 검토리포트: 미매핑 처지사, 미분류 과목, 연도 불일치 등.
+실적 집계표는 팀 양식(양식2 손익·양식3 자본, templates/actual_template_{예산}.xlsx)에 채운다(2026-10-31).
+- 계획 대비 실적: 양식 A~I 그대로, 4행부터 계획행 + 신규행. 칸 모양은 양식 4행을 복사.
+- (작성불필요)종합표: 양식 그대로 — 과목×처지사 SUMIFS 가 첫 시트를 집계한다.
+- (참고)분석결과: 앱 분석 열(집행구분·심의플래그·비고·매칭확신도). 양식에는 없어 따로 둔다.
+- (참고)검토리포트: 미매핑 처지사, 미분류 과목, 양식에 없는 과목·지사 등.
+양식 파일이 없으면 예전처럼 새로 만든다(Sheet1·종합표·검토리포트).
 - zrfm2_V1: 원본 유지 + R열에 매칭된 계획/신규 사업명.
 """
+import os
+import re
+from copy import copy
+
 import openpyxl
+from openpyxl.worksheet.datavalidation import DataValidation
 import pandas as pd
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter, column_index_from_string
@@ -51,6 +59,152 @@ def _simui_flag(item_flags, item, base_amount):
 
 def _clean(val):
     return None if (val is None or (isinstance(val, float) and pd.isna(val))) else val
+
+
+# ── 팀 양식에 채우기 ─────────────────────────────────────────────────────────
+TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                            "templates")
+FORM_HEADER_ROW = 2
+FORM_DATA_START = 4          # 3행은 양식의 «예시)» 행
+FORM_NCOL = 9                # A~I
+REF_SHEET = "(참고)분석결과"
+REVIEW_SHEET = "(참고)검토리포트"
+# 앱(계획 파일) 과목 이름 → 양식 과목 이름. 종합표 SUMIFS 가 양식 이름으로 찾으므로 첫 시트에는 양식 이름을 쓴다.
+FORM_ITEM_ALIASES = {"수선유지비-열원보완및개선": "수선유지비-열원보완개선및기타"}
+
+
+def form_template(budget):
+    p = os.path.join(TEMPLATE_DIR, f"actual_template_{budget}.xlsx")
+    return p if os.path.exists(p) else None
+
+
+def form_sheet_title(template_title, year):
+    """양식 시트 이름의 연도(«25년») → 대상연도."""
+    return re.sub(r"\d{2}년", f"{int(year) % 100:02d}년", template_title, count=1)
+
+
+def _summary_axes(ws):
+    """종합표의 처·지사 이름 줄, 처·지사 이름들, 과목 이름들."""
+    name_row = next(r for r in range(1, 10)
+                    if any(ws.cell(r, c).value == "소계" for c in range(1, ws.max_column + 1)))
+    depts = {ws.cell(name_row, c).value for c in range(3, ws.max_column + 1)} - {None, "소계"}
+    items = {ws.cell(r, 2).value for r in range(name_row + 1, ws.max_row + 1)} - {None, "계"}
+    return name_row, depts, items
+
+
+def _result_rows(plan_rows, new_rows, item_flags):
+    """계획행 + 신규행 — 양식 시트와 (참고)분석결과가 같은 순서·같은 연번을 쓴다."""
+    out, seq = [], 0
+    for row in plan_rows:
+        seq += 1
+        gubun = row.get("구분")
+        if gubun == "계획집행":
+            note = f"매칭전표 {row.get('매칭전표수', 0)}건"
+            low = row.get("저유사전표수", 0)
+            if low:
+                note += f" (저유사 {low}건)"
+            amb = row.get("임의귀속전표수", 0)
+            if amb:
+                note += f" ※임의귀속 {amb}건 — 사업 단위 배분 검증 필요"
+        elif gubun == "미시행":
+            note = "계획O·실적X (실적 없음)"
+        else:
+            note = ""
+        out.append({"연번": seq, "예산과목": _clean(row.get("예산과목")), "속성": _clean(row.get("속성")),
+                    "주관부서명": _clean(row.get("주관부서명")), "처지사": _clean(row.get("처지사")),
+                    "부서부": _clean(row.get("부서부")), "사업명": _clean(row.get("사업명")),
+                    "연예산": _clean(row.get("연예산")), "실적": round(row.get("실적금액", 0.0)),
+                    "구분": gubun, "심의": _simui_flag(item_flags, row.get("예산과목"), row.get("연예산")),
+                    "비고": note, "확신도": row.get("매칭확신도"), "신규": False})
+    for nr in new_rows:
+        seq += 1
+        out.append({"연번": seq, "예산과목": nr["예산과목"], "속성": None, "주관부서명": None,
+                    "처지사": nr["처지사"], "부서부": _clean(nr.get("부서부")), "사업명": nr["사업명"],
+                    "연예산": 0, "실적": round(nr["실적금액"]), "구분": nr.get("구분", "신규"),
+                    "심의": _simui_flag(item_flags, nr["예산과목"], nr["실적금액"]),
+                    "비고": nr.get("비고", ""), "확신도": None, "신규": True})
+    return out
+
+
+def write_actual_form(out_path, template, rows, budget, year, review):
+    """팀 양식(양식2·3)에 실적을 채운다. 종합표는 양식의 SUMIFS 가 그대로 집계한다."""
+    wb = openpyxl.load_workbook(template)
+    data, summary = wb.worksheets[0], wb.worksheets[1]
+    old = data.title
+    data.title = form_sheet_title(old, year)
+    if data.title != old:                       # 종합표 수식이 첫 시트를 이름으로 가리킨다
+        for ws in wb.worksheets[1:]:
+            for line in ws.iter_rows():
+                for cell in line:
+                    if isinstance(cell.value, str) and cell.value.startswith("="):
+                        cell.value = cell.value.replace(f"'{old}'", f"'{data.title}'")
+    _, depts, items = _summary_axes(summary)
+
+    style = [copy(data.cell(FORM_DATA_START, c)._style) for c in range(1, FORM_NCOL + 1)]
+    height = data.row_dimensions[FORM_DATA_START].height
+    r = FORM_DATA_START
+    off_items, off_depts = {}, {}
+    for x in rows:
+        item = x["예산과목"]
+        if item not in items:
+            item = FORM_ITEM_ALIASES.get(item, item)
+        if item not in items:
+            off_items[item] = off_items.get(item, 0) + x["실적"]
+        if x["처지사"] not in depts:
+            off_depts[x["처지사"]] = off_depts.get(x["처지사"], 0) + x["실적"]
+        vals = [x["연번"], item, x["속성"], x["주관부서명"], x["처지사"], x["부서부"], x["사업명"],
+                x["연예산"], x["실적"]]
+        for c, v in enumerate(vals, 1):
+            cell = data.cell(r, c, v)
+            cell._style = copy(style[c - 1])
+        if height:
+            data.row_dimensions[r].height = height
+        r += 1
+    last = max(r - 1, FORM_DATA_START)
+    data.auto_filter.ref = f"A{FORM_HEADER_ROW}:I{last}"
+    data.print_area = f"A1:I{last}"
+    dv = DataValidation(type="list", formula1='"일반,제조,건가,자산,영업외"', allow_blank=True)
+    dv.add(f"C{FORM_DATA_START}:C{last}")
+    data.add_data_validation(dv)
+
+    _write_reference_sheet(wb, rows)
+    review = dict(review)
+    warn = list(review.get("warnings") or [])
+    for name, amt in sorted(off_items.items()):
+        warn.append(f"양식 종합표에 없는 과목 «{name}» — 첫 시트에는 있지만 종합표 합계에 안 들어갑니다({amt:,}천원)")
+    for name, amt in sorted(off_depts.items(), key=lambda kv: str(kv[0])):
+        warn.append(f"양식 종합표에 없는 처·지사 «{name}» — 종합표 합계에 안 들어갑니다({amt:,}천원)")
+    review["warnings"] = warn
+    write_review_sheet(wb, review, title=REVIEW_SHEET)
+    wb.active = 0
+    wb.save(out_path)
+    wb.close()
+    return {"written_rows": r - FORM_DATA_START, "off_items": off_items, "off_depts": off_depts}
+
+
+def _write_reference_sheet(wb, rows):
+    """앱 분석 열 — 양식 시트와 같은 연번으로 맞춰 본다."""
+    ws = wb.create_sheet(REF_SHEET)
+    head = ["연번", "예산과목", "예산귀속 부서명(처.지사)", "사업명", "연예산(A)", "최종 실적금액(B)",
+            "집행구분", "심의플래그", "비고", "매칭확신도"]
+    for i, h in enumerate(head, 1):
+        c = ws.cell(1, i, h)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = epw.HEADER_FILL
+    for r, x in enumerate(rows, 2):
+        vals = [x["연번"], x["예산과목"], x["처지사"], x["사업명"], x["연예산"], x["실적"],
+                x["구분"], x["심의"], x["비고"], x["확신도"]]
+        for c, v in enumerate(vals, 1):
+            ws.cell(r, c, v)
+        fill = NEW_FILL if x["신규"] else MISSING_EXEC_FILL if x["구분"] == "미시행" else None
+        if fill:
+            for c in range(1, len(head) + 1):
+                ws.cell(r, c).fill = fill
+        for c in (5, 6):
+            ws.cell(r, c).number_format = "#,##0"
+    for i, w in enumerate([6, 26, 18, 46, 14, 14, 12, 8, 44, 10], 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = "A2"
 
 
 def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
@@ -133,8 +287,8 @@ def write_actual_datasheet(ws, plan_rows, new_rows, budget, year, item_flags):
     return {"written_rows": r - DATA_START}
 
 
-def write_review_sheet(wb, review):
-    ws = wb.create_sheet("검토리포트")
+def write_review_sheet(wb, review, title="검토리포트"):
+    ws = wb.create_sheet(title)
     ws.append(["■ 실적분석 검토리포트"])
     ws.append([])
     ws.append(["대상연도", review.get("year")])
@@ -196,6 +350,10 @@ def write_review_sheet(wb, review):
 def write_actual_workbook(out_path, plan_rows, new_rows, dept_columns, item_rows,
                           budget, year, review):
     item_flags = {it["과목"]: it["심의대상"] for cat in item_rows for it in cat["과목들"]}
+    template = form_template(budget)
+    if template:
+        return write_actual_form(out_path, template, _result_rows(plan_rows, new_rows, item_flags),
+                                 budget, year, review)
     wb = openpyxl.Workbook()
     ds = wb.active
     ds.title = ACTUAL_SHEET

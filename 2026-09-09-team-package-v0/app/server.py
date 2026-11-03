@@ -19,7 +19,9 @@ import contextlib
 import glob
 import json
 import mimetypes
+import io
 import re
+import zipfile
 import threading
 import time
 from urllib.parse import quote
@@ -36,7 +38,10 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 from budget import auth as authm                      # noqa: E402
 authm.load_dotenv_if_present(APP_DIR)                 # .env → 환경변수 (DATABASE_URL·APP_PASSWORD 등)
 
+from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
+from budget import corr_rules as corr_rules_mod   # noqa: E402
+from budget import excel_actual_writer, report_hwpx, report_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -135,8 +140,10 @@ class AuthAuditMiddleware(BaseHTTPMiddleware):
             if bad:
                 return JSONResponse({"detail": bad}, status_code=400)
         response = await call_next(request)
+        # /api/chat 은 POST 지만 읽기만 한다 — 감사 로그에 남기면 질문 원문이 저장되고, 감사 로그 id 가
+        # 계산 캐시(viewcache) 버전이라 질문할 때마다 전망 계산이 다시 돈다.
         if (request.method in ("POST", "PUT", "PATCH", "DELETE") and path.startswith("/api/")
-                and path not in ("/api/login", "/api/logout")):
+                and path not in ("/api/login", "/api/logout", "/api/chat")):
             if body_json and "password" in body_json:
                 body_json = {k: v for k, v in body_json.items() if k != "password"}
             try:
@@ -413,13 +420,15 @@ def app_redirect(path: str = ""):
 
 async def _ingest(files: list, year: str, kind: str):
     """files 는 UploadFile 목록. 계획은 여러 개(손익·자본·건설공사)를 한 데이터셋으로 합친다."""
-    tmps = []
+    tmps, originals = [], []
     try:
         for file in files:
             fd, tmp = tempfile.mkstemp(suffix=".xlsx")
             tmps.append(tmp)
+            data = await _read_upload(file)
+            originals.append((file.filename or os.path.basename(tmp), data))
             with os.fdopen(fd, "wb") as f:
-                f.write(await _read_upload(file))
+                f.write(data)
         label = " + ".join(f.filename for f in files)
         with _year_op(year, "자료 업로드"):
             conn = _conn()
@@ -429,13 +438,15 @@ async def _ingest(files: list, year: str, kind: str):
                     info = dbm.ingest_plan(conn, tmps, year, label=label)
                 else:
                     info = dbm.ingest_erp(conn, tmps[0], year, label=label)
+                # 원본도 DB 에 붙여 둔다 — 같은 양식 그대로 다시 받게(2026-11-03 grace). 임시 파일은 아래에서 지운다.
+                dbm.save_dataset_files(conn, info["dataset_id"], originals)
             finally:
                 conn.close()
         return info
     finally:
         for tmp in tmps:
             try:
-                os.remove(tmp)          # 보안: 원본 파일 미보관
+                os.remove(tmp)          # 서버 디스크에는 남기지 않는다(원본은 DB 의 dataset_file 에만)
             except OSError:
                 pass
 
@@ -502,6 +513,50 @@ def datasets():
         return _clean_json(dbm.list_datasets(conn))
     finally:
         conn.close()
+
+
+@app.get("/api/datasets/{ds_id}/download")
+def dataset_download(ds_id: int):
+    """올린 자료 내려받기(2026-11-03 grace «올라간 파일이 뭔지, 같은 양식으로 받게»).
+
+    원본을 저장해 둔 데이터셋(2026-11-03 이후 업로드)은 올린 엑셀 그대로 — 여러 개면 zip 하나로.
+    그 전에 올린 것은 원본이 없으므로 DB 에 흡수된 행을 표준 열 엑셀로 다시 만들어 준다."""
+    conn = _conn()
+    try:
+        r = conn.execute("SELECT kind, year, label FROM dataset WHERE id=?", (ds_id,)).fetchone()
+        if not r:
+            raise HTTPException(404, "그 자료가 없습니다.")
+        kind, year, label = r
+        originals = dbm.load_dataset_files(conn, ds_id)
+        if originals:
+            xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            if len(originals) == 1:
+                name, data = originals[0]
+                return Response(data, media_type=xlsx,
+                                headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
+            zbuf = io.BytesIO()
+            with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
+                seen = set()
+                for name, data in originals:
+                    n, k = name, 1
+                    while n in seen:                     # 같은 이름 두 번 올린 경우
+                        k += 1; n = f"{os.path.splitext(name)[0]} ({k}){os.path.splitext(name)[1]}"
+                    seen.add(n); zf.writestr(n, data)
+            zname = f"{year}_{'계획' if kind == 'plan' else '실적'}_원본.zip"
+            return Response(zbuf.getvalue(), media_type="application/zip",
+                            headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(zname)}"})
+        cols, table = (dbm.PLAN_COLS, "plan_row") if kind == "plan" else (dbm.ERP_COLS, "erp_row")
+        df = pd.read_sql_query(f"SELECT {','.join(cols)} FROM {table} WHERE dataset_id=? ORDER BY id",
+                               conn, params=(ds_id,))
+    finally:
+        conn.close()
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xw:
+        df.to_excel(xw, index=False, sheet_name="계획" if kind == "plan" else "실적")
+    base = re.sub(r"\.xlsx?$", "", str(label or kind), flags=re.I)
+    name = f"{base}_{year}_올라간내용.xlsx"
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}"})
 
 
 # ── 분석 실행 ───────────────────────────────────────────────────────────
@@ -994,6 +1049,47 @@ def learned_clear():
         conn.close()
 
 
+# ── 보정 규칙 (담당자 보정사전) ─────────────────────────────────────────
+# 조회는 건수만 돌려준다 — 사업명·전표텍스트를 화면·로그 밖으로 내보내지 않는다.
+
+@app.get("/api/corr-rules")
+def corr_rules_status():
+    conn = _conn()
+    try:
+        return {"stats": dbm.corr_rule_stats(conn)}
+    finally:
+        conn.close()
+
+
+@app.post("/api/corr-rules")
+async def corr_rules_upload(file: UploadFile = File(...)):
+    """보정사전 엑셀(지사·예산과목·전표텍스트·올바른사업명·계획사업명)로 규칙을 통째로 갈아끼운다."""
+    data = await _read_upload(file)
+    try:
+        parsed = corr_rules_mod.parse_xlsx(data)
+    except Exception as e:
+        raise HTTPException(400, f"보정 규칙을 읽지 못했습니다: {e}")
+    conn = _conn()
+    try:
+        dbm.replace_corr_rules(conn, parsed["rules"])
+        stats_ = dbm.corr_rule_stats(conn)
+        return {"stats": stats_, "skipped": parsed["skipped"],
+                "notice": f"보정 규칙 {stats_['총계']}건(배정 {stats_['배정']} · 제외 {stats_['제외']}) 저장"
+                          " — 다시 분석하면 반영됩니다. 마감된 연도는 숫자가 바뀌지 않아요."}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/corr-rules")
+def corr_rules_clear():
+    conn = _conn()
+    try:
+        dbm.clear_corr_rules(conn)
+        return {"cleared": True}
+    finally:
+        conn.close()
+
+
 # ── 사업 내용 수정 (관리자) ─────────────────────────────────────────────
 
 class BizEditReq(BaseModel):
@@ -1441,7 +1537,7 @@ def put_variance_note(req: VarianceNoteReq, request: Request):
         conn.close()
 
 
-# ── 검토 큐 (2026-10-27) ──────────────────────────────────────────────
+# ── 검토 대기 (2026-10-27) ──────────────────────────────────────────────
 #   사업 한 줄 = 검토 단위. 이유(차이·과다 귀속·음수·저확신)를 모으고 검토 금액 × 위험 가중으로 세운다.
 #   계산은 review_queue.py, 여기서는 DB 에서 재료를 모아 넘기기만 한다(분석 결과를 읽기만 한다).
 
@@ -1463,7 +1559,7 @@ def _rq_material(conn, year, runs):
 
 
 def _review_data(conn, year):
-    """검토 큐 계산(질의 15번 안팎 · 운영 1~3초) — 자료가 그대로면 캐시(viewcache)에서.
+    """검토 대기 계산(질의 15번 안팎 · 운영 1~3초) — 자료가 그대로면 캐시(viewcache)에서.
     버전에 차이 사유·승인도 넣는다(전망과 달리 큐의 처리 상태가 그것으로 바뀐다). 로그인·로그아웃만 뺀다."""
     def compute():
         runs = _latest_runs(conn, year)
@@ -1479,7 +1575,7 @@ def _review_data(conn, year):
 
 @app.get("/api/review-queue")
 def review_queue(year: str, brief: bool = False):
-    """검토 큐. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
+    """검토 대기. brief=1 이면 요약과 상위 3건만(메인 «다음 할 일»용)."""
     conn = _conn()
     try:
         locked = dbm.is_locked(conn, year)
@@ -1545,7 +1641,7 @@ class ReviewAckReq(BaseModel):
 
 @app.put("/api/review-ack")
 def put_review_ack(req: ReviewAckReq, request: Request):
-    """검토 큐 «승인(이상 없음)». 숫자를 바꾸지 않아 마감 연도에도 받는다(차이 사유와 같은 이유).
+    """검토 대기 «승인(이상 없음)». 숫자를 바꾸지 않아 마감 연도에도 받는다(차이 사유와 같은 이유).
     승인 시점 실적을 서버가 최신 분석에서 읽어 적는다 — 재분석으로 실적이 바뀌면 큐가 다시 연다."""
     conn = _conn()
     try:
@@ -1592,7 +1688,7 @@ def _rq_line_vouchers(conn, year, budget, branch, item):
 
 @app.get("/api/review-explain")
 def review_explain(year: str, budget: str, branch: str, item: str, name: str):
-    """검토 큐 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
+    """검토 대기 한 줄의 근거 설명과 차이 사유 초안(explain.py — 규칙 기반, 숫자는 바꾸지 않는다).
     전년 같은 사업은 같은 예산·지사의 전년 최신 분석에서 이름(연도 글자 제외)으로 찾는다."""
     conn = _conn()
     try:
@@ -1618,7 +1714,7 @@ def review_explain(year: str, budget: str, branch: str, item: str, name: str):
 
 @app.get("/api/review-suggest")
 def review_suggest(year: str, budget: str, branch: str, item: str, name: str):
-    """검토 큐 한 줄의 전표와 «추천 재배정».
+    """검토 대기 한 줄의 전표와 «추천 재배정».
 
     nominate   이 줄의 큰 전표 _RQ_VOUCHER_MAX 건 — 같은 지사·과목의 다른 계획 사업 중 전표 글자를 더 닮은 곳
     incoming   (덜 집행된 줄) 같은 과목 다른 사업에 붙었지만 이 사업 이름을 더 닮은 전표 — «이리로 가져오기»
@@ -1705,6 +1801,12 @@ def delete_override(override_id: int):
 
 # ── 통계 (25년 확정 분류체계 기준) ──────────────────────────────────────
 
+def _amt(v):
+    """금액 칸 하나를 숫자로. 계획 없이 집행된 사업(신규)은 연예산이 NaN 인데, `NaN or 0` 은 NaN 이 참이라
+    그대로 더해져 과목 합계 전체가 NaN(→ JSON null → 화면 0)이 됐다(2026-10-28 메인 과목별 펼치기에서 발견)."""
+    return 0 if v is None or v != v else v
+
+
 @app.get("/api/stats")
 def stats(year: str):
     """과목별·지사그룹별 계획 대비 실적 통계(손익/자본)."""
@@ -1728,25 +1830,25 @@ def stats(year: str):
                                             "대분류": cat_of.get(it, "기타"),
                                             "계획": 0, "실적": 0, "집행": 0, "신규": 0,
                                             "사업수": 0, "미시행": 0, "_지사": {}})
-                g["계획"] += row["연예산"] or 0
-                g["실적"] += row["실적금액"] or 0
-                # 드릴다운: 과목 숫자 → 지사별 → 3+ 상세(그 과목) → 전표·매칭 근거
+                g["계획"] += _amt(row["연예산"])
+                g["실적"] += _amt(row["실적금액"])
+                # 드릴다운: 과목 숫자 → 지사별 → 3-1 지사 상세(그 과목) → 전표·매칭 근거
                 br = g["_지사"].setdefault(row["처지사"] or "(미매핑)",
                                            {"처지사": row["처지사"] or "(미매핑)", "계획": 0, "실적": 0, "사업수": 0})
-                br["계획"] += row["연예산"] or 0
-                br["실적"] += row["실적금액"] or 0
+                br["계획"] += _amt(row["연예산"])
+                br["실적"] += _amt(row["실적금액"])
                 br["사업수"] += 1
                 g["사업수"] += 1
                 if row["구분"] == "미시행":
                     g["미시행"] += 1
                 elif row["구분"] == "계획집행":
-                    g["집행"] += row["실적금액"] or 0
+                    g["집행"] += _amt(row["실적금액"])
                 else:
-                    g["신규"] += row["실적금액"] or 0
+                    g["신규"] += _amt(row["실적금액"])
                 grp = group_of.get(row["처지사"], "기타")
                 gg = by_group.setdefault(grp, {"그룹": grp, "계획": 0, "실적": 0})
-                gg["계획"] += row["연예산"] or 0
-                gg["실적"] += row["실적금액"] or 0
+                gg["계획"] += _amt(row["연예산"])
+                gg["실적"] += _amt(row["실적금액"])
             for g in by_item.values():
                 g["지사"] = sorted(g.pop("_지사").values(), key=lambda b: -abs(b["실적"]))
             order = ["본사", "중대형CHP", "소형CHP", "DH", "기타"]
@@ -1838,11 +1940,141 @@ def _ensure_actual_outputs(conn, year, budget):
         return False
     paths = [os.path.join(OUT_DIR, n) for n in _actual_output_names(year, budget).values()]
     # 분석은 속도를 위해 파일을 만들지 않는다 → 없거나 최신 분석보다 오래됐으면 지금 생성.
-    if any(not os.path.exists(p) or _mtime_str(p) < str(run["created_at"]) for p in paths):
+    #   양식(templates/actual_template_*)이 파일보다 새로우면(배포로 양식이 바뀜)도 다시 — 안 그러면
+    #   다음 분석 전까지 옛 모양 파일이 계속 나간다(2026-10-31 팀 양식으로 바꾸며).
+    tpl = excel_actual_writer.form_template(budget)
+    newer = max(str(run["created_at"]), _mtime_str(tpl) if tpl else "")
+    if any(not os.path.exists(p) or _mtime_str(p) < newer for p in paths):
         # 파일만 다시 만든다 — 새 실행 이력을 남기면 매 다운로드마다 재생성된다.
         pipeline_db.run_actual_db(conn, OUT_DIR, year, budget,
                                   make_files=True, record_run=False)
     return True
+
+
+# ── 캐릭터 챗봇(2026-10-27, 1단계) — 규칙 엔진, 읽기만 ─────────────────────
+#   질문을 규칙으로 알아듣고(사용법·화면 이동·진행 상황), 숫자는 DB 에서 읽은 값만 쓴다.
+#   외부로 나가는 데이터는 없다. 대화 원문은 저장하지 않는다(감사 로그에도 남기지 않는 GET 성격의 POST).
+#   설계: docs/설계_캐릭터챗봇.md
+
+class ChatReq(BaseModel):
+    question: str
+    context: dict = {}
+
+
+_CHAT_VIEWS = set(chatm.kb.SUGGEST)
+
+
+def _chat_status(year):
+    """진행 상황 답에 쓸 값 — 데이터셋·최신 분석·미반영·마감. year 가 없으면 자료가 있는 최신 연도."""
+    conn = _conn()
+    try:
+        if not year:
+            years = sorted({str(d["year"]) for d in dbm.list_datasets(conn)})
+            year = years[-1] if years else None
+        if not year:
+            return None
+        runs = _latest_runs(conn, year)
+        try:
+            pend = _pending_data(conn, year, runs)
+        except Exception:
+            conn.rollback()
+            pend = None
+        return {"year": year, "datasets": dbm.list_datasets(conn, year),
+                "runs": {b: r["created_at"] for b, r in runs.items()},
+                "pending": pend, "locked": dbm.is_locked(conn, year)}
+    finally:
+        conn.close()
+
+
+def _chat_standard():
+    """예측이의 표준금액 근거 답 — 5번 표준화 결과(캐시) 그대로."""
+    conn = dbm.connect()
+    try:
+        return api_forecast.standard_rows(conn)
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+_CHAT_FACTS = {"key": None, "data": None}
+
+
+def _chat_facts():
+    """«○○ 얼마 들었어»·«몇 년도에 한 적» 답 재료 — 연도·예산마다 최신 실행의 사업 줄(읽기만).
+    실행이 그대로면 지난번 것을 다시 쓴다(질문마다 수천 줄을 다시 읽지 않게)."""
+    conn = _conn()
+    try:
+        runs = dbm.latest_runs_all(conn)
+        key = tuple(sorted((y, b, r["id"]) for (y, b), r in runs.items()))
+        if _CHAT_FACTS["key"] == key:
+            return _CHAT_FACTS["data"]
+        lines = []
+        for (year, budget), r in runs.items():
+            for 처지사, 예산과목, 사업명, 연예산, 실적금액 in conn.execute(
+                    "SELECT 처지사, 예산과목, 사업명, 연예산, 실적금액 FROM biz_line WHERE run_id=?", (r["id"],)):
+                if 사업명:
+                    lines.append({"연도": str(year), "예산": budget, "처지사": 처지사 or "", "예산과목": 예산과목 or "",
+                                  "사업명": 사업명, "연예산": float(연예산 or 0), "실적금액": float(실적금액 or 0)})
+        data = {"lines": lines, "years": sorted({y for y, _ in runs}),
+                "depts": sorted({x["처지사"] for x in lines if x["처지사"]}),
+                "vouchers": lambda years, dept: _chat_vouchers(runs, years, dept)}
+        _CHAT_FACTS.update(key=key, data=data)
+        return data
+    except Exception:
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+
+_CHAT_VOUCHERS = {}
+
+
+def _chat_vouchers(runs, years, dept):
+    """사업명에 없는 공사를 전표 내용(적요)으로 찾을 때 — 실적에 들어간 전표(계획집행·신규)만, 지사로 거른다.
+    (실행 id, 지사)마다 한 번만 읽는다(새 분석이면 id 가 바뀌어 저절로 새로 읽힌다)."""
+    out = []
+    conn = None
+    try:
+        for (year, budget), r in runs.items():
+            if years and str(year) not in years:
+                continue
+            k = (r["id"], dept or "")
+            if k not in _CHAT_VOUCHERS:
+                conn = conn or _conn()
+                sql = ("SELECT e.사업명, e.금액천원, m.매칭사업명, m.구분 FROM match_line m JOIN erp_row e ON e.id = m.erp_row_id"
+                       " WHERE m.run_id=? AND m.구분 IN ('계획집행','신규')" + (" AND m.처지사정규=?" if dept else ""))
+                rows = conn.execute(sql, (r["id"], dept) if dept else (r["id"],)).fetchall()
+                _CHAT_VOUCHERS[k] = [{"연도": str(year), "전표텍스트": t or "", "금액천원": float(a or 0),
+                                      "붙은사업": n or ("계획 외(신규)" if g == "신규" else "")} for t, a, n, g in rows if t]
+            out.extend(_CHAT_VOUCHERS[k])
+        return out
+    except Exception:
+        if conn:
+            conn.rollback()
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.post("/api/chat")
+def chat(req: ChatReq):
+    if len(req.question or "") > chatm.engine.MAX_LEN:
+        raise HTTPException(400, f"질문은 {chatm.engine.MAX_LEN}자까지예요.")
+    # context 는 본문 안쪽이라 연도 검증 미들웨어가 보지 않는다 — 여기서 모양을 강제한다.
+    raw = req.context or {}
+    ctx = {"view": raw.get("view") if raw.get("view") in _CHAT_VIEWS else "home",
+           "year": str(raw.get("year")) if re.fullmatch(r"\d{4}", str(raw.get("year") or "")) else None,
+           "voice": raw.get("voice") is True}          # 말로 물었으면 받아 적기 실수를 고쳐 알아듣는다
+    return _clean_json(chatm.RuleEngine(status_provider=_chat_status, std_provider=_chat_standard,
+                                         facts_provider=_chat_facts).answer(req.question, ctx))
+
+
+@app.get("/api/chat/suggestions")
+def chat_suggestions(view: str = "home"):
+    return {"suggestions": chatm.suggestions_for(view if view in _CHAT_VIEWS else "home")}
 
 
 @app.get("/api/export")
@@ -1867,6 +2099,82 @@ def export(year: str, budget: str, kind: str = "actual"):
     media = mimetypes.guess_type(names[kind])[0] or "application/octet-stream"
     return Response(body, media_type=media, headers={
         "Content-Disposition": f"attachment; filename*=utf-8''{quote(names[kind])}"})
+
+
+# ── 한글(hwpx) 보고서 (report_hwpx.py) ───────────────────────────────────────
+# 화면이 입력값을 받아 고치고(투자비·원인 문장 등) → 그 입력값으로 문장 초안을 다시 쓰거나 → hwpx 로 받는다.
+# 서버는 고친 값을 저장하지 않는다 — 보고서는 내려받은 파일이 원본이고, 다시 열면 분석 결과로 새로 채운다.
+
+# 보고서 종류 — 2월용 집행성과분석(perf) · 5월용 붙임2 실적 및 계획(plan). 같은 다섯 단계를 종류별 함수로.
+REPORTS = {
+    "perf": dict(template="report_perf_template.hwpx", build=report_hwpx.build_perf_inputs,
+                 normalize=report_hwpx.normalize_inputs, texts=report_hwpx.auto_texts,
+                 preview=report_hwpx.preview_perf_html, render=report_hwpx.render_perf_hwpx,
+                 name=lambda y: f"{y % 100}년 열원 유지보수예산 집행성과분석.hwpx"),
+    "plan": dict(template="report_plan_template.hwpx", build=report_plan.build_plan_inputs,
+                 normalize=report_plan.normalize_inputs, texts=report_plan.auto_texts,
+                 preview=report_plan.preview_plan_html, render=report_plan.render_plan_hwpx,
+                 name=lambda y: f"[붙임2] {y % 100}년~{(y + 1) % 100}년 열원시설 유지보수예산 집행실적 및 계획.hwpx"),
+}
+
+
+class ReportReq(BaseModel):
+    year: str
+    inputs: dict
+
+
+def _report(kind):
+    if kind not in REPORTS:
+        raise HTTPException(404, "보고서 종류는 perf(2월 집행성과분석) 또는 plan(5월 붙임2)입니다.")
+    return REPORTS[kind]
+
+
+def _report_template(rep):
+    with open(os.path.join(APP_DIR, "templates", rep["template"]), "rb") as f:
+        return f.read()
+
+
+@app.get("/api/report-years")
+def report_years():
+    """보고서 연도 고르기 — 대상연도(분석한 해)보다 넓다. 예전 해는 참고 엑셀 실적으로 채운다."""
+    conn = _conn()
+    try:
+        return report_hwpx.report_years(conn)
+    finally:
+        conn.close()
+
+
+@app.get("/api/report/{kind}")
+def report_inputs(kind: str, year: str):
+    rep = _report(kind)
+    conn = _conn()
+    try:
+        return _clean_json(rep["build"](conn, year))
+    finally:
+        conn.close()
+
+
+@app.post("/api/report/{kind}/texts")
+def report_texts(kind: str, req: ReportReq):
+    """고친 숫자로 문장 초안(◈·□·○)을 다시 — 원인 칸은 비워 둔 채."""
+    rep = _report(kind)
+    return _clean_json(rep["texts"](rep["normalize"](req.inputs, req.year)))
+
+
+@app.post("/api/report/{kind}/preview")
+def report_preview(kind: str, req: ReportReq):
+    """화면용 — 양식을 채운 결과를 종이 모양 HTML 로(고칠 칸 표시 포함). 내려받는 hwpx 와 같은 채우기를 지난다."""
+    rep = _report(kind)
+    inputs = rep["normalize"](req.inputs, req.year)
+    return {"html": rep["preview"](_report_template(rep), inputs), "inputs": _clean_json(inputs)}
+
+
+@app.post("/api/report/{kind}/hwpx")
+def report_hwpx_file(kind: str, req: ReportReq):
+    rep = _report(kind)
+    body = rep["render"](_report_template(rep), rep["normalize"](req.inputs, req.year))
+    return Response(body, media_type="application/hwp+zip", headers={
+        "Content-Disposition": f"attachment; filename*=utf-8''{quote(rep['name'](int(req.year)))}"})
 
 
 # ── 모델 레지스트리 · 학습데이터 (ml_registry.py) ─────────────────────────────

@@ -21,7 +21,7 @@ import json
 
 import pandas as pd
 
-from . import benchmark, config_store, forecast_calc, matching, normalize
+from . import benchmark, capacity, config_store, forecast_calc, matching, normalize
 from . import db as dbm
 from . import forecast_store as fs
 
@@ -195,17 +195,83 @@ def actuals_with_reference(conn, base_year):
     return merged, years_used, sorted({str(y) for y in ref["연도"]})
 
 
+def capacity_inputs(conn, base_year):
+    """(설비 현황, 용량 규칙, 구조변화 + 용량 대상 «실적사용시작») — 표가 비어 있으면 capacity.py 기본값."""
+    cap = fs.load_table(conn, base_year, "site_capacity")
+    rules = fs.load_table(conn, base_year, "capacity_rule")
+    events = pd.concat([fs.load_table(conn, base_year, "site_event"), capacity.usage_events(rules, cap, base_year)],
+                       ignore_index=True)
+    return cap, rules, events
+
+
+def price_series(conn, base_year, years):
+    """과거 실적 환산에 쓸 {연도: (지수, 출처)} — 설정 «실적환산»이 꺼져 있으면 None.
+    years 와 기준연도를 모두 덮는다(지수 빈 해는 전망 물가로 채움, forecast_calc.price_index_series)."""
+    if not fs.restate_on(conn, base_year):
+        return None
+    rate = forecast_calc.fallback_rate(fs.load_factors(conn, base_year), int(base_year))
+    return forecast_calc.price_index_series(fs.load_table(conn, base_year, "price_index"),
+                                            [int(y) for y in years] + [int(base_year)], rate)
+
+
+def restate_summary(series, base_year, years) -> dict:
+    """화면용 — {on, base_year, years: [{연도, 배수, 출처}]} (실적이 있는 해만)."""
+    if not series:
+        return {"on": False, "base_year": str(base_year), "years": []}
+    to = series[int(base_year)][0]
+    return {"on": True, "base_year": str(base_year),
+            "years": [{"연도": y, "배수": to / series[y][0], "출처": series[y][1]} for y in sorted({int(v) for v in years})]}
+
+
 def _standard(conn, base_year):
+    """표준금액 + 용량 환산(신규 발전설비 지사). 반환: std · actuals · years_used · grade · cap
+    cap = {"model": 용량 규칙(기준 지사로 맞춘 고정분·등급별 단가·과목 비중·LOO), "targets": {지사: {mw, start, excluded}},
+           "events": 대상 지사 실적사용시작 포함 구조변화, "nominal": 환산 전 실적, "restate": 환산 요약}
+    actuals 는 설정 «실적환산»이 켜져 있으면 기준연도 가치로 바꾼 실적이다 — 표준금액·용량 환산·A급정비 1회 금액·
+    예측 범위가 모두 같은 기준을 쓴다(엑셀 내보내기의 실적 이력은 cap["nominal"] 그대로)."""
     actuals, years_used, ref_years = actuals_with_reference(conn, base_year)
+    nominal = actuals
+    data_years = sorted({int(y) for y in actuals["연도"]}) if not actuals.empty else []
+    series = price_series(conn, base_year, data_years)
+    if series:
+        actuals = forecast_calc.restate_amounts(actuals, series, int(base_year))
+    restate = restate_summary(series, base_year, data_years)
     years_used = years_used + [f"{y}(참고)" for y in ref_years]
     window = fs.learning_window(conn, base_year)
-    grade = fs.load_grade_history(conn, base_year)
+    # TI = HGPI — 등급이 걸린 입력은 계산 직전에 한 이름으로(forecast_calc.SAME_GRADE). 저장값은 그대로.
+    canon = forecast_calc.canon_grades
+    grade = canon(fs.load_grade_history(conn, base_year))
     budget_lookup = forecast_calc.budget_amount_by_site_account(budget_plan_for(conn, base_year))
+    alias = config_store.load_item_alias(conn)
+    cap_table, cap_rules, events = capacity_inputs(conn, base_year)
     std = benchmark.compute_standard_amounts(
-        actuals, grade, fs.load_method_map(conn, base_year), fs.load_overrides(conn, base_year),
-        item_alias=config_store.load_item_alias(conn), rules=fs.load_table(conn, base_year, "benchmark_rule"),
-        events=fs.load_table(conn, base_year, "site_event"), budget_lookup=budget_lookup, window=window)
-    return std, actuals, years_used, grade
+        actuals, grade, fs.load_method_map(conn, base_year), canon(fs.load_overrides(conn, base_year)),
+        item_alias=alias, rules=canon(fs.load_table(conn, base_year, "benchmark_rule"), ("등급", "참조등급")),
+        events=events, budget_lookup=budget_lookup, window=window)
+    std, model, targets = capacity.apply_capacity(std, benchmark.prepare_actuals(actuals, alias, events),
+                                                  grade, cap_table, cap_rules, base_year=base_year)
+    # 빈 등급은 용량 환산으로 채우고(삼송 MI·수원 MI), 쓰지 않는 등급(BSI · CI 없는 지사의 CI)은 뺀다
+    std = forecast_calc.prune_grades(capacity.fill_missing_grades(std, model, targets))
+    for t in targets.values():
+        if "rows" in t:
+            t["rows"] = forecast_calc.prune_grades(t["rows"])
+    return std, actuals, years_used, grade, {"model": model, "targets": targets, "events": events,
+                                             "nominal": nominal, "restate": restate}
+
+
+def site_notes(conn, base_year, cap) -> dict:
+    """지사 옆 작은 딱지 — 적용시작이 기준연도 뒤인 용량 환산 대상(수원 2029 개체).
+    편입될 묶음 = 용량 환산 기준 지사들의 묶음(가장 많은 것, 지금은 중대형CHP). → {지사: 문구}"""
+    targets = cap.get("targets") or {}
+    refs = (cap.get("model") or {}).get("refs") or {}
+    groups = site_groups(conn, base_year)
+    ref_groups = [groups.get(s) for s in refs if groups.get(s)]
+    into = max(set(ref_groups), key=ref_groups.count) if ref_groups else ""
+    out = {}
+    for s, t in targets.items():
+        if "rows" in t and t.get("start"):
+            out[s] = f"{t['start']}년 준공 후 {into} 편입 예정" if into and groups.get(s) != into else f"{t['start']}년 준공 예정"
+    return out
 
 
 def finance_compare(std, fin):
@@ -213,7 +279,9 @@ def finance_compare(std, fin):
     std = std.copy()
     exact, mean = {}, {}
     if not fin.empty:
-        exact = {(r["사업장"], r["예산과목"], r["등급"]): float(r["표준금액"]) for _, r in fin.iterrows()}
+        # 재무팀 엑셀의 TI·HGPI 도 한 등급으로 — 같은 칸에 둘 다 있으면 평균
+        fin = forecast_calc.canon_grades(fin)
+        exact = fin.groupby(["사업장", "예산과목", "등급"])["표준금액"].mean().astype(float).to_dict()
         mean = fin.groupby(["사업장", "예산과목"])["표준금액"].mean().to_dict()
     vals = [exact.get((r["사업장"], r["예산과목"], r["등급"]), mean.get((r["사업장"], r["예산과목"])))
             for _, r in std.iterrows()]
@@ -276,7 +344,7 @@ def compare_reference(conn, base_year):
     """참고 엑셀과 대조 — ① 마감 연도 실적(지사×연도×예산과목) ② 표준금액(지사×예산과목×등급)."""
     fs.bind_site_resolvers(conn, base_year)
     ref_act = fs.load_table(conn, base_year, "reference_actual")
-    ref_std = fs.load_table(conn, base_year, "reference_standard")
+    ref_std = forecast_calc.canon_grades(fs.load_table(conn, base_year, "reference_standard"))   # 앱 표준금액과 같은 등급 이름으로
     detail, years_used = locked_actuals_detail(conn, base_year)
     actual_rows = []
     if not ref_act.empty and years_used:
@@ -310,14 +378,37 @@ def compare_reference(conn, base_year):
             "standard": {"summary": summary(std_rows), "rows": std_rows}}
 
 
+def capacity_view(conn, base_year):
+    """«설비용량·신규표준» 탭 — 용량 규칙(기준 지사로 맞춘 값)과 대상 지사 등급별 한 해 합계. 금액 천원."""
+    fs.bind_site_resolvers(conn, base_year)
+    std, _, _, _, cap = _standard(conn, base_year)
+    m = cap["model"]
+    if not m:
+        return {"model": None, "targets": []}
+    targets = []
+    for site, t in cap["targets"].items():
+        rows = std[(std["사업장"] == site) & (std["방식출처"] == "용량규칙")]
+        if "rows" in t:                 # 시작이 기준연도 뒤 — 표엔 정비제외 줄만, 등급별 값은 따로
+            rows = pd.concat([rows, t["rows"]], ignore_index=True)
+        by_grade = rows.groupby("등급")["표준금액"].sum().to_dict()
+        targets.append({"사업장": site, "용량MW": t["mw"], "적용시작연도": t["start"],
+                        "정비제외연도": sorted(t["excluded"]),
+                        "등급별": {g: float(by_grade[g]) for g in ("MI", "TI", "HGPI", "CI", "간이", capacity.EXCLUDED)
+                                 if g in by_grade}})
+    return {"model": {"fixed": m["fixed"], "k": m["k"], "loo": m["loo"], "loo_all": m["loo_all"],
+                      "refs": m["refs"], "table": m["table"], "accounts": sorted(capacity.MODEL_ACCOUNTS)},
+            "targets": targets}
+
+
 def run_benchmark(conn, base_year):
     """3단계 — 표준금액 표와 모집단 요약."""
     fs.bind_site_resolvers(conn, base_year)
-    std, actuals, years_used, _ = _standard(conn, base_year)
+    std, actuals, years_used, _, cap = _standard(conn, base_year)
     std = finance_compare(std, fs.load_table(conn, base_year, "reference_standard"))
     if not std.empty:
         std = std.sort_values(["사업장", "구분", "예산과목", "등급"]).reset_index(drop=True)
     return {"base_year": str(base_year), "years_used": years_used, "window": fs.learning_window(conn, base_year),
+            "site_notes": site_notes(conn, base_year, cap), "restate": cap["restate"],
             "population": {"rows": int(len(actuals)),
                            "total": float(actuals["금액"].sum()) if len(actuals) else 0.0},
             "has_ltsa": benchmark.has_ltsa_detail(actuals), "rows": records(std)}
@@ -327,8 +418,9 @@ def benchmark_frames(conn, base_year):
     """3단계 입력·결과를 DataFrame 으로 — 엑셀 양식(6-7)이 화면과 같은 계산을 쓴다.
     반환 dict: std · actuals · years_used · grade · sites"""
     fs.bind_site_resolvers(conn, base_year)
-    std, actuals, years_used, grade = _standard(conn, base_year)
-    return {"std": std, "actuals": actuals, "years_used": years_used, "grade": grade,
+    std, _, years_used, grade, cap = _standard(conn, base_year)
+    # 양식의 실적 이력 칸은 그 해 금액 그대로(환산 전) — 표준금액만 기준연도 가치
+    return {"std": std, "actuals": cap["nominal"], "years_used": years_used, "grade": grade,
             "sites": forecast_sites(conn, base_year)}
 
 
@@ -338,26 +430,56 @@ def forecast_frames(conn, base_year):
     fs.bind_site_resolvers(conn, base_year)
     by = int(base_year)
     years = forecast_calc.forecast_years(by)
-    std, actuals, years_used, grade = _standard(conn, base_year)
+    std, actuals, years_used, grade, cap = _standard(conn, base_year)
     sites = forecast_sites(conn, base_year)
     budget_df = budget_plan_for(conn, base_year)
     hq_master = fs.load_hq_master(conn, base_year)
+    targets = cap["targets"]
+    # 용량 환산 대상은 적용시작 전 실적이 지금 설비와 맞지 않는다 — A급정비 1회 금액·예측 범위에서도 뺀다
+    actuals = benchmark.apply_usage_events(actuals, cap["events"][cap["events"]["사업장"].isin(targets)])
     overhaul = overhaul_plan(conn, base_year, sites, actuals)
+    if overhaul and cap["model"]:
+        mi = {s: v for s, a, g, v in zip(std["사업장"], std["예산과목"], std["등급"], std["표준금액"])
+              if s in targets and "rows" not in targets[s] and a == forecast_calc.A_OVERHAUL_ACCOUNT and g == "MI"}
+        overhaul["amount"].update(mi)
+    # 적용시작연도가 기준연도 뒤인 대상(수원 2029): 시작 해부터만 용량 환산 표준금액·A급정비 1회 금액
+    switch = {}
+    for s, t in targets.items():
+        if "rows" in t:
+            later = t["rows"]
+            mi = later[(later["예산과목"] == forecast_calc.A_OVERHAUL_ACCOUNT) & (later["등급"] == "MI")]["표준금액"]
+            switch[s] = {"start": int(t["start"]),
+                         "lookup": {(r["사업장"], r["예산과목"], r["등급"]): r["표준금액"] for _, r in later.iterrows()},
+                         "overhaul": float(mi.iloc[0]) if len(mi) else None}
+    # 정비제외 해(수원 2027~28)는 계산에만 등급 «정비제외» — 저장된 등급 이력은 그대로
+    excl = capacity.excluded_grades(targets)
+    grade_calc = grade
+    if not excl.empty:
+        drop = set(zip(excl["사업장"], excl["연도"]))
+        grade_calc = pd.concat([grade[[(s, int(y)) not in drop for s, y in zip(grade["사업장"], grade["연도"])]], excl],
+                               ignore_index=True)
     tables = forecast_calc.compute_all_sites(
-        sites, grade, std, fs.load_hot_parts(conn, base_year), hq_master,
+        sites, grade_calc, std, fs.load_hot_parts(conn, base_year), hq_master,
         fs.load_hq_temp_projects(conn, base_year), fs.load_hq_ratio(conn, base_year),
         fs.load_factors(conn, base_year), fs.load_surprise_projects(conn, base_year),
         forecast_calc.investment_by_site(budget_df), budget_df, base_year=by, years=years,
         contracts_df=fs.load_table(conn, base_year, "regular_contract"),
         cri_rules=fs.load_table(conn, base_year, "cri_rule"),
         invest_plan_df=fs.load_table(conn, base_year, "investment_plan"),
-        overhaul=overhaul)
+        overhaul=overhaul, switch=switch)
     cri = forecast_calc.cri_events(grade, fs.load_table(conn, base_year, "cri_rule"),
                                    fs.load_factors(conn, base_year), years)
     return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,
             "hq_master": hq_master, "budget_df": budget_df, "actuals": actuals, "cri": cri,
             "factors": fs.load_factors(conn, base_year), "overhaul": overhaul,
             "window": fs.learning_window(conn, base_year)}
+
+
+def capital_items(conn, year):
+    """자본예산 과목 이름 — 메인 전망 누적 막대(손익+자본)용. 읽기만 한다(load_item_config 는 없으면 시드를 저장하므로 쓰지 않음).
+    그 해 설정이 없으면 시드 목록. 여기 없는 과목은 손익으로 본다."""
+    rows = conn.execute("SELECT 과목 FROM item_config WHERE year=? AND budget='자본'", (str(year),)).fetchall()
+    return {r[0] for r in rows} or {x["과목"] for x in config_store.seed_item_config(year, "자본")}
 
 
 def run_forecast(conn, base_year):
@@ -370,6 +492,7 @@ def run_forecast(conn, base_year):
         return [{"예산과목": r["예산과목"], **{str(y): float(r[y]) for y in years}} for _, r in df.iterrows()]
 
     out_tables = {s: rows_of(t) for s, t in tables.items()}
+    capital = capital_items(conn, base_year)
     total = {}
     for rows in out_tables.values():
         for r in rows:
@@ -380,6 +503,6 @@ def run_forecast(conn, base_year):
             "tables": out_tables, "cri_events": records(f["cri"]),
             "ranges": forecast_ranges(actuals, sites, years, int(base_year), f["factors"], f["window"]),
             "overhaul_years": {s: sorted(v) for s, v in (f["overhaul"] or {}).get("years", {}).items()},
-            "total_rows": [{"예산과목": k, **v} for k, v in total.items()],
+            "total_rows": [{"예산과목": k, "구분": "자본" if k in capital else "손익", **v} for k, v in total.items()],
             "notes": {"budget_plan_missing": bool(budget_df.empty), "grade_empty": bool(grade.empty),
                       "actuals_empty": bool(actuals.empty)}}

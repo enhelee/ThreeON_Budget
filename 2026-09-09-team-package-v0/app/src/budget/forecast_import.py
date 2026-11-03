@@ -11,6 +11,7 @@ v2 와 다른 것 둘.
   ② 단위 천원. v2 고온부품 파서는 양식(천원)을 원으로 환산했다. 이 앱은 천원이 표준이다.
 """
 import io
+import os
 import re
 
 import pandas as pd
@@ -88,10 +89,105 @@ def grades_from_workbook(data: bytes, site_names) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=GRADE_COLS)
 
 
+# ---------------------------------------------------------------- 정비등급 양식 (한 해 한 열)
+# 사용자가 정한 «26~35년 전지사 정비등급» 양식(2026-10-28, templates/builtin_template_정비등급.xlsx).
+# 중장기예산 양식의 일정 시트(한 해 = GT·ST·기간 세 열, 지사명 A열)와 달리 한 해 = «등급» 한 열,
+# A열 = 묶음(발전설비·DH, 세로 병합), B열 = 지사(«삼 송»·«청 주(신규CHP)»·«중앙 정비등급»),
+# C열 = 설비(#1 GT·#2 Block·우드칩…, 없으면 빈 칸). 표가 둘(발전설비·DH)이라 연도 머리가 두 번 나온다.
+UNIT_COLS = ["사업장", "연도", "설비", "등급"]
+
+
+def _year_cols(ws, r) -> dict:
+    return {c: int(ws.cell(row=r, column=c).value) for c in range(1, ws.max_column + 1)
+            if isinstance(ws.cell(row=r, column=c).value, (int, float)) and 2020 < ws.cell(row=r, column=c).value < 2050}
+
+
+def _merged_value(ws, r, c):
+    """병합 영역 안이면 왼쪽 위 칸 값 — B7:B8 «삼 송»의 아래 줄도 삼송으로 읽게."""
+    v = ws.cell(row=r, column=c).value
+    if v is not None:
+        return v
+    for rng in ws.merged_cells.ranges:
+        if rng.min_row <= r <= rng.max_row and rng.min_col <= c <= rng.max_col:
+            return ws.cell(row=rng.min_row, column=rng.min_col).value
+    return None
+
+
+def is_grade_plan_sheet(ws) -> bool:
+    """한 해 한 열 양식인가 — 연도 머리가 바로 옆 열로 이어진다(일정 시트는 세 열 간격)."""
+    for r in range(1, 6):
+        cols = sorted(_year_cols(ws, r))
+        if len(cols) >= 2:
+            return any(b - a == 1 for a, b in zip(cols, cols[1:]))
+    return False
+
+
+def grade_plan_layout(ws, site_names) -> list:
+    """[{row, site, unit, group, years: {열: 연도}}] — 등급이 적힌 줄마다. 연도 머리 줄·«등급» 줄은 건너뛴다."""
+    short_to_full = site_sheet_map(site_names)
+    shorts = sorted(short_to_full, key=len, reverse=True)
+    out, years = [], {}
+    for r in range(1, ws.max_row + 1):
+        ys = _year_cols(ws, r)
+        if len(ys) >= 2:
+            years = ys
+            continue
+        if not years:
+            continue
+        vals = [str(ws.cell(row=r, column=c).value or "").strip() for c in years]
+        if not any(vals) or all(v == "등급" for v in vals if v):
+            continue
+        site = None
+        for c in (2, 1):                       # 지사는 B열, 옛 모양(A열 지사)도 받는다
+            raw = str(_merged_value(ws, r, c) or "").replace(" ", "")
+            m = next((s for s in shorts if raw.startswith(s)), None)
+            if m:
+                site = short_to_full[m]
+                break
+        if site is None:
+            continue
+        group = str(_merged_value(ws, r, 1) or "").strip()
+        unit = str(ws.cell(row=r, column=3).value or "").strip()
+        if not unit:
+            unit = "DH" if "DH" in group.upper() else "등급"
+        out.append({"row": r, "site": site, "unit": unit, "group": group, "years": dict(years)})
+    return out
+
+
+def grade_plan_from_workbook(data: bytes, site_names):
+    """정비등급 양식 → (대표 등급 GRADE_COLS, 설비별 등급 UNIT_COLS).
+
+    대표 등급은 일정 시트와 같은 규칙 — 지사 줄 중 GT 어휘 줄 우선, 없으면 A/B/C 줄(DH 지사).
+    설비별 등급은 줄이 둘 이상인 지사만(삼송 #1·#2 GT, 동탄 #1·#2 Block, 대구 우드칩·신규CHP, 강남) —
+    A급정비 일정(«어느 설비든 MI 인 해»)이 대표 줄 하나만 보면 #2 설비의 MI 를 놓친다."""
+    wb = _wb(data)
+    ws = next((wb[n] for n in wb.sheetnames if is_grade_plan_sheet(wb[n])), None)
+    if ws is None:
+        return pd.DataFrame(columns=GRADE_COLS), pd.DataFrame(columns=UNIT_COLS)
+    lines = grade_plan_layout(ws, site_names)
+    by_site = {}
+    for ln in lines:
+        vals = {y: str(ws.cell(row=ln["row"], column=c).value or "").strip() for c, y in ln["years"].items()}
+        by_site.setdefault(ln["site"], []).append((ln["unit"], {y: v for y, v in vals.items() if v in VALID_GRADE_TOKENS}))
+    grades, units = [], []
+    for site, rows in by_site.items():
+        rep = next((v for _, v in rows if _classify_grade_row(v) == "GT"), None)             or next((v for _, v in rows if _classify_grade_row(v) == "ST"), None)
+        for y, g in sorted((rep or {}).items()):
+            grades.append({"사업장": site, "연도": y, "등급": g})
+        if len(rows) > 1:
+            for unit, v in rows:
+                for y, g in sorted(v.items()):
+                    units.append({"사업장": site, "연도": y, "설비": unit, "등급": g})
+    return pd.DataFrame(grades, columns=GRADE_COLS), pd.DataFrame(units, columns=UNIT_COLS)
+
+
 # ---------------------------------------------------------------- 정기점검보수공사 일정 (미래 등급)
 def schedule_from_workbook(data: bytes, site_names) -> pd.DataFrame:
-    """'정기점검보수공사' 시트에서 지사별 미래 정비등급. GT 계열 행 우선, 없으면 ST 계열 행."""
+    """'정기점검보수공사' 시트에서 지사별 미래 정비등급. GT 계열 행 우선, 없으면 ST 계열 행.
+    한 해 한 열인 정비등급 양식이면 그 파서로(설비별 등급은 `grade_plan_from_workbook`)."""
     wb = _wb(data)
+    if any(is_grade_plan_sheet(wb[n]) for n in wb.sheetnames):
+        return grade_plan_from_workbook(data, site_names)[0]
     sheet_name = next((n for n in wb.sheetnames if "정기점검보수공사" in n), None)
     if sheet_name is None:
         return pd.DataFrame(columns=GRADE_COLS)
@@ -163,6 +259,54 @@ def schedule_from_workbook(data: bytes, site_names) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- 고온부품
+HOT_CONTRACT_COLS = ["사업장", "계약방식", "계약기간", "비고"]
+HOT_TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                            "templates", "builtin_template_고온부품.xlsx")   # 사용자 «26~35년 전지사 고온부품»(2026-10-28)
+
+
+def _hot_sheet(wb):
+    name = next((n for n in wb.sheetnames if n.strip().startswith("고온부품")), None)
+    return wb[name] if name else None
+
+
+def hot_parts_contracts_from_workbook(data: bytes, site_names) -> pd.DataFrame:
+    """고온부품 시트 B·C열 — 지사별 계약방식(LTSA·LTPM…)·계약기간. 지사 칸(A)이 병합이라 첫 줄에만 있다."""
+    ws = _hot_sheet(_wb(data))
+    if ws is None:
+        return pd.DataFrame(columns=HOT_CONTRACT_COLS)
+    short_to_full = site_sheet_map(site_names)
+    rows = []
+    for r in range(1, ws.max_row + 1):
+        site = short_to_full.get(str(ws.cell(row=r, column=1).value or "").strip())
+        if site and ws.cell(row=r, column=5).value:
+            rows.append({"사업장": site, "계약방식": str(ws.cell(row=r, column=2).value or "").strip(),
+                         "계약기간": str(ws.cell(row=r, column=3).value or "").strip(), "비고": ""})
+    return pd.DataFrame(rows, columns=HOT_CONTRACT_COLS)
+
+
+def hot_parts_notes(data: bytes) -> list:
+    """«(작성 기준)» 아래 줄들 — 계약단가·물가·관세·운전시간 가정. 화면에 그대로 보인다."""
+    ws = _hot_sheet(_wb(data))
+    if ws is None:
+        return []
+    out, on = [], False
+    for r in range(1, ws.max_row + 1):
+        v = str(ws.cell(row=r, column=1).value or "").strip()
+        if v.startswith("(작성 기준)"):
+            on = True
+            continue
+        if on and v:
+            out.append(v)
+    return out
+
+
+def default_hot_contracts() -> pd.DataFrame:
+    """내장 고온부품 양식의 계약방식·계약기간(표가 비었을 때)."""
+    from .capacity import DEFAULT_CAPACITY
+    names = sorted({r[0] for r in DEFAULT_CAPACITY})
+    return hot_parts_contracts_from_workbook(open(HOT_TEMPLATE, "rb").read(), names)
+
+
 def hot_parts_from_workbook(data: bytes, site_names) -> pd.DataFrame:
     """'고온부품(NN)' 시트에서 지사×연도×항목(고온부품재생/신품구매) 금액. **천원 그대로.**"""
     wb = _wb(data)
@@ -289,3 +433,67 @@ def hq_master_from_workbook(data: bytes, site_names, base_year: int = 2026) -> t
         r += 1
     ratio_df = pd.DataFrame(ratio_rows, columns=HQ_RATIO_COLS) if ratio_rows else empty_ratio
     return master_df, ratio_df
+
+
+# ---------------------------------------------------------------- 생산자물가지수 (2026-11-03)
+PRICE_INDEX_COLS = ["연도", "지수", "비고"]
+_YEAR_RE = re.compile(r"^\s*((?:19|20)\d{2})(?:\s*년)?(?:\s*[./-]\s*(\d{1,2})(?:\s*월)?)?\s*$")
+
+
+def _year_of(v):
+    """셀 값 → 연도(int) | None. 2016 · «2016년» · «2016.01»(월 자료) · 날짜 셀 모두."""
+    if hasattr(v, "year") and not isinstance(v, (int, float)):
+        return int(v.year)
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return int(v) if float(v).is_integer() and 1990 <= v <= 2060 else None
+    m = _YEAR_RE.match(str(v)) if v is not None else None
+    return int(m.group(1)) if m else None
+
+
+def _index_val(v):
+    """지수 셀 — 숫자(20~500, 2020=100 같은 지수 범위)만."""
+    if isinstance(v, bool) or v is None:
+        return None
+    try:
+        f = float(str(v).replace(",", "")) if not isinstance(v, (int, float)) else float(v)
+    except ValueError:
+        return None
+    return f if 20 <= f <= 500 else None
+
+
+def price_index_from_workbook(data: bytes, site_names=None) -> pd.DataFrame:
+    """엑셀에서 연도별 생산자물가지수. 시트 이름에 «물가»가 든 시트를 먼저(없으면 모든 시트) 읽는다.
+    두 모양을 다 본다 — ① 세로: 한 줄에 연도 + 그 오른쪽 첫 숫자 ② 가로: 연도가 늘어선 줄 + 그 아래 첫 숫자 줄.
+    월 자료(«2016.01» 등)면 해마다 평균. 더 많이 읽힌 모양을 쓴다. 표준화 참고 엑셀(V3)의 «생산자물가지수» 시트용."""
+    wb = _wb(data)
+    names = [n for n in wb.sheetnames if "물가" in n] or list(wb.sheetnames)
+    best = {}
+    for name in names:
+        grid = [list(r) for r in wb[name].iter_rows(values_only=True)]
+        vertical, horizontal = {}, {}
+        for row in grid:                                         # ① 세로
+            for i, v in enumerate(row):
+                y = _year_of(v)
+                if y is None:
+                    continue
+                val = next((x for x in (_index_val(c) for c in row[i + 1:]) if x is not None), None)
+                if val is not None:
+                    vertical.setdefault(y, []).append(val)
+                break
+        for ri, row in enumerate(grid):                          # ② 가로
+            cols = {i: _year_of(v) for i, v in enumerate(row) if _year_of(v) is not None}
+            if len(cols) < 3:
+                continue
+            for below in grid[ri + 1:ri + 6]:
+                vals = {cols[i]: _index_val(below[i]) for i in cols if i < len(below)}
+                vals = {y: v for y, v in vals.items() if v is not None}
+                if len(vals) >= 3:
+                    for y, v in vals.items():
+                        horizontal.setdefault(y, []).append(v)
+                    break
+        for found in (vertical, horizontal):
+            if len(found) > len(best.get("years", {})):
+                best = {"years": found, "sheet": name}
+    rows = [{"연도": y, "지수": round(sum(v) / len(v), 4), "비고": f"가져옴: {best['sheet']}" + (f" ({len(v)}개월 평균)" if len(v) > 1 else "")}
+            for y, v in sorted(best.get("years", {}).items())]
+    return pd.DataFrame(rows, columns=PRICE_INDEX_COLS)
