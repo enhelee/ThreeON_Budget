@@ -21,7 +21,7 @@ import { startIntro, stopIntro } from "../components/gate_intro.js"
 // 장면의 캐릭터 — 처음 표정(a)과 마우스를 올렸을 때 표정(b). 2026-10-27 grace 결정.
 const CAST = [
   {id: "mt", a: "wow", b: "full", line: "가 전표와 예산을 잇고,"},
-  {id: "gt", a: "full", b: "happy", line: "가 차이를 살피고,"},
+  {id: "gt", a: "full", b: "happy", line: "가 표준금액을 세우고,"},
   {id: "yc", a: "think", b: "full", line: "가 다음 10년을 내다봅니다."},
 ]
 

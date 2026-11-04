@@ -6,7 +6,7 @@ import { HELP, NAMES } from "./characters.js"
 // ─────────────────────────────────────────────────────────────
 // 캐릭터 챗봇 — 오른쪽 대화 패널(2026-10-27, 1단계: 사용법·화면 이동·진행 상황)
 //
-// 오른쪽 아래 매칭이(도움말 버튼)를 누르면 열린다. 답은 서버 규칙 엔진(/api/chat)이 만든다 —
+// 오른쪽 아래 실적이(도움말 버튼)를 누르면 열린다. 답은 서버 규칙 엔진(/api/chat)이 만든다 —
 // 숫자는 DB 에서 읽은 값만, 외부 전송 없음. 대화는 이 탭 안에서만 들고 있다(서버에 저장하지 않음).
 //
 // 그림은 char_images.js 한 곳(assets/characters/*.webp) — 파일을 갈아 끼우면 패널·버튼이 함께 바뀐다.
@@ -15,7 +15,7 @@ import { HELP, NAMES } from "./characters.js"
 
 import { CHAR_IMG } from "./char_images.js"
 
-const ROLE = {mt: "실적·이동", gt: "검토", yc: "전망", hj: "사용법"}
+const ROLE = {mt: "실적·이동", gt: "표준·검토", yc: "전망", hj: "사용법"}
 
 // open 은 state.chatOpen 에도 비춘다 — 도움말 버튼(characters.js)이 aria-expanded 를 그리게.
 const chat = {open: false, busy: false, log: [], suggestions: []}

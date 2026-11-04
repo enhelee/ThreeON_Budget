@@ -2,7 +2,8 @@ import { state } from "../state.js"
 import { CHAR_IMG } from "./char_images.js"
 
 // ─────────────────────────────────────────────────────────────
-// ThreeON 캐릭터 — 한장이(전표 한 장)·매칭이(사업 찾기)·검토미(사람에게 묻기)·예측이(전망).
+// ThreeON 캐릭터 — 한장이(전표 한 장)·실적이(실적 매칭)·표준이(표준화·검토)·예측이(전망).
+// (2026-11-04 이름을 발표의 세 축에 맞춤: 매칭이 → 실적이, 검토미 → 표준이. 코드 id(mt·gt)는 그대로.)
 //
 // 그림은 입체 v2 한 벌(components/char_images.js, webp)만 쓴다 — 챗봇·도움말·안내 줄·빈 화면·사이드바 머리 모두.
 // (2026-10-27 옛 벡터 그림(sprite)을 걷어 냈다 — 화면마다 옛 그림과 새 그림이 섞여 보였다)
@@ -12,7 +13,7 @@ import { CHAR_IMG } from "./char_images.js"
 // 같은 그림이 홍보영상 콘티에도 쓰인다(팀 공유 artifact «ThreeON 전표 탐험대 콘티»).
 // ─────────────────────────────────────────────────────────────
 
-export const NAMES = {hj: "한장이", mt: "매칭이", gt: "검토미", yc: "예측이"}
+export const NAMES = {hj: "한장이", mt: "실적이", gt: "표준이", yc: "예측이"}
 
 /** 캐릭터 그림. head=true 면 머리만(사이드바 로고 옆처럼 작은 자리용), mood 로 표정을 고른다
  *  (full·think·wow·happy·empty — char_images.js). 장식이라 읽지 않는다(alt=""). */
@@ -44,7 +45,7 @@ export function lockedSay(blocked) {
     action: `<button type="button" class="btn-secondary shrink-0" data-action="go-unlock">설정에서 마감 해제 →</button>`});
 }
 
-// ── 도움말 — 오른쪽 아래 매칭이. 누르면 지금 화면에서 할 일 세 줄 ─────────────
+// ── 도움말 — 오른쪽 아래 실적이. 누르면 지금 화면에서 할 일 세 줄 ─────────────
 // 내용은 docs/팀원_실행가이드.md 「한 해를 돌리는 순서」를 화면별로 나눈 것이다.
 export const HELP = {
   home: ["오늘 기준 현황과 «다음 할 일»을 먼저 봐요.",
@@ -88,7 +89,7 @@ export function helpFabHtml() {
   const open = !!state.chatOpen
   return `<div class="help-fab">
     <button class="help-fab__btn" data-action="toggle-help" aria-expanded="${open}" title="ONDO 탐험대에게 물어보기">
-      <span class="help-fab__pill">물어보기</span><img class="help-fab__img help-fab__img--3d" src="${CHAR_IMG.mt.full}" alt="매칭이">
+      <span class="help-fab__pill">물어보기</span><img class="help-fab__img help-fab__img--3d" src="${CHAR_IMG.mt.full}" alt="실적이">
     </button>
   </div>`
 }
