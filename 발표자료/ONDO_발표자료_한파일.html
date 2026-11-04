@@ -2588,6 +2588,15 @@ ${_}`;if(Wh.has(O))return;Wh.add(O),globalThis.console.warn(`${mg} &quot;${u}&qu
   ]
 }
     </script>
-</hyperframes-slideshow>
+</hyperframes-slideshow><script>(() => {
+  const ss = () => document.querySelector("hyperframes-slideshow");
+  const vid = () => { const pl = document.querySelector("hyperframes-player"); const f = pl && (pl.shadowRoot ? pl.shadowRoot.querySelector("iframe") : pl.querySelector("iframe"));
+    try { return f && f.contentDocument && f.contentDocument.getElementById("opening-v"); } catch (e) { return null; } };
+  let started = false, tries = 0;
+  const kick = () => { const v = vid(), s = ss(); if (started || !v || !s || v.readyState < 2 || !v.paused) { if (v && !v.paused) started = true; return false; }
+    try { v.currentTime = 0; const q = v.play(); if (q) q.catch(() => {}); } catch (e) {} setTimeout(() => { if (!v.paused) started = true; }, 400); return true; };
+  const t = setInterval(() => { kick(); if (started || ++tries > 120) clearInterval(t); }, 500);
+  addEventListener("pointerdown", () => { if (!started) setTimeout(kick, 50); }, true);
+})();</script>
 
 </body></html>
