@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>ONDO 발표</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@900&amp;display=swap" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family:"Pretendard"; font-weight:500; src:url("assets/fonts/Pretendard-Medium.woff2") format("woff2"); }
+      @font-face { font-family:"Pretendard"; font-weight:600; src:url("assets/fonts/Pretendard-SemiBold.woff2") format("woff2"); }
+      @font-face { font-family:"Pretendard"; font-weight:700; src:url("assets/fonts/Pretendard-Bold.woff2") format("woff2"); }
+      @font-face { font-family:"Pretendard"; font-weight:800; src:url("assets/fonts/Pretendard-ExtraBold.woff2") format("woff2"); }
+      @font-face { font-family:"GmarketSans"; font-weight:500; src:url("assets/fonts/GmarketSansMedium.woff") format("woff"); }
+      @font-face { font-family:"GmarketSans"; font-weight:700; src:url("assets/fonts/GmarketSansBold.woff") format("woff"); }
+      /* layout: light ground, white cards, one red accent; titles in Gmarket Sans, everything else (numbers too) in Pretendard */
+      :root { --ground:#F4F7FB; --card:#FFFFFF; --ink:#1B2433; --muted:#5F6B7D; --soft:#8A94A3; --line:#DCE3EC; --on:#E8412C; --onsoft:#FDE9E5; --ac:var(--on);
+               --body:"Pretendard", sans-serif; --title:"GmarketSans", "Pretendard", sans-serif; }
+      * { margin:0; padding:0; box-sizing:border-box; }
+      html, body { margin:0; width:1920px; height:1080px; overflow:hidden; background:var(--ground); }
+      #deck { position:relative; width:1920px; height:1080px; }
+      .slide { position:absolute; inset:0; overflow:hidden; background:var(--ground); color:var(--ink); font-family:var(--body); word-break:keep-all; }
+      .slide video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; }
+      h1, h2, h3 { font-family:var(--title); font-weight:700; letter-spacing:-.02em; }
+      .logo { font-family:Montserrat, sans-serif; font-weight:900; letter-spacing:-.02em; color:var(--ink); }
+      .logo b { color:var(--on); font-weight:900; }
+      .meta { font-size:34px; line-height:1.5; color:var(--muted); font-weight:600; }
+      .meta strong { color:var(--ink); font-weight:800; }
+      .crew { position:absolute; right:110px; bottom:90px; display:flex; gap:6px; }
+      .crew img { width:170px; height:170px; object-fit:contain; }
+
+      .cover .cover { position:absolute; left:140px; top:150px; width:1300px; }
+      .eyebrow { display:inline-block; padding:12px 26px; border-radius:40px; background:var(--card); color:var(--on);
+                  font-size:30px; font-weight:700; box-shadow:0 6px 18px rgba(27,36,51,.06); }
+      .cover h1 { font-size:100px; line-height:1.2; margin-top:44px; }
+      .brand { display:flex; align-items:baseline; gap:28px; margin-top:44px; }
+      .brand .logo { font-size:84px; }
+      .brand .tag { font-size:40px; font-weight:700; color:var(--muted); }
+      .cover .meta { margin-top:70px; }
+
+      .sec { position:absolute; left:160px; top:270px; }
+      .sec .num { font-family:var(--body); font-size:170px; font-weight:800; color:var(--on); line-height:1; letter-spacing:-.04em; }
+      .sec h2 { font-size:124px; margin-top:20px; }
+      .sec .sub { font-size:44px; font-weight:600; color:var(--muted); margin-top:26px; }
+      .guide { position:absolute; right:190px; top:220px; width:520px; height:520px; object-fit:contain; }
+
+      /* progress bar: five sections, the current one filling as its slides go by */
+      .prog { position:absolute; left:110px; right:110px; bottom:28px; display:flex; gap:14px; z-index:5; }
+      .prog .seg { flex:1; display:flex; flex-direction:column; gap:8px; }
+      .prog span { font-size:22px; font-weight:700; color:var(--soft); }
+      .prog .on span { color:var(--ink); }
+      .prog i { display:block; height:8px; border-radius:4px; background:var(--line); overflow:hidden; }
+      .prog em { display:block; height:100%; background:var(--ink); }
+      .prog .on em { background:var(--on); }
+      .video .prog { left:0; right:0; bottom:0; padding:12px 110px 14px; background:rgba(244,247,251,.92); }
+
+      /* content pages */
+      .pg { position:absolute; left:110px; right:110px; top:64px; bottom:110px; display:flex; flex-direction:column; gap:34px; }
+      .hd { display:flex; flex-direction:column; gap:28px; }
+      .band { align-self:flex-start; display:inline-flex; align-items:center; gap:12px; background:var(--ac); color:#fff;
+               border-radius:40px; height:58px; padding:0 30px 0 14px; font-size:32px; font-weight:700; }
+      .band img { width:84px; height:84px; object-fit:contain; margin:-14px -2px -12px -6px; }
+      .band.plain { background:var(--ink); padding:0 30px; }
+      .hd h2 { font-size:76px; line-height:1.15; }
+      h3 { font-size:42px; }
+      ul { list-style:none; display:flex; flex-direction:column; gap:18px; }
+      li { font-size:36px; line-height:1.35; font-weight:600; padding-left:28px; position:relative; }
+      li::before { content:""; position:absolute; left:0; top:19px; width:12px; height:12px; border-radius:50%; background:var(--ac); }
+      .card { background:var(--card); border-radius:28px; padding:40px 44px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:26px; min-width:0; }
+      .tri { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; flex:1; align-content:center; }
+      .chain { font-size:38px; font-weight:700; text-align:center; }
+      .chain b { color:var(--on); font-weight:800; }
+      .foot { font-size:32px; font-weight:600; color:var(--muted); }
+      .banner { font-size:38px; font-weight:700; background:var(--ink); color:#fff; border-radius:22px; padding:28px 40px; text-align:center; }
+
+      .axes { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; flex:1; align-content:center; }
+      .axc { background:var(--card); border-radius:28px; padding:28px 36px 40px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; }
+      .axc img { width:170px; height:170px; object-fit:contain; }
+      .axc .no { font-size:28px; font-weight:700; color:var(--ac); }
+      .axc h3 { font-size:54px; }
+      .pb { font-size:36px; font-weight:600; color:var(--muted); margin-top:10px; }
+      .fx { font-size:40px; font-weight:700; }
+      .fx b { color:var(--ac); font-weight:800; }
+      .arrow { font-size:46px; font-weight:800; color:#B7C1D0; }
+
+      .pics { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; align-content:start; margin-top:10px; }
+      .pic { background:var(--card); border-radius:28px; padding:34px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:18px; min-height:470px; }
+      .pic .no { font-size:34px; font-weight:700; color:var(--ac); }
+      .flow { display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; flex:1; justify-content:center; }
+      .chip { font-size:32px; font-weight:700; padding:12px 24px; border-radius:14px; background:var(--ground); }
+      .flow i { font-style:normal; font-size:30px; font-weight:700; color:var(--muted); }
+      .flow b { font-size:120px; font-weight:800; color:var(--ac); letter-spacing:-.03em; line-height:1; }
+      .flow b.word { font-family:var(--title); font-size:60px; font-weight:700; color:var(--ink); }
+      .pic p { font-size:32px; font-weight:600; color:var(--muted); line-height:1.4; text-align:center; }
+      .flow .big { height:130px; display:flex; align-items:center; justify-content:center; width:100%; }
+      .rise { width:100%; height:130px; }
+      .rise .rax { stroke:#DCE3EC; stroke-width:3; }
+      .rdot { fill:#fff; stroke:var(--ac); stroke-width:4; }
+      .pic em { display:block; font-style:normal; font-size:22px; color:var(--soft); }
+
+      .techrow { display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-top:auto; }
+      .techrow .tl { font-size:26px; font-weight:700; color:var(--muted); margin-right:6px; }
+      .techrow .tc { display:inline-flex; align-items:baseline; gap:10px; padding:12px 22px; border-radius:16px; background:var(--card); box-shadow:0 6px 18px rgba(27,36,51,.06); font-size:24px; font-weight:600; color:var(--muted); }
+      .techrow .tc b { font-size:28px; font-weight:800; color:var(--ac); }
+      .tech3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; }
+      .tk { background:var(--ink); color:#fff; border-radius:24px; padding:30px 34px; display:flex; flex-direction:column; gap:10px; }
+      .tk b { font-size:36px; font-weight:800; color:#fff; }
+      .tk p { font-size:28px; font-weight:600; color:#C9D2DF; line-height:1.4; }
+      .step h3 { font-size:44px; }
+      .ready { margin-top:auto; min-height:250px; box-sizing:border-box; display:flex; flex-direction:column; padding:20px 22px; border-radius:18px; background:var(--onsoft); font-size:28px; font-weight:700; line-height:1.4; }
+      .ready small { display:block; font-size:22px; font-weight:800; color:var(--on); margin-bottom:6px; }
+      .ready em { display:block; font-style:normal; font-size:22px; font-weight:600; color:var(--muted); margin-top:auto; padding-top:6px; }
+      .fres { display:grid; grid-template-columns:1fr 520px; gap:40px; flex:1; align-items:stretch; }
+      .fbars { display:flex; align-items:flex-end; gap:22px; background:var(--card); border-radius:28px; padding:40px 40px 28px; box-shadow:0 10px 30px rgba(27,36,51,.06); }
+      .fbars .fb { flex:1; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:10px; }
+      .fbars i { width:100%; border-radius:12px 12px 0 0; background:#B4A5EE; display:block; }
+      .fbars .pk i { background:var(--on); }
+      .fbars em { font-style:normal; font-size:24px; font-weight:800; color:var(--muted); }
+      .fbars .pk em { color:var(--on); font-size:30px; }
+      .fbars span { font-size:24px; font-weight:700; color:var(--muted); }
+      .fside { display:flex; flex-direction:column; gap:24px; justify-content:center; }
+      .fside .st b { font-size:76px; }
+      .fside .st span { font-size:30px; }
+      .diag { display:grid; grid-template-columns:1fr 70px 1.5fr 70px 1fr; align-items:center; gap:10px; flex:1; }
+      .dcol { display:flex; flex-direction:column; gap:18px; }
+      .dcol h4 { font-size:28px; font-weight:800; color:var(--muted); text-align:center; }
+      .dcol.eng { background:var(--ink); border-radius:30px; padding:28px; }
+      .dcol.eng h4 { color:#fff; }
+      .din { background:var(--card); border-radius:20px; padding:28px 20px; text-align:center; font-size:32px; font-weight:800; box-shadow:0 8px 22px rgba(27,36,51,.06); }
+      .din.out { border:3px solid var(--on); }
+      .deng { display:grid; grid-template-columns:84px 1fr; grid-template-rows:auto auto; column-gap:16px; align-items:center; background:#fff; border-radius:20px; padding:16px 22px; border-left:12px solid var(--ac); }
+      .deng img { grid-row:span 2; width:84px; height:84px; object-fit:contain; }
+      .deng b { font-size:36px; font-weight:800; color:var(--ac); }
+      .deng span { font-size:24px; font-weight:700; color:var(--muted); }
+      .dar { font-size:64px; font-weight:800; color:#9AA6B8; text-align:center; }
+      .dstack { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+      .dstack span { font-size:26px; font-weight:700; padding:12px 22px; border-radius:14px; background:var(--card); border:2px solid var(--line); }
+      .rbig { font-size:84px; font-weight:800; color:var(--ac); letter-spacing:-.03em; line-height:1.05; margin-top:8px; white-space:nowrap; }
+      .rlab { font-size:32px; font-weight:800; }
+      .rsub { font-size:26px; font-weight:600; color:var(--muted); }
+      .stats { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; }
+      .stats.grid4 { grid-template-columns:repeat(2, 1fr); flex:1; align-content:center; }
+      .stats.col { grid-template-columns:1fr; gap:20px; }
+      .stats.big3 { flex:1; align-content:center; }
+      .st { background:var(--card); border-radius:28px; padding:36px 44px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:12px; justify-content:center; }
+      .st b { font-size:88px; font-weight:800; letter-spacing:-.03em; line-height:1.05; white-space:nowrap; }
+      .st.key b { color:var(--ac); }
+      .st span { font-size:34px; font-weight:600; color:var(--muted); line-height:1.35; }
+      .stats.col .st { padding:26px 34px; }
+      .stats.col .st b { font-size:60px; }
+      .stats.col .st span { font-size:28px; }
+      .stats.big3 .st { padding:60px 44px; }
+      .stats.big3 .st b { font-size:100px; }
+
+      .dev { display:grid; grid-template-columns:1.4fr 1fr; gap:28px; flex:1; align-content:center; }
+      .fn code { font-family:"SF Mono", Menlo, Consolas, monospace; font-size:32px; font-weight:700; color:var(--on); }
+      .fn p { font-size:36px; font-weight:600; margin-top:6px; }
+      .card.tools { background:var(--ink); color:#fff; }
+      .tool { font-size:34px; font-weight:600; padding:18px 0; border-top:2px solid rgba(255,255,255,.15); }
+
+      .steps { display:flex; align-items:stretch; gap:24px; }
+      .steps.three { display:grid; grid-template-columns:repeat(3, 1fr); flex:1; align-content:center; }
+      .step { flex:1; background:var(--card); border-radius:28px; padding:44px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:18px; }
+      .step b { font-size:72px; font-weight:800; color:var(--on); line-height:1; }
+      .step p { font-size:36px; font-weight:600; color:var(--muted); line-height:1.4; }
+      .steps .arrow { align-self:center; }
+
+      .outlook { display:grid; grid-template-columns:1.6fr 1fr; gap:28px; flex:1; min-height:0; }
+      .chart { width:100%; height:100%; background:var(--card); border-radius:28px; box-shadow:0 10px 30px rgba(27,36,51,.06); }
+      .gl { stroke:var(--line); stroke-width:2; }
+      .yl, .xl, .yu { fill:var(--muted); font-size:24px; font-weight:600; font-family:var(--body); }
+      .yl { text-anchor:end; } .xl { text-anchor:middle; }
+      .bandfill { fill:var(--onsoft); }
+      .ln { fill:none; stroke-width:6; stroke-linejoin:round; stroke-linecap:round; }
+      .ln.bs { stroke:var(--ac); }
+      .ln.sc { stroke:#9AA6B8; stroke-dasharray:10 10; stroke-width:4; }
+      .tg { font-size:28px; font-weight:700; font-family:var(--body); fill:var(--muted); }
+      .tg.bs { fill:var(--ac); }
+      .tg2 { font-size:22px; font-weight:600; font-family:var(--body); fill:var(--muted); }
+      .mini { width:100%; height:auto; }
+
+      .tl { display:grid; grid-template-columns:repeat(4, 1fr); gap:22px; flex:1; align-content:center; }
+      .stop { background:var(--card); border-radius:24px; padding:30px 34px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:10px; }
+      .stop b { font-size:40px; font-weight:800; color:var(--soft); }
+      .stop h3 { font-size:40px; }
+      .stop p { font-size:32px; font-weight:600; color:var(--muted); }
+      .stop.key { background:var(--on); color:#fff; }
+      .stop.key b, .stop.key p { color:#fff; }
+      .backup { display:flex; gap:20px; font-size:32px; font-weight:600; color:var(--muted); }
+      .backup span { background:var(--card); border-radius:14px; padding:14px 26px; }
+      .backup b { color:var(--on); margin-right:8px; font-weight:800; }
+
+      .qa { display:grid; grid-template-columns:repeat(2, 1fr); gap:24px; flex:1; align-content:center; }
+      .q { background:var(--card); border-radius:24px; padding:30px 36px 30px 104px; box-shadow:0 10px 30px rgba(27,36,51,.06); position:relative; display:flex; flex-direction:column; gap:10px; }
+      .q > b { position:absolute; left:34px; top:26px; font-size:50px; font-weight:800; color:var(--on); }
+      .q h3 { font-size:40px; }
+      .q p { font-size:34px; font-weight:600; color:var(--muted); }
+
+      .lbl { font-size:24px; font-weight:700; color:var(--soft); letter-spacing:.04em; margin-top:4px; }
+      .card h3 .dot { display:inline-block; width:18px; height:18px; border-radius:50%; background:var(--ac); margin-right:14px; vertical-align:middle; }
+      .card .lbl + ul { margin-top:-12px; }
+      .flowline { display:flex; gap:48px; align-items:center; }
+      .flowline span { flex:1; text-align:center; font-size:30px; font-weight:700; background:var(--card); border-radius:16px; padding:18px 10px;
+                       box-shadow:0 6px 18px rgba(27,36,51,.05); position:relative; }
+      .flowline span:not(:last-child)::after { content:"→"; position:absolute; right:-24px; top:50%; transform:translate(50%,-50%); z-index:1; color:#9AA6B8; font-weight:800; }
+      .stack { position:relative; display:flex; flex-direction:column; gap:16px; flex:1; justify-content:center; }
+      .layer { display:grid; grid-template-columns:120px 300px 1fr; align-items:center; gap:24px; background:var(--card); border-radius:24px;
+                padding:26px 40px; box-shadow:0 10px 30px rgba(27,36,51,.06); }
+      .layer b { font-size:30px; font-weight:800; color:var(--on); }
+      .layer h3 { font-size:44px; }
+      .layer p { font-size:32px; font-weight:600; color:var(--muted); }
+      .slot { flex:1; display:flex; align-items:center; justify-content:center; border:4px dashed var(--line); border-radius:28px; font-size:44px; font-weight:700; color:var(--soft); }
+      .end { position:absolute; left:0; right:0; top:250px; text-align:center; }
+      .end .logo { font-size:120px; }
+      .end h2 { font-size:136px; margin-top:10px; }
+      .end .meta { margin-top:30px; }
+      .closing .crew { left:0; right:0; justify-content:center; bottom:70px; }
+
+
+      /* 표준화 문제(새 장, 11/4): 왼쪽 = 같은 등급·한 지사 안 차이 막대, 오른쪽 = 실적 없는 지사 질문 */
+      .st .stn { font-size:24px; font-weight:600; color:var(--soft); line-height:1.35; }
+      .halves { display:grid; grid-template-columns:1.15fr 1fr; gap:28px; flex:1; min-height:0; }
+      .hv { background:var(--card); border-radius:28px; padding:34px 40px; box-shadow:0 10px 30px rgba(27,36,51,.06); display:flex; flex-direction:column; gap:22px; min-width:0; }
+      .hv h3 { font-size:40px; }
+      .cmp { display:flex; flex-direction:column; gap:12px; }
+      .cmp .cap { font-size:26px; font-weight:800; color:var(--muted); }
+      .cmp .cap b { color:var(--on); }
+      .hb { display:grid; grid-template-columns:150px 1fr 120px; align-items:center; gap:16px; font-size:28px; font-weight:700; }
+      .hb i { display:block; height:34px; border-radius:0 10px 10px 0; background:#B7C1D0; }
+      .hb.mx i { background:var(--on); }
+      .hb em { font-style:normal; font-weight:800; text-align:right; color:var(--muted); }
+      .hb.mx em { color:var(--on); }
+      .hv .src { margin-top:auto; font-size:22px; font-weight:600; color:var(--soft); }
+      .hv.ask { background:var(--ink); color:#fff; justify-content:center; }
+      .hv.ask .qm { font-family:var(--title); font-size:150px; line-height:.9; color:var(--on); }
+      .hv.ask h3 { font-size:50px; line-height:1.3; }
+      .hv.ask ul { gap:14px; }
+      .hv.ask li { font-size:30px; color:#C9D2DF; }
+      .hv.ask li b { color:#fff; }
+
+      /* 화면은 프론트엔드, 계산은 백엔드 — HTML 로 다시 만듦(11/4, SQLite 삭제) */
+      .archt span.fe { color:#2F6FE4; } .archt span.be { color:#0FA57A; }
+      .arch { display:grid; grid-template-columns:1fr 64px 1.2fr 64px 1.3fr 64px 1fr; align-items:stretch; flex:1; min-height:0; margin-top:6px; }
+      .acd { background:var(--card); border-radius:24px; box-shadow:0 10px 30px rgba(27,36,51,.07); border-top:12px solid var(--ink);
+             padding:24px 26px 26px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+      .acd.fe { border-top-color:#2F6FE4; } .acd.be { border-top-color:#0FA57A; } .acd.db { border-top-color:#7C5CE0; }
+      .acd small { font-size:22px; font-weight:700; color:var(--muted); }
+      .acd.fe small { color:#2F6FE4; } .acd.be small { color:#0FA57A; } .acd.db small { color:#7C5CE0; }
+      .acd h3 { font-size:46px; }
+      .acd .rw { font-size:25px; font-weight:700; background:var(--ground); border-radius:12px; padding:12px 16px; }
+      .acd .who { display:flex; align-items:center; gap:8px; margin-top:auto; font-size:22px; font-weight:700; color:var(--muted); }
+      .acd .who i { font-style:normal; width:44px; height:44px; border-radius:50%; display:grid; place-items:center; color:#fff; font-size:22px; font-weight:800; }
+      .who .c1 { background:#2F6FE4; } .who .c2 { background:#0FA57A; } .who .c3 { background:#F59E0B; }
+      .acd .go { margin-top:auto; font-size:24px; font-weight:800; color:#2F6FE4; }
+      .lnk { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#9AA6B8; }
+      .lnk span { font-size:20px; font-weight:700; color:var(--muted); }
+      .lnk b { font-size:40px; font-weight:800; line-height:1; }
+      .result { align-self:flex-start; margin-left:calc((100% - 192px) * 1 / 5.5 + 64px); font-size:22px; font-weight:800; color:#fff; background:var(--on);
+                border-radius:30px; padding:8px 20px; }
+      .runbar { background:var(--ink); color:#fff; border-radius:18px; padding:22px 30px; text-align:center; font-size:28px; font-weight:700; }
+
+      /* 영상 속 글자 고침(11/4, SQLite 삭제): 영상이 data-at 초를 지나면 같은 색 덮개 + 새 글자 */
+      .vfix { position:absolute; display:none; align-items:center; white-space:nowrap; font-family:var(--body); z-index:2; pointer-events:none; }
+      .vfix.on { display:flex; }
+      .vfix.j3 { left:1236px; top:704px; width:364px; height:56px; background:#fff; justify-content:center; font-size:34px; font-weight:700; color:#141B26; }
+      .vfix.sl { left:1186px; top:946px; width:604px; height:56px; background:rgb(26,36,52); justify-content:flex-end; padding-right:13px; font-size:21px; font-weight:500; color:rgb(185,195,211); }
+      /* entrance effects: live deck only. At rest everything is visible; the class "live" is put on the slide that
+         comes up, which replays these once. */
+      @keyframes rise { from { opacity:0; transform:translateY(46px); } to { opacity:1; transform:none; } }
+      @keyframes pop { 0% { opacity:0; transform:scale(.4); } 70% { opacity:1; transform:scale(1.08); } 100% { transform:none; } }
+      @keyframes slide { from { opacity:0; transform:translateX(-60px); } to { opacity:1; transform:none; } }
+      @keyframes draw { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
+      @keyframes fade { from { opacity:0; } to { opacity:1; } }
+      @keyframes pulse { 0%, 100% { box-shadow:0 0 0 0 rgba(232,65,44,.55); } 50% { box-shadow:0 0 0 22px rgba(232,65,44,0); } }
+      .live .anim { animation:rise .6s cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--i, 0) * .11s + .05s); }
+      .live .band.anim { animation-name:slide; }
+      .live .sec .num, .live .guide, .live .crew img, .live .st.key { animation-name:pop; animation-duration:.7s; }
+      @keyframes up { from { opacity:0; transform:translateY(80px); } to { opacity:1; transform:none; } }
+      .live .layer { animation-name:up; animation-duration:.6s; }
+      .live .draw { stroke-dasharray:1; animation:draw 1.6s .5s ease-in-out both; }
+      .live .chart .scen { animation:fade .8s 1.8s both; }
+      .live .stop.key { animation:rise .6s both, pulse 1.4s 1.6s 2; animation-delay:calc(var(--i, 0) * .11s + .05s), 1.6s; }
+      .fx .slide:not(.live) .anim { opacity:0; }
+      @media (prefers-reduced-motion: reduce) { .live * { animation:none !important; } }
+    </style>
+  </head>
+  <body>
+    <script type="application/hyperframes-slideshow+json">
+{
+  "slides": [
+    {
+      "sceneId": "opening",
+      "startTime": 0.0,
+      "endTime": 28.82,
+      "notes": "(오프닝 영상 — 끝나면 클릭)",
+      "autoplay": true
+    },
+    {
+      "sceneId": "cover",
+      "startTime": 28.82,
+      "endTime": 32.82,
+      "notes": "안녕하십니까. AI PIONEER를 통해 해커톤 경진대회 예산분석-예측 프로그램을 만들게 된 3조 ThreeON의 염민호입니다."
+    },
+    {
+      "sceneId": "sec1",
+      "startTime": 32.82,
+      "endTime": 36.82,
+      "notes": "(전환) 문제 정의"
+    },
+    {
+      "sceneId": "scale",
+      "startTime": 36.82,
+      "endTime": 49.82,
+      "notes": "(팀장 추가) 연 1,500억 · 담당자 1명 · 1년 내내 19개 지사 예산 이동.\n계획에 없던 신규·돌발 사업 연 평균 약 175건 · 약 350억 (2023~2024 실적 대조: 187건·163건 / 328억·367억). 2025는 보정 반영으로 제외.\n→ 처음 예측이 정확할수록 덜 옮기고, 덜 취소된다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "prob1a",
+      "startTime": 49.82,
+      "endTime": 51.55,
+      "notes": "(업무 흐름 — 다음 클릭에 문제 ①② 등장)",
+      "autoplay": true
+    },
+    {
+      "sceneId": "prob1",
+      "startTime": 51.55,
+      "endTime": 58.25,
+      "notes": "(⚠ 대본의 400명·4,000 M/D → 화면은 298명(26.8.6 조직도)·2,980 M/D)\n\n발전플랜트 유지보수 예산 실적 집계에 계획 엑셀과 SAP 실적 전표를 대조하는 데만 전사 유지보수 담당자 약 400명이 약 2주를 씁니다. 저희는 이 대조를 20초로 줄이는 프로그램을 만들었습니다.\n\n또한, 이 실적을 토대로 각 지사의 정비등급별 표준예산을 수립하고, 그 결과를 그대로 2026년부터 2035년까지 10개년 소요 전망으로 예측하는데 주관부서 예산 담당자 1명이 약 3개월의 시간을 소요합니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "prob-std",
+      "startTime": 58.25,
+      "endTime": 62.25,
+      "notes": "사람마다 다른 건 예측만이 아닙니다. 표준예산의 기준 자체가 지사와 정비등급마다 천차만별입니다. 같은 MI 정비인데도 화성은 1년에 약 308억, 삼송은 약 66억으로 4.6배 차이가 납니다. 한 지사 안에서도 파주는 MI 250억, HGPI 149억, 간이 108억으로 등급에 따라 2.3배가 달라집니다. 더 어려운 건 실적이 없는 곳입니다. 2029년 준공하는 수원 신규 열원, MI 정비 이력이 없는 삼송, 실적이 1~3년뿐인 양산·대구·청주는 무엇을 기준으로 예측해야 할까요?"
+    },
+    {
+      "sceneId": "prob3",
+      "startTime": 62.25,
+      "endTime": 69.05,
+      "notes": "사람이 직접 이 모든 작업을 수행하다보니 실적 데이터의 오차율도 높고, 10개년 소요 예산 예측 시 개인의 의사에 따라 금액 변동이 천차만별이었습니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "prob4",
+      "startTime": 69.05,
+      "endTime": 70.95,
+      "notes": "우리는 이것을 담당자 개개인의 판단을 철저히 배제한, 철저히 객관적인 분석/예측을 위해 시스템을 만들었습니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "prob5",
+      "startTime": 70.95,
+      "endTime": 79.45,
+      "notes": "지금부터 그 과정을 보여드리겠습니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "sec2",
+      "startTime": 79.45,
+      "endTime": 83.45,
+      "notes": "(전환) 해결 방식"
+    },
+    {
+      "sceneId": "axes",
+      "startTime": 83.45,
+      "endTime": 87.45,
+      "notes": "(⚠ 대본의 400명·4,000 M/D → 화면은 298명(26.8.6 조직도)·2,980 M/D)\n\n저희는 이 문제를 세 가지 축으로 나눠 풀었습니다. 실적매핑, 표준화, 그리고 중장기예측입니다.\n\n첫 번째 축, 실적매핑은 계획과 실적을 자동으로 대조하는 단계입니다. 전사 유지보수 담당자 약 400명이 2주, 영업일로 환산하면 4,000 M/D를 쓰던 대조 작업을 20초로 줄였습니다.\n\n두 번째 축, 표준화는 등급별 실적 데이터가 부족하다는 문제를 풉니다. 데이터가 있는 지사·등급은 과거 실적으로 표준금액을 산정하고, 데이터가 없는 지사는 설비용량으로 보정합니다.\n\n세 번째 축, 중장기예측은 사람이 가정을 정하면 10년 합계가 가정 하나로 수백억에서 수천억 원까지 들쭉날쭉하던 문제를, 시스템이 같은 기준으로 계산하도록 시스템화한 단계입니다.\n\n지금부터 이 세 축을 순서대로 보여드리겠습니다."
+    },
+    {
+      "sceneId": "axes-pic",
+      "startTime": 87.45,
+      "endTime": 91.45,
+      "notes": "이 세 가지 개선을 한 장의 그림으로 보여드리겠습니다. 실적매핑은 전표와 사업계획을 AI가 대조해서, 자동 매칭 결과의 92.5퍼센트가 그대로 확정됩니다.\n\n표준화는 등급·지사별로 흩어져 있던 기준을 시스템의 규칙 엔진에 넣어서 하나의 표준금액으로 확정합니다. 중장기예측은 사람이 정하면 들쭉날쭉했던 최고·최저 추정 범위 안에서, 시스템이 매년 같은 기준으로 값을 확정합니다.\n\n결국 사람이 줄로 대조하고, 손으로 채우고, 감으로 예측하던 일을 매칭·산정·계산으로 바꾼 것입니다. 같은 입력이면 누가 하든 같은 결과가 나옵니다."
+    },
+    {
+      "sceneId": "m-key",
+      "startTime": 91.45,
+      "endTime": 95.45,
+      "notes": "네 가지로 요약하면, 2025년 전표 14,289건 중 92.5퍼센트가 자동 결과 그대로 확정되었고 확신도 0.8 이상 자동확정은 정밀도 94.1퍼센트입니다. 확신도를 \"이름 핵심\" 유사도로 보정한 뒤에는 손익 자동확정 정밀도가 87.6퍼센트에서 95.1퍼센트로, 틀린 자동확정은 366건에서 51건으로 줄었습니다. 검토가 필요한 1,461건 중에서도 상위 231건, 16퍼센트만 처리하면 검토 금액의 80퍼센트가 끝나고, 근거 문장은 사실 네 가지와 추정 규칙 아홉 가지로 LLM 없이 자동 초안이 작성됩니다."
+    },
+    {
+      "sceneId": "s-two",
+      "startTime": 95.45,
+      "endTime": 99.45,
+      "notes": "등급별 실적 데이터가 부족해 담당자 한 명이 매년 3개월씩 손으로 채우던 표준금액을, ThreeON은 두 단계로 시스템화했습니다. 1단계는 마감된 최근 2~3개년 실적과 과거 10년치 참고 자료를 합쳐 지사별·등급별 표준금액을 산정하는 것이고, 2단계는 실적이 없는 신규·확장 지사를 설비용량(MW) 공식으로 보정하는 것입니다. LTSA·CRI·고온부품처럼 이미 연도별 계획값으로 잡힌 비용은 1단계에서 따로 빼 이중계상을 막습니다. 이 두 단계는 학습 기간 3개년 백테스트로 검증했고, 과목 단위 오차는 25에서 36퍼센트, 지사 3년 누적 오차는 15에서 20퍼센트입니다. 경상정비·정기점검처럼 10년 소요의 절반이 넘는 과목부터 이 체계로 관리됩니다."
+    },
+    {
+      "sceneId": "f-how",
+      "startTime": 99.45,
+      "endTime": 103.45,
+      "notes": "(⚠ 아래 대본 숫자는 10/27 옛 값 — 화면 숫자는 현재 운영 기준: 10년 2조 222억(투자비 포함), 정점 2031년 3,266억)\n\n표준화에서 만든 표준금액에 물가 팩터(연 1.5%)와 정기계약·CRI, A급정비 일정, 투자계획을 더해 2026년부터 2035년까지 10년 누계 1조 3,852억 원을 전망합니다. 경상정비와 정기점검 두 과목이 10년 소요의 51퍼센트를 차지합니다.\n\n물가와 물량 손잡이로 시나리오를 비교하면, 보수 시나리오(물가+1%p·물량+10%)는 1조 5,881억 원으로 14.6퍼센트 늘고, 절감 시나리오는 1조 2,246억 원으로 11.6퍼센트 줄어듭니다. 손잡이 하나씩만 보면 물량 10퍼센트가 10년 누계를 1,331억 원, 물가 1퍼센트포인트가 634억 원 움직여 물량의 영향이 2.1배 크고, 보수 시나리오 증가분의 41퍼센트는 상위 세 지사에 몰립니다. 전망 오차는 과목 단위 25~36퍼센트, 지사 3년 누적 15~20퍼센트이며, 마감 연도가 쌓일수록 좁아집니다."
+    },
+    {
+      "sceneId": "f-res",
+      "startTime": 103.45,
+      "endTime": 107.45,
+      "notes": "(이어서) 현재 운영 기준 전사 10년 2조 222억(투자비 포함, 빼면 1조 8,939억). 2031년은 A급 정비가 몰려 3,266억으로 가장 많아, 미리 알고 나눠 준비할 수 있습니다."
+    },
+    {
+      "sceneId": "slip",
+      "startTime": 107.45,
+      "endTime": 124.86,
+      "notes": "(제안 문안) 전표 한 장이 ONDO를 지나가는 길입니다. 매칭에서 사업에 붙고, 확신이 낮으면 검토로, 표준화에서 지사별 표준금액이 되고, 마지막에 10년 전망에 들어갑니다. 모든 단계가 LLM 없이 같은 규칙으로 돌아갑니다.\n\n세 축을 구현한 핵심 기법을 한 장으로 정리하면 이렇습니다.\n\n실적매핑은 전표 묶음, 사업명 유사도, 그리고 과거 사람 판단을 쌓은 학습표까지 네 층을 겹쳐 확신도를 매기고, 흔한 업무 낱말을 빼 \"이름 핵심\" 유사도로 동점 오류를 보정합니다.\n\n표준화는 과거 실적을 지사별·등급별로 산정하고(1단계), 실적이 없는 신규 지사는 설비용량(MW) 공식으로 보정하는 것(2단계)까지, 사람이 하던 두 단계를 그대로 시스템화했습니다. 학습 기간 3개년 백테스트로 정확도를 검증합니다.\n\n중장기예측은 이 표준금액에 물가 팩터(연 1.5%), 정기계약·CRI, A급정비 일정, 투자계획을 더해 10년 치를 계산하고, 물가·물량 손잡이를 가진 시나리오 엔진으로 가정별 범위를 만듭니다. 예측 범위 띠는 학습 기간 실적의 최소에서 최대까지를 같은 팩터로 늘려 그립니다.\n\n세 축 모두 외부 생성형 AI를 호출하지 않는 규칙 기반 계산입니다. 같은 입력이면 항상 같은 결과가 나오기 때문에, 설명할 수 있고 폐쇄망에서도 그대로 동작합니다.\n\n개발한 기능은 세 가지입니다. matching.py는 전표 묶음·사업명 유사도·학습 이력을 겹친 4층 매칭 엔진이고, 연도·월·회차와 흔한 업무 낱말을 뺀 \"이름 핵심\" 유사도로 동점 오류를 보정합니다. explain.py와 조회용 API는 계획 대비 실적·상위 전표·전년 같은 사업·매칭 근거라는 사실 네 가지에, 추정 원인 아홉 가지 규칙을 더해 근거 문장을 자동으로 초안 작성합니다. 생성형 AI는 쓰지 않습니다. measure_match_precision.py는 재배정과 학습을 끈 상태로 매칭만 다시 돌려 정밀도를 재고, 확신도 구간마다 무작위 표본을 뽑아 담당자 검수와 95퍼센트 신뢰구간으로 검증합니다.\n\n이 모든 기능은 파이썬 기반 백엔드와 API 위에서 동작하고, 자동 테스트 335건과 CI·자동 배포로 품질을 지킵니다. 외부 LLM이나 AI API를 호출하지 않기 때문에 폐쇄망으로 그대로 옮길 수 있고, 감사 로그·연도 잠금·전표 드릴다운을 갖춰 공공기관이 요구하는 설명 가능하고 안전한 구조를 만족합니다.\n\n개발한 기능은, 전망 파이프라인 안에 표준금액 산정과 설비용량 보정 로직을 통합한 것입니다. 실적 기반 1단계 산정에 더해, 용량 대상 실적 조정과 1회성 금액 교체, 정비제외 등급 처리까지 같은 코드에서 계산되고, LTSA·CRI 같은 장기계약 비용은 정비제외 등급으로 걸러 표준금액과 분리해 저장합니다.\n\n표준화와 중장기예측은 같은 파이썬 코드 기반을 공유합니다. 그래서 표준금액이 바뀌면 전망도 같은 규칙으로 함께 갱신됩니다. 568건의 자동 테스트로 지사별·연도별 숫자가 운영 데이터와 정확히 일치하는지 검증합니다.\n\n개발한 기능은, 시나리오 비교 엔진과 그 결과를 캐시·예열해 저장된 가정이 바뀌지 않는 한 즉시 응답하는 조회 기능입니다. 화면에는 물가·물량 손잡이 카드, 10년 누계, 근거 문장, 예측 범위 띠를 포함한 선 그래프, 지사×연도 차이 히트맵까지 한 화면에서 비교할 수 있게 구성했습니다.\n\n이 기능은 표준화와 같은 파이썬 코드 기반 위에서 동작해서, 표준금액이 바뀌면 전망도 함께 갱신됩니다. REST API와 차트·히트맵 시각화를 프런트엔드에 연결했고, 자동 테스트로 지사 × 10년 숫자가 운영 데이터와 같은지 매번 검증합니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "build1",
+      "startTime": 124.86,
+      "endTime": 130.86,
+      "notes": "(대본에 없음 · 제안 문안) 저희는 5월부터 10월까지 AI PIONEER 과정에서 배운 순서 그대로 만들었습니다. 데이터 구조와 AI 기초, 생성형 AI와 자동화, 과제 발굴과 PRD, 예측 모델링, 하네스와 AI 페어코딩, Git PR과 자동 배포까지.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "build2",
+      "startTime": 130.86,
+      "endTime": 138.43,
+      "notes": "(제안 문안) 역할은 셋으로 나눴습니다. 염민호는 기획·예측·총괄, 조주호는 웹 화면과 배포, 이은혜는 실적 매칭과 UI를 맡아 각자의 브랜치에서 만들었습니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "build3",
+      "startTime": 138.43,
+      "endTime": 146.9,
+      "notes": "(제안 문안) 그리고 PR 115건(병합 107건)으로 하나로 합쳐, 세 사람이 6개월 동안 만든 하나의 ONDO가 됐습니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "stack",
+      "startTime": 146.9,
+      "endTime": 157.9,
+      "notes": "구조는 이렇습니다. 사람이 보고 누르는 화면은 프론트엔드, 뒤에서 매칭·표준화·예측을 계산하고 저장하는 엔진은 백엔드입니다. 화면은 Vite와 Tailwind, 백엔드는 Python FastAPI와 pandas, 데이터베이스는 PostgreSQL입니다."
+    },
+    {
+      "sceneId": "sec4",
+      "startTime": 157.9,
+      "endTime": 161.9,
+      "notes": "(전환) 향후 계획"
+    },
+    {
+      "sceneId": "plan",
+      "startTime": 161.9,
+      "endTime": 165.9,
+      "notes": "앞으로의 계획은 세 가지입니다. 첫째, 중장기 재무전망입니다. 지금은 유지보수 예산만 다루지만, 추후 공사 전체 재무 전망까지 예측 범위를 넓힐 계획입니다. 둘째, 고도화입니다. 투자 유형 분석으로 정기·비정기 사업을 분리해 중장기 예측 정확도를 한층 더 높이겠습니다. 셋째, 내부망 연계입니다. 지금은 독립된 시스템이지만 ERP 연계 등을 통해 실시간 실적 분석 시스템으로 발전시키겠습니다.\n\n(이어서 · 대본 18장 «정리» 내용)\n\n정리하겠습니다.\n\nThreeON은 이미 3개년 실적으로 운영·마감된 사내 시스템입니다. 사람의 판단이 근거와 함께 쌓이고, 같은 숫자로 10개년 전망까지 이어집니다. 외부 AI 없이 폐쇄망에서 돌아갑니다.\n\n다음 단계는 세 가지입니다. 첫째, 2026년 계획본을 업로드해 기준연도를 확정 예산으로 바꿉니다. 둘째, 표본 201건 검수로 \"확인한\" 정밀도로 보강합니다. 셋째, Docker 패키지와 사내 PG로 사내 이관을 준비합니다.\n\n감사합니다."
+    },
+    {
+      "sceneId": "sec5",
+      "startTime": 165.9,
+      "endTime": 169.9,
+      "notes": "(전환) 기대효과"
+    },
+    {
+      "sceneId": "effect1",
+      "startTime": 169.9,
+      "endTime": 176.1,
+      "notes": "(대본 5·8·11장 «성과 요약»은 장 없이 말로) AI 규칙 기반 매칭으로 2025년 전표의 92.5%를 자동 확정하며, 같은 입력엔 같은 결과가 나오는 설명 가능한 시스템을 만들었습니다.\n\n장점은 세 가지입니다. 외부 AI를 부르지 않는 규칙 기반이라 같은 입력이면 항상 같은 결과가 나오고, 폐쇄망에서도 그대로 동작합니다. 담당자가 확정한 판단은 학습표에 쌓여 다음 해 자동 매칭에 그대로 재사용됩니다. 그리고 전표 한 장까지 내려가 근거를 확인할 수 있어, 설명할 수 있는 구조입니다.\n\n실적은 이렇습니다. 2025년 전표 14,289건 중 92.5퍼센트가 자동 결과 그대로 확정되었고, 확신도 0.8 이상 자동확정은 정밀도 94.1퍼센트입니다. 확신도 보정 이후에는 손익 자동확정 정밀도가 87.6퍼센트에서 95.1퍼센트로 올랐고, 틀린 자동확정은 366건에서 51건으로 줄었습니다. 검토가 필요한 1,461건 중에서도 상위 231건, 16퍼센트만 처리하면 검토 금액의 80퍼센트가 끝납니다.\n\n설명드리면, 계획 엑셀과 SAP 전표를 전표 묶음·사업명 유사도·학습 이력까지 네 층으로 겹쳐 대조하고, 확신도가 낮은 전표만 검토 큐 상단에 올립니다. 근거 문장은 규칙으로 자동 초안이 작성되고, 담당자가 승인하거나 재배정하면 그 판단이 다시 학습표에 쌓입니다.\n\n사람이 3개월 걸리던 표준금액 산정을 두 단계 규칙 엔진으로 시스템화해, 데이터가 없는 지사도 빠짐없이 같은 기준으로 계산합니다.\n\n장점은, 담당자 한 명이 매년 3개월 손으로 채우던 표준금액을 규칙 엔진이 매번 같은 기준으로 계산한다는 것입니다. 실적이 없는 신규·확장 지사도 설비용량 보정으로 채워지기 때문에 \"데이터가 없다\"는 이유로 비워두지 않습니다. 또 LTSA·CRI·고온부품처럼 이미 계상된 비용은 자동으로 걸러내 이중계상을 막습니다.\n\n실적은, 마감된 최근 2~3개년 실적과 과거 10년치 참고 자료를 합쳐 지사별·등급별 표준금액을 산정하고, 백테스트 결과 과목 단위 오차 25에서 36퍼센트, 지사 3년 누적 오차 15에서 20퍼센트로 검증되었습니다. 이 표준금액을 기반으로 경상정비·정기점검이 10년 소요의 51퍼센트를 차지한다는 것도 계산해 냈습니다.\n\n설명드리면, 1단계는 마감 실적과 과거 참고치를 합쳐 지사별·등급별 표준금액을 산정하는 것이고, 2단계는 실적이 없는 지사를 설비용량(MW) 공식으로 보정하는 것입니다. 1단계 산정에서는 LTSA·CRI·고온부품처럼 이미 연도별 계획값으로 잡힌 금액을 따로 빼 이중으로 계산되지 않게 합니다.\n\n표준금액을 기반으로 물가·물량 손잡이로 시나리오를 즉시 비교해, 사람의 감이 아니라 시스템이 10년 전망의 범위를 투명하게 보여줍니다.\n\n장점은, 물가와 물량이라는 손잡이 두 개로 여러 시나리오를 즉시 비교할 수 있어서 감이 아니라 숫자로 토론할 수 있다는 것입니다. 10개년 숫자가 표준화 단계와 같은 기준으로 자동 계산되기 때문에 전망이 바뀌어도 근거가 그대로 남고, 결과는 캐시와 예열로 저장돼 화면에서 바로 확인됩니다.\n\n실적은, 2026년 기준 10년 소요 전망이 1조 3,852억 원이고, 물가와 물량을 함께 올리는 보수 시나리오는 1조 5,881억 원으로 14.6퍼센트 늘고, 함께 낮추는 절감 시나리오는 1조 2,246억 원으로 11.6퍼센트 줄어듭니다. 손잡이 하나씩만 움직이면 정비 물량 10퍼센트는 10년 누계를 1,331억 원, 물가 1퍼센트포인트는 634억 원 움직여, 물량의 영향이 물가보다 2.1배 큽니다.\n\n설명드리면, 표준화 단계에서 만든 표준금액을 그대로 이어받아 10개년에 적용하고, 물가·물량 팩터를 바꾸면 전망 전체가 같은 규칙으로 다시 계산됩니다. 지사×연도 히트맵으로 어디에서 얼마나 바뀌는지 보여주기 때문에, \"오차가 몇 퍼센트냐\"가 아니라 \"어떤 가정이 얼마를 움직이나\"로 질문을 바꿔서 답합니다.\n\n(10억 산출: 평균연봉 8,523만 원(알리오 26년) × 유지보수 298명 × 2/52주 = 9.77억 + 주관부서 2명 × 20/52주 = 0.66억 → 10.4억)\n\n기대효과는 세 가지입니다. 인력편익은 M/D 절감으로 연간 약 10억 원이고, 예산효율은 정확한 예측으로 적재적소에 예산을 투입해 연간 약 100억 원의 효율적 집행입니다. 마지막으로 지속개선 효과가 있습니다. 담당자 판단이 학습표로 쌓여 자동화율이 매년 스스로 개선되는 복리 구조라, 시간이 지날수록 효과가 커집니다.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "effect2",
+      "startTime": 176.1,
+      "endTime": 182.3,
+      "notes": "(이어서) 예산효율 — 정확한 예측으로 적재적소 투입, 연 약 168억. 근거: 최근 3개년(2023~2025) 미집행(배정액−실적) 평균 약 168억 중 제자리를 찾아 쓰이는 몫.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "effect3",
+      "startTime": 182.3,
+      "endTime": 188.9,
+      "notes": "(이어서) 지속개선 — 판단이 학습표로 쌓여 해마다 자동화율 상승, 쓸수록 똑똑해지는 구조.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "sec3",
+      "startTime": 188.9,
+      "endTime": 192.9,
+      "notes": "(전환) 시연"
+    },
+    {
+      "sceneId": "trailer",
+      "startTime": 192.9,
+      "endTime": 249.6,
+      "notes": "시연 오프닝 — ONDO 예고편(1분). 끝나면 클릭해서 시연 영상으로.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "demo",
+      "startTime": 249.6,
+      "endTime": 421.5,
+      "notes": "시연 영상(2분 52초, 나레이션 포함) — 로그인 · 사용법 · 올리기·분석 · 전표 근거 · 검토 · 학습 · 표준화 · 10년 전망 · 보고서 · 실적 엑셀 · 챗봇.",
+      "autoplay": true
+    },
+    {
+      "sceneId": "closing",
+      "startTime": 421.5,
+      "endTime": 429.1,
+      "notes": "감사합니다.",
+      "autoplay": true
+    }
+  ]
+}
+    </script>
+    <div id="deck" data-composition-id="deck" data-start="0" data-duration="429.10" data-width="1920" data-height="1080">
+    <div id="opening" class="slide video clip" data-composition-id="opening" data-start="0.00" data-duration="28.82" data-label="opening" data-width="1920" data-height="1080"><video id="opening-v" class="clip" src="assets/opening.mp4" data-start="0" data-duration="28.82" data-has-audio="true" playsinline></video></div>
+      <div id="cover" class="slide cover clip" data-composition-id="cover" data-start="28.82" data-duration="4.0" data-label="cover" data-width="1920" data-height="1080"><div class="cover"><div class="eyebrow anim">실적매핑 · 표준화 · 중장기예측</div><h1 class="anim">과거 실적으로<br/>미래 10년을 읽다</h1><div class="brand anim"><span class="logo"><b>ON</b>DO</span><span class="tag">예산의 온도를 읽다</span></div><div class="meta anim">발전플랜트 유지보수 예산 업무 자동화 · AI PIONEER 해커톤 경진대회<br/><strong>3조 ThreeON</strong> · 염민호</div></div><div class="crew"><img class="anim" src="assets/hj.png" alt=""/><img class="anim" src="assets/mt.png" alt=""/><img class="anim" src="assets/gt.png" alt=""/><img class="anim" src="assets/yc.png" alt=""/></div></div>
+      <div id="sec1" class="slide section clip" data-composition-id="sec1" data-start="32.82" data-duration="4.0" data-label="문제 정의" data-width="1920" data-height="1080"><div class="sec"><div class="num anim">01</div><h2 class="anim">문제 정의</h2><div class="sub anim">사람이 하면 오래 걸리고, 가정에 따라 흔들린다</div></div><img class="guide anim" src="assets/hj.png" alt=""/><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:14%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="scale" class="slide video clip" data-composition-id="scale" data-start="36.82" data-duration="13.0" data-label="scale" data-width="1920" data-height="1080"><video id="scale-v" class="clip" src="assets/scale.mp4" data-start="0" data-duration="13.0" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:29%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob1a" class="slide video clip" data-composition-id="prob1a" data-start="49.82" data-duration="1.73" data-label="prob1a" data-width="1920" data-height="1080"><video id="prob1a-v" class="clip" src="assets/problem1a.mp4" data-start="0" data-duration="1.73" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:43%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob1" class="slide video clip" data-composition-id="prob1" data-start="51.55" data-duration="6.7" data-label="prob1" data-width="1920" data-height="1080"><video id="prob1-v" class="clip" src="assets/problem1.mp4" data-start="0" data-duration="6.7" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:57%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob-std" class="slide html clip" data-composition-id="prob-std" data-start="58.25" data-duration="4.0" data-label="표준화의 문제" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band plain anim"><span>문제 정의</span></div><h2 class="anim">표준예산, 지사·등급마다 천차만별</h2></header><div class="halves"><section class="hv anim"><h3>같은 정비등급인데 금액은 제각각</h3><div class="cmp"><p class="cap">같은 등급(MI) · 지사 간 <b>4.6배</b></p><div class="hb mx"><span>화성</span><i style="width:100.0%"></i><em>308억</em></div><div class="hb"><span>삼송</span><i style="width:21.4%"></i><em>66억</em></div></div><div class="cmp"><p class="cap">한 지사(파주) · 등급 간 <b>2.3배</b></p><div class="hb mx"><span>MI</span><i style="width:100.0%"></i><em>250억</em></div><div class="hb"><span>HGPI</span><i style="width:59.6%"></i><em>149억</em></div><div class="hb"><span>간이</span><i style="width:43.2%"></i><em>108억</em></div></div><p class="src">정비등급별 1년 표준금액(손익+자본, 억 원) · ONDO 운영 기준 2026-11-04</p></section><section class="hv ask anim"><div class="qm">?</div><h3>실적이 없는 지사는<br>무엇을 기준으로 예측하지?</h3><ul><li><b>수원</b> — 2029년 준공 신규 열원</li><li><b>삼송</b> — MI 정비 이력 없음</li><li><b>양산·대구·청주</b> — 실적 1~3년뿐</li></ul></section></div></div><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:71%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob3" class="slide video clip" data-composition-id="prob3" data-start="62.25" data-duration="6.8" data-label="prob3" data-width="1920" data-height="1080"><video id="prob3-v" class="clip" src="assets/problem3.mp4" data-start="0" data-duration="6.8" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:78%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob4" class="slide video clip" data-composition-id="prob4" data-start="69.05" data-duration="1.9" data-label="prob4" data-width="1920" data-height="1080"><video id="prob4-v" class="clip" src="assets/problem4.mp4" data-start="0" data-duration="1.9" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:86%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="prob5" class="slide video clip" data-composition-id="prob5" data-start="70.95" data-duration="8.5" data-label="prob5" data-width="1920" data-height="1080"><video id="prob5-v" class="clip" src="assets/problem5.mp4" data-start="0" data-duration="8.5" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg on"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:0%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="sec2" class="slide section clip" data-composition-id="sec2" data-start="79.45" data-duration="4.0" data-label="해결 방식" data-width="1920" data-height="1080"><div class="sec"><div class="num anim">02</div><h2 class="anim">해결 방식</h2><div class="sub anim">실적매핑 · 표준화 · 중장기예측</div></div><img class="guide anim" src="assets/mt.png" alt=""/><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:8%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="axes" class="slide html clip" data-composition-id="axes" data-start="83.45" data-duration="4.0" data-label="세 가지 축으로 문제를 풀었습니다" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band plain anim"><span>해결 방식</span></div><h2 class="anim">세 가지 축으로 문제를 풀었습니다</h2></header><div class="axes"><section class="axc anim" style="--ac:#0E9F95"><img src="assets/mt.png" alt=""/><div class="no">축 1</div><h3>실적매핑</h3><div class="pb">2,980 M/D 수작업</div><div class="arrow">↓</div><div class="fx">자동 대조 <b>20초</b></div></section><section class="axc anim" style="--ac:#EE5A43"><img src="assets/gt.png" alt=""/><div class="no">축 2</div><h3>표준화</h3><div class="pb">등급별 데이터 부족</div><div class="arrow">↓</div><div class="fx">실적 분석 + <b>데이터 기반 예측</b></div></section><section class="axc anim" style="--ac:#7C5CE0"><img src="assets/yc.png" alt=""/><div class="no">축 3</div><h3>중장기예측</h3><div class="pb">담당자 판단마다 다른 10년</div><div class="arrow">↓</div><div class="fx"><b>데이터 기반</b> 판단</div></section></div><p class="chain anim">깨끗한 데이터 → 객관적 기준값 → 10년 전망</p></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:17%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="axes-pic" class="slide html clip" data-composition-id="axes-pic" data-start="87.45" data-duration="4.0" data-label="세 축의 개선을 그림으로" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band plain anim"><span>해결 방식</span></div><h2 class="anim">세 축의 개선을 그림으로</h2></header><div class="pics"><section class="pic anim" style="--ac:#0E9F95"><div class="no">축 1 · 실적매핑</div><div class="flow"><span class="chip">전표(SAP) × 사업계획</span><i>↓ AI 매칭</i><div class="big"><b data-to="92.5" data-dec="1" data-suf="%" data-pre="">92.5%</b></div><p>20초 만에 나온 결과가 그대로 확정되는 정확도</p></div></section><section class="pic anim" style="--ac:#EE5A43"><div class="no">축 2 · 표준화</div><div class="flow"><span class="chip">지사 · 등급별 과거 실적</span><i>↓ 데이터 분석</i><div class="big"><b data-to="635" data-dec="0" data-suf="개" data-pre="">635개</b></div><p>지사 × 정비등급 × 과목 표준금액 자동 산출</p></div></section><section class="pic anim" style="--ac:#7C5CE0"><div class="no">축 3 · 중장기예측</div><div class="flow"><span class="chip">표준금액 → 2026~2035</span><i>↓ 데이터 예측</i><div class="big"><svg class="rise" viewBox="0 0 440 150" role="img" aria-label="예시 그림: 완만하게 오르는 10년 선"><line x1="20" x2="420" y1="136" y2="136" class="rax"/><polyline points="24,118 68,104 111,108 155,90 198,94 242,74 285,80 329,60 372,50 416,34" class="ln bs draw" pathLength="1"/><circle cx="24" cy="118" r="7" class="rdot"/><circle cx="68" cy="104" r="7" class="rdot"/><circle cx="111" cy="108" r="7" class="rdot"/><circle cx="155" cy="90" r="7" class="rdot"/><circle cx="198" cy="94" r="7" class="rdot"/><circle cx="242" cy="74" r="7" class="rdot"/><circle cx="285" cy="80" r="7" class="rdot"/><circle cx="329" cy="60" r="7" class="rdot"/><circle cx="372" cy="50" r="7" class="rdot"/><circle cx="416" cy="34" r="7" class="rdot"/></svg></div><p>해마다 같은 기준으로 계산 <em>예시 그림</em></p></div></section></div><p class="chain anim">사람이 대조 · 채움 · 예측 → <b>데이터가 매칭 · 산정 · 예측</b></p></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:25%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="m-key" class="slide html clip" style="--ac:#0E9F95" data-composition-id="m-key" data-start="91.45" data-duration="4.0" data-label="핵심 결과" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band anim"><img src="assets/mt.png" alt=""/><span>축 1 · 실적매핑</span></div><h2 class="anim">핵심 결과</h2></header><div class="stats big3"><div class="st anim key"><b data-to="14289" data-dec="0" data-suf="건" data-pre="">14,289건</b><span>2025 전표를 20초 만에 자동 대조</span><small class="stn">사업계획 1,688건(손익 1,407 · 자본 281)과 대조 — 계획집행 1,247건 · 신규 62건</small></div><div class="st anim"><b data-to="94.1" data-dec="1" data-suf="%" data-pre="">94.1%</b><span>자동확정 정밀도</span></div><div class="st anim"><b>LLM 0</b><span>같은 입력 → 같은 결과 · 폐쇄망</span></div></div><p class="chain anim" style="margin-bottom:44px">표기 정규화 → 전표번호 묶기 → <b>글자 유사도</b> → <b>학습 DB</b>가 다음 해 자동 적용</p><div class="techrow anim"><span class="tl">사용 기술</span><span class="tc"><b>rapidfuzz</b>글자 유사도</span><span class="tc"><b>pandas</b>전표 집계</span><span class="tc"><b>openpyxl</b>엑셀 양식</span></div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:33%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="s-two" class="slide html clip" style="--ac:#EE5A43" data-composition-id="s-two" data-start="95.45" data-duration="4.0" data-label="두 단계로 데이터 부족을 메우다" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band anim"><img src="assets/gt.png" alt=""/><span>축 2 · 표준화</span></div><h2 class="anim">두 단계로 데이터 부족을 메우다</h2></header><div class="steps two"><section class="step anim"><b>1</b><h3>실적 기반 산정</h3><p>과거 10개년 실적 기반</p></section><div class="arrow anim">→</div><section class="step anim"><b>2</b><h3>데이터 기반 예측</h3><p>실적 없는 지사도 과거 실적 + 유사 지사 데이터 분석 + 현시점 물가 환산 등 다양한 표준화 기법 적용</p></section></div><div class="tech3"><section class="tk anim"><b>pandas 통계 규칙</b><p>η² · 변동계수로 산출 방식 자동 추천</p></section><section class="tk anim"><b>자체 표준화 검증 로직 437건</b><p>표준금액 635개를 같은 기준으로 자동 산출·검증</p></section><section class="tk anim"><b>변수 4가지 자동 반영</b><p>물가지수 · 설비용량 · 정비등급 · 지사 규모를 시스템이 자동 계산해 반영</p></section></div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:42%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="f-how" class="slide html clip" style="--ac:#7C5CE0" data-composition-id="f-how" data-start="99.45" data-duration="4.0" data-label="엑셀로는 못 하는 세 가지" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band anim"><img src="assets/yc.png" alt=""/><span>축 3 · 중장기예측</span></div><h2 class="anim">엑셀로는 못 하는 세 가지</h2></header><div class="steps three"><section class="step anim"><b>1</b><h3>정비 일정 엔진</h3><p>설비별 정비등급 × 연도 일정을 10년 자동 전개</p></section><section class="step anim"><b>2</b><h3>계획표 합산</h3><p>표준금액 × 물가 복리 + 고온부품 · LTSA · CRI + 돌발사업</p></section><section class="step anim"><b>3</b><h3>백테스트</h3><p>과거로 맞혀 보며 학습 기간을 데이터로 선택</p></section></div><div class="techrow anim"><span class="tl">사용 기술</span><span class="tc"><b>pandas</b>10년 표 계산</span><span class="tc"><b>규칙 엔진</b>정비 일정 · 계약 분리</span><span class="tc"><b>백테스트</b>학습 기간 검증</span></div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:50%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="f-res" class="slide html clip" style="--ac:#7C5CE0" data-composition-id="f-res" data-start="103.45" data-duration="4.0" data-label="2026~2035 전사 10년 전망" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band anim"><img src="assets/yc.png" alt=""/><span>축 3 · 중장기예측</span></div><h2 class="anim">2026~2035 전사 10년 전망</h2></header><div class="fres"><div class="fbars anim"><div class="fb"><em>1,504</em><i style="height:36%"></i><span>2026</span></div><div class="fb"><em>1,520</em><i style="height:36%"></i><span>2027</span></div><div class="fb"><em>2,131</em><i style="height:51%"></i><span>2028</span></div><div class="fb"><em>2,106</em><i style="height:50%"></i><span>2029</span></div><div class="fb"><em>1,919</em><i style="height:46%"></i><span>2030</span></div><div class="fb pk"><em>3,266</em><i style="height:78%"></i><span>2031</span></div><div class="fb"><em>1,769</em><i style="height:42%"></i><span>2032</span></div><div class="fb"><em>1,947</em><i style="height:46%"></i><span>2033</span></div><div class="fb"><em>2,094</em><i style="height:50%"></i><span>2034</span></div><div class="fb"><em>1,965</em><i style="height:47%"></i><span>2035</span></div></div><div class="fside"><section class="st anim key"><b>2조 222억</b><span>10년 누계 · 투자비 포함</span></section><section class="st anim"><b>2031년</b><span>3,266억 — 동탄 장기유지보수 계약 변경에 따른 예비품 구매<br/>특정연도 예산 집중에 따른 분할 투자 계획 재수립 필요</span></section></div></div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:58%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="slip" class="slide video clip" data-composition-id="slip" data-start="107.45" data-duration="17.41" data-label="slip" data-width="1920" data-height="1080"><video id="slip-v" class="clip" src="assets/slip.mp4" data-start="0" data-duration="17.41" data-has-audio="true" playsinline></video><div class="vfix sl" data-at="16.01">FastAPI · pandas · Vite · PostgreSQL · 테스트 716개</div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:67%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="build1" class="slide video clip" data-composition-id="build1" data-start="124.86" data-duration="6.0" data-label="build1" data-width="1920" data-height="1080"><video id="build1-v" class="clip" src="assets/journey1.mp4" data-start="0" data-duration="6.0" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:75%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="build2" class="slide video clip" data-composition-id="build2" data-start="130.86" data-duration="7.57" data-label="build2" data-width="1920" data-height="1080"><video id="build2-v" class="clip" src="assets/journey2.mp4" data-start="0" data-duration="7.57" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:83%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="build3" class="slide video clip" data-composition-id="build3" data-start="138.43" data-duration="8.47" data-label="build3" data-width="1920" data-height="1080"><video id="build3-v" class="clip" src="assets/journey3.mp4" data-start="0" data-duration="8.47" data-has-audio="true" playsinline></video><div class="vfix j3" data-at="4.68">PostgreSQL</div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:92%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="stack" class="slide html clip" data-composition-id="stack" data-start="146.90" data-duration="11.0" data-label="화면은 프론트엔드, 계산은 백엔드" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><h2 class="anim archt">화면은 <span class="fe">프론트엔드</span>, 계산은 <span class="be">백엔드</span></h2></header><div class="arch"><section class="acd anim"><small>브라우저로 접속</small><h3>사용자</h3><div class="rw">지사 담당자</div><div class="rw">주관부서</div><div class="go">분석 실행 ›</div></section><div class="lnk anim"><span>요청</span><b>⇄</b></div><section class="acd fe anim"><small>사람이 보고 누르는 화면</small><h3>프론트엔드</h3><div class="rw">Vite · Tailwind · JavaScript</div><div class="rw">메뉴 · 표 · 히트맵</div><div class="rw">챗봇 창 · 엑셀 올리기/받기</div><div class="who"><i class="c1">조</i><i class="c2">이</i>담당</div></section><div class="lnk anim"><span>API</span><b>⇄</b></div><section class="acd be anim"><small>뒤에서 계산하고 저장하는 엔진</small><h3>백엔드</h3><div class="rw">Python · FastAPI</div><div class="rw">매칭 · 표준화 · 예측 엔진</div><div class="rw">pandas · rapidfuzz · scikit-learn</div><div class="rw">한글 보고서 · 엑셀 양식 생성</div><div class="who"><i class="c2">이</i><i class="c3">염</i>담당</div></section><div class="lnk anim"><span>저장</span><b>⇄</b></div><section class="acd db anim"><small>데이터 보관</small><h3>DB</h3><div class="rw">PostgreSQL</div><div class="rw">마감 실적 · 학습표</div><div class="rw">표준금액 · 10년 전망</div><div class="rw">수정 이력</div></section></div><div class="runbar anim">Render 자동 배포 · 로그인 · 수정 이력 · 자동 테스트 716개</div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:0%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="sec4" class="slide section clip" data-composition-id="sec4" data-start="157.90" data-duration="4.0" data-label="향후 계획" data-width="1920" data-height="1080"><div class="sec"><div class="num anim">03</div><h2 class="anim">향후 계획</h2><div class="sub anim">다음 단계 세 가지</div></div><img class="guide anim" src="assets/yc.png" alt=""/><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>03 향후 계획</span><i><em style="width:50%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="plan" class="slide html clip" data-composition-id="plan" data-start="161.90" data-duration="4.0" data-label="다음 단계 세 가지 — 이미 준비돼 있어요" data-width="1920" data-height="1080"><div class="pg"><header class="hd"><div class="band plain anim"><span>향후 계획</span></div><h2 class="anim">다음 단계 세 가지 — 이미 준비돼 있어요</h2></header><div class="steps three"><section class="step anim"><b>1</b><h3>중장기 재무전망</h3><p>공사 전체로 확대</p><div class="ready"><small>이미 된 것</small>유형별 엔진 개발 및 병합으로 공사 전체 확대<em>표준화 · 10년 표 엔진 가동 중</em></div></section><section class="step anim"><b>2</b><h3>고도화</h3><p>예측 변수 다각화로 정확도 향상</p><div class="ready"><small>이미 된 것</small>투자유형 분류 모델 준비 완료 → 다음은 설비별 정비주기 · 투자유형 분석 고도화<em>scikit-learn · 투자유형 분류 모델</em></div></section><section class="step anim"><b>3</b><h3>내부망 연계</h3><p>AI 기반 PIMS 실시간 연동 — 설비별 정비주기 · 정비자재 수요예측 등 신규 플랫폼과 연계, 예측 정확도 99.9% 목표</p><div class="ready"><small>이미 된 것</small>DB 전환 계층으로 사내 PostgreSQL 바로 이관<em>SQLite ↔ PostgreSQL · Docker</em></div></section></div></div><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:0%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="sec5" class="slide section clip" data-composition-id="sec5" data-start="165.90" data-duration="4.0" data-label="기대효과" data-width="1920" data-height="1080"><div class="sec"><div class="num anim">04</div><h2 class="anim">기대효과</h2><div class="sub anim">인력편익 · 예산효율 · 지속개선</div></div><img class="guide anim" src="assets/mt.png" alt=""/><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>04 기대효과</span><i><em style="width:25%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="effect1" class="slide video clip" data-composition-id="effect1" data-start="169.90" data-duration="6.2" data-label="effect1" data-width="1920" data-height="1080"><video id="effect1-v" class="clip" src="assets/effect1.mp4" data-start="0" data-duration="6.2" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>04 기대효과</span><i><em style="width:50%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="effect2" class="slide video clip" data-composition-id="effect2" data-start="176.10" data-duration="6.2" data-label="effect2" data-width="1920" data-height="1080"><video id="effect2-v" class="clip" src="assets/effect2.mp4" data-start="0" data-duration="6.2" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>04 기대효과</span><i><em style="width:75%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="effect3" class="slide video clip" data-composition-id="effect3" data-start="182.30" data-duration="6.6" data-label="effect3" data-width="1920" data-height="1080"><video id="effect3-v" class="clip" src="assets/effect3.mp4" data-start="0" data-duration="6.6" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>04 기대효과</span><i><em style="width:100%"></em></i></div><div class="seg"><span>05 시연</span><i><em style="width:0%"></em></i></div></nav></div>
+      <div id="sec3" class="slide section clip" data-composition-id="sec3" data-start="188.90" data-duration="4.0" data-label="시연" data-width="1920" data-height="1080"><div class="sec"><div class="num anim">05</div><h2 class="anim">시연</h2><div class="sub anim">살아 있는 장부</div></div><img class="guide anim" src="assets/gt.png" alt=""/><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>05 시연</span><i><em style="width:100%"></em></i></div></nav></div>
+      <div id="trailer" class="slide video clip" data-composition-id="trailer" data-start="192.90" data-duration="56.7" data-label="시연 오프닝" data-width="1920" data-height="1080"><video id="trailer-v" class="clip" src="assets/trailer.mp4" data-start="0" data-duration="56.7" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>05 시연</span><i><em style="width:100%"></em></i></div></nav></div>
+      <div id="demo" class="slide video clip" data-composition-id="demo" data-start="249.60" data-duration="171.9" data-label="시연 영상" data-width="1920" data-height="1080"><video id="demo-v" class="clip" src="assets/demo.mp4" data-start="0" data-duration="171.9" data-has-audio="true" playsinline></video><nav class="prog" aria-label="발표 진행"><div class="seg"><span>01 문제 정의</span><i><em style="width:100%"></em></i></div><div class="seg"><span>02 해결 방식</span><i><em style="width:100%"></em></i></div><div class="seg"><span>03 향후 계획</span><i><em style="width:100%"></em></i></div><div class="seg"><span>04 기대효과</span><i><em style="width:100%"></em></i></div><div class="seg on"><span>05 시연</span><i><em style="width:100%"></em></i></div></nav></div>
+      <div id="closing" class="slide video clip" data-composition-id="closing" data-start="421.50" data-duration="7.6" data-label="closing" data-width="1920" data-height="1080"><video id="closing-v" class="clip" src="assets/closing.mp4" data-start="0" data-duration="7.6" data-has-audio="true" playsinline></video></div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["deck"] = gsap.timeline({ paused: true });
+      for (const el of document.querySelectorAll(".slide")) {
+        const tl = gsap.timeline({ paused: true });
+        window.__timelines[el.dataset.compositionId] = tl;
+        el.querySelectorAll(".anim").forEach((a, k) => a.style.setProperty("--i", k));
+      }
+      // Live-deck only (never rendered). Whichever slide is showing gets "live" so its entrance plays, its numbers
+      // count up, and if it is a video slide its clip plays (the slideshow's own autoplay can't see videos inside the
+      // player iframe). A clip that hasn't started yet is retried until the browser allows sound (after the first click).
+      const countUp = (slide) => slide.querySelectorAll("[data-to]").forEach((b) => {
+        const to = +b.dataset.to, dec = +b.dataset.dec, t0 = performance.now(), final = b.textContent;
+        const step = (now) => {
+          const p = Math.min(1, (now - t0 - 300) / 1100), e = 1 - Math.pow(1 - Math.max(p, 0), 3);
+          b.textContent = p >= 1 ? final : b.dataset.pre + (+(to * e).toFixed(dec)).toLocaleString("ko-KR", {minimumFractionDigits: dec, maximumFractionDigits: dec}) + b.dataset.suf;
+          if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+      // Entrances only inside the presenter's player (an iframe); snapshots and stills load the page on its own
+      // and must see every slide complete.
+      const LIVE = window.top !== window;
+      if (LIVE) document.documentElement.classList.add("fx");
+      let shown = null;
+      const tick = () => {
+        const cur = [...document.querySelectorAll(".slide")].find((s) => getComputedStyle(s).visibility === "visible") || null;
+        if (cur !== shown) {
+          if (shown) shown.classList.remove("live");
+          for (const v of document.querySelectorAll(".slide.video video")) if (!cur || !cur.contains(v)) v.pause();
+          if (cur) {
+            if (LIVE) { void cur.offsetWidth; cur.classList.add("live"); countUp(cur); }
+            const v = cur.querySelector("video"); if (v) v.currentTime = 0;
+          }
+          shown = cur;
+        }
+        const v = cur && cur.querySelector("video");
+        for (const o of document.querySelectorAll(".vfix")) { const w = o.parentElement.querySelector("video"); o.classList.toggle("on", !!w && w.currentTime >= +o.dataset.at); }
+        if (v && v.paused && !v.ended && v.currentTime < 0.05) v.play().catch(() => {});
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
