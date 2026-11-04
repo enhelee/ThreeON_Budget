@@ -68,3 +68,13 @@ def test_help_fab_lives_inside_app_shell():
     css = _read(SRC, "styles", "custom.css")
     for cls in (".char-say", ".help-fab", ".help-bubble", ".empty-state__img", ".sidebar-mascot"):
         assert cls in css, f"custom.css 에 {cls} 가 없습니다"
+
+
+def test_character_names_follow_the_three_axes():
+    """2026-11-04 grace: 캐릭터 이름을 발표의 세 축에 맞춘다 — 매칭이 → 실적이, 검토미 → 표준이(예측이·한장이 그대로).
+    화면에 나오는 글자(이름표·인사·로그인 소개·대화 패널)에 옛 이름이 남으면 발표 영상과 앱이 달라 보인다."""
+    assert 'NAMES = {hj: "한장이", mt: "실적이", gt: "표준이", yc: "예측이"}' in CHARS
+    shown = ["components/characters.js", "components/fab_intro.js", "components/chat.js", "views/gate.js", "views/collect.js"]
+    for rel in shown:
+        body = "\n".join(l for l in _read(SRC, *rel.split("/")).splitlines() if not l.lstrip().startswith(("//", "*", "/*")))
+        assert "매칭이" not in body and "검토미" not in body, f"{rel}: 화면 글자에 옛 이름"

@@ -45,7 +45,7 @@ function matchingSay(ds, runs) {
   if (done.length) {
     const sum = k => done.reduce((a, s) => a + (Number(s[k]) || 0), 0);
     return charSay({who: "mt", title: "분석 끝! 전표마다 맞는 사업을 찾아 붙였어요.",
-      body: `계획집행 ${fmt(sum("계획집행 행수"))}행 · 신규 ${fmt(sum("신규 행수"))}행 · 학습확정 ${fmt(sum("학습확정 전표수"))}건. 확신도가 낮은 건 지사 상세에서 검토미와 같이 봐요.`,
+      body: `계획집행 ${fmt(sum("계획집행 행수"))}행 · 신규 ${fmt(sum("신규 행수"))}행 · 학습확정 ${fmt(sum("학습확정 전표수"))}건. 확신도가 낮은 건 지사 상세에서 표준이와 같이 봐요.`,
       action: `<button class="btn-secondary" data-view="detail">확인하러 가기 →</button>`});
   }
   if (ds.length) {

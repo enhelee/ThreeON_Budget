@@ -2,7 +2,7 @@ import { CHAR_IMG } from "./char_images.js"
 import { state } from "../state.js"
 
 // ─────────────────────────────────────────────────────────────
-// 매칭이 등장 — 처음 보는 사람이 오른쪽 아래 «물어보기»를 못 보고 지나치지 않게(2026-11-03 grace).
+// 실적이 등장 — 처음 보는 사람이 오른쪽 아래 «물어보기»를 못 보고 지나치지 않게(2026-11-03 grace).
 // 메인 화면에 들어올 때마다(11/3 grace: 하루 한 번 → 매번): 가운데에 크게 나와 인사 → 오른쪽 아래로 날아가 앉는다.
 // 메인 안에서 다시 그릴 때(자료 받은 뒤 등)는 다시 나오지 않는다 — 다른 화면에서 메인으로 «들어올» 때만.
 // 누르면 바로 대화가 열리고, Esc·바깥을 누르면 바로 자리로 간다.
@@ -32,11 +32,11 @@ function play(openChat, onDone) {
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches
   const box = document.createElement("div")
   box.className = "fab-intro"
-  box.innerHTML = `<button class="fab-intro__char" type="button" aria-label="매칭이에게 물어보기">
+  box.innerHTML = `<button class="fab-intro__char" type="button" aria-label="실적이에게 물어보기">
       <img src="${CHAR_IMG.mt.full}" alt="">
     </button>
     <div class="fab-intro__bub" role="status">
-      <p class="fab-intro__hi">안녕하세요, 매칭이예요!</p>
+      <p class="fab-intro__hi">안녕하세요, 실적이예요!</p>
       <p>궁금한 건 언제든 저한테 물어보세요.</p>
       <p>🎤 말로 물어봐도 돼요.</p>
       <p class="fab-intro__where">저는 오른쪽 아래에 있을게요 ↘</p>
