@@ -7,6 +7,8 @@ import { esc } from "../util.js"
 // 1단계 화면(2026-11-03 grace «처음 보면 뭘 하라는지 모르겠다»): 위에 세 단계 안내(지금 할 단계가 반짝),
 // 파일이 없으면 캐릭터가 업로드 칸을 가리키고, 처음 온 사람에게는 사용법 둘러보기(components/tour.js).
 // 화면 안 연도 고르기 칸은 맨 위 줄과 같은 기능이라 뺐다. 조각은 components/stage.js(2단계와 같이 쓴다).
+// 두 칸 grid 는 minmax(0,…): 그냥 1fr 이면 오른쪽 긴 파일 이름(여러 파일 합친 2023년 등)이 칸 최소 폭을 밀어
+// 왼쪽 업로드 칸이 좁아지고 글자가 한 글자씩 세로로 쪼개졌다(2026-11-04 grace 캡처).
 export function renderBudget() {
   const ds = (state.status?.datasets || []).filter(d => d.kind === "plan" && String(d.year) === String(state.year));
   const locked = !!state.status?.locked;
@@ -16,7 +18,7 @@ export function renderBudget() {
         ${tourButton("budget")}</section>
       ${locked ? lockedSay("업로드가 차단됩니다.") : ""}
       ${stepGuide(["계획 엑셀 올리기", "올라간 파일 확인", "다음 단계로"], ds.length ? 3 : 1, "예산 계획 단계")}
-      <section class="grid gap-5 xl:grid-cols-[1fr_.85fr]">
+      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,.85fr)]">
         <article class="panel p-5"><h3 class="section-title">① 계획 엑셀 올리기 <span class="text-base font-semibold text-sub">· ${esc(state.year)}년</span></h3>
           ${slimDrop({action: "pick-plan", drop: "plan", title: "계획 엑셀 선택 또는 끌어다 놓기",
                       sub: "손익·자본·건설공사 파일을 함께 고르면 한 계획으로 합쳐져요 (.xlsx)", locked, empty: !ds.length, hint: "여기를 눌러 계획 엑셀을 올려요"})}

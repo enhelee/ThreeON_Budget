@@ -82,7 +82,7 @@ export function renderCollect() {
         ${tourButton("collect")}</section>
       ${locked ? lockedSay("업로드·분석이 차단됩니다.") : matchingSay(ds, runs)}
       ${stepGuide(["ERP 전표(zrfm2) 올리기", "자동 매칭 분석 실행", "매칭 결과 확인"], now, "실적 집계 단계")}
-      <section class="grid gap-5 xl:grid-cols-[1fr_.85fr]">
+      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,.85fr)]">
         <article class="panel p-5"><h3 class="section-title">① ERP 전표 올리기 <span class="text-base font-semibold text-sub">· ${esc(state.year)}년</span></h3>
           ${slimDrop({action: "pick-erp", drop: "erp", title: "zrfm2 엑셀 선택 또는 끌어다 놓기",
                       sub: "SAP 에서 내려받은 zrfm2 파일 하나 (.xlsx)", locked, empty: !ds.length, hint: "여기를 눌러 zrfm2 엑셀을 올려요"})}
