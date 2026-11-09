@@ -5,7 +5,8 @@
 
 순서: 기준정보 마스터 → 보정 규칙 → 연도마다(2016~2025) 계획·전표 업로드 → 분석 → 학습 → 마감
       → 2026 계획 업로드 → 중장기 전망 기준정보(정비등급·정기계약·투자계획·물가지수).
-마감한 해의 실적이 표준화·중장기 전망의 입력이 된다. 비밀번호(APP_PASSWORD)를 켠 서버면
+마감한 해의 실적이 표준화·중장기 전망의 입력이 된다. 2025년은 «올해 작업 중»으로 열어 둔다 — 검토·재배정·학습·마감을
+직접 해 볼 수 있게(DEMO_LOCK_UNTIL, 기본 2024). 시연 녹화처럼 2025년 업로드부터 보여 줄 때는 DEMO_UPLOAD_UNTIL=2024. 비밀번호(APP_PASSWORD)를 켠 서버면
 DEMO_PASSWORD 환경변수로 로그인한다. 빈 DB 에만 넣는다 — 자료가 하나라도 있는 서버(운영 등)면 아무것도 하지 않고 멈춘다.
 """
 import http.cookiejar
@@ -62,7 +63,9 @@ def main():
     call("POST", "/api/upload/master?kind=dept&year=2016", files=[("file", f("마스터_부서코드.xlsx"))])
     step("보정 규칙")
     call("POST", "/api/corr-rules", files=[("file", f("보정규칙.xlsx"))])
-    for y in [str(y) for y in range(2016, 2026)]:
+    upload_until = int(os.environ.get("DEMO_UPLOAD_UNTIL", "2025"))
+    lock_until = int(os.environ.get("DEMO_LOCK_UNTIL", "2024"))
+    for y in [str(y) for y in range(2016, upload_until + 1)]:
         step(f"{y} 계획·전표 업로드")
         call("POST", f"/api/upload/plan?year={y}", files=[("file", f(f"{y}_계획_양식1.xlsx"))])
         call("POST", f"/api/upload/erp?year={y}", files=[("file", f(f"{y}_zrfm2.xlsx"))])
@@ -71,9 +74,10 @@ def main():
         for b, v in res.items():
             s = v["요약"]
             print(f"    {b}: 총 실적 {s.get('총 실적(천원)', 0) / 1e5:,.1f}억 · 신규 {s.get('신규 실적(천원)', 0) / 1e5:,.1f}억")
-        step(f"{y} 학습 · 마감")
-        call("POST", "/api/learn", {"year": y})
-        call("POST", "/api/lock", {"year": y})
+        if int(y) <= lock_until:
+            step(f"{y} 학습 · 마감")
+            call("POST", "/api/learn", {"year": y})
+            call("POST", "/api/lock", {"year": y})
     step("2026 계획 업로드(전망 기준연도)")
     call("POST", "/api/upload/plan?year=2026", files=[("file", f("2026_계획_양식1.xlsx"))])
     step("중장기 전망 기준정보")

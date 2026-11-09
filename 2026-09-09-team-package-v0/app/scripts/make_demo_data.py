@@ -145,11 +145,6 @@ def plan_rows(rng, year, grades):
                         "예산코드": ALL_CODES[item], "예산과목": item, "사업명": f"{s[:2]} {name}",
                         "산출내역": "가상 산출내역(시연용)", "연예산": amt, "_budget": budget,
                     })
-    # 본사 배분: 경상정비는 본사(플랜트기술처)에 계획을 잡고 지사가 집행 — 앱 «본사 배분» 규칙 시연
-    rows.append({"주관부서명": "플랜트기술처", "부서코드": DEPT_CODE["플랜트기술처"], "처지사": "플랜트기술처",
-                 "부서부": "플랜트기술처 설비기획부", "속성": "제조", "예산코드": PL_CODES["수선유지비-열원경상정비"],
-                 "예산과목": "수선유지비-열원경상정비", "사업명": "전사 경상정비 통합계약",
-                 "산출내역": "가상 산출내역(시연용)", "연예산": round(3_000_000 * infl, -3), "_budget": "손익"})
     return rows
 
 
@@ -226,13 +221,6 @@ def erp_rows(rng, year, plan, grades):
 
     for p in plan:
         site, item = p["처지사"], p["예산과목"]
-        if site == "플랜트기술처" and item == "수선유지비-열원경상정비":
-            # 본사 통합계약 → 지사들이 나눠 집행(지사에 같은 과목 계획이 없으면 본사 배분으로 귀속)
-            for s, g in SITES:
-                if g == "DH" and rng.random() < 0.5:
-                    add(s, item, f"경상정비 통합계약 {s[:2]} 배분", p["연예산"] * 1000 * rng.uniform(0.04, 0.08),
-                        rng.randint(3, 11))
-            continue
         exec_rate = rng.choices([0, rng.uniform(0.55, 0.85), rng.uniform(0.85, 1.05)], [0.06, 0.34, 0.60])[0]
         total = p["연예산"] * 1000 * exec_rate
         if total <= 0:
