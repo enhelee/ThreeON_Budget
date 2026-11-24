@@ -36,7 +36,7 @@ TABLES = ("site_grade", "benchmark_method", "benchmark_override", "forecast_fact
           "site_history", "site_event", "site_grade_eq", "benchmark_rule", "actual_tag",
           "regular_contract", "cri_rule", "investment_plan", "reference_actual", "reference_standard",
           "forecast_setting", "site_capacity", "capacity_rule", "hot_parts_contract", "price_index",
-          "investment_actual")
+          "investment_actual", "unit_split")
 
 GRADE_COLS = ["사업장", "연도", "등급"]
 METHOD_COLS = ["사업장", "예산과목", "방식"]
@@ -339,6 +339,8 @@ SPECS = {
     "site_grade_eq": dict(cols=["사업장", "연도", "설비", "등급"], ints=["연도"],
                           key=["사업장", "연도", "설비"], need=["사업장", "연도", "설비", "등급"],
                           order="사업장, 연도, 설비"),
+    "unit_split": dict(cols=["사업장", "설비", "비율", "사유"], floats=["비율"], key=["사업장", "설비"],
+                       need=["사업장", "설비", "비율"], order="사업장, 설비"),
     "benchmark_rule": dict(cols=["사업장", "예산과목", "등급", "방식", "연도목록", "보정률",
                                  "참조지사", "참조등급", "조정액", "사유"],
                            opt_floats=["보정률", "조정액"], key=["사업장", "예산과목", "등급"],

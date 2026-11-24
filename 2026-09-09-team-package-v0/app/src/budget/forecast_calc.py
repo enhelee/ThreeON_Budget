@@ -427,6 +427,25 @@ def _peer_amount(site, own, scale, site_groups):
     return sum(own[p] * scale[site] / scale[p] for p in peers) / len(peers)
 
 
+def unit_split_plan(split_df: pd.DataFrame, unit_grades: pd.DataFrame, years) -> dict:
+    """설비 분할 비율 표 + 설비별 등급 → {지사: {연도: [(비율, 등급), …]}}.
+    그 해 비율을 준 설비의 등급이 모두 있어야 쓴다(하나라도 비면 대표 등급으로 — 반쪽 계산을 막는다)."""
+    if split_df is None or split_df.empty or unit_grades is None or unit_grades.empty:
+        return {}
+    out = {}
+    for site, g in split_df.groupby("사업장"):
+        ratio = {str(u).strip(): float(r) for u, r in zip(g["설비"], g["비율"])}
+        eq = unit_grades[unit_grades["사업장"] == site]
+        by = {(int(y), str(u).strip()): canon_grade(str(gr)) for y, u, gr in zip(eq["연도"], eq["설비"], eq["등급"])}
+        plan = {}
+        for y in years:
+            if all((int(y), u) in by for u in ratio):
+                plan[int(y)] = [(r, by[(int(y), u)]) for u, r in ratio.items()]
+        if plan:
+            out[site] = plan
+    return out
+
+
 def _standard_lookup(standard_df: pd.DataFrame) -> dict:
     """{(사업장,예산과목,등급): 표준금액}"""
     if standard_df.empty:
@@ -441,8 +460,11 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                         budget_lookup: dict = None, base_year: int = BASE_YEAR,
                         years: list = None, contracts_df: pd.DataFrame = None,
                         cri_df: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                        overhaul: dict = None, switch: dict = None, invest_std: bool = False) -> pd.DataFrame:
+                        overhaul: dict = None, switch: dict = None, invest_std: bool = False,
+                        split: dict = None) -> pd.DataFrame:
     """한 지사의 기준연도~+9년 예산과목별 금액 표. 반환: 라벨(행) × 연도(열)
+    split = {지사: {연도: [(비율, 등급), …]}} 에 그 지사·연도가 있으면 표준금액은 대표 등급 하나 대신
+    Σ 비율 × 그 설비 등급의 표준금액, A급정비는 1회 금액 × (MI 인 설비 비율 합)이다(설비 분할, 동탄 #1·#2 Block).
 
     표준화 대상 계정과목(SITE_TABLE_LINES의 "표준화:" 항목)의 당해년도(BASE_YEAR) 금액은
     "지사 자체 몫 + 본사 원가분배 몫"의 합이다("총원가배분(전체) = 본사 + 지사" 원본 양식과 동일한
@@ -462,7 +484,18 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
 
     std_lookup = _standard_lookup(standard_df)
     sw = (switch or {}).get(site)
+    unit_mix = (split or {}).get(site, {})
     budget_lookup = budget_lookup or {}
+
+    def std_amount(lookup, account, grade, year):
+        """그 해 표준금액 — 설비 분할이 있으면 Σ 비율 × 설비 등급 금액, 없으면 대표 등급 금액(없으면 «표준»)."""
+        def one(g):
+            v = lookup.get((site, account, g)) if g else None
+            return lookup.get((site, account, "표준"), 0.0) if v is None else v
+        mix = unit_mix.get(year)
+        if mix:
+            return sum(r * float(one(g)) for r, g in mix)
+        return one(grade)
     hot_parts_lookup = {
         (r["사업장"], r["연도"], r["항목"]): r["금액"] for _, r in hot_parts_df.iterrows()
     } if not hot_parts_df.empty else {}
@@ -517,17 +550,18 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
                     once = overhaul["amount"].get(site, 0.0)
                     if sw and year >= sw["start"] and sw.get("overhaul") is not None:
                         once = sw["overhaul"]
-                    site_amount = once * mult if year in overhaul["years"][site] else 0.0
+                    if unit_mix.get(year):
+                        share = sum(r for r, g in unit_mix[year] if g == "MI")
+                    else:
+                        share = 1.0 if year in overhaul["years"][site] else 0.0
+                    site_amount = once * share * mult
                 else:
                     # 등급 이력이 없는 지사는 benchmark 가 등급을 «표준» 으로 두고 표를 만든다.
                     # v2 는 지사 목록이 등급 이력에서 나와 이 경로가 없었지만, 여기서는 지사가
                     # dept_config 에서 오므로 등급 없는 지사가 정상 입력이다 — 그때 0 이 되면
                     # 기준연도 이후 10년이 통째로 비어 보인다(6-6 실측).
                     lookup = sw["lookup"] if sw and year >= sw["start"] else std_lookup
-                    base = lookup.get((site, account, grade)) if grade else None
-                    if base is None:
-                        base = lookup.get((site, account, "표준"), 0.0)
-                    site_amount = base * mult
+                    site_amount = std_amount(lookup, account, grade, year) * mult
                 # 26년은 지사 자체 예산(예산계획/표준화)에 본사 원가분배 마스터 표의 배분액을 더한다 -
                 # "총원가배분(전체) = 본사 + 지사"라 두 금액은 서로 다른 부서코드에 잡힌 별도 예산이며
                 # 합쳐야 그 지사의 26년 총액이 된다(경상정비/정기유지보수/정기점검/지급수수료/
@@ -588,11 +622,13 @@ def compute_site_table(site: str, grade_hist: pd.DataFrame, standard_df: pd.Data
             elif invest_std:
                 grade = grade_by_year.get(year, latest_known_grade)
                 lookups = [sw["lookup"], std_lookup] if sw and year >= sw["start"] else [std_lookup]
+                pairs = unit_mix.get(year) or [(1.0, grade)]
                 total = 0.0
                 for account in INVESTMENT_ACCOUNTS:
-                    base = next((lk[(site, account, g)] for lk in lookups for g in (grade, "표준")
-                                 if g and (site, account, g) in lk), 0.0)
-                    total += float(base)
+                    for r, gg in pairs:
+                        base = next((lk[(site, account, g)] for lk in lookups for g in (gg, "표준")
+                                     if g and (site, account, g) in lk), 0.0)
+                        total += r * float(base)
                 invest_row[year] = total * mult_by_scope["자본"][year]
             else:
                 invest_row[year] = 0.0
@@ -608,7 +644,8 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                        investment_df: pd.DataFrame, budget_df: pd.DataFrame = None,
                        base_year: int = BASE_YEAR, years: list = None, contracts_df: pd.DataFrame = None,
                        cri_rules: pd.DataFrame = None, invest_plan_df: pd.DataFrame = None,
-                       overhaul: dict = None, switch: dict = None, invest_std: bool = False) -> dict:
+                       overhaul: dict = None, switch: dict = None, invest_std: bool = False,
+                       split: dict = None) -> dict:
     """지사별 표를 한 번에 계산. 반환: {사업장: DataFrame}"""
     hq_amount = hq_amount_by_site_account(hq_master_df)
     hq_temp_alloc = allocate_hq_temp_projects(hq_temp_df, hq_ratio_df)
@@ -620,6 +657,6 @@ def compute_all_sites(sites: list, grade_hist: pd.DataFrame, standard_df: pd.Dat
                                   hq_temp_alloc, factors_df, surprise_df, investment_df, budget_lookup,
                                   base_year=base_year, years=years, contracts_df=contracts_df,
                                   cri_df=cri_df, invest_plan_df=invest_plan_df, overhaul=overhaul,
-                                  switch=switch, invest_std=invest_std)
+                                  switch=switch, invest_std=invest_std, split=split)
         for site in sites
     }

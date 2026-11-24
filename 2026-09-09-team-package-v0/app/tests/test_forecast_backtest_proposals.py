@@ -260,3 +260,39 @@ def test_api_settings_backtest_finance(client):
     assert [x["window"] for x in bt["runs"]] == [2, 3, 5, 10] and bt["sources"]["참고"]
     t = client.get("/api/forecast/table?base_year=2026").json()
     assert "ranges" in t and t["overhaul_years"] == {}
+
+
+# ---------------------------------------------------------------- 설비 분할(동탄 #1·#2 Block, 2026-11-24)
+def test_unit_split_overhaul_takes_ratio_of_mi_units_only(conn):
+    """블럭을 나눠 정비하면 A급정비는 MI 인 블럭의 비율만큼 — 두 블럭 합산 1회 금액을 해마다 통째로 넣지 않는다."""
+    _save_ref(conn, [("화성지사", 2025, A_ACCT, 1000.0), ("화성지사", 2024, A_ACCT, 0.0), ("화성지사", 2023, A_ACCT, 0.0)])
+    _flat_factor(conn)
+    rows = [("화성지사", u, y, g) for y in range(2026, 2036) for u, g in
+            (("#1 Block", "MI" if y == 2028 else "간이"), ("#2 Block", "MI" if y == 2029 else "간이"))]
+    fs.save_table(conn, "2026", "site_grade_eq", _units(rows))
+    line = {r["예산과목"]: r for r in pf.run_forecast(conn, "2026")["tables"]["화성지사"]}[A_ACCT]
+    assert line["2028"] == pytest.approx(1000.0) and line["2029"] == pytest.approx(1000.0)   # 분할 전: 두 번 통째로
+    fs.save_table(conn, "2026", "unit_split", pd.DataFrame([{"사업장": "화성지사", "설비": u, "비율": 0.55, "사유": "t"}
+                                                            for u in ("#1 Block", "#2 Block")]))
+    line = {r["예산과목"]: r for r in pf.run_forecast(conn, "2026")["tables"]["화성지사"]}[A_ACCT]
+    assert line["2028"] == pytest.approx(550.0) and line["2029"] == pytest.approx(550.0)
+    assert line["2030"] == 0
+
+
+def test_unit_split_standard_mixes_unit_grades():
+    std = pd.DataFrame([{"사업장": "S", "예산과목": CHECK, "등급": g, "표준금액": v}
+                        for g, v in (("MI", 100.0), ("CI", 40.0), ("간이", 20.0), ("HGPI", 60.0))])
+    units = _units([("S", "#1", 2027, "MI"), ("S", "#2", 2027, "CI"), ("S", "#1", 2028, "TI"),
+                    ("S", "#1", 2029, "간이"), ("S", "#2", 2029, "간이")])           # 2028 은 #2 가 비어 대표 등급
+    split = forecast_calc.unit_split_plan(pd.DataFrame([{"사업장": "S", "설비": "#1", "비율": 0.55},
+                                                        {"사업장": "S", "설비": "#2", "비율": 0.55}]), units, range(2026, 2036))
+    assert split == {"S": {2027: [(0.55, "MI"), (0.55, "CI")], 2029: [(0.55, "간이"), (0.55, "간이")]}}
+    grade = pd.DataFrame([{"사업장": "S", "연도": y, "등급": "MI"} for y in (2027, 2028, 2029)])
+    empty = pd.DataFrame()
+    t = forecast_calc.compute_site_table(
+        "S", grade, std, empty, {}, None, pd.DataFrame([{"팩터명": "물가", "연간비율": 0.0, "활성": True}]),
+        empty, empty, base_year=2026, years=[2026, 2027, 2028, 2029], split=split)
+    row = t[t["예산과목"] == CHECK].iloc[0]
+    assert row[2027] == pytest.approx(0.55 * 100 + 0.55 * 40)
+    assert row[2028] == pytest.approx(100.0)                         # 설비 등급이 다 없으면 대표 등급
+    assert row[2029] == pytest.approx(1.1 * 20)
