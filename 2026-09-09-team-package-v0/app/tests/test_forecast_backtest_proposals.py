@@ -283,10 +283,11 @@ def test_unit_split_standard_mixes_unit_grades():
     std = pd.DataFrame([{"사업장": "S", "예산과목": CHECK, "등급": g, "표준금액": v}
                         for g, v in (("MI", 100.0), ("CI", 40.0), ("간이", 20.0), ("HGPI", 60.0))])
     units = _units([("S", "#1", 2027, "MI"), ("S", "#2", 2027, "CI"), ("S", "#1", 2028, "TI"),
-                    ("S", "#1", 2029, "간이"), ("S", "#2", 2029, "간이")])           # 2028 은 #2 가 비어 대표 등급
+                    ("S", "#1", 2029, "간이"), ("S", "#2", 2029, "간이")])           # 2028 은 #2 가 비어 높은 등급(#1 TI)을 따른다
     split = forecast_calc.unit_split_plan(pd.DataFrame([{"사업장": "S", "설비": "#1", "비율": 0.55},
                                                         {"사업장": "S", "설비": "#2", "비율": 0.55}]), units, range(2026, 2036))
-    assert split == {"S": {2027: [(0.55, "MI"), (0.55, "CI")], 2029: [(0.55, "간이"), (0.55, "간이")]}}
+    assert split == {"S": {2027: [(0.55, "MI"), (0.55, "CI")], 2028: [(0.55, "HGPI"), (0.55, "HGPI")],
+                     2029: [(0.55, "간이"), (0.55, "간이")]}}
     grade = pd.DataFrame([{"사업장": "S", "연도": y, "등급": "MI"} for y in (2027, 2028, 2029)])
     empty = pd.DataFrame()
     t = forecast_calc.compute_site_table(
@@ -294,5 +295,15 @@ def test_unit_split_standard_mixes_unit_grades():
         empty, empty, base_year=2026, years=[2026, 2027, 2028, 2029], split=split)
     row = t[t["예산과목"] == CHECK].iloc[0]
     assert row[2027] == pytest.approx(0.55 * 100 + 0.55 * 40)
-    assert row[2028] == pytest.approx(100.0)                         # 설비 등급이 다 없으면 대표 등급
+    assert row[2028] == pytest.approx(1.1 * 60)
     assert row[2029] == pytest.approx(1.1 * 20)
+
+
+def test_unit_split_unit_without_grade_follows_highest_gt():
+    """삼송: GT 40%·40%·ST 20%. ST 는 미래 일정이 없어 그 해 두 GT 중 높은 등급을 따른다."""
+    units = _units([("삼송", "#1 GT", 2031, "CI"), ("삼송", "#2 GT", 2031, "HGPI"),
+                    ("삼송", "#1 GT", 2032, "간이"), ("삼송", "#2 GT", 2032, "간이")])
+    split = forecast_calc.unit_split_plan(pd.DataFrame([{"사업장": "삼송", "설비": u, "비율": r}
+                                                        for u, r in (("#1 GT", 0.4), ("#2 GT", 0.4), ("ST", 0.2))]), units, [2031, 2032, 2033])
+    assert split == {"삼송": {2031: [(0.4, "CI"), (0.4, "HGPI"), (0.2, "HGPI")],
+                            2032: [(0.4, "간이"), (0.4, "간이"), (0.2, "간이")]}}     # 2033 은 등급 없음 → 대표 등급

@@ -427,9 +427,14 @@ def _peer_amount(site, own, scale, site_groups):
     return sum(own[p] * scale[site] / scale[p] for p in peers) / len(peers)
 
 
+# 정비 규모 순서(큰 것 먼저) — 등급이 없는 설비가 따를 «가장 높은 등급»을 고를 때만 쓴다.
+GRADE_RANK = {g: i for i, g in enumerate(["MI", "HGPI", "CI", "BSI", "A", "B", "C", "간이", "표준"])}
+
+
 def unit_split_plan(split_df: pd.DataFrame, unit_grades: pd.DataFrame, years) -> dict:
     """설비 분할 비율 표 + 설비별 등급 → {지사: {연도: [(비율, 등급), …]}}.
-    그 해 비율을 준 설비의 등급이 모두 있어야 쓴다(하나라도 비면 대표 등급으로 — 반쪽 계산을 막는다)."""
+    그 해 등급이 없는 설비(삼송 ST — 미래 일정 없음)는 등급이 있는 설비 중 가장 높은 등급을 따른다
+    (팀장 기준 2026-11-24, ST 일정이 들어오면 그 등급). 그 해 비율 설비가 하나도 등급이 없으면 대표 등급으로."""
     if split_df is None or split_df.empty or unit_grades is None or unit_grades.empty:
         return {}
     out = {}
@@ -439,8 +444,11 @@ def unit_split_plan(split_df: pd.DataFrame, unit_grades: pd.DataFrame, years) ->
         by = {(int(y), str(u).strip()): canon_grade(str(gr)) for y, u, gr in zip(eq["연도"], eq["설비"], eq["등급"])}
         plan = {}
         for y in years:
-            if all((int(y), u) in by for u in ratio):
-                plan[int(y)] = [(r, by[(int(y), u)]) for u, r in ratio.items()]
+            known = [by[(int(y), u)] for u in ratio if (int(y), u) in by]
+            if not known:
+                continue
+            top = min(known, key=lambda x: GRADE_RANK.get(x, len(GRADE_RANK)))
+            plan[int(y)] = [(r, by.get((int(y), u), top)) for u, r in ratio.items()]
         if plan:
             out[site] = plan
     return out
