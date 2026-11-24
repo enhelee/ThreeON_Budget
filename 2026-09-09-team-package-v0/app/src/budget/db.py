@@ -307,6 +307,12 @@ def init_db(conn):
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 연도 INTEGER NOT NULL,
         설비 TEXT NOT NULL, 등급 TEXT NOT NULL,
         PRIMARY KEY(base_year, 사업장, 연도, 설비))""")
+    # 설비 분할 비율 — 지금까지 함께 정비하던 설비를 나눠 정비할 때(동탄 #1·#2 Block), 그 해 금액 =
+    # Σ 설비 비율 × 그 설비 등급의 표준금액. A급정비는 MI 인 설비의 비율만큼. 줄이 없는 지사는 대표 등급 그대로.
+    cur.execute("""CREATE TABLE IF NOT EXISTS unit_split(
+        base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 설비 TEXT NOT NULL,
+        비율 REAL NOT NULL, 사유 TEXT,
+        PRIMARY KEY(base_year, 사업장, 설비))""")
     # 산정 규칙 — 방식·대상연도·보정률·차용(지사·등급)·조정액·사유. 등급 '*' = 모든 등급.
     cur.execute("""CREATE TABLE IF NOT EXISTS benchmark_rule(
         base_year TEXT NOT NULL, 사업장 TEXT NOT NULL, 예산과목 TEXT NOT NULL,

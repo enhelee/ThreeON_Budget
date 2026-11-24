@@ -45,7 +45,7 @@ SPEC_TABLES = {"site-history": "site_history", "site-event": "site_event", "site
                "regular-contract": "regular_contract", "cri-rule": "cri_rule", "investment-plan": "investment_plan",
                "site-capacity": "site_capacity", "capacity-rule": "capacity_rule",
                "hot-parts-contract": "hot_parts_contract", "price-index": "price_index",
-               "investment-actual": "investment_actual"}
+               "investment-actual": "investment_actual", "unit-split": "unit_split"}
 IMPORTERS = {
     "grades": forecast_import.grades_from_workbook,
     "schedule": forecast_import.schedule_from_workbook,

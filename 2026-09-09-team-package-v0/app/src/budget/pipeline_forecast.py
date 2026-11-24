@@ -497,7 +497,9 @@ def forecast_frames(conn, base_year):
         contracts_df=fs.load_table(conn, base_year, "regular_contract"),
         cri_rules=fs.load_table(conn, base_year, "cri_rule"),
         invest_plan_df=fs.load_table(conn, base_year, "investment_plan"),
-        overhaul=overhaul, switch=switch, invest_std=fs.invest_std_on(conn, base_year))
+        overhaul=overhaul, switch=switch, invest_std=fs.invest_std_on(conn, base_year),
+        split=forecast_calc.unit_split_plan(fs.load_table(conn, base_year, "unit_split"),
+                                            fs.load_table(conn, base_year, "site_grade_eq"), years))
     cri = forecast_calc.cri_events(grade, fs.load_table(conn, base_year, "cri_rule"),
                                    fs.load_factors(conn, base_year), years)
     return {"tables": tables, "years": years, "years_used": years_used, "sites": sites, "grade": grade,
