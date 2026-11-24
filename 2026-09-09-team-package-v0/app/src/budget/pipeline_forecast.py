@@ -26,6 +26,8 @@ from . import db as dbm
 from . import forecast_store as fs
 
 KEEP = ("계획집행", "신규", "신규(소액집행)")
+# 마감 연도에 앱 실적이 없어도 참고 엑셀로 채우지 않는 과목 — 연도별 계획으로 따로 잡힌다.
+REF_FILL_SKIP = {"건설중인자산-재생고온부품"}
 ACTUAL_COLS = ["사업장", "연도", "예산과목", "금액"]
 # v2 예산계획의 열 이름 — 계산부(forecast_calc.investment_by_site 등)가 이 리터럴을 본다.
 DEPT_COL = "예산귀속 \n부서코드"
@@ -180,7 +182,8 @@ def records(df: pd.DataFrame) -> list:
 def actuals_with_reference(conn, base_year):
     """마감 실적 + 참고 엑셀 실적(마감되지 않은 연도만). 앱에 마감 연도가 2~3개뿐이어도
     엑셀이 가진 10년 이력으로 «5개년 평균»·«등급별 최근실적»이 엑셀과 같은 모집단을 쓴다.
-    같은 연도는 마감 실적이 이긴다 — 마감 = 대외 보고 확정값.
+    같은 연도·지사·과목은 마감 실적이 이긴다 — 마감 = 대외 보고 확정값. 마감 연도라도 앱 실적에
+    그 지사·과목이 아예 없으면 엑셀 값을 쓴다(전표에 안 잡히는 A급정비 등, REF_FILL_SKIP 제외).
     설정 «투자비표준화»가 켜져 있으면 투자비 실적(investment_actual — 전표에 계정이 없어 실적 분석 엑셀에서
     가져온 건설공사 3과목)도 더한다. 그러면 투자비도 다른 과목처럼 표준금액이 생긴다.
     그 안의 LTSA·CRI·고온부품재생은 기계장치처럼 뺀다 — 연도별 계획표(정기계약·CRI·고온부품)로 따로 잡혀서다.
@@ -203,13 +206,24 @@ def actuals_with_reference(conn, base_year):
     if ref.empty:
         return actuals, years_used, []
     locked = {int(y) for y in years_used}
-    ref = ref[~ref["연도"].isin(locked) & (ref["금액"] != 0)].copy()
+    ref = ref[ref["금액"] != 0].copy()
+    ref["연도"] = ref["연도"].astype(int)
+    # 마감 연도라도 앱 실적에 그 지사·과목이 «아예 없으면» 엑셀 값을 쓴다 — ERP 전표에 계정이 없어
+    # 사업별 실적에 안 잡히는 돈(건가-외주비 A급정비)이 버려져 표준금액이 «실적없음»이 되던
+    # 문제(2026-11-24 참고 엑셀 대조). 양쪽에 다 있으면 지금처럼 마감값이 이긴다.
+    # 고온부품 신품(건설중인자산-재생고온부품)은 연도별 고온부품 계획으로 따로 잡혀 채우지 않는다.
+    have = set(zip(actuals["사업장"], actuals["연도"].astype(int), actuals["예산과목"])) if not actuals.empty else set()
+    in_locked = ref["연도"].isin(locked)
+    fill = in_locked & ~ref["예산과목"].isin(REF_FILL_SKIP) & \
+        ~pd.Series([k in have for k in zip(ref["사업장"], ref["연도"], ref["예산과목"])], index=ref.index)
+    ref_years = sorted({str(y) for y in ref.loc[~in_locked, "연도"]})
+    ref = ref[~in_locked | fill]
     if ref.empty:
         return actuals, years_used, []
     ref["사업명"] = ""
     ref["유형출처"] = "참고엑셀"
     merged = pd.concat([actuals, ref[DETAIL_COLS]], ignore_index=True)
-    return merged, years_used, sorted({str(y) for y in ref["연도"]})
+    return merged, years_used, ref_years
 
 
 def capacity_inputs(conn, base_year):

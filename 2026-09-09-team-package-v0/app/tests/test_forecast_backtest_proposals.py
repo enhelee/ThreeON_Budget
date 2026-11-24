@@ -94,6 +94,21 @@ def test_reference_merges_with_locked_years_locked_wins(conn):
     assert a[a["연도"] == 2025]["금액"].sum() == pytest.approx(100.0)      # 엑셀 999 가 아니라 마감값
 
 
+def test_reference_fills_account_missing_in_locked_year(conn):
+    """마감 연도라도 앱에 없는 지사·과목(전표에 안 잡히는 A급정비)은 엑셀 값을 쓴다. 고온부품 신품은 예외."""
+    A, HOT = "외주비-열원정기점검", "건설중인자산-재생고온부품"
+    _save_ref(conn, [("화성지사", 2025, CHECK, 999.0), ("화성지사", 2025, A, 500.0),
+                     ("화성지사", 2025, HOT, 700.0), ("화성지사", 2024, A, 40.0)])
+    _seed_run(conn, "2025", "손익", [("화성지사", CHECK, "x", 100.0)])
+    dbm.lock_year(conn, "2025")
+    a, locked, ref_years = pf.actuals_with_reference(conn, "2026")
+    assert locked == ["2025"] and ref_years == ["2024"]                    # 마감 연도는 «참고» 연도로 세지 않는다
+    y25 = a[a["연도"] == 2025].groupby("예산과목")["금액"].sum()
+    assert y25[CHECK] == pytest.approx(100.0)                              # 양쪽에 있으면 마감값
+    assert y25[A] == pytest.approx(500.0)                                  # 앱에 없으면 엑셀값
+    assert HOT not in y25.index
+
+
 def test_learning_window_defaults_to_three_and_limits_unruled_cells(conn):
     fs.save_settings(conn, "2026", {"실적환산": "0"})   # 이 테스트는 물가 환산과 무관 — 그 해 금액 그대로 본다
     _save_ref(conn, [("화성지사", y, CHECK, float(y - 2000)) for y in range(2016, 2026)])
