@@ -164,6 +164,16 @@ document.addEventListener("click", async e => {
   if (act === "toggle-alerts") { state.alertsAll = !state.alertsAll; renderPage(); return; }
   const ak = e.target.closest("[data-alert-kind]");
   if (ak) { state.alertKind = ak.dataset.alertKind; state.alertsAll = false; renderPage(); return; }
+  const ptab = e.target.closest("[data-plantab]");
+  if (ptab) { state.planTab = ptab.dataset.plantab; await navigate("budget"); return; }
+  if (act === "del-plan-dept") {
+    const b = e.target.closest("[data-action]");
+    if (!confirm(`${b.dataset.dept} 부서의 «${b.dataset.name}» 파일을 뺄까요?
+남은 부서 파일로 계획을 다시 취합합니다.`)) return;
+    try { await api(`/api/plan-depts/${b.dataset.id}`, {method: "DELETE"}); toast("파일을 뺐어요 — 남은 파일로 다시 취합했어요."); await navigate("budget"); }
+    catch (err) { toast(err.message); }
+    return;
+  }
   const stab = e.target.closest("[data-settab]");
   if (stab) { await openSettingsTab(stab.dataset.settab); return; }
   const gq = e.target.closest("[data-goto-review]");
@@ -207,6 +217,7 @@ document.addEventListener("click", async e => {
   if (act === "std-full") { if (openStandardWindow() === false) toast("새 창이 막혔어요 — 브라우저 주소창의 팝업 허용을 눌러 주세요."); return; }   // 5 표준화 표를 새 창에 크게
   if (act === "tour") { const b = e.target.closest("[data-action]"); markTourClicked(b); startTour(b.dataset.tour); return; }
   if (act === "pick-plan") $("#planFile").click();
+  if (act === "pick-plan-dept") $("#planDeptFile").click();
   if (act === "pick-erp") $("#erpFile").click();
   if (act === "pick-erp-invest") $("#erpInvestFile").click();
   if (act === "add-alias") {
@@ -564,6 +575,7 @@ document.addEventListener("change", async e => {
     }
     return;
   }
+  if (e.target.id === "planDeptFile" && e.target.files.length) { uploadFile("plan-dept", [...e.target.files]); e.target.value = ""; return; }
   if (e.target.id === "planFile" && e.target.files.length) { uploadFile("plan", [...e.target.files]); e.target.value = ""; return; }
   if (e.target.id === "erpFile" && e.target.files[0]) { uploadFile("erp", e.target.files[0]); e.target.value = ""; return; }
   if (e.target.id === "erpInvestFile" && e.target.files[0]) { uploadFile("erp-invest", e.target.files[0]); e.target.value = ""; return; }
@@ -889,5 +901,5 @@ document.addEventListener("drop", e => {
   if (z.disabled) return;
   const files = [...(e.dataTransfer?.files || [])].filter(f => /\.xlsx$/i.test(f.name));
   if (!files.length) { toast("엑셀(.xlsx) 파일만 올릴 수 있어요."); return; }
-  uploadFile(z.dataset.drop, z.dataset.drop === "plan" ? files : files[0]);
+  uploadFile(z.dataset.drop, z.dataset.drop.startsWith("plan") ? files : files[0]);
 });

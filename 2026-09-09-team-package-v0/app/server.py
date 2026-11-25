@@ -42,6 +42,7 @@ from budget import chat as chatm   # noqa: E402
 from budget import alerts as alertm, api_forecast, explain as explainm, review_queue as rqm, viewcache, config_store, db as dbm, dbcore, ml_registry, pipeline_db, uploads   # noqa: E402
 from budget import corr_rules as corr_rules_mod   # noqa: E402
 from budget import excel_actual_writer, report_hwpx, report_plan   # noqa: E402
+from budget import dept_plan   # noqa: E402
 
 OUT_DIR = os.environ.get("OUT_DIR") or os.path.join(APP_DIR, "output")
 # 메인 대시보드 헤더에 찍히는 리비전 문자열(.env 또는 배포 플랫폼 환경변수).
@@ -462,6 +463,59 @@ async def upload_plan(year: str, file: list[UploadFile] = File(...)):
         raise                          # 413·423·409 는 그대로(예전엔 400 으로 뭉개졌다)
     except Exception as e:
         raise HTTPException(400, f"계획 파일 흡수 실패: {e}")
+
+
+@app.get("/api/plan-depts")
+def plan_depts(year: str):
+    """부서별 계획 올리기 화면 — 부서마다 제출 여부·파일, 안 낸 부서 목록."""
+    conn = _conn()
+    try:
+        return _clean_json(dept_plan.status(conn, year))
+    finally:
+        conn.close()
+
+
+@app.post("/api/upload/plan-dept")
+async def upload_plan_dept(year: str, file: list[UploadFile] = File(...)):
+    """처·지사가 낸 계획 엑셀(여러 개 가능)을 부서별로 받아 두고, 그 해 부서 파일 전부를 한 계획으로 다시 합친다."""
+    try:
+        files = [(f.filename or "plan.xlsx", await _read_upload(f)) for f in file]
+        with _year_op(year, "자료 업로드"):
+            conn = _conn()
+            try:
+                _guard_unlocked(conn, year, "자료 업로드")
+                saved = dept_plan.add_files(conn, year, files)
+                info = dept_plan.rebuild(conn, year)
+                st = dept_plan.status(conn, year)
+            finally:
+                conn.close()
+        return _clean_json({"saved": saved, "dataset_id": info["dataset_id"], "rows": info["rows"],
+                            "total": info["total"], "submitted": st["submitted"],
+                            "expected": st["expected"], "missing": st["missing"]})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"부서 계획 파일 흡수 실패: {e}")
+
+
+@app.delete("/api/plan-depts/{file_id}")
+def delete_plan_dept(file_id: int):
+    conn = _conn()
+    try:
+        year = dept_plan.file_year(conn, file_id)
+        if year is None:
+            raise HTTPException(404, "없는 파일입니다.")
+    finally:
+        conn.close()
+    with _year_op(year, "자료 업로드"):
+        conn = _conn()
+        try:
+            _guard_unlocked(conn, year, "부서 계획 파일 삭제")
+            dept_plan.remove_file(conn, file_id)
+            info = dept_plan.rebuild(conn, year)
+            return {"deleted": file_id, "dataset_id": info["dataset_id"] if info else None}
+        finally:
+            conn.close()
 
 
 @app.post("/api/upload/erp")

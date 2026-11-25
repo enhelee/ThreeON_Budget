@@ -39,6 +39,8 @@ export const state = {
   alertKind: "",    // 이상 알림 종류 필터(빈 값 = 전체)
   alertsAll: false, // 이상 알림 전부 보기(기본은 위 10건)
   statsTab: "손익",       // 4번 통계 탭(손익 | 자본 | compare | report) — 연 탭 자료만 받는다
+  planTab: "merged",     // 1단계 계획 올리기 탭(merged 취합 계획 | dept 부서별 계획) — 2026-11-25
+  planDepts: null,       // /api/plan-depts — 부서별 제출 현황
   settingsTab: "year",   // 설정 화면 탭(연도·학습 | 기준정보 | 데이터셋·모델 | 이력)
   chatOpen: false,  // 오른쪽 대화 패널(components/chat.js) — 화면을 옮겨도 열린 채로 둔다
   helpOpen: false,  // 오른쪽 아래 도움말 말풍선 — 화면을 옮기면 닫는다
