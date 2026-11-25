@@ -2,7 +2,7 @@ import { openActiveSub } from "./components/sidebar.js"
 import { maybeStartTour } from "./components/tour.js"
 import { api } from "./api.js"
 import { busy, toast } from "./components/feedback.js"
-import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadStatus, loadYearConfig } from "./data.js"
+import { loadAlerts, loadReviewBrief, loadReviewQueue, loadBranches, loadDetail, loadForecastBench, loadForecastCapacity, loadForecastCompare, loadForecastGradePlan, loadForecastMeta, loadForecastRegular, loadForecastState, loadForecastTable, loadHealth, loadNavState, loadOverview, loadPlanDepts, loadStatus, loadYearConfig } from "./data.js"
 import { closeMenu } from "./main.js"
 import { state, viewMeta } from "./state.js"
 import { $, esc, fmt } from "./util.js"
@@ -55,6 +55,7 @@ export function viewHash(view, branch) {
   if (h === "forecast" && state.fc.tab && state.fc.tab !== "manage") return `#/forecast/${state.fc.tab}`;
   if (h === "stats" && STATS_HASH[state.statsTab]) return `#/stats/${STATS_HASH[state.statsTab]}`;
   if (h === "settings" && state.settingsTab && state.settingsTab !== "year") return `#/settings/${state.settingsTab}`;
+  if (h === "plan" && state.planTab === "dept") return "#/plan/dept";
   return `#/${h}`;
 }
 
@@ -73,6 +74,7 @@ export function parseHash(hash = location.hash) {
   if (view === "forecast" && FC_TABS.includes(m[2])) tab = m[2];
   if (view === "stats") tab = HASH_STATS[m[2]] || "손익";
   if (view === "settings") tab = SETTINGS_TABS.includes(m[2]) ? m[2] : "year";
+  if (view === "budget") tab = m[2] === "dept" ? "dept" : "merged";
   return {view, branch, tab};
 }
 
@@ -92,7 +94,8 @@ export function onHashChange() {
                (t.view !== "detail" || t.branch === state.det.branch) &&
                (t.view !== "forecast" || (t.tab || "manage") === (state.fc.tab || "manage")) &&
                (t.view !== "stats" || t.tab === (state.statsTab || "손익")) &&
-               (t.view !== "settings" || t.tab === (state.settingsTab || "year"));
+               (t.view !== "settings" || t.tab === (state.settingsTab || "year")) &&
+               (t.view !== "budget" || t.tab === (state.planTab || "merged"));
   if (same) return;                               // navigate() 가 방금 맞춘 주소 — 할 일 없음
   navigate(t.view, {branch: t.branch, tab: t.tab});
 }
@@ -274,6 +277,7 @@ export async function navigate(view, opts = {}) {
   }
   if (view === "stats" && opts.tab && opts.tab in STATS_HASH) state.statsTab = opts.tab;
   if (view === "settings" && opts.tab && SETTINGS_TABS.includes(opts.tab)) state.settingsTab = opts.tab;
+  if (view === "budget" && (opts.tab === "dept" || opts.tab === "merged")) state.planTab = opts.tab;
   if (view === "forecast" && opts.tab && FC_TABS.includes(opts.tab) && opts.tab !== state.fc.tab) {
     state.fc.tab = opts.tab; state.fc.preview = null;   // 주소에서 온 하위 탭 — 미리보기는 탭마다 다르니 비운다
   }
@@ -319,6 +323,7 @@ export async function navigate(view, opts = {}) {
     if (view === "forecast" && fcTab === "table") jobs.push(["중장기 전망", loadForecastTable]);
   }
   if (view === "budget" || view === "collect") jobs.push(["현황", loadStatus]);
+  if (view === "budget" && state.planTab === "dept") jobs.push(["부서별 제출 현황", loadPlanDepts]);
   if (view === "collect") later.push(["이상 알림", loadAlerts]);             // 업로드 칸 아래
   if (view === "stats") jobs.push(...statsJobs(state.statsTab));
   if (view === "settings") jobs.push(...(SETTINGS_JOBS[state.settingsTab] || SETTINGS_JOBS.year)());
@@ -439,11 +444,15 @@ export function syncAnalyzeButton() {
 // files: File 하나 또는 목록. 계획은 손익·자본·건설공사를 한 번에 올려 한 데이터셋으로 합친다.
 export async function uploadFile(kind, files) {
   const list = Array.from(files instanceof File ? [files] : files);
-  busy(true, `${{plan: "계획", "erp-invest": "투자비 전표"}[kind] || "zrfm2"} 자료${list.length > 1 ? ` ${list.length}개` : ""}를 ${state.year}년으로 DB에 흡수 중...`);
+  busy(true, `${{plan: "계획", "plan-dept": "부서 계획", "erp-invest": "투자비 전표"}[kind] || "zrfm2"} 자료${list.length > 1 ? ` ${list.length}개` : ""}를 ${state.year}년으로 DB에 흡수 중...`);
   try {
     const fd = new FormData();
     for (const f of list) fd.append("file", f);
     const info = await api(`/api/upload/${kind}?year=${state.year}`, {method: "POST", body: fd});
+    if (kind === "plan-dept") {
+      const who = [...new Set(info.saved.map(s => s.부서))].join("·");
+      toast(`${who} 계획 받음 — 전체 ${info.rows.toLocaleString()}행으로 취합 (제출 ${info.submitted}/${info.expected}개 부서)`);
+    } else
     toast(`흡수 완료 — ${info.rows.toLocaleString()}행 (dataset #${info.dataset_id})${info.실적반영켬?.length ? ` · 자본 실적 대상에 ${info.실적반영켬.join("·")} 추가 — 분석을 다시 실행하세요` : ""}`);
     await navigate(state.view);
   } catch (e) { toast(e.message); }

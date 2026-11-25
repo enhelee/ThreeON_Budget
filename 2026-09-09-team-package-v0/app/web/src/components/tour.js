@@ -9,7 +9,8 @@ import { esc } from "../util.js"
 export const TOURS = {
   budget: [
     {sel: ".step-guide", text: "예산 계획은 이 세 단계예요. 지금 할 단계가 반짝여요."},
-    {sel: '[data-action="pick-plan"]', text: "여기를 눌러 계획 엑셀을 올려요. 손익·자본·건설공사 파일을 한 번에 골라도 되고, 끌어다 놓아도 돼요."},
+    {sel: '[data-plantab="dept"]', text: "지사가 따로 낸 파일이면 «부서별 계획 올리기»에서 올려요. 앱이 합쳐 주고, 안 낸 부서도 보여 줘요."},
+    {sel: '[data-action="pick-plan"]', text: "합쳐 둔 취합 계획 엑셀은 여기를 눌러 올려요. 손익·자본·건설공사 파일을 한 번에 골라도 되고, 끌어다 놓아도 돼요."},
     {sel: ".plan-files", text: "올라간 파일이 여기 보여요. 맨 위 «지금 쓰는 파일»이 분석에 쓰여요."},
     {sel: ".next-cta", text: "다 올렸으면 이 버튼으로 다음 단계 «실적 집계»로 넘어가요."},
   ],

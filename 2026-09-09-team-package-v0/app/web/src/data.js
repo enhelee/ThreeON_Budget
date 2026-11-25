@@ -77,6 +77,10 @@ export async function loadReviewBrief() {
   catch (e) { state.rqBrief = {failed: true}; throw e; }
 }
 
+export async function loadPlanDepts() {
+  state.planDepts = await api(`/api/plan-depts?year=${state.year}`);
+}
+
 export async function loadStatus() {
   state.status = await api(`/api/status?year=${state.year}`);
 }

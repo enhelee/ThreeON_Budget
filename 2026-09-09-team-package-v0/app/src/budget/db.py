@@ -126,6 +126,19 @@ def init_db(conn):
         dataset_id INTEGER NOT NULL REFERENCES dataset(id),
         filename TEXT NOT NULL,
         content BLOB NOT NULL)""")
+    # 부서(처·지사)가 따로 낸 계획 엑셀(2026-11-25 팀장 «지사 파일만 올리면 자동 취합»).
+    # 올릴 때마다 그 해 파일 전부를 한 계획 데이터셋으로 다시 합친다(budget/dept_plan.py).
+    # 부서 = 파일 안 처지사 중 가장 많은 것, 포함부서 = 파일에 행이 있는 처지사 전부(JSON 목록).
+    cur.execute("""CREATE TABLE IF NOT EXISTS dept_plan_file(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year TEXT NOT NULL,
+        부서 TEXT NOT NULL,
+        포함부서 TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL,
+        row_count INTEGER,
+        total_amount REAL,
+        content BLOB NOT NULL)""")
     cur.execute("""CREATE TABLE IF NOT EXISTS erp_row(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dataset_id INTEGER NOT NULL REFERENCES dataset(id),
