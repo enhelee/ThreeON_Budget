@@ -30,5 +30,19 @@ for js in ("player.js", "slideshow.js"):
 old = '<hyperframes-player interactive src="composition/index.html">'
 assert old in page
 page = page.replace(old, '<hyperframes-player interactive srcdoc="' + html.escape(comp, quote=True) + '">')
+# In one file the composition is parsed from srcdoc, so the deck enters slide 1 before the opening video can
+# play and its autoplay is lost (moving to slide 2 and back fixes it). Kick it once the video is ready, and
+# again on the first click if the browser wanted a gesture first.
+KICK = """<script>(() => {
+  const ss = () => document.querySelector("hyperframes-slideshow");
+  const vid = () => { const pl = document.querySelector("hyperframes-player"); const f = pl && (pl.shadowRoot ? pl.shadowRoot.querySelector("iframe") : pl.querySelector("iframe"));
+    try { return f && f.contentDocument && f.contentDocument.getElementById("opening-v"); } catch (e) { return null; } };
+  let started = false, tries = 0;
+  const kick = () => { const v = vid(), s = ss(); if (started || !v || !s || v.readyState < 2 || !v.paused) { if (v && !v.paused) started = true; return false; }
+    try { v.currentTime = 0; const q = v.play(); if (q) q.catch(() => {}); } catch (e) {} setTimeout(() => { if (!v.paused) started = true; }, 400); return true; };
+  const t = setInterval(() => { kick(); if (started || ++tries > 120) clearInterval(t); }, 500);
+  addEventListener("pointerdown", () => { if (!started) setTimeout(kick, 50); }, true);
+})();</script>"""
+page = page.replace("</hyperframes-slideshow>", "</hyperframes-slideshow>" + KICK, 1)
 open(OUT, "w").write(page)
 print(OUT, round(os.path.getsize(OUT) / 1e6, 1), "MB")
