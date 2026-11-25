@@ -26,4 +26,18 @@ if [ -z "${DATABASE_URL:-}" ]; then
   echo "[entrypoint] INFO: DATABASE_URL 없음 → SQLite(${DATA_DIR:-/data/budget}/budget.db). 무료 PaaS는 디스크가 비영속이므로 Supabase PostgreSQL 사용을 권장." >&2
 fi
 
+# 시연·심사용(DEMO_SEED=1): 빈 DB 라면 서버가 뜬 뒤 가짜 데이터(app/demo_data)를 API 로 한 번 넣는다.
+#   실데이터가 없는 곳에서만 켠다 — DATABASE_URL(운영 PostgreSQL)이 있으면 켜도 넣지 않는다.
+#   넣은 뒤 표시 파일을 남겨 재시작 때 다시 넣지 않는다(load_demo 도 자료가 있는 DB 는 거부한다).
+if [ "${DEMO_SEED:-0}" = "1" ] && [ -z "${DATABASE_URL:-}" ] && [ ! -f "${DATA_DIR:-/data/budget}/.demo_seeded" ]; then
+  (
+    for _ in $(seq 1 60); do
+      curl -fsS "http://localhost:${PORT:-8080}/healthz" >/dev/null 2>&1 && break
+      sleep 2
+    done
+    DEMO_PASSWORD="${APP_PASSWORD:-}" python /srv/app/scripts/load_demo.py "http://localhost:${PORT:-8080}" \
+      && touch "${DATA_DIR:-/data/budget}/.demo_seeded"
+  ) &
+fi
+
 exec python -m uvicorn server:app --app-dir /srv/app --host 0.0.0.0 --port "${PORT:-8080}" --proxy-headers --forwarded-allow-ips="*" --no-server-header
